@@ -21,6 +21,7 @@ export const OBSERVATION_ORDER = [
   "masked_read",
   "egress",
   "descendant_reaped",
+  "seccomp",
 ] as const;
 
 export type ObservationName = (typeof OBSERVATION_ORDER)[number];
@@ -32,6 +33,7 @@ const OBSERVATION_LABEL: Record<ObservationName, string> = {
   masked_read: "Cannot read Raiker's own state",
   egress: "Cannot reach the network",
   descendant_reaped: "Stopping ends every descendant",
+  seccomp: "Forbidden system calls are refused",
 };
 
 const VERDICT_LABEL: Record<ProbeVerdict, string> = {

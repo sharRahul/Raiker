@@ -709,6 +709,8 @@ export const api = {
     contract.discardCredentialDelta(runId, { decision_id: decisionId }),
   // Sandbox copies: nothing a command wrote is in the project until promoted.
   taskWorkspaces: () => contract.listTaskWorkspaces(),
+  taskWorkspaceFileDiff: (workspaceId: string, path: string) =>
+    contract.taskWorkspaceFileDiff(workspaceId, { path }),
   promoteTaskWorkspace: (
     workspaceId: string,
     reviewed: { created: string[]; modified: string[]; deleted: string[] },

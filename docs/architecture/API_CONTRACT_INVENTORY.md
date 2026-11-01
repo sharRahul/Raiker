@@ -12,7 +12,7 @@ operation answers with, and whether OpenAPI describes it (OPT-01/OPT-02 —
 * **deferred** — the body has no declared type; a test fails while any is.
 * **special** — a stream, a file or another non-JSON transport; hand-written.
 
-**500 operations: 486 verified, 0 eligible, 0 deferred, 14 special.**
+**501 operations: 487 verified, 0 eligible, 0 deferred, 14 special.**
 
 | Method | Path | Request | Response | Status | Why |
 |---|---|---|---|---|---|
@@ -126,6 +126,7 @@ operation answers with, and whether OpenAPI describes it (OPT-01/OPT-02 —
 | GET | `/api/command-runs/{run_id}/receipt` |  | CommandReceiptAnswer | verified | declared CommandReceiptAnswer |
 | POST | `/api/command-runs/{run_id}/stop` |  | CommandStopped | verified | declared CommandStopped |
 | GET | `/api/command-workspaces` |  | TaskWorkspaceList | verified | declared TaskWorkspaceList |
+| GET | `/api/command-workspaces/{workspace_id}/diff` |  | TaskWorkspaceFileDiff | verified | declared TaskWorkspaceFileDiff |
 | POST | `/api/command-workspaces/{workspace_id}/discard` |  | TaskWorkspaceDiscarded | verified | declared TaskWorkspaceDiscarded |
 | POST | `/api/command-workspaces/{workspace_id}/promote` | PromoteTaskWorkspaceRequest | TaskWorkspacePromoted | verified | declared TaskWorkspacePromoted |
 | GET | `/api/connections` |  | ConnectionsView | verified | DashboardService.get_connections |

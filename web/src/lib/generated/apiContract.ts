@@ -6405,6 +6405,16 @@ export type TaskWorkspaceDiscarded = {
   workspace_id: string;
 };
 
+/** One changed file of a copy, as a unified diff against the project. */
+export type TaskWorkspaceFileDiff = {
+  workspace_id: string;
+  path: string;
+  status: "created" | "modified" | "deleted";
+  diff: string;
+  binary: boolean;
+  truncated: boolean;
+};
+
 export type TaskWorkspaceList = {
   workspaces: TaskWorkspaceView[];
 };
@@ -7127,6 +7137,8 @@ export const contract = {
     call<CommandStopped>("POST", `/api/command-runs/${encodeURIComponent(runId)}/stop`),
   listTaskWorkspaces: () =>
     request<TaskWorkspaceList>("/api/command-workspaces"),
+  taskWorkspaceFileDiff: (workspaceId: string, query: { path: string }) =>
+    request<TaskWorkspaceFileDiff>(withQuery(`/api/command-workspaces/${encodeURIComponent(workspaceId)}/diff`, query)),
   discardTaskWorkspace: (workspaceId: string) =>
     call<TaskWorkspaceDiscarded>("POST", `/api/command-workspaces/${encodeURIComponent(workspaceId)}/discard`),
   promoteTaskWorkspace: (workspaceId: string, body: PromoteTaskWorkspaceRequest) =>

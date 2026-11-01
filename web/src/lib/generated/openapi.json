@@ -33240,6 +33240,50 @@
         "title": "TaskWorkspaceDiscarded",
         "type": "object"
       },
+      "TaskWorkspaceFileDiff": {
+        "description": "One changed file of a copy, as a unified diff against the project.\n\n``binary`` is true when either side is not text, and then ``diff`` is\nempty; ``truncated`` says the diff was cut at its size bound.",
+        "properties": {
+          "binary": {
+            "title": "Binary",
+            "type": "boolean"
+          },
+          "diff": {
+            "title": "Diff",
+            "type": "string"
+          },
+          "path": {
+            "title": "Path",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "created",
+              "modified",
+              "deleted"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "truncated": {
+            "title": "Truncated",
+            "type": "boolean"
+          },
+          "workspace_id": {
+            "title": "Workspace Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "workspace_id",
+          "path",
+          "status",
+          "diff",
+          "binary",
+          "truncated"
+        ],
+        "title": "TaskWorkspaceFileDiff",
+        "type": "object"
+      },
       "TaskWorkspaceList": {
         "properties": {
           "workspaces": {
@@ -40293,6 +40337,57 @@
           }
         },
         "summary": "List Task Workspaces"
+      }
+    },
+    "/api/command-workspaces/{workspace_id}/diff": {
+      "get": {
+        "description": "One changed file's unified diff, project against copy, for review.\n\nOnly a path in the copy's change set is answered, so this reads nothing\nthe review does not already list.",
+        "operationId": "task_workspace_file_diff_api_command_workspaces__workspace_id__diff_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "workspace_id",
+            "required": true,
+            "schema": {
+              "title": "Workspace Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "path",
+            "required": true,
+            "schema": {
+              "maxLength": 4096,
+              "minLength": 1,
+              "title": "Path",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskWorkspaceFileDiff"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Task Workspace File Diff"
       }
     },
     "/api/command-workspaces/{workspace_id}/discard": {

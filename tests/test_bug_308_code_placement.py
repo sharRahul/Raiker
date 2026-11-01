@@ -272,7 +272,7 @@ class TestThePluginCardSaysWhereItsCodeRuns:
         monkeypatch.delenv("RAIKER_PLUGIN_RUNTIME_ALLOWLIST", raising=False)
         assert plugin_code_runtime("demo")["where"] == "not_enabled"
 
-    def test_with_no_container_it_reports_execution_blocked(
+    def test_an_allowlisted_plugin_runs_in_the_native_sandbox_never_the_host(
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         from raiker.runtime.executors.tier4_plugins import plugin_code_runtime
@@ -280,7 +280,7 @@ class TestThePluginCardSaysWhereItsCodeRuns:
         monkeypatch.setenv("RAIKER_PLUGIN_RUNTIME_ALLOWLIST", "demo")
         monkeypatch.delenv("RAIKER_PLUGIN_RUNTIME_IMAGE", raising=False)
         answer = plugin_code_runtime("demo")
-        assert answer["where"] == "not_enabled"
+        assert answer["where"] == "native_sandbox"
         assert "native sandbox" in answer["summary"]
 
 

@@ -1,10 +1,11 @@
 from __future__ import annotations
 
 import contextlib
+import difflib
 import json
 from dataclasses import asdict
 from pathlib import Path
-from typing import Any, NoReturn, cast
+from typing import Any, Literal, NoReturn, cast
 
 from fastapi import APIRouter, Depends, Query, Request, status
 
@@ -26,6 +27,7 @@ from raiker.api.wire.commands import (
     CredentialDeltaList,
     CredentialDeltaView,
     TaskWorkspaceDiscarded,
+    TaskWorkspaceFileDiff,
     TaskWorkspaceList,
     TaskWorkspacePromoted,
     TaskWorkspaceView,
@@ -339,6 +341,79 @@ def list_task_workspaces(
         ]
     }
     return serialize_dto(listed)
+
+
+#: A copy's file diff is cut at this size, and says so.
+_FILE_DIFF_MAX_BYTES = 200_000
+
+
+def _text_side(path: Path) -> tuple[str, bool]:
+    """A file's text for a diff, or ``("", True)`` when it is not text."""
+    from raiker.execution.workspaces import _path_is_link_like  # noqa: PLC0415
+
+    if _path_is_link_like(path) or not path.is_file():
+        return "", False
+    with path.open("rb") as handle:
+        data = handle.read(_FILE_DIFF_MAX_BYTES * 4)
+    if b"\0" in data:
+        return "", True
+    return data.decode("utf-8", errors="replace"), False
+
+
+@router.get("/api/command-workspaces/{workspace_id}/diff")
+def task_workspace_file_diff(
+    workspace_id: str,
+    request: Request,
+    path: str = Query(..., min_length=1, max_length=4096),
+    auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+) -> dict[str, Any]:
+    """One changed file's unified diff, project against copy, for review.
+
+    Only a path in the copy's change set is answered, so this reads nothing
+    the review does not already list.
+    """
+    from raiker.execution.workspaces import _target  # noqa: PLC0415
+
+    owner = auth_data[0].principal_id
+    try:
+        workspace = _workspaces(request).load(owner, workspace_id)
+    except WorkspaceError as exc:
+        raise refusal(status.HTTP_404_NOT_FOUND, exc.reason_code) from exc
+    diff = diff_workspace(workspace)
+    if path in diff.created:
+        kind: Literal["created", "modified", "deleted"] = "created"
+    elif path in diff.modified:
+        kind = "modified"
+    elif path in diff.deleted:
+        kind = "deleted"
+    else:
+        raise refusal(status.HTTP_404_NOT_FOUND, "workspace_path_unchanged")
+    try:
+        original = _target(workspace.source, path)
+    except WorkspaceError as exc:
+        raise refusal(status.HTTP_409_CONFLICT, exc.reason_code) from exc
+    before, before_binary = ("", False) if kind == "created" else _text_side(original)
+    after, after_binary = (
+        ("", False) if kind == "deleted" else _text_side(workspace.root / path)
+    )
+    binary = before_binary or after_binary
+    text = "" if binary else "".join(
+        difflib.unified_diff(
+            before.splitlines(keepends=True),
+            after.splitlines(keepends=True),
+            fromfile="/dev/null" if kind == "created" else f"a/{path}",
+            tofile="/dev/null" if kind == "deleted" else f"b/{path}",
+        )
+    )
+    answer: TaskWorkspaceFileDiff = {
+        "workspace_id": workspace_id,
+        "path": path,
+        "status": kind,
+        "diff": text[:_FILE_DIFF_MAX_BYTES],
+        "binary": binary,
+        "truncated": len(text) > _FILE_DIFF_MAX_BYTES,
+    }
+    return serialize_dto(answer)
 
 
 @router.post("/api/command-workspaces/{workspace_id}/promote")

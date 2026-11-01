@@ -209,6 +209,7 @@ VERIFIED: frozenset[tuple[str, str]] = frozenset(
         ("GET", "/api/command-egress"),
         ("PUT", "/api/command-egress"),
         ("GET", "/api/command-workspaces"),
+        ("GET", "/api/command-workspaces/{workspace_id}/diff"),
         ("POST", "/api/command-workspaces/{workspace_id}/discard"),
         ("POST", "/api/command-workspaces/{workspace_id}/promote"),
         ("GET", "/api/command-runs/{run_id}"),

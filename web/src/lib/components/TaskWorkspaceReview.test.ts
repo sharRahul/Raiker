@@ -72,3 +72,33 @@ it("rereads the copy when a turn ends", async () => {
   expect(await screen.findByText("Sandbox changes · app")).toBeInTheDocument();
   expect(list).toHaveBeenCalledTimes(2);
 });
+
+it("opens one changed file's diff from the review, and closes it again", async () => {
+  vi.spyOn(api, "taskWorkspaces").mockResolvedValue({ workspaces: [copy] });
+  const read = vi.spyOn(api, "taskWorkspaceFileDiff").mockResolvedValue({
+    workspace_id: copy.workspace_id, path: "main.py", status: "modified",
+    diff: "--- a/main.py\n+++ b/main.py\n@@ -1 +1 @@\n-print('a')\n+print('b')\n",
+    binary: false, truncated: false,
+  });
+  render(TaskWorkspaceReview, { sessionId: "sess_build" });
+
+  const file = await screen.findByRole("button", { name: /Changed main\.py/ });
+  await fireEvent.click(file);
+
+  const diff = await screen.findByLabelText("Changes to main.py");
+  expect(read).toHaveBeenCalledWith(copy.workspace_id, "main.py");
+  expect(diff).toHaveTextContent("+print('b')");
+  expect(file).toHaveAttribute("aria-expanded", "true");
+  await fireEvent.click(file);
+  expect(screen.queryByLabelText("Changes to main.py")).not.toBeInTheDocument();
+});
+
+it("says a binary file has no line-by-line view", async () => {
+  vi.spyOn(api, "taskWorkspaces").mockResolvedValue({ workspaces: [copy] });
+  vi.spyOn(api, "taskWorkspaceFileDiff").mockResolvedValue({
+    workspace_id: copy.workspace_id, path: "new.py", status: "created", diff: "", binary: true, truncated: false,
+  });
+  render(TaskWorkspaceReview, { sessionId: "sess_build" });
+  await fireEvent.click(await screen.findByRole("button", { name: /Added new\.py/ }));
+  expect(await screen.findByText(/Not a text file/)).toBeInTheDocument();
+});

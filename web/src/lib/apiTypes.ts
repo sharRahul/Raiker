@@ -54,6 +54,7 @@ import type {
   ConversionPreview,
   CredentialDeltaView,
   TaskWorkspaceView,
+  TaskWorkspaceFileDiff,
   CommandEgressView,
   CredentialLifecycleView,
   CriticalApprovalResolved,
@@ -782,7 +783,7 @@ export type { CommandReceiptView };
 
 export type { CredentialDeltaView };
 
-export type { TaskWorkspaceView };
+export type { TaskWorkspaceView, TaskWorkspaceFileDiff };
 
 export type { CommandEgressView };
 

@@ -328,6 +328,10 @@ def _task_copies(ws: Path, _client: TestClient, _h: dict[str, str]) -> Call:
     return "/api/command-workspaces"
 
 
+def _task_copy_diff(ws: Path, _client: TestClient, _h: dict[str, str]) -> Call:
+    return f"/api/command-workspaces/{_task_copy(ws)}/diff?path=main.py"
+
+
 def _task_copy_promoted(ws: Path, _client: TestClient, _h: dict[str, str]) -> Call:
     return f"/api/command-workspaces/{_task_copy(ws)}/promote", {
         "created": [], "modified": ["main.py"], "deleted": [],
@@ -705,6 +709,7 @@ CASES: Cases = {
     ("GET", "/api/command-egress"): plain("/api/command-egress"),
     ("PUT", "/api/command-egress"): plain("/api/command-egress", {"enabled": True, "domains": ["pypi.org"]}),
     ("GET", "/api/command-workspaces"): _task_copies,
+    ("GET", "/api/command-workspaces/{workspace_id}/diff"): _task_copy_diff,
     ("POST", "/api/command-workspaces/{workspace_id}/promote"): _task_copy_promoted,
     ("POST", "/api/command-workspaces/{workspace_id}/discard"): _task_copy_discarded,
     ("GET", "/api/credential-deltas"): _deltas,

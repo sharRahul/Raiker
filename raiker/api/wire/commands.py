@@ -147,6 +147,21 @@ class TaskWorkspaceList(TypedDict):
     workspaces: list[TaskWorkspaceView]
 
 
+class TaskWorkspaceFileDiff(TypedDict):
+    """One changed file of a copy, as a unified diff against the project.
+
+    ``binary`` is true when either side is not text, and then ``diff`` is
+    empty; ``truncated`` says the diff was cut at its size bound.
+    """
+
+    workspace_id: str
+    path: str
+    status: Literal["created", "modified", "deleted"]
+    diff: str
+    binary: bool
+    truncated: bool
+
+
 class TaskWorkspacePromoted(TypedDict):
     ok: bool
     workspace_id: str

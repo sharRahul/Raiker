@@ -147,3 +147,30 @@ def test_another_principals_copy_reads_as_missing(
     assert root.exists()
     malformed = client.post("/api/command-workspaces/..%2F..%2Fx/discard", headers=headers)
     assert malformed.status_code == 404
+
+
+def test_each_changed_file_reads_as_a_unified_diff_against_the_project(
+    client: TestClient, headers: dict[str, str], workspace: Path
+) -> None:
+    key, root = _task_copy(workspace)
+    (root / "blob.bin").write_bytes(b"\x00\x01")
+
+    def diff(path: str) -> dict[str, object]:
+        answer = client.get(
+            f"/api/command-workspaces/{key}/diff", params={"path": path}, headers=headers
+        )
+        assert answer.status_code == 200, answer.text
+        return dict(answer.json())
+
+    modified = diff("main.py")
+    assert modified["status"] == "modified"
+    assert "-print('v1')" in str(modified["diff"]) and "+print('v2')" in str(modified["diff"])
+    assert str(diff("new.py")["diff"]).startswith("--- /dev/null")
+    assert "-old" in str(diff("old.txt")["diff"])
+    assert diff("blob.bin")["binary"] is True
+    # Only what the review lists: an unchanged file, or a way out, reads as missing.
+    for path in ("unchanged.txt", "../outside.txt"):
+        refused = client.get(
+            f"/api/command-workspaces/{key}/diff", params={"path": path}, headers=headers
+        )
+        assert refused.status_code == 404

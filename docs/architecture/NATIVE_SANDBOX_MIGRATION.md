@@ -251,6 +251,18 @@ the default gateway, and hosted CI networks drop that packet, so egress read
 `indeterminate` and every sandboxed command there was refused. It now connects
 to a listener on the host's own outward address for the length of the probe.
 
+## Reviewing a copy, and the sandbox card (2026-11-01)
+
+Each file in Build's *Sandbox changes* review opens as a unified diff against
+the project (`GET /api/command-workspaces/{workspace_id}/diff?path=`). Only a
+path in the copy's change set is answered; a binary side says so instead of
+showing bytes, and a long diff is cut at 200 KB and says so. The Settings card
+for the local sandbox now lists the seccomp observation too (Linux), with a
+failed control arm shown as *Not proven*. Covered by
+`tests/test_task_workspace_api.py`, `TaskWorkspaceReview.test.ts` and the
+mocked Playwright test *the local sandbox card shows each measured control and
+the downloads allow-list*.
+
 ## Project setup with project-local dependencies (2026-11-01)
 
 A task copy is set up with the project's own tools, and what they install

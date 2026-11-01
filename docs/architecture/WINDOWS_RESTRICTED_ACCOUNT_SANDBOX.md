@@ -130,7 +130,14 @@ and the profile-escape refusal; CI's Windows job now runs setup and requires it.
   command that started it. The WSL2 backend (a private network namespace, the
   same as Claude Code's Linux sandbox) has neither. The probe reports a
   `loopback` row against an owner listener on a fixed port, and
-  `own_loopback`; reported, not yet required. The download proxy binds
+  `own_loopback`; reported, not yet required. **Measured on Windows 11
+  (2026-11-01, setup rerun with this filter):** every probe row enforced,
+  `loopback` included, and `own_loopback` true; the account reached a
+  proxy-range port and a port-0 server and not a fixed-port owner listener
+  (`tests/windows_account.rs`, 10/10); inside the sandbox a Python 3.13
+  asyncio program served and connected on its own port 55278 while its
+  connection to Raiker's port 8765 was refused with `PermissionError` (the
+  WFP block, not a closed port). The download proxy binds
   exclusively within 47300–47363. A local service of the owner's that listens
   on a proxy-range port is reachable.
 * **Explicit grants under denied drives:** an explicit allow on a folder below a

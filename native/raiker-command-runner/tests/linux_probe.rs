@@ -593,20 +593,31 @@ fn an_interactive_run_sees_a_terminal_inside_bubblewrap() {
     };
     assert_eq!(opened, 0);
     let stdio = |fd: i32| unsafe { Stdio::from_raw_fd(libc::dup(fd)) };
-    let mut child = Command::new(&runner)
-        .arg("--policy")
-        .arg(&policy_path)
-        .arg("--")
-        .args([
-            "/usr/bin/python3",
-            "-c",
-            "import os; print('tty', os.isatty(0), os.isatty(1))",
-        ])
-        .stdin(stdio(slave))
-        .stdout(stdio(slave))
-        .stderr(stdio(slave))
-        .spawn()
-        .unwrap();
+    // A test running in parallel may fork while the runner copy is still
+    // open for writing; exec then fails with ETXTBSY until that child execs.
+    let mut attempts = 0;
+    let mut child = loop {
+        let spawned = Command::new(&runner)
+            .arg("--policy")
+            .arg(&policy_path)
+            .arg("--")
+            .args([
+                "/usr/bin/python3",
+                "-c",
+                "import os; print('tty', os.isatty(0), os.isatty(1))",
+            ])
+            .stdin(stdio(slave))
+            .stdout(stdio(slave))
+            .stderr(stdio(slave))
+            .spawn();
+        match spawned {
+            Err(error) if error.raw_os_error() == Some(libc::ETXTBSY) && attempts < 20 => {
+                attempts += 1;
+                std::thread::sleep(std::time::Duration::from_millis(50));
+            }
+            other => break other.unwrap(),
+        }
+    };
     unsafe { libc::close(slave) };
     let status = child.wait().unwrap();
     let mut file = unsafe { std::fs::File::from_raw_fd(master) };

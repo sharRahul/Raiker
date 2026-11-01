@@ -241,11 +241,10 @@ fn runs_in_one_copy_overlap_while_another_copy_waits_for_the_grant() {
     let cmd = r"C:\Windows\System32\cmd.exe";
     let first = copy_under(&base, "overlap-a");
     let second = copy_under(&base, "overlap-b");
-    let long = spawn(&first, "long", 60, &[ping, "-n", "8", "127.0.0.1"]);
+    let mut long = spawn(&first, "long", 90, &[ping, "-n", "25", "127.0.0.1"]);
     std::thread::sleep(std::time::Duration::from_secs(2));
 
-    // Same copy: starts at once beside the long run.
-    let started = std::time::Instant::now();
+    // Same copy: runs to completion beside the long run.
     let same = spawn(&first, "same", 30, &[cmd, "/c", "echo same"])
         .wait_with_output()
         .unwrap();
@@ -254,7 +253,10 @@ fn runs_in_one_copy_overlap_while_another_copy_waits_for_the_grant() {
         "{}",
         String::from_utf8_lossy(&same.stderr)
     );
-    assert!(started.elapsed() < std::time::Duration::from_secs(4));
+    assert!(
+        long.try_wait().unwrap().is_none(),
+        "the same-copy run waited for the long run instead of overlapping it"
+    );
 
     // Another copy: the account may hold only one copy's grant, so a run
     // whose wait ends before the long run does is refused, never granted.

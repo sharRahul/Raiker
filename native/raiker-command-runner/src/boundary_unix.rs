@@ -69,12 +69,22 @@ pub fn probe(workspace: &Path) -> Value {
         return unavailable("native_sandbox_probe_storage_unavailable");
     }
 
+    // Held open until both arms have run; dropped with this scope.
+    #[cfg(target_os = "linux")]
+    let _listener = local_listener();
+    #[cfg(target_os = "linux")]
+    let connect_address = _listener
+        .as_ref()
+        .map(|(_, address)| address.clone())
+        .unwrap_or_else(probe_destination);
+    #[cfg(not(target_os = "linux"))]
+    let connect_address = probe_destination();
     let test = SelfTest {
         nonce: nonce.clone(),
         inside_path: workspace.join(format!(".{nonce}-inside.tmp")),
         outside_paths: outside_targets(&workspace, &nonce),
         masked_read_path: masked.clone(),
-        connect_address: probe_destination(),
+        connect_address,
         // macOS has no verified descendant reaper yet; starting a detached
         // probe child there would leave it running after every status check.
         spawn_grandchild: cfg!(target_os = "linux"),
@@ -768,6 +778,28 @@ fn probe_destination() -> String {
     )
 }
 
+/// A listener on this host's own outward address, never loopback.
+///
+/// Some networks silently drop a packet to a closed gateway port, which leaves
+/// the control arm without an answer and the egress row indeterminate. A
+/// listener here answers the outside arm on every network, and no packet
+/// leaves the machine. Inside a fresh network namespace that address does not
+/// exist, so the inside arm cannot reach it. The route lookup on an unbound
+/// UDP socket sends nothing.
+#[cfg(target_os = "linux")]
+fn local_listener() -> Option<(std::net::TcpListener, String)> {
+    let gateway = default_gateway()?;
+    let route = std::net::UdpSocket::bind("0.0.0.0:0").ok()?;
+    route.connect(format!("{gateway}:9")).ok()?;
+    let ip = route.local_addr().ok()?.ip();
+    if ip.is_loopback() || ip.is_unspecified() {
+        return None;
+    }
+    let listener = std::net::TcpListener::bind((ip, 0)).ok()?;
+    let address = listener.local_addr().ok()?.to_string();
+    Some((listener, address))
+}
+
 fn default_gateway() -> Option<String> {
     let text = std::fs::read_to_string("/proc/net/route").ok()?;
     parse_default_gateway(&text)
@@ -1240,6 +1272,20 @@ mod tests {
             output.status.success(),
             "{}",
             String::from_utf8_lossy(&output.stderr)
+        );
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn the_local_listener_is_never_loopback_and_answers_from_outside() {
+        let Some((_listener, address)) = local_listener() else {
+            return; // no default route: the gateway fallback applies
+        };
+        let target: std::net::SocketAddr = address.parse().unwrap();
+        assert!(!target.ip().is_loopback());
+        assert!(
+            std::net::TcpStream::connect_timeout(&target, std::time::Duration::from_secs(2))
+                .is_ok()
         );
     }
 

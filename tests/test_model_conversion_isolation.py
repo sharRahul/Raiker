@@ -93,9 +93,7 @@ def test_a_real_conversion_runs_in_the_sandbox_and_writes_only_its_results(
 
     if not sys.platform.startswith("linux"):
         pytest.skip("the boundary mounts a model read-only on Linux only")
-    probe_root = NativeConversionRunner.STATE
-    probe_root.mkdir(parents=True, exist_ok=True)
-    if not NativeSandboxDriver(probe_root).probe().available:
+    if not NativeSandboxDriver(NativeConversionRunner.state_dir()).probe().available:
         pytest.skip("no enforced native boundary on this host")
     source, output = _snapshot(tmp_path)
     toolchain = tmp_path / "llama.cpp"
@@ -129,3 +127,25 @@ def test_a_real_conversion_runs_in_the_sandbox_and_writes_only_its_results(
     assert sorted(path.name for path in output.iterdir()) == sorted(
         [result.name, result.name.replace("Q4_K_M", "bf16"), f"{result.name}.provenance.json"]
     )
+
+
+def test_conversion_state_that_others_could_write_is_refused(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import sys
+
+    from raiker.models.conversion import NativeConversionRunner
+
+    if sys.platform == "win32":
+        pytest.skip("POSIX ownership and modes")
+    monkeypatch.setattr(Path, "home", staticmethod(lambda: tmp_path))
+    state = NativeConversionRunner.state_dir()
+    assert state == tmp_path / ".cache" / "raiker" / "conversion"
+    state.chmod(0o777)
+    with pytest.raises(ConversionRefused, match="model_conversion_state_unsafe"):
+        NativeConversionRunner.state_dir()
+    state.chmod(0o700)
+    state.rmdir()
+    state.symlink_to(tmp_path)
+    with pytest.raises(ConversionRefused, match="model_conversion_state_unsafe"):
+        NativeConversionRunner.state_dir()

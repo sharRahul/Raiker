@@ -13,9 +13,9 @@ import hashlib
 import json
 import os
 import shutil
+import stat
 import subprocess
 import sys
-import tempfile
 import time
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -155,9 +155,27 @@ class NativeConversionRunner:
     this refuses rather than copying gigabytes or widening the boundary.
     """
 
-    #: Where the boundary keeps its own state for conversions; never the
-    #: owner's model library.
-    STATE = Path(tempfile.gettempdir()) / "raiker-conversion"
+    @staticmethod
+    def state_dir() -> Path:
+        """Where the boundary keeps its state for conversions: private to this user.
+
+        Not a shared temporary folder: the runner's policies are written here,
+        and a folder another local user could create first (or replace with a
+        link) would let them rewrite one. Each level is created owner-only and
+        refused if it is a link, someone else's, or readable by others.
+        """
+        base = Path.home() / ".cache" / "raiker"
+        base.parent.mkdir(parents=True, exist_ok=True)
+        for path in (base, base / "conversion"):
+            path.mkdir(mode=0o700, exist_ok=True)
+            info = os.lstat(path)
+            if (
+                stat.S_ISLNK(info.st_mode)
+                or info.st_uid != os.getuid()
+                or info.st_mode & 0o077
+            ):
+                raise ConversionRefused("model_conversion_state_unsafe")
+        return base / "conversion"
 
     def __init__(self, toolchain: LlamaCppToolchain) -> None:
         self.toolchain = toolchain
@@ -175,10 +193,10 @@ class NativeConversionRunner:
         source, output = Path(preview.source), Path(preview.output)
         intermediate, result = _output_paths(preview)
         isolation = preview.isolation
-        self.STATE.mkdir(parents=True, exist_ok=True)
+        state = self.state_dir()
         try:
             with scratch_run(
-                self.STATE, "convert", timeout_seconds=isolation.timeout_seconds,
+                state, "convert", timeout_seconds=isolation.timeout_seconds,
                 memory_bytes=isolation.max_memory_bytes,
             ) as run:
                 scratch_bf16 = run.folder / "model.bf16.gguf"

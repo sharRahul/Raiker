@@ -101,7 +101,11 @@ class NativeSandboxProof:
         does the Windows restricted account (a kill-on-close Job Object owns
         the tree; runs in one copy may overlap, other copies wait). Only
         Bubblewrap offers a terminal: `CreateProcessWithLogonW` cannot attach
-        a pseudo-console. macOS cannot yet contain a detached descendant.
+        a pseudo-console. On macOS the sandbox account owns every process a
+        run starts, so the run's tree stops with it (`macos_account`); plain
+        Seatbelt cannot contain a detached descendant. Background runs stay
+        off there for now: the account serves one run at a time, so a
+        background run would hold every other command.
         """
         tree_stop = self.observations.get("descendant_reaped") == ENFORCED
         terminal = tree_stop and self.boundary == "bubblewrap"
@@ -325,8 +329,14 @@ class NativeSandboxDriver:
         return directory / f"{request.run_id}.json"
 
     def account_base(self) -> Path | None:
-        """The restricted-account copy base, when the owner has set it up (Windows)."""
-        if sys.platform != "win32":
+        """The sandbox account's copy base, when the owner has set it up.
+
+        Windows: the restricted account (`C:\\RaikerSandbox`). macOS: the
+        `_raikersandbox` account (`/Library/RaikerSandbox/copies`), whose
+        ownership of every process a run starts is what stops detached
+        descendants there.
+        """
+        if sys.platform not in {"win32", "darwin"}:
             return None
         binary, _ = self.locate()
         if binary is None:

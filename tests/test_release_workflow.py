@@ -190,6 +190,9 @@ def test_a_release_requires_the_sandbox_enforcement_tests_on_every_platform() ->
     for platform in platforms:
         assert f'"{platform}"' in gate, f"{platform} is tested in CI but not required here"
     assert "refused:" in gate
+    # Only Actions' own runs count, and the newest run per name decides.
+    assert 'app != "github-actions"' in gate
+    assert "filter=all" in gate and "run_id > latest[name][0]" in gate
 
 
 def test_every_published_download_is_signed_with_the_repository_identity() -> None:

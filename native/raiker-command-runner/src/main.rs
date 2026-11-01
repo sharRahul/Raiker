@@ -24,6 +24,12 @@
 //! * `--egress-bridge <socket> <port> -- <argv>` — Linux only, started by the
 //!   boundary *inside* the sandbox: forwards the namespace's loopback port to
 //!   Raiker's egress proxy socket, the command's only network route.
+//! * `--setup-account [--owner-uid <uid>]`, `--reset-account`,
+//!   `--account-status` — the dedicated sandbox account (Windows: elevated;
+//!   macOS: as root, once, with the owner's approval).
+//! * `--account-run <handoff>` — macOS only, started by `sudo` *as* the
+//!   sandbox account: reads the run's handoff, starts Seatbelt and supervises
+//!   the run's memory and lifetime.
 //! * `--linger <marker>` — the probe's detached grandchild, which exists to
 //!   prove containment reaches descendants and not merely the first executable.
 
@@ -75,6 +81,11 @@ fn dispatch(arguments: &[String]) -> Result<i32, String> {
         Some("--probe") => {
             let workspace =
                 named(arguments, "--workspace").ok_or("runner_probe_workspace_required")?;
+            #[cfg(target_os = "macos")]
+            if named(arguments, "--boundary").as_deref() == Some("seatbelt") {
+                println!("{}", boundary::probe_kernel_sandbox(Path::new(&workspace)));
+                return Ok(0);
+            }
             #[cfg(windows)]
             if named(arguments, "--boundary").as_deref() == Some("appcontainer") {
                 println!("{}", boundary::probe_appcontainer(Path::new(&workspace)));
@@ -88,6 +99,33 @@ fn dispatch(arguments: &[String]) -> Result<i32, String> {
                 named(arguments, "--workspace").ok_or("runner_probe_workspace_required")?;
             boundary::revoke_workspace_grant(Path::new(&workspace))?;
             return Ok(0);
+        }
+        #[cfg(target_os = "macos")]
+        Some("--setup-account") => {
+            let owner = match named(arguments, "--owner-uid") {
+                Some(text) => Some(text.parse().map_err(|_| "runner_arguments_invalid")?),
+                None => None,
+            };
+            println!("{}", boundary::account::setup(owner)?);
+            return Ok(0);
+        }
+        #[cfg(target_os = "macos")]
+        Some("--reset-account") => {
+            boundary::account::reset()?;
+            return Ok(0);
+        }
+        #[cfg(target_os = "macos")]
+        Some("--account-status") => {
+            println!("{}", boundary::account::status());
+            return Ok(0);
+        }
+        #[cfg(target_os = "macos")]
+        Some("--account-run") => {
+            let handoff = arguments.get(1).ok_or("runner_arguments_invalid")?;
+            if arguments.len() != 2 {
+                return Err("runner_arguments_invalid".into());
+            }
+            return boundary::account::account_run(Path::new(handoff));
         }
         #[cfg(windows)]
         Some("--setup-account") => {
@@ -157,6 +195,12 @@ fn dispatch(arguments: &[String]) -> Result<i32, String> {
         std::fs::read_to_string(PathBuf::from(path)).map_err(|_| "runner_policy_unreadable")?;
     let launch = policy::parse(&text)?;
     policy::validate_filesystem_paths(&launch)?;
+    // A copy in the sandbox account's base runs as that account (macOS);
+    // everything else keeps plain Seatbelt.
+    #[cfg(target_os = "macos")]
+    if boundary::account::owns(&launch) {
+        return boundary::account::launch(&launch, &text, argv);
+    }
     boundary::launch(&launch, argv)
 }
 

@@ -110,13 +110,23 @@ jobs:
           import json, os, subprocess, sys
           required = {f"Native runner ({os_})" for os_ in
                       ("ubuntu-24.04", "windows-2025", "macos-15", "macos-15-intel")}
+          # Only GitHub Actions' own check runs count: another app with
+          # checks:write could post a run under the same name. A job re-run
+          # adds a newer run, so the latest one per name decides; an old pass
+          # never outlives a later failure.
           out = subprocess.run(
               ["gh", "api", "--paginate",
-               f"repos/{os.environ['GH_REPO']}/commits/{os.environ['SHA']}/check-runs",
-               "--jq", ".check_runs[] | [.name, .conclusion]"],
+               f"repos/{os.environ['GH_REPO']}/commits/{os.environ['SHA']}/check-runs?filter=all",
+               "--jq", ".check_runs[] | [.name, .app.slug, .id, .conclusion]"],
               check=True, capture_output=True, text=True).stdout
-          passed = {name for name, conclusion in map(json.loads, out.splitlines())
-                    if name in required and conclusion == "success"}
+          latest = {}
+          for name, app, run_id, conclusion in map(json.loads, out.splitlines()):
+              if app != "github-actions" or name not in required:
+                  continue
+              if name not in latest or run_id > latest[name][0]:
+                  latest[name] = (run_id, conclusion)
+          passed = {name for name, (_, conclusion) in latest.items()
+                    if conclusion == "success"}
           missing = sorted(required - passed)
           if missing:
               sys.exit("refused: sandbox enforcement tests have not passed on this "
@@ -288,7 +298,7 @@ jobs:
       # Keyless signing with this repository's GitHub identity: Sigstore
       # binds each file's digest to this workflow, commit and run, and the
       # signature is logged publicly. Owners check a download with
-      # `gh attestation verify <file> --repo {{ github.repository }}`; the
+      # `gh attestation verify <file> --repo sharRahul/Raiker`; the
       # next step does exactly that before the draft exists.
       - name: Sign the downloads with the repository's GitHub identity
         uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
@@ -382,7 +392,7 @@ jobs:
       # Keyless signing with this repository's GitHub identity: Sigstore
       # binds each file's digest to this workflow, commit and run, and the
       # signature is logged publicly. Owners check a download with
-      # `gh attestation verify <file> --repo {{ github.repository }}`; the
+      # `gh attestation verify <file> --repo sharRahul/Raiker`; the
       # next step does exactly that before the draft exists.
       - name: Sign the downloads with the repository's GitHub identity
         uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2

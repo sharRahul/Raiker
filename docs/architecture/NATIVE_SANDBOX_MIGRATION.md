@@ -245,8 +245,9 @@ All four native runner jobs pass: `ubuntu-24.04`, `windows-2025`, `macos-15` and
 
 These are boundary measurements, not release evidence: native execution remains
 unavailable until disposable workspaces are wired in (see `TO_BE_FIXED.md`).
-The Python suite still has the same 189 pre-migration host-execution failures
-it had before Docker was removed; none are new.
+At that commit the Python suite still had 189 pre-migration host-execution
+failures. They were migrated as each feature came back: every Python shard
+passes on the PR's final commit (`f0163aad`).
 
 ## Open designs: macOS containment and a WSL2 backend (2026-11-01)
 
@@ -276,6 +277,56 @@ assumed). Allow-listed downloads would stay off in this mode at first: a
 Windows `AF_UNIX` proxy socket is not reachable from a WSL2 namespace. The
 restricted-account boundary already runs Windows toolchains, so this is an
 addition for Linux toolchains, not a gap in containment.
+
+## macOS sandbox account (2026-11-01, implemented; CI evidence pending)
+
+Built as designed above, with `sudo` in place of a privileged helper. A
+helper (`SMAppService`/`SMJobBless`) must be Developer ID signed, which would
+have made this wait for the Apple certificate; a `sudoers` drop-in does not.
+
+`sudo raiker-command-runner --setup-account` (once, administrator password):
+
+* creates the hidden role account and group `_raikersandbox` (first free id in
+  400–499, shell `/usr/bin/false`, home `/var/empty`, no password);
+* installs this runner root-owned at `/Library/RaikerSandbox/bin/`, with every
+  ancestor root-owned, so only root can change what `sudoers` names;
+* creates the copy base `/Library/RaikerSandbox/copies`, owned by the owner,
+  `0700`, with one ACL entry letting the account *search* it (not list it);
+* writes `/etc/sudoers.d/raiker-sandbox`, checked with `visudo -c` before it
+  goes live: the owner may run, as the account only, the installed runner's
+  `--account-run` and `/bin/kill -9 -1`. Nothing as root.
+
+A run in a copy under the base (`account::owns`): the owner side takes a
+machine-wide lock the account cannot open, kills anything the account still
+has (a crashed run), grants the account that one copy (inheritable ACL entries;
+the owner gets an inheritable entry too, so what the account creates can be
+reviewed, applied and deleted), writes a handoff file into the copy, and
+starts `sudo -n -u _raikersandbox <installed runner> --account-run <handoff>`.
+The account side checks its identity, reads and deletes the handoff, starts
+`sandbox-exec` with the same profile as before, and supervises: it sums
+`ri_phys_footprint` over the account's processes every 50 ms and kills all of
+them (`kill(-1)`) past `max_memory_bytes`, at the deadline, or when the owner
+side is gone. When the run ends the owner side runs `kill -9 -1` as the account
+— every descendant, detached or not — checks none survived, and removes the
+copy's grant. `RLIMIT_NPROC` is per user, which is exactly this run.
+
+`setup` refuses without root; `--reset-account` removes the `sudoers` rule
+first, then the account and installed runner, and leaves copies (they can hold
+unreviewed work). After a Raiker update, `--account-status` reports
+`runner_current: false` and the boundary is unavailable until setup is run
+again — the price of `sudoers` naming a root-owned binary.
+
+The probe measures the account boundary when it is configured (`boundary:
+macos_account`), including `descendant_reaped` from a real `setsid` grandchild;
+`--boundary seatbelt` still measures plain Seatbelt. `tests/macos_account.rs`
+covers identity, copy isolation, grant removal, a double-forked `setsid`
+descendant and the memory limit (with a control arm under a larger limit). CI's
+macOS jobs run the setup and require these tests, so the release gate's macOS
+check now covers them.
+
+Not yet: background runs and terminals on macOS (the account serves one run at
+a time; a small pool of accounts would let runs overlap); Seatbelt's downloads
+rule is still unmeasured.
 
 ## MCP servers and plugin code (2026-11-01)
 

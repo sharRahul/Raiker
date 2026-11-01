@@ -48,6 +48,8 @@ fn seatbelt_probe_measures_real_filesystem_controls_without_claiming_availabilit
         .arg("--probe")
         .arg("--workspace")
         .arg(&fixture.root)
+        // Plain Seatbelt, even where the sandbox account is set up.
+        .args(["--boundary", "seatbelt"])
         .output()
         .unwrap();
     assert!(

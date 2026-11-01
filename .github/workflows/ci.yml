@@ -353,6 +353,17 @@ jobs:
           cargo build -p raiker-command-runner
           ./target/debug/raiker-command-runner.exe --setup-account
           echo "RAIKER_REQUIRE_ACCOUNT_SANDBOX=1" >> $env:GITHUB_ENV
+      - name: Set up the macOS sandbox account
+        # Hosted macOS runners have passwordless sudo, so the one-time setup an
+        # owner approves with their administrator password runs here directly.
+        # The account tests below then require it rather than skipping.
+        if: runner.os == 'macOS'
+        working-directory: native
+        run: |
+          cargo build -p raiker-command-runner
+          sudo ./target/debug/raiker-command-runner --setup-account --owner-uid "$(id -u)"
+          ./target/debug/raiker-command-runner --account-status
+          echo "RAIKER_REQUIRE_ACCOUNT_SANDBOX=1" >> "$GITHUB_ENV"
       - name: Test
         working-directory: native
         run: cargo test --all --no-fail-fast

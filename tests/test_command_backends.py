@@ -496,6 +496,9 @@ def test_feature_contract_refuses_delivery_without_quarantine() -> None:
         ("restricted_account", "indeterminate", False, False),
         ("appcontainer", "enforced", False, False),
         ("seatbelt", "enforced", False, False),
+        # The macOS sandbox account stops the whole tree, but serves one run
+        # at a time, so a background run would hold every other command.
+        ("macos_account", "enforced", False, False),
     ),
 )
 def test_background_and_terminals_need_a_measured_tree_stop(
@@ -539,3 +542,37 @@ def test_an_interactive_run_gets_a_terminal_and_says_so_in_its_policy(
     [(policy, pty)] = launched
     assert pty is True
     assert policy["pty"] is True
+
+
+def test_the_macos_account_tree_stop_is_reported_where_measured() -> None:
+    proof = NativeSandboxProof(
+        available=True,
+        reason_code=None,
+        boundary="macos_account",
+        checked_at="2026-11-01T00:00:00Z",
+        observations={"descendant_reaped": "enforced"},
+    )
+    assert proof.features.process_tree_stop is True
+
+
+def test_the_driver_asks_for_the_account_base_on_macos(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import json as json_module
+    import subprocess as subprocess_module
+
+    import raiker.execution.commands.backends.native as native_backend
+
+    monkeypatch.setattr(native_backend.sys, "platform", "darwin")
+    native_backend._ACCOUNT_BASE_CACHE.clear()
+    driver = native_backend.NativeSandboxDriver(tmp_path)
+    binary = tmp_path / "raiker-command-runner"
+    monkeypatch.setattr(driver, "locate", lambda: (binary, None))
+    status = {"configured": True, "base": "/Library/RaikerSandbox/copies"}
+    monkeypatch.setattr(
+        driver,
+        "_run_probe",
+        lambda argv: subprocess_module.CompletedProcess(argv, 0, json_module.dumps(status), ""),
+    )
+    assert driver.account_base() == Path("/Library/RaikerSandbox/copies")
+    native_backend._ACCOUNT_BASE_CACHE.clear()

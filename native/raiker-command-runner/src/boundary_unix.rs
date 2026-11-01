@@ -23,6 +23,10 @@
 //! leaves the process group and survives — so the probe's descendant
 //! observation reports `unenforced` there, and `process_tree_stop` is false.
 
+#[cfg(target_os = "macos")]
+#[path = "account_macos.rs"]
+pub mod account;
+
 use crate::policy::{LaunchPolicy, NetworkPolicy};
 use crate::selftest::{self, SelfTest};
 use serde_json::{Value, json};
@@ -44,6 +48,17 @@ pub fn revoke_workspace_grant(_workspace: &Path) -> Result<(), String> {
 /// default on several current distributions. So the probe launches a child
 /// through the real boundary and reads back what it could do.
 pub fn probe(workspace: &Path) -> Value {
+    // Once the owner has set up the sandbox account, that is the boundary
+    // macOS commands run in, so it is the one measured.
+    #[cfg(target_os = "macos")]
+    if account::status()["configured"] == true {
+        return account::probe();
+    }
+    probe_kernel_sandbox(workspace)
+}
+
+/// The Bubblewrap or plain Seatbelt measurement, regardless of account setup.
+pub fn probe_kernel_sandbox(workspace: &Path) -> Value {
     let (mechanism, tool) = mechanism();
     let Ok(workspace) = workspace.canonicalize() else {
         return unavailable("native_sandbox_workspace_unreadable");

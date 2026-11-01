@@ -236,3 +236,25 @@ def test_a_command_in_a_subfolder_runs_in_the_projects_copy(tmp_path: Path) -> N
     assert Path(policies[0]["cwd"]) == (copy.root / "src").resolve()
     # The command's tree holds the edit made before it.
     assert (copy.root / "src" / "app.py").read_text(encoding="utf-8") == "print('edited')\n"
+
+
+def test_git_status_and_diff_show_the_copys_edits_git_cannot_see(tmp_path: Path) -> None:
+    from raiker.execution.task_tree import pending_copy_changes
+
+    workspace = _workspace(tmp_path)
+    authority = _tree(tmp_path, workspace)
+    assert pending_copy_changes(authority) == []
+    write_file_content(workspace, "proj/src/app.py", "print('v2')\n", authority=authority)
+    write_file_content(workspace, "proj/src/new.py", "x = 1\n", authority=authority)
+
+    [status] = pending_copy_changes(authority)
+    assert status["folder"] == "proj"
+    assert (status["created"], status["modified"]) == (["proj/src/new.py"], ["proj/src/app.py"])
+    assert "diff" not in status
+
+    [narrowed] = pending_copy_changes(authority, paths=["proj/src/app.py"], with_diffs=True)
+    assert narrowed["created"] == [] and narrowed["modified"] == ["proj/src/app.py"]
+    assert "-print('v1')" in narrowed["diff"] and "+print('v2')" in narrowed["diff"]
+    assert pending_copy_changes(authority, paths=["notes.md"]) == []
+    # A plain authority has no copy, and Git's answer stands alone.
+    assert pending_copy_changes(PathAuthority(workspace)) == []

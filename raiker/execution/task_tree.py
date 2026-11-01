@@ -236,3 +236,57 @@ def glob_regex(pattern: str) -> re.Pattern[str]:
         else:
             parts.append(re.escape(piece))
     return re.compile("".join(parts) + "/?")
+
+
+def pending_copy_changes(
+    authority: Any, *, paths: list[str] | None = None, with_diffs: bool = False
+) -> list[dict[str, Any]]:
+    """What the session's copies hold that the project does not, yet.
+
+    Git reads the real repository; the session's edits are in its copy until
+    the owner applies them. This is the other half, so a status or diff the
+    agent reads shows its own work. *paths* narrows to project-relative paths
+    (a file or a folder); *with_diffs* adds each file's unified diff.
+    """
+    from raiker.execution.workspaces import diff_workspace, file_diff
+
+    tree = getattr(authority, "tree", None)
+    if tree is None:
+        return []
+    root = Path(authority.workspace_root).resolve()
+    answers: list[dict[str, Any]] = []
+    for workspace in tree._copies():
+        diff = diff_workspace(workspace)
+        try:
+            prefix = workspace.source.resolve().relative_to(root).as_posix()
+        except ValueError:
+            continue
+        prefix = "" if prefix == "." else prefix + "/"
+
+        def wanted(relative: str, prefix: str = prefix) -> bool:
+            full = prefix + relative
+            return not paths or any(
+                full == item.rstrip("/") or full.startswith(item.rstrip("/") + "/")
+                for item in paths
+            )
+
+        entry: dict[str, Any] = {
+            "folder": prefix.rstrip("/") or ".",
+            "created": [prefix + item for item in diff.created if wanted(item)],
+            "modified": [prefix + item for item in diff.modified if wanted(item)],
+            "deleted": [prefix + item for item in diff.deleted if wanted(item)],
+        }
+        if not (entry["created"] or entry["modified"] or entry["deleted"]):
+            continue
+        if with_diffs:
+            texts = []
+            for relative in (*diff.created, *diff.modified, *diff.deleted):
+                if not wanted(relative):
+                    continue
+                changed = file_diff(workspace, diff, relative)
+                if changed is not None:
+                    texts.append("(binary file differs)" if changed.binary else changed.text)
+            entry["diff"] = "".join(texts)[:200_000]
+        answers.append(entry)
+    return answers
+

@@ -698,3 +698,64 @@ class TaskWorkspaceRegistry:
                 discard(TaskWorkspace("orphan", self.base, child, {}))
                 removed.append(child)
             return removed
+
+
+#: A file diff is cut at this size, and says so.
+FILE_DIFF_MAX_BYTES = 200_000
+
+
+@dataclass(frozen=True)
+class FileDiff:
+    path: str
+    status: str
+    text: str
+    binary: bool
+    truncated: bool
+
+
+def _diff_side(path: Path) -> tuple[str, bool]:
+    """A file's text for a diff, or ``("", True)`` when it is not text."""
+    if _path_is_link_like(path) or not path.is_file():
+        return "", False
+    with path.open("rb") as handle:
+        data = handle.read(FILE_DIFF_MAX_BYTES * 4)
+    if b"\0" in data:
+        return "", True
+    return data.decode("utf-8", errors="replace"), False
+
+
+def file_diff(workspace: TaskWorkspace, diff: WorkspaceDiff, path: str) -> FileDiff | None:
+    """*path*'s unified diff, project against copy, or ``None`` if it is unchanged.
+
+    Only a path in *diff* is answered, so nothing outside the change set is read.
+    Raises :class:`WorkspaceError` when the project side is reached through a link.
+    """
+    import difflib
+
+    if path in diff.created:
+        status = "created"
+    elif path in diff.modified:
+        status = "modified"
+    elif path in diff.deleted:
+        status = "deleted"
+    else:
+        return None
+    before, before_binary = ("", False) if status == "created" else _diff_side(
+        _target(workspace.source, path)
+    )
+    after, after_binary = ("", False) if status == "deleted" else _diff_side(
+        workspace.root / path
+    )
+    binary = before_binary or after_binary
+    text = "" if binary else "".join(
+        difflib.unified_diff(
+            before.splitlines(keepends=True),
+            after.splitlines(keepends=True),
+            fromfile="/dev/null" if status == "created" else f"a/{path}",
+            tofile="/dev/null" if status == "deleted" else f"b/{path}",
+        )
+    )
+    return FileDiff(
+        path, status, text[:FILE_DIFF_MAX_BYTES], binary, len(text) > FILE_DIFF_MAX_BYTES
+    )
+

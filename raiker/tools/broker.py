@@ -269,9 +269,13 @@ class ToolBroker:
                 str(args.get("after_path", ".")),
                 authority=self.path_authority,
             ),
-            "git_status": lambda args: run_git(self.git_root(), "status", ["--short"]),
-            "git_diff": lambda args: run_git(
-                self.git_root(), "diff", list(args.get("args", []))
+            "git_status": lambda args: self._with_copy_changes(
+                run_git(self.git_root(), "status", ["--short"]), None, with_diffs=False
+            ),
+            "git_diff": lambda args: self._with_copy_changes(
+                run_git(self.git_root(), "diff", list(args.get("args", []))),
+                list(args.get("args", [])),
+                with_diffs=True,
             ),
             "git_log": lambda args: run_git(
                 self.git_root(), "log", ["--oneline", "-n", str(args.get("limit", 10))]
@@ -1227,6 +1231,34 @@ class ToolBroker:
             context={"status": failed.status},
         )
         return failed, decision
+
+    def _with_copy_changes(
+        self, result: dict[str, Any], args: list[str] | None, *, with_diffs: bool
+    ) -> dict[str, Any]:
+        """Git's answer plus the session's copy, whose edits Git cannot see.
+
+        The repository on disk is the project; this session's edits are in its
+        disposable copy until the owner applies them, so a status or diff that
+        left them out would show the agent none of its own work.
+        """
+        from raiker.execution.task_tree import pending_copy_changes  # noqa: PLC0415
+
+        paths: list[str] | None = None
+        if args and "--" in args:
+            paths = [item for item in args[args.index("--") + 1:] if item]
+        try:
+            pending = pending_copy_changes(self.path_authority, paths=paths, with_diffs=with_diffs)
+        except Exception:  # noqa: BLE001 - Git's answer stands without the copy's half
+            return result
+        if pending and isinstance(result, dict):
+            return {
+                **result,
+                "task_copy": {
+                    "note": "Edits in this session's sandbox copy, not yet applied to the project.",
+                    "changes": pending,
+                },
+            }
+        return result
 
     def _git_credential_method(self) -> str | None:
         """BUG-334 — the owner's selected push credential's method, asked of the broker.

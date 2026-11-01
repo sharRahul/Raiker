@@ -488,11 +488,11 @@ def test_feature_contract_refuses_delivery_without_quarantine() -> None:
     (
         ("bubblewrap", "enforced", True, True),
         # Without a measured tree stop, a run that outlives its turn could
-        # leave children behind. The Windows account's job owns its tree but
-        # cannot attach a pseudo-console; macOS cannot contain a detached
-        # descendant yet.
+        # leave children behind. The Windows account's job owns its tree and
+        # its runner relays a pseudo-console; an AppContainer and plain
+        # Seatbelt offer neither.
         ("bubblewrap", "indeterminate", False, False),
-        ("restricted_account", "enforced", True, False),
+        ("restricted_account", "enforced", True, True),
         ("restricted_account", "indeterminate", False, False),
         ("appcontainer", "enforced", False, False),
         ("seatbelt", "enforced", False, False),

@@ -178,6 +178,13 @@ fn dispatch(arguments: &[String]) -> Result<i32, String> {
             return Ok(0);
         }
         #[cfg(windows)]
+        Some("--conpty-host") => {
+            if arguments.get(1).map(String::as_str) != Some("--") {
+                return Err("runner_arguments_invalid".into());
+            }
+            return boundary::conpty::host(&arguments[2..]);
+        }
+        #[cfg(windows)]
         Some("--account-status") => {
             println!("{}", boundary::account::status());
             return Ok(0);

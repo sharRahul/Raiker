@@ -115,6 +115,9 @@ pub mod wsl;
 #[path = "wfp_windows.rs"]
 pub mod wfp;
 
+#[path = "conpty_windows.rs"]
+pub mod conpty;
+
 // ---------------------------------------------------------------------------
 // Public entry points
 // ---------------------------------------------------------------------------
@@ -222,9 +225,6 @@ pub fn probe_appcontainer(workspace: &Path) -> Value {
 
 /// Run one governed command inside the boundary and relay its streams.
 pub fn launch(policy: &LaunchPolicy, argv: &[String]) -> Result<i32, String> {
-    if policy.pty {
-        return Err("native_sandbox_pty_unsupported".into());
-    }
     // Task copies under the restricted account's base run as that account,
     // where ordinary toolchains work; anything else keeps the AppContainer.
     // The account's outbound firewall block leaves loopback, so it reaches the
@@ -233,6 +233,11 @@ pub fn launch(policy: &LaunchPolicy, argv: &[String]) -> Result<i32, String> {
         && strip_verbatim(&policy.workspace_root).starts_with(&base)
     {
         return account::launch(policy, argv);
+    }
+    // A terminal needs the account's pseudo-console broker; an AppContainer
+    // cannot reach the console objects one is built from.
+    if policy.pty {
+        return Err("native_sandbox_pty_unsupported".into());
     }
     if policy.network != NetworkPolicy::Denied {
         // Reaching a loopback proxy from an AppContainer needs a loopback

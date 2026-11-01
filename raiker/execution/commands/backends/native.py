@@ -50,7 +50,12 @@ from raiker.execution.commands.egress_runtime import (
 from raiker.execution.commands.egress_runtime import load_settings as load_egress_settings
 from raiker.execution.commands.models import CommandFeatures, CommandRequest
 from raiker.execution.commands.process_lifetime import bind_to_runtime_lifetime
-from raiker.execution.commands.runner import CommandSink, MemoryCommandSink, StreamingCommandRunner
+from raiker.execution.commands.runner import (
+    CommandSink,
+    MemoryCommandSink,
+    StreamingCommandRunner,
+    native_runner_process_factory,
+)
 from raiker.execution.commands.supervisor_client import (
     SupervisorUnavailable,
     spawn_supervised,
@@ -127,15 +132,20 @@ class NativeSandboxProof:
         (`descendant_reaped`; its PID namespace dies with the runner), and so
         does the Windows restricted account (a kill-on-close Job Object owns
         the tree; runs in one copy may overlap, other copies wait). Only
-        Bubblewrap and the macOS sandbox account offer a terminal:
-        `CreateProcessWithLogonW` cannot attach a pseudo-console. On macOS a
+        Every one of those offers a terminal: on Windows the account's runner
+        builds a pseudo-console as the account and relays it, because
+        `CreateProcessWithLogonW` cannot attach one directly. On macOS a
         pool of sandbox accounts serves runs, each account one run at a time,
         and the account owns every process its run starts, so the run's tree
         stops with it (`macos_account`) and runs in different copies overlap;
         plain Seatbelt cannot contain a detached descendant.
         """
         tree_stop = self.observations.get("descendant_reaped") == ENFORCED
-        terminal = tree_stop and self.boundary in {"bubblewrap", "macos_account"}
+        terminal = tree_stop and self.boundary in {
+            "bubblewrap",
+            "macos_account",
+            "restricted_account",
+        }
         background = tree_stop and self.boundary in {
             "bubblewrap",
             "restricted_account",
@@ -584,7 +594,9 @@ class NativeSandboxBackend:
         # write to the owner's project: refuse rather than run there.
         self.workspaces = workspaces
         self.features = proof.features
-        self._runner = runner or StreamingCommandRunner().start
+        self._runner = runner or StreamingCommandRunner(
+            process_factory=native_runner_process_factory
+        ).start
 
     def start(self, request: CommandRequest, sink: CommandSink | None = None) -> Any:
         if not self.proof.available:

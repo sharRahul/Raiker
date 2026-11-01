@@ -62,6 +62,9 @@ jobs:
   plan:
     name: Plan
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      checks: read
     steps:
       - name: Checkout
         # actions/checkout v5.0.1 (Node 24 runtime)
@@ -92,6 +95,34 @@ jobs:
         run: |
           echo "refused: unsigned artifacts may only be published as a beta draft." >&2
           exit 1
+      # Release gate — the sandbox is what makes running a model's commands
+      # safe, so a commit whose boundary was not proven on every platform it
+      # ships to is not released. CI runs the runner's enforcement tests on
+      # each one (`Native runner (<os>)` in ci.yml); every one must have
+      # passed on this exact commit.
+      - name: Refuse a commit whose sandbox enforcement tests did not pass
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          SHA: ${{ github.sha }}
+        run: |
+          python - <<'PY'
+          import json, os, subprocess, sys
+          required = {f"Native runner ({os_})" for os_ in
+                      ("ubuntu-24.04", "windows-2025", "macos-15", "macos-15-intel")}
+          out = subprocess.run(
+              ["gh", "api", "--paginate",
+               f"repos/{os.environ['GH_REPO']}/commits/{os.environ['SHA']}/check-runs",
+               "--jq", ".check_runs[] | [.name, .conclusion]"],
+              check=True, capture_output=True, text=True).stdout
+          passed = {name for name, conclusion in map(json.loads, out.splitlines())
+                    if name in required and conclusion == "success"}
+          missing = sorted(required - passed)
+          if missing:
+              sys.exit("refused: sandbox enforcement tests have not passed on this "
+                       "commit: " + ", ".join(missing))
+          print("sandbox enforcement tests passed on every platform")
+          PY
 
   # ── 2. The desktop installers, built, installed and tested per target ─
   # DIST-01/DIST-11 — what an owner downloads is the desktop package: the
@@ -231,6 +262,10 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+      # Keyless signing: the OIDC token names this workflow to Sigstore, and
+      # the attestation is stored with the repository.
+      id-token: write
+      attestations: write
     steps:
       - name: Collect the signed channel
         # actions/download-artifact v7.0.0, the first release on Node 24 (v5 and v6 run on Node 20)
@@ -250,6 +285,23 @@ jobs:
         env:
           VERSION: ${{ inputs.version }}
         run: python source/scripts/select_release_assets.py --version "$VERSION" --from dist --to assets
+      # Keyless signing with this repository's GitHub identity: Sigstore
+      # binds each file's digest to this workflow, commit and run, and the
+      # signature is logged publicly. Owners check a download with
+      # `gh attestation verify <file> --repo {{ github.repository }}`; the
+      # next step does exactly that before the draft exists.
+      - name: Sign the downloads with the repository's GitHub identity
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-path: assets/Raiker-*
+      - name: Verify the signatures the way an owner will
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          for file in assets/Raiker-*; do
+            gh attestation verify "$file" --repo "${{ github.repository }}" \
+              --signer-workflow "${{ github.repository }}/.github/workflows/release.yml"
+          done
       # `gh` ships on the runner, so the draft needs no third-party action.
       - name: Create the draft
         env:
@@ -273,7 +325,12 @@ jobs:
 
           ## Verifying
 
-          These builds are signed with the platform identities. The signed
+          Every download is signed with this repository's GitHub identity
+          (Sigstore build provenance). Check one before installing:
+
+              gh attestation verify <file> --repo sharRahul/Raiker
+
+          These builds are also signed with the platform identities. The signed
           update index, per-installer manifests, SBOM, provenance and checksums
           are in this run's `release-channel` workflow artifact, for hosting at
           the update channel URL.
@@ -299,6 +356,10 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+      # Keyless signing: the OIDC token names this workflow to Sigstore, and
+      # the attestation is stored with the repository.
+      id-token: write
+      attestations: write
     steps:
       - name: Checkout
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.0.0 (Node 24)
@@ -318,6 +379,23 @@ jobs:
           mkdir -p dist
           find collected -type f -name 'Raiker-*' -exec cp {} dist/ \;
           python scripts/select_release_assets.py --version "$VERSION" --from dist --to assets
+      # Keyless signing with this repository's GitHub identity: Sigstore
+      # binds each file's digest to this workflow, commit and run, and the
+      # signature is logged publicly. Owners check a download with
+      # `gh attestation verify <file> --repo {{ github.repository }}`; the
+      # next step does exactly that before the draft exists.
+      - name: Sign the downloads with the repository's GitHub identity
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-path: assets/Raiker-*
+      - name: Verify the signatures the way an owner will
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          for file in assets/Raiker-*; do
+            gh attestation verify "$file" --repo "${{ github.repository }}" \
+              --signer-workflow "${{ github.repository }}/.github/workflows/release.yml"
+          done
       - name: Create the beta draft
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -343,8 +421,14 @@ jobs:
           because no Apple Developer ID certificate or notarization was
           available. Windows SmartScreen may ask you to confirm *Run anyway*.
 
+          Each download is still signed with this repository's GitHub identity
+          (Sigstore build provenance), which proves it was built by this
+          repository's release workflow from the tagged commit. Check one
+          before installing:
+
+              gh attestation verify <file> --repo sharRahul/Raiker
+
           Beta downloads are not added to Raiker's automatic update channel.
-          Check the SHA-256 below before installing.
 
           ## Maintainer notes
 

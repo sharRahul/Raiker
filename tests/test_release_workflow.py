@@ -177,3 +177,34 @@ def test_the_build_set_carries_the_desktop_build_tool() -> None:
     locked = _locked(ROOT / "requirements" / "release-build.txt")
     assert "pyinstaller" in locked
     assert set(_locked(ROOT / "requirements" / "release.txt")) <= set(locked)
+
+
+def test_a_release_requires_the_sandbox_enforcement_tests_on_every_platform() -> None:
+    """Item 11 — no release of a commit whose boundary was not proven where it ships."""
+    plan = _workflow()["jobs"]["plan"]
+    assert plan["permissions"]["checks"] == "read"
+    gate = _step(plan, "Refuse a commit whose sandbox enforcement tests did not pass")["run"]
+    ci = _workflow(ROOT / ".github" / "workflows" / "ci.yml")
+    platforms = ci["jobs"]["native"]["strategy"]["matrix"]["os"]
+    assert platforms, "the native runner is tested on no platform"
+    for platform in platforms:
+        assert f'"{platform}"' in gate, f"{platform} is tested in CI but not required here"
+    assert "refused:" in gate
+
+
+def test_every_published_download_is_signed_with_the_repository_identity() -> None:
+    """Item 11 — keyless Sigstore signing, verified before either draft exists."""
+    workflow = _workflow()
+    for name in ("publish", "beta_publish"):
+        job = workflow["jobs"][name]
+        assert job["permissions"]["id-token"] == "write"
+        assert job["permissions"]["attestations"] == "write"
+        steps = [step.get("name", "") for step in job["steps"]]
+        sign = _step(job, "Sign the downloads with the repository's GitHub identity")
+        assert re.fullmatch(r"actions/attest-build-provenance@[0-9a-f]{40}", sign["uses"])
+        assert sign["with"]["subject-path"] == "assets/Raiker-*"
+        verify = _step(job, "Verify the signatures the way an owner will")["run"]
+        assert "gh attestation verify" in verify and "--signer-workflow" in verify
+        draft = next(step for step in steps if step.startswith("Create the"))
+        assert steps.index(sign["name"]) < steps.index(draft)
+        assert steps.index("Verify the signatures the way an owner will") < steps.index(draft)

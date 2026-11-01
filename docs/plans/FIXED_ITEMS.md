@@ -1586,6 +1586,7 @@ file you can open. The two capture sets that remain — `screenshots/pages/` and
 | [FIXED-1279](#fixed-1279--native-background-runs-were-lost-on-every-restart-of-raiker-bug-194-regression) | Medium | Commands | Fixed 2026-11-01 |
 | [FIXED-1280](#fixed-1280--python--ccode-and-python--ic-code-passed-the-command-policys--c-refusal) | Medium | Command policy | Fixed 2026-11-01 |
 | [FIXED-1281](#fixed-1281--sandboxed-commands-ran-the-first-program-on-raikers-path-or-a-copys-program-looked-up-from-raikers-folder) | Medium | Native sandbox | Fixed 2026-11-01 |
+| [FIXED-1282](#fixed-1282--a-release-could-ship-a-commit-whose-sandbox-was-unproven-and-an-unsigned-beta-carried-no-verifiable-origin) | Medium | Release | Fixed 2026-11-01 |
 
 ---
 
@@ -38675,3 +38676,13 @@ Found live in this round and fixed before it closed: re-applying a listener the 
 
 **Evidence.** `tests/test_project_setup_policy.py::test_a_real_copy_gets_its_own_virtualenv_and_promotes_none_of_it` on Windows 11 and WSL2.
 
+---
+## FIXED-1282 — A release could ship a commit whose sandbox was unproven, and an unsigned beta carried no verifiable origin
+
+**Severity: Medium. Area: Release. Status: Fixed 2026-11-01.**
+
+**Observed.** `release.yml` built and published from any commit, including one whose native-runner enforcement tests had failed on a platform it ships to. A beta built without platform identities (`signing: skip`) reached owners with only a SHA-256 in the same release notes to check it against, which proves nothing about who built it.
+
+**Fixed.** The `plan` job refuses a commit unless every `Native runner (<os>)` check from `ci.yml` passed on that exact commit. Both draft jobs sign every download keylessly with the repository's GitHub identity (`actions/attest-build-provenance`, Sigstore, with `id-token: write`) and then run `gh attestation verify --signer-workflow …/release.yml` on each file before the draft exists; the notes tell owners to run the same command.
+
+**Evidence.** `tests/test_release_workflow.py::test_a_release_requires_the_sandbox_enforcement_tests_on_every_platform` (the gate's platform list must match the CI matrix) and `::test_every_published_download_is_signed_with_the_repository_identity`; the gate's query run against `d2d61d37` returned all four platforms `success`.

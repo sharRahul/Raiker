@@ -66,12 +66,28 @@ class CheckpointService:
     def get_checkpoint(self, checkpoint_id: str) -> dict | None:
         return self.store.load_checkpoint_by_id(checkpoint_id)
 
-    def _current_file_state(self, workspace_path: str) -> tuple[bool, str | None, int]:
+    def _current_file_state(
+        self, workspace_path: str, session_id: str | None = None
+    ) -> tuple[bool, str | None, int]:
         """Return (exists, sha256|None, size) for a workspace-relative path.
 
-        Metadata only — the content is hashed, never returned or logged.
+        Metadata only — the content is hashed, never returned or logged. A
+        session with a task copy is compared against the copy, where its
+        edits live; the project file has not changed.
         """
         resolved = self.store.paths.workspace_root / workspace_path
+        if session_id and ":" not in workspace_path:
+            from raiker.execution.task_tree import authority_for_action
+            from raiker.tools.filesystem import FilesystemSafetyError
+            from raiker.tools.path_authority import PathAuthority
+
+            root = self.store.paths.workspace_root
+            authority = authority_for_action(PathAuthority(root), root, session_id)
+            if getattr(authority, "tree", None) is not None:
+                try:
+                    resolved = authority.resolve_read(workspace_path).path
+                except FilesystemSafetyError:
+                    return (False, None, 0)
         if not (resolved.exists() and resolved.is_file()):
             return (False, None, 0)
         data = resolved.read_bytes()
@@ -122,7 +138,7 @@ class CheckpointService:
                 op = RESTORE_OP_SKIP_OVERSIZE
                 target_sha = None
                 target_size = 0
-            exists, current_sha, current_size = self._current_file_state(path)
+            exists, current_sha, current_size = self._current_file_state(path, session_id)
             if op == RESTORE_OP_DELETE:
                 changed = exists
             elif op == RESTORE_OP_CONTENT:

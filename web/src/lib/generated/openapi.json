@@ -5620,7 +5620,7 @@
         "type": "object"
       },
       "CodeRepoChangesView": {
-        "description": "The working tree's uncommitted state, from the helpers a commit is built from.",
+        "description": "The working tree's uncommitted state, from the helpers a commit is built from.\n\n``task_copy`` is the other half when a session was named: Git describes the\nproject, and the session's edits are in its copy until the owner applies\nthem. ``None`` when no session was named or it holds no copy here.",
         "properties": {
           "diff": {
             "title": "Diff",
@@ -5652,6 +5652,16 @@
             "title": "Root Missing",
             "type": "boolean"
           },
+          "task_copy": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CodeRepoTaskCopyChanges"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "truncated": {
             "title": "Truncated",
             "type": "boolean"
@@ -5663,7 +5673,8 @@
           "truncated",
           "diff_truncated",
           "root_missing",
-          "reason_code"
+          "reason_code",
+          "task_copy"
         ],
         "title": "CodeRepoChangesView",
         "type": "object"
@@ -5747,6 +5758,14 @@
             "title": "Size Bytes",
             "type": "integer"
           },
+          "source": {
+            "enum": [
+              "project",
+              "task_copy"
+            ],
+            "title": "Source",
+            "type": "string"
+          },
           "text": {
             "title": "Text",
             "type": "string"
@@ -5762,7 +5781,8 @@
           "truncated",
           "size_bytes",
           "readable",
-          "reason_code"
+          "reason_code",
+          "source"
         ],
         "title": "CodeRepoFileView",
         "type": "object"
@@ -6119,6 +6139,56 @@
           "fingerprint"
         ],
         "title": "CodeRepoTargetView",
+        "type": "object"
+      },
+      "CodeRepoTaskCopyChanges": {
+        "description": "Edits in a session's sandbox copy that the owner has not applied yet.",
+        "properties": {
+          "diff": {
+            "title": "Diff",
+            "type": "string"
+          },
+          "diff_truncated": {
+            "title": "Diff Truncated",
+            "type": "boolean"
+          },
+          "entries": {
+            "items": {
+              "$ref": "#/components/schemas/CodeRepoTaskCopyEntry"
+            },
+            "title": "Entries",
+            "type": "array"
+          }
+        },
+        "required": [
+          "entries",
+          "diff",
+          "diff_truncated"
+        ],
+        "title": "CodeRepoTaskCopyChanges",
+        "type": "object"
+      },
+      "CodeRepoTaskCopyEntry": {
+        "properties": {
+          "path": {
+            "title": "Path",
+            "type": "string"
+          },
+          "state": {
+            "enum": [
+              "created",
+              "modified",
+              "deleted"
+            ],
+            "title": "State",
+            "type": "string"
+          }
+        },
+        "required": [
+          "path",
+          "state"
+        ],
+        "title": "CodeRepoTaskCopyEntry",
         "type": "object"
       },
       "CodeRepoView": {
@@ -39627,6 +39697,22 @@
               "title": "Path",
               "type": "string"
             }
+          },
+          {
+            "in": "query",
+            "name": "session_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Session Id"
+            }
           }
         ],
         "responses": {
@@ -39656,7 +39742,7 @@
     },
     "/api/code/repos/{repo_id}/changes": {
       "get": {
-        "description": "What has changed in this repository's working tree, and not yet been committed.\n\nthe Build artifact pane asks Build's third pane to be *the object of work*. For a coding\nturn that object is the change: which files moved, and what the diff says.\nUntil now the only diff Build could show was a *proposed* one, attached to\nan approval — so once a change was applied, the workspace had nothing to\nshow for it, and the owner went to a terminal to find out what the turn had\nactually done.\n\nBuilt from :func:`raiker.tools.git.working_tree_changes` and\n:func:`raiker.tools.git.working_tree_diff` rather than from a second git\ninvocation of its own. That is the point: those two functions are what a\ncommit proposal is assembled from, so this pane and the commit it leads to\ndescribe one change set. A pane that ran its own `git diff` could disagree\nwith the commit, and the owner would have no way to tell which was right.\n\nRead-only, and bounded in both directions: at most\n:data:`MAX_CHANGED_FILES` entries, at most\n:data:`MAX_CHANGES_DIFF_CHARS` of diff, each truncation stated.",
+        "description": "What has changed in this repository's working tree, and not yet been committed.\n\nthe Build artifact pane asks Build's third pane to be *the object of work*. For a coding\nturn that object is the change: which files moved, and what the diff says.\nUntil now the only diff Build could show was a *proposed* one, attached to\nan approval — so once a change was applied, the workspace had nothing to\nshow for it, and the owner went to a terminal to find out what the turn had\nactually done.\n\nBuilt from :func:`raiker.tools.git.working_tree_changes` and\n:func:`raiker.tools.git.working_tree_diff` rather than from a second git\ninvocation of its own. That is the point: those two functions are what a\ncommit proposal is assembled from, so this pane and the commit it leads to\ndescribe one change set. A pane that ran its own `git diff` could disagree\nwith the commit, and the owner would have no way to tell which was right.\n\nRead-only, and bounded in both directions: at most\n:data:`MAX_CHANGED_FILES` entries, at most\n:data:`MAX_CHANGES_DIFF_CHARS` of diff, each truncation stated.\n\nWith *session_id*, ``task_copy`` adds that session's sandbox edits not yet\napplied. They are not in the working tree, so no commit includes them until\nthe owner applies the copy; they are listed apart for that reason.",
         "operationId": "read_code_repo_changes_api_code_repos__repo_id__changes_get",
         "parameters": [
           {
@@ -39666,6 +39752,22 @@
             "schema": {
               "title": "Repo Id",
               "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "session_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Session Id"
             }
           }
         ],
@@ -39746,7 +39848,7 @@
     },
     "/api/code/repos/{repo_id}/file": {
       "get": {
-        "description": "One bounded text file, or a stated reason it cannot be shown.",
+        "description": "One bounded text file, or a stated reason it cannot be shown.\n\nWith *session_id*, a file that session's sandbox copy holds is read from\nthe copy (``source: task_copy``), through the same bounded read.",
         "operationId": "read_code_repo_file_api_code_repos__repo_id__file_get",
         "parameters": [
           {
@@ -39766,6 +39868,22 @@
               "default": "",
               "title": "Path",
               "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "session_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Session Id"
             }
           }
         ],

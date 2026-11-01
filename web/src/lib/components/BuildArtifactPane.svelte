@@ -104,13 +104,14 @@
    */
   $effect(() => {
     const id = repoId;
+    const session = sessionId;
     // Named so the effect re-runs when the caller bumps it.
     void revision;
     if (tab !== "changes" || id === null) return;
     let cancelled = false;
     changesLoading = true;
     void api
-      .readCodeRepoChanges(id)
+      .readCodeRepoChanges(id, session)
       .then((view) => {
         if (cancelled) return;
         changes = view;
@@ -135,11 +136,13 @@
   $effect(() => {
     const id = repoId;
     const path = previewPath;
+    const session = sessionId;
+    void revision;
     if (tab !== "preview" || id === null || path === null) return;
     let cancelled = false;
     fileLoading = true;
     void api
-      .readCodeRepoFile(id, path)
+      .readCodeRepoFile(id, path, session)
       .then((view) => {
         if (cancelled) return;
         file = view;
@@ -159,6 +162,9 @@
   });
 
   const summary = $derived(changesSummary(changes));
+  // The tab counts the sandbox copy's unapplied edits too: they are this
+  // session's change, even though no commit holds them yet.
+  const changeCount = $derived(summary.count + (changes?.task_copy?.entries.length ?? 0));
 </script>
 
 <section class="artifact-pane" aria-label="Workbench">
@@ -177,8 +183,8 @@
           <!-- One token, and only when it is not the ordinary
                state. A count of changed files is the exception worth seeing;
                "0 changes" beside a tab called Changes is noise. -->
-          {#if entry.id === "changes" && summary.count > 0}
-            <span class="tab-count">{summary.count}</span>
+          {#if entry.id === "changes" && changeCount > 0}
+            <span class="tab-count">{changeCount}</span>
           {/if}
         </button>
       {/each}
@@ -201,6 +207,32 @@
       aria-labelledby="artifact-tab-changes"
       class="panel"
     >
+      {#if changes?.task_copy}
+        <!-- The session's edits are in its sandbox copy until the owner applies
+             them, so Git cannot see them and no commit includes them yet. They
+             are listed apart, above the working tree, for that reason. -->
+        <section class="task-copy" aria-label="Sandbox edits not yet applied">
+          <p class="changes-lead">
+            {changes.task_copy.entries.length}
+            {changes.task_copy.entries.length === 1 ? "file" : "files"} changed in the sandbox copy,
+            not yet applied to the project.
+          </p>
+          <ul class="changed-files" aria-label="Sandbox changes">
+            {#each changes.task_copy.entries as entry (entry.path)}
+              <li>
+                <span class="state" data-state={entry.state}>{entry.state}</span>
+                <span class="path" title={entry.path}>{entry.path}</span>
+              </li>
+            {/each}
+          </ul>
+          {#if changes.task_copy.diff}
+            <DiffView diff={changes.task_copy.diff} open={true} />
+          {/if}
+          {#if changes.task_copy.diff_truncated}
+            <p class="note">More changed than the pane renders; review the rest under Sandbox changes.</p>
+          {/if}
+        </section>
+      {/if}
       {#if repoId === null}
         <PageState
           state="empty"
@@ -292,7 +324,12 @@
           detail={file.reason_code.replaceAll("_", " ")}
         />
       {:else if file !== null}
-        <p class="preview-path" title={file.path}>{file.path}</p>
+        <p class="preview-path" title={file.path}>
+          {file.path}
+          {#if file.source === "task_copy"}
+            <span class="note">· sandbox copy, not yet applied</span>
+          {/if}
+        </p>
         <pre class="preview-text">{file.text}</pre>
         {#if file.truncated}
           <p class="note">Shown up to this build's reading limit.</p>
@@ -321,6 +358,11 @@
 </section>
 
 <style>
+  .task-copy {
+    margin-bottom: var(--space-3);
+    padding-bottom: var(--space-3);
+    border-bottom: 1px solid var(--border);
+  }
   .artifact-pane {
     display: flex;
     flex-direction: column;

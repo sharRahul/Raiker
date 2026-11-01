@@ -56,12 +56,14 @@ from raiker.api.wire.code import (
     CodeRepoPullRequestsView,
     CodeRepoReviewView,
     CodeRepoTargetView,
+    CodeRepoTaskCopyChanges,
     ModelPatchReview,
     PatchReview,
     PatchReviewSummary,
     PullRequestReceipt,
 )
 from raiker.api.wire.projects import ProjectBrowseEntry
+from raiker.execution.task_tree import TaskTree, TaskTreeAuthority, copy_changes_under, owner_tree
 from raiker.knowledge.extractors import resolve_extractable_media_type
 from raiker.knowledge.reconcile import IGNORED_DIRECTORY_NAMES
 from raiker.runtime.authority.models import Principal
@@ -157,6 +159,30 @@ def _resolved_target(
     return resolved.path
 
 
+def _session_tree(
+    request: Request, principal_id: str, session_id: str | None
+) -> TaskTree | None:
+    """The asking owner's task tree for *session_id*, when it holds a copy.
+
+    A Build session's edits live in its sandbox copy until the owner applies
+    them; naming the session makes the explorer, the viewer and Changes show
+    that copy rather than a project the session has not touched yet.
+    """
+    if not session_id:
+        return None
+    return owner_tree(_ws(request), principal_id, session_id)
+
+
+def _in_tree(tree: TaskTree | None, real: Path) -> Path:
+    """Where *real* is read from: the copy when *tree* holds it, else itself."""
+    if tree is None:
+        return real
+    try:
+        return tree.to_copy(real, create=False)
+    except FilesystemSafetyError as exc:
+        raise _bad_request(str(exc)) from exc
+
+
 def _missing_view(repo: dict[str, Any]) -> CodeRepoBrowseView:
     kind = cast(Literal["local", "github"], str(repo.get("kind", "local")))
     answer: CodeRepoBrowseView = {
@@ -179,19 +205,24 @@ async def browse_code_repo(
     repo_id: str,
     request: Request,
     path: str = "",
+    session_id: str | None = None,
     auth_data: tuple[ApiSession, Principal] = Depends(_auth),
 ) -> dict[str, Any]:
     repo = _owned_repo(request, repo_id, auth_data[0].principal_id)
     root = _repo_root(request, repo)
     if root is None:
         return serialize_dto(_missing_view(repo))
+    tree = _session_tree(request, auth_data[0].principal_id, session_id)
     target = _resolved_target(request, root, path)
-    if not target.is_dir():
+    listed = _in_tree(tree, target)
+    if not listed.is_dir():
         raise _not_found("directory_not_found")
+    # Entries are named by their real twins, so a path the explorer sends back
+    # resolves against the repository like any other.
     children = [
-        child
+        target / child.name
         for child in sorted(
-            target.iterdir(), key=lambda item: (not item.is_dir(), item.name.lower())
+            listed.iterdir(), key=lambda item: (not item.is_dir(), item.name.lower())
         )
         if child.name not in IGNORED_DIRECTORY_NAMES
     ]
@@ -201,7 +232,9 @@ async def browse_code_repo(
         "parent": (
             Path(relative).parent.as_posix().replace(".", "") if relative else None
         ),
-        "entries": [_entry(child, root) for child in children[:MAX_BROWSE_ENTRIES]],
+        "entries": [
+            _entry(child, root, _in_tree(tree, child)) for child in children[:MAX_BROWSE_ENTRIES]
+        ],
         "truncated": len(children) > MAX_BROWSE_ENTRIES,
         "root_kind": cast(Literal["local", "github"], str(repo.get("kind", "local"))),
         "root_label": str(repo.get("label", "")),
@@ -210,13 +243,15 @@ async def browse_code_repo(
     return serialize_dto(answer)
 
 
-def _entry(child: Path, root: Path) -> ProjectBrowseEntry:
-    is_directory = child.is_dir()
+def _entry(child: Path, root: Path, on_disk: Path | None = None) -> ProjectBrowseEntry:
+    """*child* named against *root*; *on_disk* is where it is read (its copy)."""
+    disk = on_disk or child
+    is_directory = disk.is_dir()
     answer: ProjectBrowseEntry = {
         "name": child.name,
         "relative_path": child.relative_to(root).as_posix(),
         "is_directory": is_directory,
-        "size_bytes": 0 if is_directory else _size(child),
+        "size_bytes": 0 if is_directory else _size(disk),
         "media_type": (
             ""
             if is_directory
@@ -242,9 +277,14 @@ async def read_code_repo_file(
     repo_id: str,
     request: Request,
     path: str = "",
+    session_id: str | None = None,
     auth_data: tuple[ApiSession, Principal] = Depends(_auth),
 ) -> dict[str, Any]:
-    """One bounded text file, or a stated reason it cannot be shown."""
+    """One bounded text file, or a stated reason it cannot be shown.
+
+    With *session_id*, a file that session's sandbox copy holds is read from
+    the copy (``source: task_copy``), through the same bounded read.
+    """
     if not (path or "").strip():
         raise _bad_request("path_required")
     repo = _owned_repo(request, repo_id, auth_data[0].principal_id)
@@ -255,13 +295,16 @@ async def read_code_repo_file(
             if str(repo.get("kind")) == "github"
             else "repo_folder_missing"
         )
+    tree = _session_tree(request, auth_data[0].principal_id, session_id)
     target = _resolved_target(request, root, path)
-    if not target.exists():
+    on_disk = _in_tree(tree, target)
+    source: Literal["project", "task_copy"] = "project" if on_disk == target else "task_copy"
+    if not on_disk.exists():
         raise _not_found("file_not_found")
-    if not target.is_file():
+    if not on_disk.is_file():
         raise _bad_request("not_a_file")
     relative = target.relative_to(root).as_posix()
-    size = _size(target)
+    size = _size(on_disk)
     if size > MAX_VIEW_BYTES:
         # Refused with the number in it. "Too large" without the size is a dead
         # end; the size is what tells the owner whether to open it elsewhere.
@@ -272,9 +315,11 @@ async def read_code_repo_file(
             "size_bytes": size,
             "readable": False,
             "reason_code": "file_too_large",
+            "source": source,
         }
         return serialize_dto(answer_0)
-    result = read_file(_ws(request), target, max_bytes=MAX_VIEW_BYTES)
+    authority = None if tree is None else TaskTreeAuthority(PathAuthority(_ws(request)), tree)
+    result = read_file(_ws(request), target, max_bytes=MAX_VIEW_BYTES, authority=authority)
     if result.get("status") != "success":
         error = result.get("error") or {}
         answer_1: CodeRepoFileView = {
@@ -284,6 +329,7 @@ async def read_code_repo_file(
             "size_bytes": size,
             "readable": False,
             "reason_code": str(error.get("type") or "unreadable"),
+            "source": source,
         }
         return serialize_dto(answer_1)
     answer_2: CodeRepoFileView = {
@@ -293,6 +339,7 @@ async def read_code_repo_file(
         "size_bytes": size,
         "readable": True,
         "reason_code": "",
+        "source": source,
     }
     return serialize_dto(answer_2)
 
@@ -301,6 +348,7 @@ async def read_code_repo_file(
 async def read_code_repo_changes(
     repo_id: str,
     request: Request,
+    session_id: str | None = None,
     auth_data: tuple[ApiSession, Principal] = Depends(_auth),
 ) -> dict[str, Any]:
     """What has changed in this repository's working tree, and not yet been committed.
@@ -322,6 +370,10 @@ async def read_code_repo_changes(
     Read-only, and bounded in both directions: at most
     :data:`MAX_CHANGED_FILES` entries, at most
     :data:`MAX_CHANGES_DIFF_CHARS` of diff, each truncation stated.
+
+    With *session_id*, ``task_copy`` adds that session's sandbox edits not yet
+    applied. They are not in the working tree, so no commit includes them until
+    the owner applies the copy; they are listed apart for that reason.
     """
     from raiker.tools.git import working_tree_changes, working_tree_diff  # noqa: PLC0415
 
@@ -339,8 +391,12 @@ async def read_code_repo_changes(
                 if str(repo.get("kind")) == "github"
                 else "repo_folder_missing"
             ),
+            "task_copy": None,
         }
         return serialize_dto(answer_0)
+    task_copy = _task_copy_changes(
+        _session_tree(request, auth_data[0].principal_id, session_id), root
+    )
     if not (root / ".git").exists():
         # Not a failure: a plain folder is a perfectly good place to work, it
         # just has no history to compare against. Saying which of the two it is
@@ -352,6 +408,7 @@ async def read_code_repo_changes(
             "diff_truncated": False,
             "root_missing": False,
             "reason_code": "not_a_git_repository",
+            "task_copy": task_copy,
         }
         return serialize_dto(answer_1)
 
@@ -375,8 +432,27 @@ async def read_code_repo_changes(
         "diff_truncated": diff_truncated,
         "root_missing": False,
         "reason_code": None,
+        "task_copy": task_copy,
     }
     return serialize_dto(answer_2)
+
+
+def _task_copy_changes(tree: TaskTree | None, root: Path) -> CodeRepoTaskCopyChanges | None:
+    if tree is None:
+        return None
+    entries, diff, diff_truncated = copy_changes_under(
+        tree, root, max_chars=MAX_CHANGES_DIFF_CHARS
+    )
+    if not entries:
+        return None
+    return {
+        "entries": [
+            {"path": entry["path"], "state": cast(Any, entry["state"])}
+            for entry in entries[:MAX_CHANGED_FILES]
+        ],
+        "diff": diff,
+        "diff_truncated": diff_truncated or len(entries) > MAX_CHANGED_FILES,
+    }
 
 
 @router.get("/api/code/repos/{repo_id}/diagnostics")

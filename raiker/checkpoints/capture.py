@@ -91,12 +91,13 @@ class CheckpointCaptureService:
         return capability in CAPTURE_PATH_ARG
 
     def snapshot_pre_image(
-        self, capability: str, arguments: dict[str, object]
+        self, capability: str, arguments: dict[str, object], *, session_id: str | None = None
     ) -> PreImage | list[PreImage] | None:
         """Read the target file's current bytes *before* a mutation overwrites it.
 
         Returns ``None`` when the capability is not a file mutation, no path was
         given, or the path resolves outside the workspace (nothing to capture).
+        *session_id* names the session whose task copy holds the file, if any.
         """
         arg = CAPTURE_PATH_ARG.get(capability)
         if arg is None:
@@ -106,24 +107,34 @@ class CheckpointCaptureService:
             if capability == "patch_apply_execution"
             else [str(arguments.get(arg, ""))]
         )
-        snapshots = [item for path in raw_paths if (item := self.snapshot_path(path, capability))]
+        snapshots = [
+            item for path in raw_paths if (item := self.snapshot_path(path, capability, session_id=session_id))
+        ]
         if capability == "patch_apply_execution":
             return snapshots or None
         return snapshots[0] if snapshots else None
 
-    def snapshot_path(self, raw_path: str, capability: str) -> PreImage | None:
+    def snapshot_path(
+        self, raw_path: str, capability: str, *, session_id: str | None = None
+    ) -> PreImage | None:
         """Snapshot the current bytes of one workspace file (reusable primitive).
 
         Used both by the broker capture hook and by the restore executor, which
         captures its *own* pre-image before overwriting a file so a restore is
         itself reversible. Returns ``None`` for an empty path or one that resolves
         outside the workspace.
+
+        A session with a task copy reads the file from the copy, where its
+        edits live, so the pre-image is the file the write is about to replace.
         """
         if not raw_path:
             return None
+        from raiker.execution.task_tree import authority_for_action
         from raiker.tools.path_authority import PathAuthority, encode_root_path
 
-        authority = self.authority or PathAuthority(self.workspace_root)
+        authority = authority_for_action(
+            self.authority or PathAuthority(self.workspace_root), self.workspace_root, session_id
+        )
         try:
             resolved_path = authority.resolve_read(raw_path)
         except FilesystemSafetyError:

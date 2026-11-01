@@ -337,6 +337,42 @@ describe("Build's artifact zone", () => {
     expect(within(tabs).getByRole("tab", { name: /^Changes/ })).toHaveTextContent("2");
   });
 
+  it("lists the sandbox copy's unapplied edits apart from the working tree", async () => {
+    // The session's edits are in its copy until the owner applies them: Git
+    // sees a clean tree, and the pane must not stop at "no changes".
+    stubFetch(
+      baseRoutes({
+        "GET /api/code/repos": reposView({
+          repos: [LOCAL_REPO],
+          selected_repo_id: "repo_local",
+        }),
+        "GET /api/code/repos/repo_local/changes": {
+          entries: [],
+          diff: "",
+          truncated: false,
+          diff_truncated: false,
+          root_missing: false,
+          reason_code: null,
+          task_copy: {
+            entries: [{ path: "src/app.py", state: "modified" }],
+            diff: "--- a/src/app.py\n+++ b/src/app.py\n@@ -1 +1 @@\n-old\n+new\n",
+            diff_truncated: false,
+          },
+        },
+      }),
+    );
+    await renderBuildWithProject();
+
+    await fireEvent.click(await screen.findByRole("button", { name: /background work/i }));
+    const tabs = await screen.findByRole("tablist", { name: "Workbench views" });
+    await fireEvent.click(within(tabs).getByRole("tab", { name: /^Changes/ }));
+
+    const listed = await screen.findByRole("list", { name: "Sandbox changes" });
+    expect(within(listed).getByText("src/app.py")).toBeInTheDocument();
+    expect(screen.getByText(/not yet applied to the project/)).toBeInTheDocument();
+    expect(within(tabs).getByRole("tab", { name: /^Changes/ })).toHaveTextContent("1");
+  });
+
   it("lets each header control answer about its own view, not the column", async () => {
     // With two panels sharing a column, "open" was a property of the column and
     // both toggles read it — so opening the terminal made the other control say

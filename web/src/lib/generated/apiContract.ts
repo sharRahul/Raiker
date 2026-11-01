@@ -1131,6 +1131,7 @@ export type CodeRepoChangesView = {
   diff_truncated: boolean;
   root_missing: boolean;
   reason_code: string | null;
+  task_copy: CodeRepoTaskCopyChanges | null;
 };
 
 /** B10 — parse-level problems for one file; ``checked`` false means not looked at. */
@@ -1156,6 +1157,7 @@ export type CodeRepoFileView = {
   size_bytes: number;
   readable: boolean;
   reason_code: string;
+  source: "project" | "task_copy";
 };
 
 /** BR-D04 — the answer to asking a model to read the current patch. */
@@ -1217,6 +1219,18 @@ export type CodeRepoTargetView = {
   code_placement_reason: string;
   fingerprint: string;
   authority?: TargetAuthority;
+};
+
+/** Edits in a session's sandbox copy that the owner has not applied yet. */
+export type CodeRepoTaskCopyChanges = {
+  entries: CodeRepoTaskCopyEntry[];
+  diff: string;
+  diff_truncated: boolean;
+};
+
+export type CodeRepoTaskCopyEntry = {
+  path: string;
+  state: "created" | "modified" | "deleted";
 };
 
 /** One repository a coding chat can be pointed at. */
@@ -7116,13 +7130,13 @@ export const contract = {
     call<CodeRepoSelected>("PUT", "/api/code/repos/selection", { body }),
   disconnectCodeRepo: (repoId: string) =>
     call<CodeRepoDisconnected>("DELETE", `/api/code/repos/${encodeURIComponent(repoId)}`),
-  browseCodeRepo: (repoId: string, query: { path?: string } = {}) =>
+  browseCodeRepo: (repoId: string, query: { path?: string; session_id?: string } = {}) =>
     request<CodeRepoBrowseView>(withQuery(`/api/code/repos/${encodeURIComponent(repoId)}/browse`, query)),
-  readCodeRepoChanges: (repoId: string) =>
-    request<CodeRepoChangesView>(`/api/code/repos/${encodeURIComponent(repoId)}/changes`),
+  readCodeRepoChanges: (repoId: string, query: { session_id?: string } = {}) =>
+    request<CodeRepoChangesView>(withQuery(`/api/code/repos/${encodeURIComponent(repoId)}/changes`, query)),
   readCodeRepoDiagnostics: (repoId: string, query: { path?: string } = {}) =>
     request<CodeRepoDiagnosticsView>(withQuery(`/api/code/repos/${encodeURIComponent(repoId)}/diagnostics`, query)),
-  readCodeRepoFile: (repoId: string, query: { path?: string } = {}) =>
+  readCodeRepoFile: (repoId: string, query: { path?: string; session_id?: string } = {}) =>
     request<CodeRepoFileView>(withQuery(`/api/code/repos/${encodeURIComponent(repoId)}/file`, query)),
   readCodeRepoProvenance: (repoId: string) =>
     request<CodeRepoProvenanceView>(`/api/code/repos/${encodeURIComponent(repoId)}/provenance`),

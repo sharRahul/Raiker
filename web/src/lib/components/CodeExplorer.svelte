@@ -36,12 +36,15 @@
   let {
     repoId,
     repoLabel,
+    sessionId = null,
     onclose,
     onmention,
     onopen,
   }: {
     repoId: string;
     repoLabel: string;
+    /** The Build session whose sandbox copy the tree and files are read from. */
+    sessionId?: string | null;
     onclose: () => void;
     /** Put the open file's path in the composer, so reading leads to asking. */
     onmention?: (path: string) => void;
@@ -92,7 +95,7 @@
     if (listings[path] !== undefined) return;
     loadingPaths = { ...loadingPaths, [path]: true };
     try {
-      const view = await api.browseCodeRepo(repoId, path);
+      const view = await api.browseCodeRepo(repoId, path, sessionId);
       listings = { ...listings, [path]: view };
       if (path === "") error = null;
     } catch (e) {
@@ -131,7 +134,7 @@
     fileText = "";
     fileTruncated = false;
     try {
-      const view = await api.readCodeRepoFile(repoId, entry.relative_path);
+      const view = await api.readCodeRepoFile(repoId, entry.relative_path, sessionId);
       if (!view.readable) {
         fileNotice = NOTICES[view.reason_code] ?? "This file could not be shown.";
         return;
@@ -168,10 +171,11 @@
   );
 
   $effect(() => {
-    // Re-read whenever the repository changes, so switching repositories never
-    // shows the previous one's tree. Only `repoId` is a dependency: the reload
+    // Re-read whenever the repository or session changes, so switching never
+    // shows the previous one's tree. Only those are dependencies: the reload
     // writes the very caches it reads.
     void repoId;
+    void sessionId;
     untrack(() => {
       listings = {};
       expanded = {};

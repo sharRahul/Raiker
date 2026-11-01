@@ -74,6 +74,9 @@ class CodeRepoFileView(TypedDict):
     size_bytes: int
     readable: bool
     reason_code: str
+    #: ``task_copy`` when the asked-for session's sandbox copy holds the file,
+    #: so the viewer shows the edit the owner has not applied yet.
+    source: Literal["project", "task_copy"]
 
 
 class CodeRepoChangeEntry(TypedDict):
@@ -85,8 +88,26 @@ class CodeRepoChangeEntry(TypedDict):
     unstaged: bool
 
 
+class CodeRepoTaskCopyEntry(TypedDict):
+    path: str
+    state: Literal["created", "modified", "deleted"]
+
+
+class CodeRepoTaskCopyChanges(TypedDict):
+    """Edits in a session's sandbox copy that the owner has not applied yet."""
+
+    entries: list[CodeRepoTaskCopyEntry]
+    diff: str
+    diff_truncated: bool
+
+
 class CodeRepoChangesView(TypedDict):
-    """The working tree's uncommitted state, from the helpers a commit is built from."""
+    """The working tree's uncommitted state, from the helpers a commit is built from.
+
+    ``task_copy`` is the other half when a session was named: Git describes the
+    project, and the session's edits are in its copy until the owner applies
+    them. ``None`` when no session was named or it holds no copy here.
+    """
 
     entries: list[CodeRepoChangeEntry]
     diff: str
@@ -94,6 +115,7 @@ class CodeRepoChangesView(TypedDict):
     diff_truncated: bool
     root_missing: bool
     reason_code: str | None
+    task_copy: CodeRepoTaskCopyChanges | None
 
 
 class CodeRepoDiagnosticsView(TypedDict):

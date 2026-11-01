@@ -820,7 +820,7 @@
     {
       "path": "raiker/storage/stores/records.py",
       "rule": "S608",
-      "fingerprint": "4321ea17e7e8154a",
+      "fingerprint": "15b77d320d715ea7",
       "owner": "Raiker maintainers",
       "reason": "WHERE/ORDER BY assembled from fixed in-code fragments; every value is bound as a parameter",
       "expires": "2027-04-10"

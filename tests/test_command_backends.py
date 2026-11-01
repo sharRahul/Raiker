@@ -22,6 +22,7 @@ from raiker.execution.commands.backends import (
     NativeSandboxDriver,
     UnavailableBackend,
 )
+from raiker.execution.commands.backends.native import NativeSandboxProof
 from raiker.execution.commands.service import CommandService, CommandServiceError
 from raiker.execution.profiles import (
     ExecutionProfile,
@@ -480,3 +481,53 @@ def test_feature_contract_refuses_delivery_without_quarantine() -> None:
             credential_delivery=True,
             credential_delta_quarantine=False,
         )
+
+
+@pytest.mark.parametrize(
+    ("boundary", "descendant", "supervised"),
+    (
+        ("bubblewrap", "enforced", True),
+        # Without a measured tree stop, a run that outlives its turn could
+        # leave children behind; and the Windows account holds one copy at a
+        # time, while macOS cannot contain a detached descendant yet.
+        ("bubblewrap", "indeterminate", False),
+        ("restricted_account", "enforced", False),
+        ("appcontainer", "enforced", False),
+        ("seatbelt", "enforced", False),
+    ),
+)
+def test_background_and_terminals_need_a_measured_tree_stop_on_bubblewrap(
+    boundary: str, descendant: str, supervised: bool
+) -> None:
+    proof = NativeSandboxProof(
+        available=True,
+        reason_code=None,
+        boundary=boundary,
+        checked_at="2026-11-01T00:00:00Z",
+        observations={"descendant_reaped": descendant},
+    )
+    assert proof.features.background is supervised
+    assert proof.features.pty is supervised
+    assert proof.features.input is supervised
+
+
+def test_an_interactive_run_gets_a_terminal_and_says_so_in_its_policy(tmp_path: Path) -> None:
+    project = tmp_path / "ws"
+    (project / ".raiker").mkdir(parents=True)
+    directory = _installed_runner(tmp_path)
+    driver = NativeSandboxDriver(project, helper_root=directory, run_probe=_probe_reply())
+    proof = replace(driver.probe(), boundary="bubblewrap")
+    launched: list[tuple[dict[str, Any], bool]] = []
+
+    def fake_runner(req: Any, argv: list[str], *_args: Any, pty: bool, **_kwargs: Any) -> Any:
+        launched.append((json.loads(Path(argv[2]).read_text(encoding="utf-8")), pty))
+        return object()
+
+    backend = NativeSandboxBackend(
+        driver=driver, proof=proof, workspaces=TaskWorkspaceRegistry(tmp_path / "copies"),
+        runner=fake_runner,
+    )
+    backend.start(request(project, interactive=True, background=True))
+    [(policy, pty)] = launched
+    assert pty is True
+    assert policy["pty"] is True

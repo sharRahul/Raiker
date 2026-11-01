@@ -1,5 +1,16 @@
 # Fixed items
 
+## Sandboxed commands could not run in the background or with a terminal (Linux)
+
+On Linux, where the probe measures descendant reaping inside Bubblewrap,
+`background_run` and interactive runs now work in the sandbox: Raiker hands the
+runner a pseudo-terminal and bwrap passes it through, with `--new-session`
+keeping the command from injecting terminal input. Stopping the run, or Raiker
+exiting, takes the whole PID namespace down. Windows and macOS keep refusing by
+name (see `TO_BE_FIXED.md`). Covered by
+`tests/test_command_backends.py` and the real-terminal test in
+`native/raiker-command-runner/tests/linux_probe.rs`.
+
 ## Sandboxed commands could not download packages
 
 The native boundary denied all network, so `pip install`, `npm install`,

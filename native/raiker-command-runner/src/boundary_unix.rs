@@ -269,7 +269,11 @@ fn host_escape_verdict(test: &SelfTest, outside: &Value) -> &'static str {
 }
 
 pub fn launch(policy: &LaunchPolicy, argv: &[String]) -> Result<i32, String> {
-    if policy.pty {
+    // On Linux the terminal is simply the stdio Raiker hands the runner; bwrap
+    // passes it through and `--new-session` keeps the command from injecting
+    // input into it (TIOCSTI). macOS cannot yet contain a detached
+    // descendant, so an interactive session there stays refused.
+    if policy.pty && !cfg!(target_os = "linux") {
         return Err("native_sandbox_pty_unsupported".into());
     }
     let (_, tool) = mechanism();

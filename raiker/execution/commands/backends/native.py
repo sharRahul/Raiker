@@ -85,13 +85,24 @@ class NativeSandboxProof:
 
     @property
     def features(self) -> CommandFeatures:
-        """Capabilities derived from measurements, never from configuration."""
+        """Capabilities derived from measurements, never from configuration.
+
+        Background and interactive runs need the whole process tree to stop
+        when the run is stopped or Raiker exits. Only Bubblewrap measures that
+        today (`descendant_reaped`, and its PID namespace dies with the runner).
+        Windows runs as one restricted account whose grant covers a single
+        copy at a time, so a long run would hold every other command, and
+        `CreateProcessWithLogonW` cannot attach a pseudo-console; macOS cannot
+        yet contain a detached descendant.
+        """
+        tree_stop = self.observations.get("descendant_reaped") == ENFORCED
+        supervised = tree_stop and self.boundary == "bubblewrap"
         return CommandFeatures(
             shell=False,
-            pty=False,
-            background=False,
-            input=False,
-            process_tree_stop=self.observations.get("descendant_reaped") == ENFORCED,
+            pty=supervised,
+            background=supervised,
+            input=supervised,
+            process_tree_stop=tree_stop,
             network_escalation=False,
             filtered_network=False,
             persistent_environment=False,
@@ -278,7 +289,7 @@ class NativeSandboxDriver:
             "deny_paths": list(PROTECTED_DENY_PATHS),
             "readonly_paths": list(PROTECTED_READONLY_PATHS),
             "network": "none",
-            "pty": False,
+            "pty": request.interactive,
             "deadline_seconds": max(1, int(request.timeout_seconds) + 5),
             "max_cpu_seconds": max(1, int(request.timeout_seconds) + 5),
             "max_processes": 64,
@@ -375,9 +386,9 @@ class NativeSandboxBackend:
             raise CommandBackendError(self.proof.reason_code or "native_sandbox_unavailable")
         if request.shell:
             raise CommandBackendError("native_sandbox_shell_source_denied")
-        if request.background:
+        if request.background and not self.features.background:
             raise CommandBackendError("selected_environment_background_unsupported")
-        if request.interactive:
+        if request.interactive and not self.features.pty:
             raise CommandBackendError("selected_environment_pty_unsupported")
         if request.network_policy_id:
             raise CommandBackendError("filtered_egress_windows_unsupported")
@@ -436,7 +447,12 @@ class NativeSandboxBackend:
         ]
         try:
             process = self._runner(
-                request, argv, request.workspace_root, environment, sink, pty=False
+                request,
+                argv,
+                request.workspace_root,
+                environment,
+                sink,
+                pty=request.interactive,
             )
         except BaseException:
             if egress is not None:

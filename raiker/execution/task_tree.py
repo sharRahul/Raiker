@@ -221,18 +221,18 @@ _GLOB_TOKEN = re.compile(r"\*\*/|\*\*|\*|\?|\[[^\]]*\]|[^*?\[]+")
 def glob_regex(pattern: str) -> re.Pattern[str]:
     """A ``Path.glob`` pattern as an anchored regex over ``/``-joined paths."""
     parts: list[str] = []
-    for token in _GLOB_TOKEN.findall(pattern.replace("\\", "/")):
-        if token == "**/":
+    for piece in _GLOB_TOKEN.findall(pattern.replace("\\", "/")):
+        if piece == "**/":
             parts.append("(?:[^/]+/)*")
-        elif token == "**":
+        elif piece == "**":
             parts.append(".*")
-        elif token == "*":
+        elif piece == "*":
             parts.append("[^/]*")
-        elif token == "?":
+        elif piece == "?":
             parts.append("[^/]")
-        elif token.startswith("["):
-            body = token[1:-1]
+        elif piece.startswith("["):
+            body = piece[1:-1]
             parts.append("[^" + re.escape(body[1:]) + "]" if body.startswith("!") else "[" + re.escape(body) + "]")
         else:
-            parts.append(re.escape(token))
+            parts.append(re.escape(piece))
     return re.compile("".join(parts) + "/?")

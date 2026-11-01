@@ -553,3 +553,63 @@ fn filtered_egress_reaches_only_the_proxy_socket_from_inside_the_namespace() {
     assert_eq!(lines[0], "pong", "{stdout}");
     assert!(lines[1].starts_with("direct-refused"), "{stdout}");
 }
+
+#[test]
+fn an_interactive_run_sees_a_terminal_inside_bubblewrap() {
+    use std::io::Read;
+    use std::os::fd::FromRawFd;
+    use std::process::Stdio;
+    let path = std::env::temp_dir().join(format!(
+        "raiker-linux-pty-{}-{}",
+        std::process::id(),
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos()
+    ));
+    std::fs::create_dir(&path).unwrap();
+    let workspace = Workspace(path);
+    let runner = workspace.0.join("runner");
+    std::fs::copy(env!("CARGO_BIN_EXE_raiker-command-runner"), &runner).unwrap();
+    let policy = serde_json::json!({
+        "workspace_root": workspace.0,
+        "cwd": workspace.0,
+        "profile_name": "raiker.pty.test",
+        "pty": true,
+        "max_processes": 4096,
+        "deadline_seconds": 15
+    });
+    let policy_path = workspace.0.join("policy.json");
+    std::fs::write(&policy_path, policy.to_string()).unwrap();
+    let (mut master, mut slave) = (0, 0);
+    let opened = unsafe {
+        libc::openpty(&mut master, &mut slave, std::ptr::null_mut(), std::ptr::null(), std::ptr::null())
+    };
+    assert_eq!(opened, 0);
+    let stdio = |fd: i32| unsafe { Stdio::from_raw_fd(libc::dup(fd)) };
+    let mut child = Command::new(&runner)
+        .arg("--policy")
+        .arg(&policy_path)
+        .arg("--")
+        .args(["/usr/bin/python3", "-c", "import os; print('tty', os.isatty(0), os.isatty(1))"])
+        .stdin(stdio(slave))
+        .stdout(stdio(slave))
+        .stderr(stdio(slave))
+        .spawn()
+        .unwrap();
+    unsafe { libc::close(slave) };
+    let status = child.wait().unwrap();
+    let mut file = unsafe { std::fs::File::from_raw_fd(master) };
+    let mut output = Vec::new();
+    let mut buffer = [0u8; 4096];
+    // Reading the master after the slave closes ends with EIO, not EOF.
+    while let Ok(read) = file.read(&mut buffer) {
+        if read == 0 {
+            break;
+        }
+        output.extend_from_slice(&buffer[..read]);
+    }
+    let text = String::from_utf8_lossy(&output);
+    assert!(status.success(), "{text}");
+    assert!(text.contains("tty True True"), "{text}");
+}

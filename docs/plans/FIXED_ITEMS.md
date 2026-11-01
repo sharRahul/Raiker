@@ -1584,6 +1584,8 @@ file you can open. The two capture sets that remain — `screenshots/pages/` and
 | [FIXED-1277](#fixed-1277--hosted-linux-ci-measured-egress-as-indeterminate-so-every-sandboxed-command-there-refused) | High | Native sandbox (Linux) | Fixed 2026-11-01 |
 | [FIXED-1278](#fixed-1278--linux-sandboxed-commands-failed-to-start-on-a-busy-session-rlimit_nproc) | High | Native sandbox (Linux) | Fixed 2026-11-01 |
 | [FIXED-1279](#fixed-1279--native-background-runs-were-lost-on-every-restart-of-raiker-bug-194-regression) | Medium | Commands | Fixed 2026-11-01 |
+| [FIXED-1280](#fixed-1280--python--ccode-and-python--ic-code-passed-the-command-policys--c-refusal) | Medium | Command policy | Fixed 2026-11-01 |
+| [FIXED-1281](#fixed-1281--sandboxed-commands-ran-the-first-program-on-raikers-path-or-a-copys-program-looked-up-from-raikers-folder) | Medium | Native sandbox | Fixed 2026-11-01 |
 
 ---
 
@@ -38652,4 +38654,24 @@ Found live in this round and fixed before it closed: re-applying a listener the 
 **Fixed.** On Linux a background run without downloads is started under the detached supervisor, which runs the runner; `restart_recovery` is reported only there.
 
 **Evidence.** `tests/test_command_supervisor_reattach.py` on real Bubblewrap (WSL2).
+
+## FIXED-1280 — `python -cCODE` and `python -Ic CODE` passed the command policy's `-c` refusal
+
+**Severity: Medium. Area: Command policy. Status: Fixed 2026-11-01.**
+
+**Observed.** The policy compared each whole argument with `-c`, so the attached (`-cCODE`) and clustered (`-Ic`) spellings Python accepts were let through.
+
+**Fixed.** Python's options are parsed as Python parses them, stopping at the script or the module; `-c` in any spelling is refused and `-m` names one of `venv`, `pip`, `pytest`, `unittest`.
+
+**Evidence.** `tests/test_project_setup_policy.py::test_other_code_and_other_cargo_commands_are_refused`.
+
+## FIXED-1281 — Sandboxed commands ran the first program on Raiker's path, or a copy's program looked up from Raiker's folder
+
+**Severity: Medium. Area: Native sandbox. Status: Fixed 2026-11-01.**
+
+**Observed.** A bare `python` resolved to the project's own `.venv` interpreter on another drive, which the Windows sandbox account cannot run; `.venv/bin/python` was looked up from Raiker's working folder rather than the copy; and a virtualenv's linked `bin/python` was refused as outside the workspace.
+
+**Fixed.** `command_executable` resolves a path-like name in the command's folder in the copy and a bare name to the first program the sandbox can reach; the binary check is on where the program sits, not what it links to.
+
+**Evidence.** `tests/test_project_setup_policy.py::test_a_real_copy_gets_its_own_virtualenv_and_promotes_none_of_it` on Windows 11 and WSL2.
 

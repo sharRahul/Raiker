@@ -17,6 +17,9 @@ What the snapshot deliberately leaves out, and why:
   files, so a write in the copy never reaches the original inode.
 * **Anything that is not a regular file or directory.** Devices, sockets and
   FIFOs are skipped.
+* **A toolchain's folders** (``ENVIRONMENT_NAMES``: ``.venv``, ``node_modules``,
+  caches, Cargo's ``target``). They are the task's environment: set up again in
+  the copy, never copied from the project and never promoted.
 
 A Git worktree is not a sandbox: this copy is only the *workspace*; the native
 runner is the boundary that keeps the task inside it.
@@ -47,6 +50,19 @@ from dataclasses import dataclass, field
 from pathlib import Path, PurePosixPath
 
 EXCLUDED_NAMES = frozenset({".git", ".raiker"})
+#: Folders a toolchain fills: installed dependencies and caches. They are the
+#: task's environment, not its work, so they are neither copied in from the
+#: project (a virtualenv's scripts name the project's own paths, and one
+#: `node_modules` can pass the copy's file limit alone) nor part of the change
+#: set the owner reviews: `python -m venv .venv` or `npm install` in a copy
+#: promotes nothing. Matched as folder names at any depth.
+ENVIRONMENT_NAMES = frozenset({
+    ".venv", "venv", "node_modules", "__pycache__", ".pytest_cache", ".mypy_cache",
+    ".ruff_cache", ".tox", ".nox",
+})
+#: At the copy's top only: where the package managers' caches land, because a
+#: sandboxed command's HOME is the copy.
+ENVIRONMENT_ROOT_NAMES = frozenset({".cache", ".npm", ".local", ".cargo"})
 DEFAULT_MAX_FILES = 200_000
 DEFAULT_MAX_BYTES = 4 * 1024**3
 _CHUNK = 1024 * 1024
@@ -135,11 +151,20 @@ def _walk(root: Path) -> Iterator[tuple[str, os.DirEntry[str] | None, str | None
                 if _is_link_like(entry):
                     yield relative.as_posix(), None, "link"
                 elif entry.is_dir(follow_symlinks=False):
-                    pending.append((Path(entry.path), relative))
+                    if not _is_environment(directory, entry.name, top=not prefix.parts):
+                        pending.append((Path(entry.path), relative))
                 elif entry.is_file(follow_symlinks=False):
                     yield relative.as_posix(), entry, None
                 else:
                     yield relative.as_posix(), None, "special_file"
+
+
+def _is_environment(directory: Path, name: str, *, top: bool) -> bool:
+    """Whether the folder *name* in *directory* is a toolchain's, not the task's."""
+    if name in ENVIRONMENT_NAMES or (top and name in ENVIRONMENT_ROOT_NAMES):
+        return True
+    # Cargo's build output, recognised by the manifest beside it.
+    return name == "target" and (directory / "Cargo.toml").is_file()
 
 
 def _hash_file(path: Path) -> str:

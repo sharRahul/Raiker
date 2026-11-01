@@ -34,7 +34,7 @@ from pathlib import Path
 
 ALLOWED_SHELL_COMMANDS: frozenset[str] = frozenset({
     "ls", "cat", "head", "tail", "echo", "pwd", "which",
-    "git", "python", "pip", "node", "npm",
+    "git", "python", "python3", "pip", "node", "npm", "cargo",
     "diff", "grep", "find", "sort", "wc", "uniq",
 })
 
@@ -267,8 +267,9 @@ _DANGEROUS_FLAGS: dict[str, frozenset[str]] = {
         "-c", "--exec-path", "--upload-pack", "--receive-pack", "--exec",
         "-u", "--upload-archive",
     }),
-    "python": frozenset({"-c", "-m"}),
-    "python3": frozenset({"-c", "-m"}),
+    # `--config` sets any Cargo key for one command, `target.<triple>.runner`
+    # (a program Cargo runs) among them.
+    "cargo": frozenset({"--config", "-Z"}),
     "node": frozenset({"-e", "--eval", "-p", "--print", "--require", "-r"}),
     "npm": frozenset({"--ignore-scripts=false"}),
     "find": frozenset({"-exec", "-execdir", "-ok", "-okdir", "-delete", "-fprintf"}),
@@ -278,6 +279,20 @@ _DANGEROUS_FLAGS: dict[str, frozenset[str]] = {
     "awk": frozenset({"-f"}),
     "sed": frozenset({"-i", "--in-place", "-f", "--file", "-s"}),
 }
+
+#: The modules `python -m` may run: setting up a project-local environment and
+#: running its tests. A script in the project already runs any code the
+#: project holds, so these add a way to reach the project's own tools, not a
+#: way to run code the project does not contain. Any other module is refused.
+PYTHON_MODULES: frozenset[str] = frozenset({"venv", "pip", "pytest", "unittest"})
+
+#: What `cargo` may be asked to do: build, check, test and fetch the project.
+#: Not `install` (it writes outside the project) and not plugins (`cargo foo`
+#: runs a `cargo-foo` program found on the path).
+CARGO_SUBCOMMANDS: frozenset[str] = frozenset({
+    "build", "check", "test", "fetch", "run", "fmt", "clippy", "doc", "bench",
+    "metadata", "tree", "clean",
+})
 
 #: Programs a governed shell action may name. Everything else is refused by name
 #: rather than by behaviour, so the refusal is legible.
@@ -344,7 +359,20 @@ def validate_command(
     # An absolute or relative path to the binary must itself be inside the
     # workspace; a bare name is resolved by PATH and is covered by the allowlist.
     if "/" in argv[0] or "\\" in argv[0]:
-        _assert_contained(argv[0], root, "command_binary_outside_workspace")
+        # The program's own location, not what it links to: a virtualenv's
+        # `bin/python` is a link to the system interpreter it was made from.
+        # Its folder is resolved, so a linked folder cannot carry it outside.
+        named = Path(argv[0])
+        located = (named if named.is_absolute() else root / named).parent.resolve() / named.name
+        _assert_contained(str(located), root, "command_binary_outside_workspace", follow=False)
+
+    if binary == "cargo":
+        subcommand = next((part for part in argv[1:] if not part.startswith("-")), "")
+        if subcommand not in CARGO_SUBCOMMANDS:
+            raise CommandRejected("command_subcommand_denied", f"cargo {subcommand}"[:80])
+
+    if binary in {"python", "python3"}:
+        _assert_python_options(binary, argv)
 
     dangerous = _DANGEROUS_FLAGS.get(binary, frozenset())
     for index, argument in enumerate(argv[1:], start=1):
@@ -362,6 +390,44 @@ def validate_command(
             _assert_contained(argument, root, "command_path_outside_workspace")
 
     return SafeCommand(tuple(argv), binary, root)
+
+
+#: Python options that take a value, so the next argument is not the script.
+_PYTHON_VALUE_OPTIONS = frozenset("WXQ")
+
+
+def _assert_python_options(binary: str, argv: list[str]) -> None:
+    """Python's own options, read the way Python reads them.
+
+    Short options cluster (`-Ic` is `-I -c`) and take their value attached or
+    as the next argument (`-mvenv`, `-m venv`), so comparing whole arguments
+    with `-c` let `-cCODE` through. Reading stops where Python's does: at the
+    script, or at `-m`'s module, after which every argument belongs to it
+    (`pytest -c setup.cfg` is pytest's option, not Python's).
+    """
+    index = 1
+    while index < len(argv):
+        argument = argv[index]
+        if argument == "--" or not argument.startswith("-") or argument == "-":
+            return
+        if argument.startswith("--"):
+            index += 1
+            continue
+        cluster = argument[1:]
+        for position, option in enumerate(cluster):
+            rest = cluster[position + 1:]
+            if option == "c":
+                raise CommandRejected("command_flag_denied", f"{binary} -c")
+            if option == "m":
+                module = rest or (argv[index + 1] if index + 1 < len(argv) else "")
+                if module not in PYTHON_MODULES:
+                    raise CommandRejected("command_module_denied", f"{binary} -m {module}"[:80])
+                return
+            if option in _PYTHON_VALUE_OPTIONS:
+                if not rest:
+                    index += 1
+                break
+        index += 1
 
 
 def _assert_no_shell_syntax(argument: str) -> None:
@@ -387,12 +453,13 @@ def _assert_no_shell_syntax(argument: str) -> None:
             )
 
 
-def _assert_contained(value: str, root: Path, reason: str) -> None:
+def _assert_contained(value: str, root: Path, reason: str, *, follow: bool = True) -> None:
     """Refuse a path that leaves the workspace, or reaches its private internals."""
     if value.startswith("~"):
         raise CommandRejected("command_tilde_denied", value[:80])
     candidate = Path(value)
-    resolved = (candidate if candidate.is_absolute() else root / candidate).resolve()
+    absolute = candidate if candidate.is_absolute() else root / candidate
+    resolved = absolute.resolve() if follow else absolute
     try:
         relative = resolved.relative_to(root)
     except ValueError:

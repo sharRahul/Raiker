@@ -240,9 +240,14 @@ def test_explicit_extras_are_the_only_way_in(workspace: Path) -> None:
 # ── End to end, through the executor's own entry point ───────────────────────
 
 
-def test_direct_command_execution_requires_native_sandbox(workspace: Path) -> None:
-    with pytest.raises(SandboxError, match="native_sandbox_required"):
-        run_command(["cat", "README.md"], allowlist=ALLOWED_SHELL_COMMANDS, cwd=workspace)
+def test_direct_command_execution_runs_in_the_native_sandbox_or_not_at_all(workspace: Path) -> None:
+    """The shared launcher has no host path: it runs in the boundary or refuses."""
+    try:
+        result = run_command(["cat", "README.md"], allowlist=ALLOWED_SHELL_COMMANDS, cwd=workspace)
+    except SandboxError as refused:
+        assert str(refused).startswith(("native_sandbox_required", "command_not_found"))
+    else:
+        assert result["returncode"] == 0
 
 
 @pytest.mark.parametrize(

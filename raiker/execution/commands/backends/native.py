@@ -427,7 +427,12 @@ class NativeSandboxBackend:
             raise CommandBackendError(reason or "native_sandbox_artifact_missing")
 
         environment = sandbox_environment(workspace_root=request.workspace_root)
-        executable = shutil.which(request.argv_template[0], path=environment.get("PATH"))
+        executable = command_executable(
+            request.argv_template[0],
+            cwd=request.workspace_root / request.cwd,
+            search_path=environment.get("PATH", ""),
+            project=original.workspace_root,
+        )
         if executable is None:
             # `portable_command`'s Windows shim rewrites `echo` and `cat` into
             # the interpreter Raiker itself runs on. That is right for the host
@@ -592,6 +597,28 @@ def task_workspace_registry(
 #: than most hooks take, so a hook reuses a measurement this recent; commands
 #: keep probing per run, because their receipts state what was measured.
 _HOOK_PROOF_TTL_SECONDS = 30.0
+def command_executable(name: str, *, cwd: Path, search_path: str, project: Path) -> str | None:
+    """The program a sandboxed command names, as the sandbox will find it.
+
+    A name with a separator is the copy's own (`.venv/bin/python`), so it is
+    looked up from the command's folder in the copy, not from Raiker's. A bare
+    name is the first on the path the sandbox can reach: never in the project
+    or the owner's home, and on Windows only on the system drive.
+    """
+    from raiker.execution.commands.sandboxed_program import sandbox_interpreter
+
+    if "/" in name or "\\" in name:
+        candidate = cwd / name
+        for option in (candidate, candidate.with_name(candidate.name + ".exe")):
+            if option.is_file():
+                return str(option)
+        return None
+    try:
+        return str(sandbox_interpreter(name, search_path, project.resolve()))
+    except FileNotFoundError:
+        return None
+
+
 #: Interpreters whose install prefix is mounted read-only when it lives
 #: outside `/usr`: a hosted runner's Python, a pyenv or nvm install. Nothing
 #: else is: a tool's prefix in the owner's home can hold its credentials

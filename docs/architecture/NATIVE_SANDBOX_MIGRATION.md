@@ -251,6 +251,39 @@ the default gateway, and hosted CI networks drop that packet, so egress read
 `indeterminate` and every sandboxed command there was refused. It now connects
 to a listener on the host's own outward address for the length of the probe.
 
+## Project setup with project-local dependencies (2026-11-01)
+
+A task copy is set up with the project's own tools, and what they install
+stays in the copy:
+
+* **Commands.** `python -m` may run `venv`, `pip`, `pytest` or `unittest`
+  (any other module is refused); `cargo` may `build`, `check`, `test`,
+  `fetch`, `run`, `fmt`, `clippy`, `doc`, `bench`, `metadata`, `tree` or
+  `clean`, never `install`, a `+toolchain` override, `--config` or `-Z`.
+  `npm install` / `npm ci` were already allowed. A script in the project
+  already runs any code the project holds, so these reach the project's own
+  tools rather than code it does not contain. Python's options are now read
+  the way Python reads them, which also closed `-cCODE` and `-Ic CODE`, two
+  spellings of `-c` the old whole-argument comparison let through.
+* **Where things land.** `.venv`, `venv`, `node_modules`, `__pycache__`, test
+  and linter caches, Cargo's `target` (beside a `Cargo.toml`) and, at the
+  copy's top, the package managers' caches under the sandbox's HOME
+  (`.cache`, `.npm`, `.local`, `.cargo`) are the task's environment. They are
+  not copied in from the project and never appear in the change set the owner
+  reviews, so setting a copy up promotes nothing.
+* **Finding the program.** A command naming `.venv/bin/python` runs the
+  copy's own interpreter (looked up from the command's folder in the copy, not
+  from Raiker's), and a virtualenv's `bin/python` link to the system
+  interpreter is accepted because the check is on where the program sits, not
+  what it links to. A bare name resolves to the first program on the path the
+  sandbox can reach, never the project's or the owner's home's.
+
+Measured on Windows 11 (restricted account) and WSL2 Ubuntu 24.04:
+`python -m venv .venv` then `.venv/…/python -m pip --version` succeed in the
+copy, the project gains no `.venv`, and the copy's change set is empty
+(`tests/test_project_setup_policy.py`). Installing packages needs downloads on
+(`pypi.org`, `registry.npmjs.org`, `crates.io` are on the default list).
+
 ## Resource limits, measured (2026-11-01)
 
 **Linux.** Where the owner's systemd user manager runs (its bus is at

@@ -294,7 +294,9 @@ have made this wait for the Apple certificate; a `sudoers` drop-in does not.
   `0700`, with one ACL entry letting the account *search* it (not list it);
 * writes `/etc/sudoers.d/raiker-sandbox`, checked with `visudo -c` before it
   goes live: the owner may run, as the account only, the installed runner's
-  `--account-run` and `/bin/kill -9 -1`. Nothing as root.
+  `--account-run` and `--account-stop` (which calls `kill(-1, SIGKILL)`).
+  Nothing as root. (`/bin/kill -9 -1` through `sudo` exited non-zero on
+  macOS 15 CI, so the runner sends the signal itself.)
 
 A run in a copy under the base (`account::owns`): the owner side takes a
 machine-wide lock the account cannot open, kills anything the account still
@@ -306,7 +308,7 @@ The account side checks its identity, reads and deletes the handoff, starts
 `sandbox-exec` with the same profile as before, and supervises: it sums
 `ri_phys_footprint` over the account's processes every 50 ms and kills all of
 them (`kill(-1)`) past `max_memory_bytes`, at the deadline, or when the owner
-side is gone. When the run ends the owner side runs `kill -9 -1` as the account
+side is gone. When the run ends the owner side runs `--account-stop` as the account
 — every descendant, detached or not — checks none survived, and removes the
 copy's grant. `RLIMIT_NPROC` is per user, which is exactly this run.
 

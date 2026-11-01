@@ -11,7 +11,7 @@
 //! before. Every process a run starts, detached or not, belongs to that
 //! account, so:
 //!
-//! * **stopping a run** is `kill -9 -1` as the account, which reaches every
+//! * **stopping a run** is `kill(-1, SIGKILL)` as the account, which reaches every
 //!   one of its processes and nothing else;
 //! * **memory** is the sum of `ri_phys_footprint` over the account's
 //!   processes, polled by the account-side runner, and the run is stopped
@@ -27,8 +27,8 @@
 //! root-owned at [`INSTALLED_RUNNER`], creates the copy base [`COPIES`]
 //! (owner-owned, `0700`, searchable by the account through one ACL entry), and
 //! writes one `sudoers` drop-in that lets the owner — and only the owner — run
-//! exactly two programs as the account: the installed runner's `--account-run`
-//! mode, and `/bin/kill -9 -1`. No helper daemon and no Developer ID signature
+//! exactly two commands as the account: the installed runner's `--account-run`
+//! and `--account-stop` modes. No helper daemon and no Developer ID signature
 //! are needed, and the owner gains nothing: the account holds less than the
 //! owner already does.
 //!
@@ -54,7 +54,6 @@ pub const COPIES: &str = "/Library/RaikerSandbox/copies";
 const LOCK: &str = "/Library/RaikerSandbox/copies/.account.lock";
 const SUDOERS: &str = "/etc/sudoers.d/raiker-sandbox";
 const SUDO: &str = "/usr/bin/sudo";
-const KILL: &str = "/bin/kill";
 const CHMOD: &str = "/bin/chmod";
 const FIND: &str = "/usr/bin/find";
 const DSCL: &str = "/usr/bin/dscl";
@@ -316,7 +315,7 @@ pub fn sudoers_rule(owner: u32) -> String {
          # removed by `--reset-account`. The owner may run exactly these two programs\n\
          # as the sandbox account, which owns nothing; never as anyone else.\n\
          Defaults>{ACCOUNT} env_reset, !use_pty, !lecture\n\
-         #{owner} ALL=({ACCOUNT}) NOPASSWD: {INSTALLED_RUNNER} --account-run *, {KILL} -9 -1\n"
+         #{owner} ALL=({ACCOUNT}) NOPASSWD: {INSTALLED_RUNNER} --account-run *, {INSTALLED_RUNNER} --account-stop\n"
     )
 }
 
@@ -432,21 +431,51 @@ impl Drop for AccountLock {
     }
 }
 
-/// `kill -9 -1` as the account: every process it owns, and nothing else.
-/// Run before a run (a crashed Raiker can leave one behind) and after it.
+/// Every process the account owns, and nothing else, stopped by the installed
+/// runner's `--account-stop` running as the account. Run before a run (a
+/// crashed Raiker can leave one behind) and after it.
+///
+/// Not `/bin/kill -9 -1`: measured on macOS 15, BSD `kill` exits non-zero
+/// through `sudo` there, and its argument rules are not ours to rely on. The
+/// runner calls `kill(-1, SIGKILL)` itself and reports only its own failure.
 fn stop_account_processes() -> Result<(), String> {
-    let status = Command::new(SUDO)
-        .args(["-n", "-u", ACCOUNT, KILL, "-9", "-1"])
+    let output = Command::new(SUDO)
+        .args(["-n", "-u", ACCOUNT, INSTALLED_RUNNER, "--account-stop"])
+        .current_dir("/")
         .stdin(std::process::Stdio::null())
-        .stdout(std::process::Stdio::null())
-        .stderr(std::process::Stdio::null())
-        .status()
+        .output()
         .map_err(|_| "native_sandbox_account_stop_failed")?;
-    // `kill -1` with nothing to signal exits 1; that is the expected case.
-    match status.code() {
-        Some(0 | 1) => Ok(()),
-        _ => Err("native_sandbox_account_stop_failed".into()),
+    if output.status.success() {
+        return Ok(());
     }
+    let detail: String = String::from_utf8_lossy(&output.stderr)
+        .lines()
+        .next()
+        .unwrap_or("")
+        .chars()
+        .filter(|character| !character.is_control())
+        .take(160)
+        .collect();
+    Err(format!(
+        "native_sandbox_account_stop_failed:{}:{detail}",
+        output.status.code().unwrap_or(-1)
+    ))
+}
+
+/// `--account-stop`, started by `sudo` as the account: `kill(-1, SIGKILL)`,
+/// which reaches every process with this uid except the caller. `ESRCH` means
+/// there was nothing to stop.
+pub fn account_stop() -> Result<i32, String> {
+    let account = account().ok_or("native_sandbox_account_unconfigured")?;
+    if unsafe { libc::getuid() } != account.uid || unsafe { libc::geteuid() } != account.uid {
+        return Err("native_sandbox_account_identity_mismatch".into());
+    }
+    if unsafe { libc::kill(-1, libc::SIGKILL) } != 0
+        && std::io::Error::last_os_error().raw_os_error() != Some(libc::ESRCH)
+    {
+        return Err("native_sandbox_account_stop_failed".into());
+    }
+    Ok(0)
 }
 
 fn account_has_processes(uid: u32) -> bool {
@@ -1053,7 +1082,8 @@ mod tests {
             [
                 "Defaults>_raikersandbox env_reset, !use_pty, !lecture",
                 "#501 ALL=(_raikersandbox) NOPASSWD: \
-                 /Library/RaikerSandbox/bin/raiker-command-runner --account-run *, /bin/kill -9 -1",
+                 /Library/RaikerSandbox/bin/raiker-command-runner --account-run *, \
+                 /Library/RaikerSandbox/bin/raiker-command-runner --account-stop",
             ]
         );
         assert!(!rule.contains("(ALL)") && !rule.contains("root"));

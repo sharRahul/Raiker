@@ -133,6 +133,13 @@ fn dispatch(arguments: &[String]) -> Result<i32, String> {
             return Ok(0);
         }
         #[cfg(target_os = "macos")]
+        Some("--account-stop") => {
+            if arguments.len() != 1 {
+                return Err("runner_arguments_invalid".into());
+            }
+            return boundary::account::account_stop();
+        }
+        #[cfg(target_os = "macos")]
         Some("--account-run") => {
             let handoff = arguments.get(1).ok_or("runner_arguments_invalid")?;
             if arguments.len() != 2 {

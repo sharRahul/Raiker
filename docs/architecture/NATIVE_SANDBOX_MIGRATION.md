@@ -248,6 +248,35 @@ unavailable until disposable workspaces are wired in (see `TO_BE_FIXED.md`).
 The Python suite still has the same 189 pre-migration host-execution failures
 it had before Docker was removed; none are new.
 
+## Open designs: macOS containment and a WSL2 backend (2026-11-01)
+
+**macOS process tree and memory.** XNU has no PID namespace, `RLIMIT_AS` is
+not enforced and `RLIMIT_NPROC` counts the whole user, so a command can leave
+a detached descendant running and its memory is unbounded. Polling the
+runner's children cannot close this: a double fork followed by `setsid`
+reparents the grandchild to `launchd` between two polls. The one mechanism
+that holds is the one the Windows boundary already uses: run commands as a
+dedicated, unprivileged account created once with the owner's approval
+(`sysadminctl`, an administrator prompt), so every process the run starts —
+detached or not — is that account's, and stopping the run is killing all of
+that account's processes. Memory is then bounded by polling the account's
+total footprint (`proc_pid_rusage` `ri_phys_footprint`) and stopping the run
+past its limit. Until that exists, macOS keeps background and terminal runs
+refused (`descendant_reaped` is `indeterminate`), which is fail-closed.
+
+**WSL2 as a Windows option.** Running the Linux runner inside a WSL2
+distribution (`wsl.exe -d <distro> --exec …`) would give Windows owners
+Bubblewrap, seccomp, a network namespace and Linux toolchains. What it needs:
+the Linux runner shipped in the Windows package; every path translated to its
+`/mnt/<drive>` form (copy, working folder, policy); the Linux `PATH` rather
+than the Windows one; and a probe observation that the command cannot start a
+Windows program through WSL interop (`binfmt_misc` registers `/init` with the
+fix-binary flag, so hiding `/mnt` and `/run/WSL` must be measured, not
+assumed). Allow-listed downloads would stay off in this mode at first: a
+Windows `AF_UNIX` proxy socket is not reachable from a WSL2 namespace. The
+restricted-account boundary already runs Windows toolchains, so this is an
+addition for Linux toolchains, not a gap in containment.
+
 ## MCP servers and plugin code (2026-11-01)
 
 A local stdio MCP server and an installed plugin's entrypoint are both an

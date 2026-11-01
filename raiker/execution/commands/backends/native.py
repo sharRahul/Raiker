@@ -123,16 +123,20 @@ class NativeSandboxProof:
         (`descendant_reaped`; its PID namespace dies with the runner), and so
         does the Windows restricted account (a kill-on-close Job Object owns
         the tree; runs in one copy may overlap, other copies wait). Only
-        Bubblewrap offers a terminal: `CreateProcessWithLogonW` cannot attach
-        a pseudo-console. On macOS the sandbox account owns every process a
-        run starts, so the run's tree stops with it (`macos_account`); plain
-        Seatbelt cannot contain a detached descendant. Background runs stay
-        off there for now: the account serves one run at a time, so a
-        background run would hold every other command.
+        Bubblewrap and the macOS sandbox account offer a terminal:
+        `CreateProcessWithLogonW` cannot attach a pseudo-console. On macOS a
+        pool of sandbox accounts serves runs, each account one run at a time,
+        and the account owns every process its run starts, so the run's tree
+        stops with it (`macos_account`) and runs in different copies overlap;
+        plain Seatbelt cannot contain a detached descendant.
         """
         tree_stop = self.observations.get("descendant_reaped") == ENFORCED
-        terminal = tree_stop and self.boundary == "bubblewrap"
-        background = tree_stop and self.boundary in {"bubblewrap", "restricted_account"}
+        terminal = tree_stop and self.boundary in {"bubblewrap", "macos_account"}
+        background = tree_stop and self.boundary in {
+            "bubblewrap",
+            "restricted_account",
+            "macos_account",
+        }
         # A background run outlives a restart where a detached supervisor runs
         # it (POSIX); with downloads on it stays in-process and is still lost.
         recovery = background and supervisor_supported()

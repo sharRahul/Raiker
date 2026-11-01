@@ -9,10 +9,9 @@ use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
 use std::time::{Duration, Instant};
 
-/// The account serves one run at a time, and a run's deadline includes its
-/// wait for the account. Run in parallel, these tests queued behind each other
-/// and timed out (`native_sandbox_account_busy`) on the slower Intel runner;
-/// that is the designed behaviour, not what these tests measure.
+/// Each pool account serves one run at a time. These tests measure one run
+/// each and stay serial so a slow runner never makes them wait for an
+/// account; the overlap test below measures concurrency on its own.
 fn serial() -> std::sync::MutexGuard<'static, ()> {
     static ACCOUNT: std::sync::Mutex<()> = std::sync::Mutex::new(());
     ACCOUNT
@@ -62,7 +61,7 @@ fn copy_under(base: &Path, name: &str) -> Copy {
 
 /// The policy lives beside the copy's owner, never in the copy: the runner
 /// reads it as the owner before anything runs as the account.
-fn run(copy: &Copy, memory: u64, argv: &[&str]) -> Output {
+fn write_policy(copy: &Copy, memory: u64, pty: bool) -> PathBuf {
     let policy = std::env::temp_dir().join(format!(
         "raiker-account-policy-{}.json",
         copy.0.file_name().unwrap().to_string_lossy()
@@ -72,11 +71,16 @@ fn run(copy: &Copy, memory: u64, argv: &[&str]) -> Output {
         serde_json::json!({
             "workspace_root": copy.0, "cwd": copy.0,
             "profile_name": "raiker.account.test", "deadline_seconds": 30,
-            "max_memory_bytes": memory, "max_processes": 64
+            "max_memory_bytes": memory, "max_processes": 64, "pty": pty
         })
         .to_string(),
     )
     .unwrap();
+    policy
+}
+
+fn run(copy: &Copy, memory: u64, argv: &[&str]) -> Output {
+    let policy = write_policy(copy, memory, false);
     let output = Command::new(runner())
         .arg("--policy")
         .arg(&policy)
@@ -135,7 +139,7 @@ fn a_command_runs_as_the_account_and_writes_only_its_copy() {
         "{stdout} {}",
         String::from_utf8_lossy(&output.stderr)
     );
-    assert!(stdout.starts_with("_raikersandbox\n"), "{stdout}");
+    assert!(stdout.starts_with("_raikersandbox"), "{stdout}");
     assert!(stdout.contains("from the owner"), "{stdout}");
     // The owner reads, changes and deletes what the account made: the change
     // set can be reviewed, applied and discarded.
@@ -276,6 +280,67 @@ fn a_copy_outside_the_base_never_runs_as_the_account() {
     let copy = Copy(std::fs::canonicalize(&outside).unwrap());
     let output = run(&copy, 2 * GIB, &["/usr/bin/id", "-un"]);
     assert!(!String::from_utf8_lossy(&output.stdout).contains("_raikersandbox"));
+}
+
+#[test]
+fn runs_in_two_copies_overlap_on_different_accounts() {
+    let _serial = serial();
+    let Some(base) = configured() else { return };
+    let first = copy_under(&base, "overlap-a");
+    let second = copy_under(&base, "overlap-b");
+    let start = |copy: &Copy| {
+        let policy = write_policy(copy, 2 * GIB, false);
+        let child = Command::new(runner())
+            .arg("--policy")
+            .arg(&policy)
+            .args(["--", "/bin/sh", "-c", "id -un; sleep 3"])
+            .stdout(std::process::Stdio::piped())
+            .spawn()
+            .unwrap();
+        (child, policy)
+    };
+    let began = Instant::now();
+    let (a, policy_a) = start(&first);
+    let (b, policy_b) = start(&second);
+    let a = a.wait_with_output().unwrap();
+    let b = b.wait_with_output().unwrap();
+    let elapsed = began.elapsed();
+    let _ = std::fs::remove_file(policy_a);
+    let _ = std::fs::remove_file(policy_b);
+    let name = |output: &Output| String::from_utf8_lossy(&output.stdout).trim().to_owned();
+    assert!(a.status.success() && b.status.success(), "{a:?} {b:?}");
+    assert!(name(&a).starts_with("_raikersandbox"), "{}", name(&a));
+    // Two accounts, so each run's tree is still exactly one account's.
+    assert_ne!(name(&a), name(&b));
+    // Serial runs would take six seconds.
+    assert!(elapsed < Duration::from_millis(5500), "{elapsed:?}");
+}
+
+#[test]
+fn a_terminal_run_sees_its_terminal_and_cannot_type_into_it() {
+    let _serial = serial();
+    let Some(base) = configured() else { return };
+    let copy = copy_under(&base, "terminal");
+    let policy = write_policy(&copy, 2 * GIB, true);
+    // `script` gives the runner a pseudo-terminal as its stdio, as Raiker
+    // does. TIOCSTI is _IOW('t', 114, char).
+    let check = "test -t 0 && test -t 1 && echo tty-ok; \
+                 /usr/bin/perl -e 'ioctl(STDIN, 0x80017472, \"x\") or print \"sti-refused\\n\"'";
+    let output = Command::new("/usr/bin/script")
+        .args(["-q", "/dev/null", runner(), "--policy"])
+        .arg(&policy)
+        .args(["--", "/bin/sh", "-c", check])
+        .stdin(std::process::Stdio::null())
+        .output()
+        .unwrap();
+    let _ = std::fs::remove_file(&policy);
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(
+        stdout.contains("tty-ok"),
+        "{stdout} {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert!(stdout.contains("sti-refused"), "{stdout}");
 }
 
 unsafe extern "C" {

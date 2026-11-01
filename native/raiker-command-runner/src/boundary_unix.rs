@@ -898,6 +898,15 @@ pub fn macos_profile(policy: &LaunchPolicy) -> Result<String, String> {
         "(allow file-write* (require-all (subpath \"{root}\"){unwritable}))\n"
     ));
     profile.push_str("(allow file-write* (literal \"/dev/null\"))\n");
+    if policy.pty {
+        // The terminal Raiker handed the run, used through the descriptors it
+        // inherited: reads, writes and terminal ioctls on a pseudo-terminal
+        // device. Opening another user's terminal stays refused by its mode.
+        profile.push_str(
+            "(allow file-read-data file-write-data file-ioctl \
+             (regex #\"^/dev/ttys[0-9]+$\"))\n",
+        );
+    }
     for relative in &policy.deny_paths {
         let path = policy.workspace_root.join(relative);
         profile.push_str(&format!(

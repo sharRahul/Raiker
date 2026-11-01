@@ -496,9 +496,10 @@ def test_feature_contract_refuses_delivery_without_quarantine() -> None:
         ("restricted_account", "indeterminate", False, False),
         ("appcontainer", "enforced", False, False),
         ("seatbelt", "enforced", False, False),
-        # The macOS sandbox account stops the whole tree, but serves one run
-        # at a time, so a background run would hold every other command.
-        ("macos_account", "enforced", False, False),
+        # The macOS sandbox accounts stop the whole tree, and a pool of them
+        # lets a background run proceed beside other commands.
+        ("macos_account", "enforced", True, True),
+        ("macos_account", "indeterminate", False, False),
     ),
 )
 def test_background_and_terminals_need_a_measured_tree_stop(

@@ -17,18 +17,21 @@
 //!   processes, polled by the account-side runner, and the run is stopped
 //!   past its limit;
 //! * **process count** is `RLIMIT_NPROC`, which counts per user — exact here,
-//!   because the account is used by one run at a time.
+//!   because an account is used by one run at a time.
 //!
-//! Runs are serialised by a lock the account cannot open, so "all of the
-//! account's processes" is always exactly one run's tree.
+//! There is a small pool of such accounts ([`POOL_SIZE`]: `_raikersandbox`,
+//! `_raikersandbox1`, …). A run takes whichever is free, holding that
+//! account's lock (which no account can open) for its whole life, so "all of
+//! the account's processes" is always exactly one run's tree, and runs in
+//! different copies overlap instead of queueing behind each other.
 //!
 //! Setup is one-time and owner-approved (`sudo raiker-command-runner
 //! --setup-account`). It creates the account and group, installs this runner
 //! root-owned at [`INSTALLED_RUNNER`], creates the copy base [`COPIES`]
 //! (owner-owned, `0700`, searchable by the account through one ACL entry), and
 //! writes one `sudoers` drop-in that lets the owner — and only the owner — run
-//! exactly two commands as the account: the installed runner's `--account-run`
-//! and `--account-stop` modes. No helper daemon and no Developer ID signature
+//! exactly two commands as a pool account: the installed runner's
+//! `--account-run` and `--account-stop` modes. No helper daemon and no Developer ID signature
 //! are needed, and the owner gains nothing: the account holds less than the
 //! owner already does.
 //!
@@ -51,7 +54,8 @@ pub const ACCOUNT: &str = "_raikersandbox";
 pub const BASE: &str = "/Library/RaikerSandbox";
 pub const INSTALLED_RUNNER: &str = "/Library/RaikerSandbox/bin/raiker-command-runner";
 pub const COPIES: &str = "/Library/RaikerSandbox/copies";
-const LOCK: &str = "/Library/RaikerSandbox/copies/.account.lock";
+/// How many accounts runs are spread over. Each serves one run at a time.
+pub const POOL_SIZE: usize = 4;
 const SUDOERS: &str = "/etc/sudoers.d/raiker-sandbox";
 const SUDO: &str = "/usr/bin/sudo";
 const CHMOD: &str = "/bin/chmod";
@@ -79,17 +83,57 @@ const OWNER_DIRECTORY_RIGHTS: &str = "list,add_file,search,delete,add_subdirecto
 // ── Status ─────────────────────────────────────────────────────────────────
 
 struct Account {
+    name: String,
     uid: u32,
 }
 
-fn account() -> Option<Account> {
-    let name = CString::new(ACCOUNT).ok()?;
-    let entry = unsafe { libc::getpwnam(name.as_ptr()) };
+/// The name of pool account *index*: the first keeps the original name, so a
+/// host set up before the pool keeps its account.
+pub fn member_name(index: usize) -> String {
+    if index == 0 {
+        ACCOUNT.to_owned()
+    } else {
+        format!("{ACCOUNT}{index}")
+    }
+}
+
+fn member_lock(index: usize) -> String {
+    if index == 0 {
+        format!("{COPIES}/.account.lock")
+    } else {
+        format!("{COPIES}/.account{index}.lock")
+    }
+}
+
+fn lookup(name: &str) -> Option<Account> {
+    let c_name = CString::new(name).ok()?;
+    let entry = unsafe { libc::getpwnam(c_name.as_ptr()) };
     if entry.is_null() {
         return None;
     }
     let entry = unsafe { &*entry };
-    Some(Account { uid: entry.pw_uid })
+    Some(Account {
+        name: name.to_owned(),
+        uid: entry.pw_uid,
+    })
+}
+
+/// Every pool account, or `None` if any is missing.
+fn members() -> Option<Vec<Account>> {
+    (0..POOL_SIZE)
+        .map(|index| lookup(&member_name(index)))
+        .collect()
+}
+
+/// The pool account this process runs as (the account side), if any.
+fn current_member() -> Option<Account> {
+    let uid = unsafe { libc::getuid() };
+    if unsafe { libc::geteuid() } != uid {
+        return None;
+    }
+    (0..POOL_SIZE)
+        .filter_map(|index| lookup(&member_name(index)))
+        .find(|member| member.uid == uid)
 }
 
 /// Whether the installed runner is this runner, byte for byte. The `sudoers`
@@ -111,7 +155,9 @@ fn root_owned_file(path: &str) -> bool {
 /// Whether the account boundary is set up for the user running this.
 pub fn status() -> Value {
     let owner = unsafe { libc::getuid() };
-    let account = account();
+    let present = (0..POOL_SIZE)
+        .filter(|index| lookup(&member_name(*index)).is_some())
+        .count();
     let copies = fs::symlink_metadata(COPIES).ok();
     let copies_owned = copies
         .as_ref()
@@ -121,10 +167,12 @@ pub fn status() -> Value {
     let current = installed && installed_runner_current();
     let sudoers = root_owned_file(SUDOERS);
     json!({
-        "configured": account.is_some() && copies_owned && installed && current && sudoers,
+        "configured": present == POOL_SIZE && copies_owned && installed && current && sudoers,
         "account": ACCOUNT,
+        "pool_size": POOL_SIZE,
         "base": COPIES,
-        "account_present": account.is_some(),
+        "account_present": present == POOL_SIZE,
+        "accounts_present": present,
         "copies_owned_by_owner": copies_owned,
         "runner_installed": installed,
         "runner_current": current,
@@ -184,8 +232,8 @@ fn free_id(used_users: &[u32], used_groups: &[u32]) -> Option<u32> {
         .find(|id| !used_users.contains(id) && !used_groups.contains(id))
 }
 
-fn ensure_account() -> Result<Account, String> {
-    if let Some(existing) = account() {
+fn ensure_account(name: &str) -> Result<Account, String> {
+    if let Some(existing) = lookup(name) {
         return Ok(existing);
     }
     let id = free_id(
@@ -194,8 +242,8 @@ fn ensure_account() -> Result<Account, String> {
     )
     .ok_or("native_sandbox_account_no_free_id")?;
     let id_text = id.to_string();
-    let group = format!("/Groups/{ACCOUNT}");
-    let user = format!("/Users/{ACCOUNT}");
+    let group = format!("/Groups/{name}");
+    let user = format!("/Users/{name}");
     let failure = "native_sandbox_account_create_failed";
     for arguments in [
         vec![".", "-create", &group],
@@ -213,7 +261,7 @@ fn ensure_account() -> Result<Account, String> {
     ] {
         command_succeeds(DSCL, &arguments, failure)?;
     }
-    account().ok_or_else(|| failure.to_owned())
+    lookup(name).ok_or_else(|| failure.to_owned())
 }
 
 /// The user the `sudoers` rule is for: `--owner-uid`, else the user who ran
@@ -289,33 +337,42 @@ fn create_copies(owner: u32) -> Result<(), String> {
     }
     fs::set_permissions(COPIES, fs::Permissions::from_mode(0o700))
         .map_err(|_| failure.to_owned())?;
-    let entry = format!("user:{ACCOUNT} allow search");
-    // Repeated setup must not stack duplicate entries.
-    let _ = command_succeeds(CHMOD, &["-a", &entry, COPIES], failure);
-    command_succeeds(CHMOD, &["+a", &entry, COPIES], failure)?;
-    // The lock the account cannot open: it serialises runs.
-    let lock = fs::OpenOptions::new()
-        .create(true)
-        .truncate(false)
-        .write(true)
-        .mode(0o600)
-        .open(LOCK)
-        .map_err(|_| failure.to_owned())?;
-    drop(lock);
-    let c_lock = CString::new(LOCK).map_err(|_| failure.to_owned())?;
-    if unsafe { libc::lchown(c_lock.as_ptr(), owner, owner_gid(owner)?) } != 0 {
-        return Err(failure.into());
+    for index in 0..POOL_SIZE {
+        let entry = format!("user:{} allow search", member_name(index));
+        // Repeated setup must not stack duplicate entries.
+        let _ = command_succeeds(CHMOD, &["-a", &entry, COPIES], failure);
+        command_succeeds(CHMOD, &["+a", &entry, COPIES], failure)?;
+        // One lock per account, which no account can open: it gives the
+        // account to one run at a time.
+        let path = member_lock(index);
+        let lock = fs::OpenOptions::new()
+            .create(true)
+            .truncate(false)
+            .write(true)
+            .mode(0o600)
+            .open(&path)
+            .map_err(|_| failure.to_owned())?;
+        drop(lock);
+        let c_lock = CString::new(path).map_err(|_| failure.to_owned())?;
+        if unsafe { libc::lchown(c_lock.as_ptr(), owner, owner_gid(owner)?) } != 0 {
+            return Err(failure.into());
+        }
     }
     Ok(())
 }
 
 pub fn sudoers_rule(owner: u32) -> String {
+    let accounts = (0..POOL_SIZE)
+        .map(member_name)
+        .collect::<Vec<_>>()
+        .join(", ");
     format!(
         "# Raiker command sandbox: written by `raiker-command-runner --setup-account`,\n\
          # removed by `--reset-account`. The owner may run exactly these two programs\n\
-         # as the sandbox account, which owns nothing; never as anyone else.\n\
-         Defaults>{ACCOUNT} env_reset, !use_pty, !lecture\n\
-         #{owner} ALL=({ACCOUNT}) NOPASSWD: {INSTALLED_RUNNER} --account-run *, {INSTALLED_RUNNER} --account-stop\n"
+         # as a sandbox account, which owns nothing; never as anyone else.\n\
+         Runas_Alias RAIKER_SANDBOX = {accounts}\n\
+         Defaults>RAIKER_SANDBOX env_reset, !use_pty, !lecture\n\
+         #{owner} ALL=(RAIKER_SANDBOX) NOPASSWD: {INSTALLED_RUNNER} --account-run *, {INSTALLED_RUNNER} --account-stop\n"
     )
 }
 
@@ -348,7 +405,9 @@ pub fn setup(requested_owner: Option<u32>) -> Result<Value, String> {
         return Err("native_sandbox_account_setup_requires_elevation".into());
     }
     let owner = owner_uid(requested_owner)?;
-    let account = ensure_account()?;
+    let accounts = (0..POOL_SIZE)
+        .map(|index| ensure_account(&member_name(index)))
+        .collect::<Result<Vec<_>, _>>()?;
     root_directory(BASE)?;
     root_directory(&format!("{BASE}/bin"))?;
     install_runner()?;
@@ -357,7 +416,8 @@ pub fn setup(requested_owner: Option<u32>) -> Result<Value, String> {
     Ok(json!({
         "configured": true,
         "account": ACCOUNT,
-        "account_uid": account.uid,
+        "account_uid": accounts[0].uid,
+        "accounts": accounts.iter().map(|member| json!({"name": member.name, "uid": member.uid})).collect::<Vec<_>>(),
         "owner_uid": owner,
         "base": COPIES,
         "runner": INSTALLED_RUNNER,
@@ -376,9 +436,13 @@ pub fn reset() -> Result<(), String> {
     if fs::remove_file(SUDOERS).is_err() && fs::symlink_metadata(SUDOERS).is_ok() {
         failures.push("sudoers");
     }
-    if account().is_some() {
-        let _ = command_succeeds(PKILL, &["-9", "-u", ACCOUNT], "");
-        for path in [format!("/Users/{ACCOUNT}"), format!("/Groups/{ACCOUNT}")] {
+    for index in 0..POOL_SIZE {
+        let name = member_name(index);
+        if lookup(&name).is_none() {
+            continue;
+        }
+        let _ = command_succeeds(PKILL, &["-9", "-u", &name], "");
+        for path in [format!("/Users/{name}"), format!("/Groups/{name}")] {
             if command_succeeds(DSCL, &[".", "-delete", &path], "").is_err() {
                 failures.push("account");
             }
@@ -401,20 +465,35 @@ pub fn reset() -> Result<(), String> {
 
 // ── Owner side: one run ────────────────────────────────────────────────────
 
-/// Machine-wide exclusive hold on the account, for one whole run.
-struct AccountLock(fs::File);
+/// Machine-wide exclusive hold on one pool account, for one whole run.
+struct AccountLock {
+    file: fs::File,
+    account: Account,
+}
 
 impl AccountLock {
+    /// The first free account; waits while every one is in use.
     fn acquire(deadline: Instant) -> Result<AccountLock, String> {
         use std::os::fd::AsRawFd;
-        let file = fs::OpenOptions::new()
-            .read(true)
-            .write(true)
-            .open(LOCK)
-            .map_err(|_| "native_sandbox_account_lock_unavailable")?;
+        let members = members().ok_or("native_sandbox_account_unconfigured")?;
+        let mut files = Vec::with_capacity(POOL_SIZE);
+        for index in 0..POOL_SIZE {
+            files.push(
+                fs::OpenOptions::new()
+                    .read(true)
+                    .write(true)
+                    .open(member_lock(index))
+                    .map_err(|_| "native_sandbox_account_lock_unavailable")?,
+            );
+        }
+        let mut pool: Vec<(fs::File, Account)> = files.into_iter().zip(members).collect();
         loop {
-            if unsafe { libc::flock(file.as_raw_fd(), libc::LOCK_EX | libc::LOCK_NB) } == 0 {
-                return Ok(AccountLock(file));
+            for index in 0..pool.len() {
+                let fd = pool[index].0.as_raw_fd();
+                if unsafe { libc::flock(fd, libc::LOCK_EX | libc::LOCK_NB) } == 0 {
+                    let (file, account) = pool.swap_remove(index);
+                    return Ok(AccountLock { file, account });
+                }
             }
             if Instant::now() >= deadline {
                 return Err("native_sandbox_account_busy".into());
@@ -427,16 +506,16 @@ impl AccountLock {
 impl Drop for AccountLock {
     fn drop(&mut self) {
         use std::os::fd::AsRawFd;
-        unsafe { libc::flock(self.0.as_raw_fd(), libc::LOCK_UN) };
+        unsafe { libc::flock(self.file.as_raw_fd(), libc::LOCK_UN) };
     }
 }
 
 /// Every process the account owns, and nothing else, stopped by the installed
 /// runner's `--account-stop` running as the account. Run before a run (a
 /// crashed Raiker can leave one behind) and after it.
-fn stop_account_processes() -> Result<(), String> {
+fn stop_account_processes(name: &str) -> Result<(), String> {
     let output = Command::new(SUDO)
-        .args(["-n", "-u", ACCOUNT, INSTALLED_RUNNER, "--account-stop"])
+        .args(["-n", "-u", name, INSTALLED_RUNNER, "--account-stop"])
         .current_dir("/")
         .stdin(std::process::Stdio::null())
         .output()
@@ -460,10 +539,7 @@ fn stop_account_processes() -> Result<(), String> {
 
 /// `--account-stop`, started by `sudo` as the account.
 pub fn account_stop() -> Result<i32, String> {
-    let account = account().ok_or("native_sandbox_account_unconfigured")?;
-    if unsafe { libc::getuid() } != account.uid || unsafe { libc::geteuid() } != account.uid {
-        return Err("native_sandbox_account_identity_mismatch".into());
-    }
+    let account = current_member().ok_or("native_sandbox_account_identity_mismatch")?;
     if kill_account_processes(account.uid) {
         Ok(0)
     } else {
@@ -515,17 +591,19 @@ fn account_has_processes(uid: u32) -> bool {
 /// follows them, so a link a previous run planted cannot redirect a grant.
 struct CopyGrant {
     root: PathBuf,
+    account: String,
 }
 
 impl CopyGrant {
-    fn apply(root: &Path) -> Result<CopyGrant, String> {
+    fn apply(root: &Path, account: &str) -> Result<CopyGrant, String> {
         let owner = unsafe { libc::getuid() };
         let owner_name = user_name(owner).ok_or("native_sandbox_account_owner_unknown")?;
         let grant = CopyGrant {
             root: root.to_owned(),
+            account: account.to_owned(),
         };
-        let directory_entry = format!("user:{ACCOUNT} allow {ACCOUNT_DIRECTORY_RIGHTS}");
-        let file_entry = format!("user:{ACCOUNT} allow {ACCOUNT_FILE_RIGHTS}");
+        let directory_entry = format!("user:{account} allow {ACCOUNT_DIRECTORY_RIGHTS}");
+        let file_entry = format!("user:{account} allow {ACCOUNT_FILE_RIGHTS}");
         let owner_entry = format!("user:{owner_name} allow {OWNER_DIRECTORY_RIGHTS}");
         let root_text = root.to_str().ok_or("native_sandbox_account_grant_failed")?;
         let failure = "native_sandbox_account_grant_failed";
@@ -571,8 +649,9 @@ impl Drop for CopyGrant {
         let Some(root) = self.root.to_str() else {
             return;
         };
-        let directory_entry = format!("user:{ACCOUNT} allow {ACCOUNT_DIRECTORY_RIGHTS}");
-        let file_entry = format!("user:{ACCOUNT} allow {ACCOUNT_FILE_RIGHTS}");
+        let account = &self.account;
+        let directory_entry = format!("user:{account} allow {ACCOUNT_DIRECTORY_RIGHTS}");
+        let file_entry = format!("user:{account} allow {ACCOUNT_FILE_RIGHTS}");
         // The copy's own folder is what matters: without its entry the account
         // cannot reach anything below it. Entries on files the account itself
         // created cannot be removed by the owner, and need not be.
@@ -648,11 +727,11 @@ pub fn owns(policy: &LaunchPolicy) -> bool {
 }
 
 /// Run `argv` as the account in the copy `policy` names.
+///
+/// A terminal run needs nothing extra here: the runner's stdio is the
+/// terminal Raiker opened, `sudo` passes it through (`!use_pty`), and the
+/// account side starts the command in a session of its own.
 pub fn launch(policy: &LaunchPolicy, policy_text: &str, argv: &[String]) -> Result<i32, String> {
-    if policy.pty {
-        return Err("native_sandbox_pty_unsupported".into());
-    }
-    let account = account().ok_or("native_sandbox_account_unconfigured")?;
     if status()["configured"] != true {
         return Err("native_sandbox_account_unconfigured".into());
     }
@@ -668,15 +747,16 @@ pub fn launch(policy: &LaunchPolicy, policy_text: &str, argv: &[String]) -> Resu
     let deadline = Instant::now()
         .checked_add(Duration::from_secs(policy.deadline_seconds))
         .ok_or("native_sandbox_deadline_invalid")?;
-    let _lock = AccountLock::acquire(deadline)?;
+    let lock = AccountLock::acquire(deadline)?;
+    let account = &lock.account;
     // Whatever a crashed run left behind is stopped before this one starts,
     // so the account's processes are only ever this run's.
-    stop_account_processes()?;
-    let _grant = CopyGrant::apply(&root)?;
+    stop_account_processes(&account.name)?;
+    let _grant = CopyGrant::apply(&root, &account.name)?;
     let handoff = root.join(format!(".raiker-launch-{}.json", selftest::probe_nonce()));
-    let _handoff = Handoff::write(&handoff, &payload(policy_text, argv))?;
+    let _handoff = Handoff::write(&handoff, &payload(policy_text, argv), &account.name)?;
     let mut child = Command::new(SUDO)
-        .args(["-n", "-u", ACCOUNT, INSTALLED_RUNNER, "--account-run"])
+        .args(["-n", "-u", &account.name, INSTALLED_RUNNER, "--account-run"])
         .arg(&handoff)
         // The owner's working folder is not the account's to enter.
         .current_dir("/")
@@ -696,7 +776,7 @@ pub fn launch(policy: &LaunchPolicy, policy_text: &str, argv: &[String]) -> Resu
         if Instant::now() >= deadline {
             // The account side enforces the same deadline; this is the backstop
             // for an account side that stopped answering.
-            let _ = stop_account_processes();
+            let _ = stop_account_processes(&account.name);
             let _ = child.kill();
             let _ = child.wait();
             break Ok(137);
@@ -704,7 +784,7 @@ pub fn launch(policy: &LaunchPolicy, policy_text: &str, argv: &[String]) -> Resu
         std::thread::sleep(Duration::from_millis(20));
     };
     // Every descendant, detached or not, is the account's: this is the stop.
-    stop_account_processes()?;
+    stop_account_processes(&account.name)?;
     if account_has_processes(account.uid) {
         return Err("native_sandbox_account_processes_survived".into());
     }
@@ -714,7 +794,7 @@ pub fn launch(policy: &LaunchPolicy, policy_text: &str, argv: &[String]) -> Resu
 struct Handoff(PathBuf);
 
 impl Handoff {
-    fn write(path: &Path, value: &Value) -> Result<Handoff, String> {
+    fn write(path: &Path, value: &Value, account: &str) -> Result<Handoff, String> {
         let failure = "native_sandbox_account_handoff_failed";
         let mut file = fs::OpenOptions::new()
             .create_new(true)
@@ -725,7 +805,7 @@ impl Handoff {
         let handoff = Handoff(path.to_owned());
         file.write_all(value.to_string().as_bytes())
             .map_err(|_| failure.to_owned())?;
-        let entry = format!("user:{ACCOUNT} allow read,delete");
+        let entry = format!("user:{account} allow read,delete");
         let text = path.to_str().ok_or(failure)?;
         command_succeeds(CHMOD, &["+a", &entry, text], failure)?;
         Ok(handoff)
@@ -744,10 +824,7 @@ impl Drop for Handoff {
 
 /// `--account-run <handoff>`, started by `sudo` as the account.
 pub fn account_run(handoff: &Path) -> Result<i32, String> {
-    let account = account().ok_or("native_sandbox_account_unconfigured")?;
-    if unsafe { libc::getuid() } != account.uid || unsafe { libc::geteuid() } != account.uid {
-        return Err("native_sandbox_account_identity_mismatch".into());
-    }
+    let account = current_member().ok_or("native_sandbox_account_identity_mismatch")?;
     // The handoff must sit directly in a copy directly in the base.
     let copy = handoff
         .parent()
@@ -806,7 +883,7 @@ pub fn account_run(handoff: &Path) -> Result<i32, String> {
     let mut command = Command::new(sandbox_exec);
     command.args(macos_arguments(&policy, &argv)?);
     command.env_clear();
-    command.envs(account_environment(environment));
+    command.envs(account_environment(environment, &account.name));
     command.current_dir(&policy.cwd);
     bound_account_child(&mut command, &policy);
     let mut child = command.spawn().map_err(|error| {
@@ -841,7 +918,7 @@ pub fn account_run(handoff: &Path) -> Result<i32, String> {
 
 /// The run's environment, as Raiker built it, with the identity variables
 /// naming the account rather than the owner.
-fn account_environment(environment: Vec<(String, String)>) -> Vec<(String, String)> {
+fn account_environment(environment: Vec<(String, String)>, name: &str) -> Vec<(String, String)> {
     let mut merged: Vec<(String, String)> = environment
         .into_iter()
         .filter(|(name, _)| {
@@ -851,8 +928,8 @@ fn account_environment(environment: Vec<(String, String)>) -> Vec<(String, Strin
             )
         })
         .collect();
-    merged.push(("USER".into(), ACCOUNT.into()));
-    merged.push(("LOGNAME".into(), ACCOUNT.into()));
+    merged.push(("USER".into(), name.into()));
+    merged.push(("LOGNAME".into(), name.into()));
     merged
 }
 
@@ -863,6 +940,7 @@ fn bound_account_child(command: &mut Command, policy: &LaunchPolicy) {
     // The account side itself is one of the account's processes.
     let processes = policy.max_processes.saturating_add(1) as libc::rlim_t;
     let cpu = policy.max_cpu_seconds as libc::rlim_t;
+    let terminal = policy.pty;
     unsafe {
         command.pre_exec(move || {
             for (resource, requested) in [(libc::RLIMIT_NPROC, processes), (libc::RLIMIT_CPU, cpu)]
@@ -876,9 +954,20 @@ fn bound_account_child(command: &mut Command, policy: &LaunchPolicy) {
                     return Err(std::io::Error::last_os_error());
                 }
             }
-            // Its own process group, so a stray terminal signal reaches the
-            // run and not this supervisor.
-            libc::setpgid(0, 0);
+            if terminal {
+                // A session of its own, without a controlling terminal: the
+                // command reads and writes the terminal it was handed, but
+                // XNU refuses `TIOCSTI` from a process whose controlling
+                // terminal it is not, so it cannot type into the owner's
+                // input (Bubblewrap's `--new-session` on Linux).
+                if libc::setsid() < 0 {
+                    return Err(std::io::Error::last_os_error());
+                }
+            } else {
+                // Its own process group, so a stray terminal signal reaches
+                // the run and not this supervisor.
+                libc::setpgid(0, 0);
+            }
             Ok(())
         });
     }
@@ -935,16 +1024,16 @@ pub fn probe() -> Value {
 }
 
 fn measure() -> Result<Value, String> {
-    let account = account().ok_or("native_sandbox_account_unconfigured")?;
+    let accounts = members().ok_or("native_sandbox_account_unconfigured")?;
     let nonce = selftest::probe_nonce();
     let scratch = Path::new(COPIES).join(&nonce);
     fs::create_dir(&scratch).map_err(|_| "native_sandbox_probe_storage_unavailable")?;
-    let outcome = measure_in(&scratch, &nonce, &account);
+    let outcome = measure_in(&scratch, &nonce, &accounts);
     let _ = fs::remove_dir_all(&scratch);
     outcome
 }
 
-fn measure_in(scratch: &Path, nonce: &str, account: &Account) -> Result<Value, String> {
+fn measure_in(scratch: &Path, nonce: &str, accounts: &[Account]) -> Result<Value, String> {
     let current = std::env::current_exe().map_err(|_| "native_sandbox_runner_unreadable")?;
     // The selftest runs inside Seatbelt, which reads only the copy and the
     // system: the runner is copied in like any program the copy holds.
@@ -1011,7 +1100,7 @@ fn measure_in(scratch: &Path, nonce: &str, account: &Account) -> Result<Value, S
     let network = selftest::verdict(reached(&inside), reached(&outside));
     // The run is over: a descendant still alive escaped it.
     let descendant = match inside.get("descendant_pid").and_then(Value::as_u64) {
-        Some(pid) => descendant_verdict(pid as i32, account.uid),
+        Some(pid) => descendant_verdict(pid as i32, accounts),
         None => "indeterminate",
     };
     let enforced = relay
@@ -1079,7 +1168,7 @@ fn user_home(uid: u32) -> Option<PathBuf> {
 /// After the run: `ESRCH` means the descendant is gone. `EPERM` means a
 /// process exists that the owner may not signal — the account's, since the
 /// pid was the account's descendant a moment ago — so containment failed.
-fn descendant_verdict(pid: i32, uid: u32) -> &'static str {
+fn descendant_verdict(pid: i32, accounts: &[Account]) -> &'static str {
     let end = Instant::now() + Duration::from_secs(5);
     loop {
         if unsafe { libc::kill(pid, 0) } != 0
@@ -1092,8 +1181,13 @@ fn descendant_verdict(pid: i32, uid: u32) -> &'static str {
         }
         std::thread::sleep(Duration::from_millis(50));
     }
-    if account_pids(uid).contains(&pid) {
-        let _ = stop_account_processes();
+    // The probe ran as whichever account was free: any of them still holding
+    // the descendant means containment failed.
+    if let Some(holder) = accounts
+        .iter()
+        .find(|account| account_pids(account.uid).contains(&pid))
+    {
+        let _ = stop_account_processes(&holder.name);
         "unenforced"
     } else {
         // Reused by someone else's process: not proof either way.
@@ -1115,8 +1209,10 @@ mod tests {
         assert_eq!(
             grants,
             [
-                "Defaults>_raikersandbox env_reset, !use_pty, !lecture",
-                "#501 ALL=(_raikersandbox) NOPASSWD: \
+                "Runas_Alias RAIKER_SANDBOX = \
+                 _raikersandbox, _raikersandbox1, _raikersandbox2, _raikersandbox3",
+                "Defaults>RAIKER_SANDBOX env_reset, !use_pty, !lecture",
+                "#501 ALL=(RAIKER_SANDBOX) NOPASSWD: \
                  /Library/RaikerSandbox/bin/raiker-command-runner --account-run *, \
                  /Library/RaikerSandbox/bin/raiker-command-runner --account-stop",
             ]
@@ -1135,12 +1231,15 @@ mod tests {
 
     #[test]
     fn the_account_environment_names_the_account_not_the_owner() {
-        let merged = account_environment(vec![
-            ("USER".into(), "owner".into()),
-            ("SUDO_UID".into(), "501".into()),
-            ("PATH".into(), "/usr/bin".into()),
-        ]);
-        assert!(merged.contains(&("USER".into(), ACCOUNT.into())));
+        let merged = account_environment(
+            vec![
+                ("USER".into(), "owner".into()),
+                ("SUDO_UID".into(), "501".into()),
+                ("PATH".into(), "/usr/bin".into()),
+            ],
+            "_raikersandbox2",
+        );
+        assert!(merged.contains(&("USER".into(), "_raikersandbox2".into())));
         assert!(merged.contains(&("PATH".into(), "/usr/bin".into())));
         assert!(
             !merged
@@ -1148,5 +1247,16 @@ mod tests {
                 .any(|(name, value)| name == "USER" && value == "owner")
         );
         assert!(!merged.iter().any(|(name, _)| name == "SUDO_UID"));
+    }
+
+    #[test]
+    fn the_pool_keeps_the_original_account_first_and_names_each_lock() {
+        assert_eq!(member_name(0), ACCOUNT);
+        assert_eq!(member_name(3), "_raikersandbox3");
+        let mut locks: Vec<String> = (0..POOL_SIZE).map(member_lock).collect();
+        assert_eq!(locks[0], format!("{COPIES}/.account.lock"));
+        locks.sort();
+        locks.dedup();
+        assert_eq!(locks.len(), POOL_SIZE);
     }
 }

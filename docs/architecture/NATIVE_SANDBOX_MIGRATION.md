@@ -341,7 +341,40 @@ Not yet: background runs and terminals on macOS (the account serves one run at
 a time; a small pool of accounts would let runs overlap); Seatbelt's downloads
 rule is still unmeasured.
 
-## WSL2 backend (2026-11-01, runner side implemented; unmeasured)
+## WSL2 backend (2026-11-01, runner side implemented; measurement incomplete)
+
+**Measured on Windows 10.0.26300.9818, WSL 2.5.7.0 (2026-11-01):**
+`wsl --version` reported kernel 6.6.87.1-1; `wsl -l -q` listed Ubuntu
+and docker-desktop, with no RaikerSandbox. The requested branch was deleted
+after PR #240 merged; `git fetch origin refs/pull/240/head:refs/heads/claude/zealous-edison-puad15`
+restored its head locally. `cargo build -p raiker-command-runner` in `native/`
+succeeded. `gh run download 41342084307 -n wsl-linux-runner -D %TEMP%\raiker-measure-runner`
+retrieved the latest PR Desktop package artifact; Git's `file.exe` reported
+`static-pie linked`. Ubuntu's `ubuntu-base-24.04.5-base-amd64.tar.gz` was
+downloaded from cdimage.ubuntu.com to `%TEMP%\raiker-measure-ubuntu-base.tar.gz`.
+`native\target\debug\raiker-command-runner.exe --setup-wsl --linux-runner %TEMP%\raiker-measure-runner\raiker-command-runner --rootfs %TEMP%\raiker-measure-ubuntu-base.tar.gz`
+succeeded and `--wsl-status` reported all four booleans true. The command
+`wsl -d RaikerSandbox -u root -- cat /etc/wsl.conf` showed `systemd=false`,
+automount `enabled=false`, `mountFsTab=false`, interop `enabled=false`,
+`appendWindowsPath=false`, and default user `raiker`.
+
+**Probe: fail.** `native\target\debug\raiker-command-runner.exe --probe --workspace %TEMP% --boundary wsl`
+returned `{"account_base":"\\\\wsl.localhost\\RaikerSandbox\\var\\lib\\raiker\\copies","available":false,"boundary":"wsl_bubblewrap","concurrent_runs":false,"network":"indeterminate","observations":{"windows_interop":"unenforced"},"platform":"windows","process_tree_stop":false,"pty":false,"reason":"native_sandbox_not_enforced"}`.
+`wsl -d RaikerSandbox -u root --cd / --exec /bin/sh -c 'cat /proc/sys/fs/binfmt_misc/WSLInterop; cat /proc/mounts | grep /mnt'`
+showed an enabled `WSLInterop` handler and WSL/WSLg mounts. The positive
+interop control `wsl -d Ubuntu -- cmd.exe /c ver` printed the Windows version;
+the positive network control `wsl -d Ubuntu -- curl -sS -o /dev/null -w '%{http_code}\n' https://example.com`
+returned 200. The Linux-side probe
+`wsl -d RaikerSandbox -u raiker --cd / --exec /opt/raiker/raiker-command-runner --probe --workspace /var/lib/raiker/copies`
+returned `native_sandbox_probe_no_output`. Windows
+`New-Item -ItemType Directory -Path '\\wsl.localhost\RaikerSandbox\var\lib\raiker\copies\measure-1'`
+failed with `The network name cannot be found`; the Linux-side `mkdir` and
+`rmdir` in the same copy base succeeded. This is not a matched Windows-share
+control, so Windows copy creation and ownership are **not measured**. Direct
+sandbox attempts, their enforcement, UI setup/removal and the end-to-end
+receipt and Apply behavior are **not measured**. No shared WSL handler was
+changed. After owner approval, `native\target\debug\raiker-command-runner.exe --reset-wsl` removed RaikerSandbox; `wsl -l -q` again listed only Ubuntu and docker-desktop. The downloaded temporary files were deleted.
+
 
 Simplified from the design above: Raiker uses **its own** distribution,
 `RaikerSandbox`, never the owner's, and turns the two risky parts off by

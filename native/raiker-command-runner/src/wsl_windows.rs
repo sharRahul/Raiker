@@ -101,7 +101,7 @@ fn in_distro(user: &str, script: &str, input: Option<&[u8]>) -> Result<Vec<u8>, 
 pub fn status() -> Value {
     let present = distro_present();
     let conf = present
-        && in_distro("root", "cat /etc/wsl.conf", None)
+        && in_distro("root", "test ! -s /etc/fstab && cat /etc/wsl.conf", None)
             .is_ok_and(|bytes| bytes == wsl_paths::wsl_conf().as_bytes());
     let runner = present
         && in_distro(
@@ -158,6 +158,7 @@ pub fn setup(rootfs: Option<&Path>, linux_runner: &Path) -> Result<Value, String
          chown root:root /opt/raiker && chmod 0755 /opt/raiker\n\
          chown {RUN_USER}:{RUN_USER} {LINUX_COPIES} {LINUX_POLICIES}\n\
          chmod 0700 {LINUX_COPIES} {LINUX_POLICIES}\n\
+         install -o root -g root -m 0644 /dev/null /etc/fstab\n\
          command -v bwrap >/dev/null 2>&1 || (apt-get update -qq && apt-get install -y -qq bubblewrap) >/dev/null 2>&1 || true\n\
          cat > /etc/wsl.conf <<'RAIKER_WSL_CONF'\n{}RAIKER_WSL_CONF\n",
         wsl_paths::wsl_conf()

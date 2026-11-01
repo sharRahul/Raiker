@@ -122,7 +122,11 @@ pub fn probe_kernel_sandbox(workspace: &Path) -> Value {
         profile_name: format!("raiker.probe.{}", std::process::id()),
     };
     let argv = vec![
-        current.to_string_lossy().into_owned(),
+        if cfg!(target_os = "linux") {
+            "/run/raiker/runner".to_owned()
+        } else {
+            current.to_string_lossy().into_owned()
+        },
         "--selftest".to_owned(),
         test.to_value().to_string(),
     ];

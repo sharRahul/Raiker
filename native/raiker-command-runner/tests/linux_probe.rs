@@ -36,7 +36,9 @@ fn bubblewrap_probe_observes_descendant_exit_and_host_write_protection() {
     ));
     std::fs::create_dir(&path).unwrap();
     let workspace = Workspace(path);
-    let runner = workspace.0.join("runner");
+    let runner_dir = Workspace(workspace.0.with_extension("runner-dir"));
+    std::fs::create_dir(&runner_dir.0).unwrap();
+    let runner = runner_dir.0.join("runner");
     std::fs::copy(env!("CARGO_BIN_EXE_raiker-command-runner"), &runner).unwrap();
     let output = output_after_transient_exec_busy(
         Command::new(&runner)

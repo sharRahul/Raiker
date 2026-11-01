@@ -7,10 +7,9 @@
 //! rather than by measurement alone. Raiker uses its **own** distribution,
 //! never the owner's, configured with:
 //!
-//! * `[interop] enabled=false` — WSL does not register its `binfmt_misc`
-//!   handler, so nothing in the distribution can start a Windows program.
-//!   Hiding `/init` would not do this: the handler is registered with the
-//!   fix-binary flag and keeps working inside any mount namespace.
+//! * `[interop] enabled=false` requests disabled Windows interop. The handler
+//!   can still be enabled on a shared WSL kernel, so the probe must refuse
+//!   that case. Hiding `/init` does not disable a fix-binary handler.
 //! * `[automount] enabled=false` — no `/mnt/c`: the Windows drives are not in
 //!   the distribution at all, so no path needs converting to `/mnt/<drive>`.
 //!
@@ -29,12 +28,12 @@ pub const LINUX_POLICIES: &str = "/var/lib/raiker/policies";
 pub fn wsl_conf() -> String {
     format!(
         "# Written by raiker-command-runner --setup-wsl. Raiker's own distribution:\n\
-         # no Windows programs (interop), no Windows drives (automount).\n\
+         # request no interop or drive automount; the probe checks enforcement.\n\
          [boot]\n\
          systemd=false\n\
          [automount]\n\
          enabled=false\n\
-         mountFsTab=false\n\
+         mountFsTab=true\n\
          [interop]\n\
          enabled=false\n\
          appendWindowsPath=false\n\
@@ -182,7 +181,7 @@ mod tests {
         let conf = wsl_conf();
         for line in [
             "[interop]\nenabled=false\nappendWindowsPath=false",
-            "[automount]\nenabled=false\nmountFsTab=false",
+            "[automount]\nenabled=false\nmountFsTab=true",
             "default=raiker",
         ] {
             assert!(conf.contains(line), "{conf}");

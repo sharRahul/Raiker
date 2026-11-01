@@ -358,6 +358,26 @@ succeeded and `--wsl-status` reported all four booleans true. The command
 automount `enabled=false`, `mountFsTab=false`, interop `enabled=false`,
 `appendWindowsPath=false`, and default user `raiker`.
 
+**Follow-up diagnosis (2026-11-01):** In a newly imported RaikerSandbox,
+changing only `mountFsTab=false` to `mountFsTab=true` with an empty `/etc/fstab`
+made the previously inaccessible `\\wsl.localhost\RaikerSandbox` share
+accessible, while drive automount remained disabled. A Windows-created file
+was owned by `raiker`. Setup now installs an empty root-owned fstab, and
+status refuses a nonempty one; this permits WSL to start its 9P server without
+adding fstab mounts. A Linux regression test also reproduced the failed probe
+when the runner was outside the workspace: the sandbox mounted the runner at
+`/run/raiker/runner` but attempted its original `/opt/raiker` path. The probe
+now uses the mounted path. With those changes, setup and the share worked and
+`--probe --workspace %TEMP% --boundary wsl` reported relay, workspace write,
+escape write, masked read, egress, seccomp and descendant reaping enforced;
+`windows_interop` remained `unenforced` and availability remained false. A
+copied, executable `cmd.exe` launched through the Linux runner caused WSL's
+`/init` to execute despite its absence from the sandbox filesystem, confirming
+that hiding that path does not neutralize the registered handler. It did not
+start Windows cmd in that attempt, but this is not proof that interop is
+contained in every case. `id -un` also failed to resolve uid 999 because the
+sandbox lacks a user database. These remaining issues are not fixed.
+
 **Probe: fail.** `native\target\debug\raiker-command-runner.exe --probe --workspace %TEMP% --boundary wsl`
 returned `{"account_base":"\\\\wsl.localhost\\RaikerSandbox\\var\\lib\\raiker\\copies","available":false,"boundary":"wsl_bubblewrap","concurrent_runs":false,"network":"indeterminate","observations":{"windows_interop":"unenforced"},"platform":"windows","process_tree_stop":false,"pty":false,"reason":"native_sandbox_not_enforced"}`.
 `wsl -d RaikerSandbox -u root --cd / --exec /bin/sh -c 'cat /proc/sys/fs/binfmt_misc/WSLInterop; cat /proc/mounts | grep /mnt'`

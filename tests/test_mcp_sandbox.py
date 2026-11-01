@@ -124,3 +124,29 @@ def test_only_an_interpreter_prefix_outside_usr_is_mounted(tmp_path: Path) -> No
     inside.mkdir(parents=True)
     (inside / "python").write_text("", encoding="utf-8")
     assert toolchain_mounts(inside / "python", ws) == []
+
+
+@pytest.mark.skipif(not sys.platform.startswith("linux"), reason="Linux mounts toolchains")
+def test_a_link_in_the_copy_never_mounts_a_home_folder(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from raiker.execution.commands.backends.native import toolchain_mounts
+
+    home = tmp_path / "home" / "owner"
+    (home / "notes" / "bin").mkdir(parents=True)
+    (home / "notes" / "bin" / "python").write_text("", encoding="utf-8")
+    monkeypatch.setattr(Path, "home", staticmethod(lambda: home))
+    ws = tmp_path / "copy"
+    (ws / ".venv" / "bin").mkdir(parents=True)
+    link = ws / ".venv" / "bin" / "python"
+    link.symlink_to(home / "notes" / "bin" / "python")
+    assert toolchain_mounts(link, ws) == []
+    # Nor any other user's home, nor a target that is not an interpreter.
+    other = Path("/home/someone/bin/python")
+    assert toolchain_mounts(other, ws) == []
+    secret = tmp_path / "opt" / "tool" / "bin" / "secrets.txt"
+    secret.parent.mkdir(parents=True)
+    secret.write_text("", encoding="utf-8")
+    renamed = ws / ".venv" / "bin" / "python3"
+    renamed.symlink_to(secret)
+    assert toolchain_mounts(renamed, ws) == []

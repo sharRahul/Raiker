@@ -28,6 +28,7 @@ import hashlib
 import json
 import os
 import platform
+import re
 import secrets
 import shutil
 import subprocess
@@ -626,34 +627,51 @@ def command_executable(name: str, *, cwd: Path, search_path: str, project: Path)
 TOOLCHAIN_INTERPRETERS = frozenset({"python", "python3", "pip", "pip3", "node", "npm", "npx"})
 
 
+#: An interpreter's own file name, versioned or not (`python3.12`, `node`).
+_INTERPRETER_NAME = re.compile(r"(python|pip|node|npm|npx)(\d+(\.\d+)*)?")
+
+#: Never mounted, whatever links point there: every user's home, not only the
+#: owner's, and root's.
+_HOME_ROOTS = (Path("/home"), Path("/root"))
+
+
 def toolchain_mounts(executable: str | Path, workspace_root: Path) -> list[str]:
     """Install prefixes the Linux boundary must mount for *executable* to run.
 
     `/usr` is always mounted, so an interpreter there needs nothing. One in
-    `/usr/local`, `/opt` or a version manager's folder needs its prefix (the
-    folder above its `bin`), read-only, both as found on the path and after
-    resolving links. Never the home folder itself, nor anything holding the
-    project or inside it; other platforms already read system installs.
+    `/usr/local`, `/opt` or another system folder needs its prefix (the folder
+    above its `bin`), read-only, both as found on the path and after resolving
+    links. Both names must be an interpreter's, and no prefix is ever in a
+    home folder, holding the project, or inside it.
+
+    The link is the reason for the last rules: a command can make a link in
+    its own copy (`.venv/bin/python` to `~/notes/bin/python`), and the prefix
+    of its target would otherwise be mounted into the very sandbox that keeps
+    the owner's home out of reach.
     """
     if not sys.platform.startswith("linux"):
         return []
     path = Path(executable)
     if path.name not in TOOLCHAIN_INTERPRETERS:
         return []
-    home = Path.home().resolve()
+    homes = (Path.home().resolve(), *_HOME_ROOTS)
     root = workspace_root.resolve()
+    usr, local = Path("/usr"), Path("/usr/local")
     mounts: list[str] = []
     for candidate in (path.absolute(), path.resolve()):
-        if candidate.parent.name != "bin":
+        if candidate.parent.name != "bin" or not _INTERPRETER_NAME.fullmatch(candidate.name):
             continue
         prefix = candidate.parent.parent
-        usr = Path("/usr")
-        if prefix == usr or (usr in prefix.parents and Path("/usr/local") not in (prefix, *prefix.parents)):
+        if root == prefix or root in prefix.parents:
+            continue  # the copy's own, already in the sandbox
+        if prefix in root.parents:
+            return []  # would hold the project
+        if prefix == usr or (usr in prefix.parents and local not in (prefix, *prefix.parents)):
             continue
-        if len(prefix.parts) < 3 or prefix == home or prefix in home.parents:
-            continue
-        if root == prefix or prefix in root.parents or root in prefix.parents:
-            continue
+        if len(prefix.parts) < 3 or any(
+            prefix == home or home in prefix.parents or prefix in home.parents for home in homes
+        ):
+            return []  # a home folder, or something holding one: never mounted
         if str(prefix) not in mounts:
             mounts.append(str(prefix))
     return mounts

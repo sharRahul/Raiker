@@ -117,10 +117,18 @@ def sandbox_interpreter(name: str, search_path: str, workspace: Path) -> Path:
         candidate = Path(found).resolve()
         if sys.platform == "win32" and candidate.drive.upper() != system_drive:
             continue
-        if not any(candidate == root or root in candidate.parents for root in unreachable):
+        found_path = Path(found).absolute()
+        # Both the name as found and what it links to must be in reach: a
+        # virtualenv in the owner's home links to a system interpreter, but
+        # its own folder is still out of the sandbox.
+        if not any(
+            place == root or root in place.parents
+            for place in (candidate, found_path)
+            for root in unreachable
+        ):
             # As found, not resolved: a virtualenv finds itself from the name it
             # was started under, and the boundary mounts both prefixes.
-            return Path(found).absolute()
+            return found_path
     raise FileNotFoundError(name)
 
 

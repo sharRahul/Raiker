@@ -79,7 +79,7 @@ a run in another copy waits until the copy's last run ends (or is refused as
 grant a crashed run left on another copy is revoked first, failing closed if
 it cannot be, so at most one copy carries the account's entry at a time;
 holders are files each run keeps open without sharing, kept in the owner's
-`%LOCALAPPDATA%\Raikerccount-grant`, which the account cannot write), a
+`%LOCALAPPDATA%/Raiker/account-grant` (Windows path separators), which the account cannot write), a
 kill-on-close Job Object with UI
 restrictions (handles, clipboard, desktop, system parameters, exit Windows)
 and pipes for stdio. A policy whose workspace is under `C:\RaikerSandbox` runs

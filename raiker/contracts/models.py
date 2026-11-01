@@ -361,6 +361,7 @@ EVENT_TYPES = {
     # review, or thrown away. Paths and counts only — never file content.
     "task_workspace_promoted",
     "task_workspace_discarded",
+    "command_egress_changed",
     # BR-D04 — a connected model read an exact patch, or its stored reading of
     # the same patch was returned. Provider, model, fingerprint and counts only.
     "patch_model_review_completed",

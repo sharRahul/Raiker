@@ -477,3 +477,79 @@ fn bubblewrap_process_limit_denies_forks_that_the_host_control_allows() {
         "process limit was not enforced"
     );
 }
+
+#[test]
+fn filtered_egress_reaches_only_the_proxy_socket_from_inside_the_namespace() {
+    use std::io::{Read, Write};
+    use std::os::unix::net::UnixListener;
+    let path = std::env::temp_dir().join(format!(
+        "raiker-linux-egress-{}-{}",
+        std::process::id(),
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos()
+    ));
+    std::fs::create_dir(&path).unwrap();
+    let workspace = Workspace(path);
+    let runner = workspace.0.join("runner");
+    std::fs::copy(env!("CARGO_BIN_EXE_raiker-command-runner"), &runner).unwrap();
+    // Outside the workspace, as Raiker places it: the sandbox sees it only
+    // through the bridge's bind mount.
+    let socket_dir = std::env::temp_dir().join(format!("rk-egress-test-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&socket_dir);
+    std::fs::create_dir(&socket_dir).unwrap();
+    let socket = socket_dir.join("egress.sock");
+    let listener = UnixListener::bind(&socket).unwrap();
+    std::thread::spawn(move || {
+        for stream in listener.incoming() {
+            let mut stream = stream.unwrap();
+            let mut request = [0u8; 4];
+            if stream.read_exact(&mut request).is_ok() {
+                let _ = stream.write_all(b"pong");
+            }
+        }
+    });
+    // Through the bridge the proxy answers; a direct connection anywhere else
+    // has no route. The second address is a public resolver: an unsandboxed
+    // control would reach it or time out, never fail with "unreachable".
+    let program = concat!(
+        "import socket\n",
+        "s = socket.create_connection(('127.0.0.1', 3128), timeout=5)\n",
+        "s.sendall(b'ping')\n",
+        "print(s.recv(4).decode())\n",
+        "try:\n",
+        "    socket.create_connection(('1.1.1.1', 443), timeout=3)\n",
+        "    print('direct-reached')\n",
+        "except OSError as error:\n",
+        "    print('direct-refused', error.errno)\n",
+    );
+    let policy = serde_json::json!({
+        "workspace_root": workspace.0,
+        "cwd": workspace.0,
+        "profile_name": "raiker.egress.test",
+        "max_processes": 4096,
+        "network": "proxy:127.0.0.1:3128",
+        "proxy_socket": socket,
+        "deadline_seconds": 20
+    });
+    let policy_path = workspace.0.join("policy.json");
+    std::fs::write(&policy_path, policy.to_string()).unwrap();
+    let output = output_after_transient_exec_busy(
+        Command::new(&runner)
+            .arg("--policy")
+            .arg(policy_path)
+            .arg("--")
+            .args(["/usr/bin/python3", "-c", program]),
+    );
+    let _ = std::fs::remove_dir_all(&socket_dir);
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(
+        output.status.success(),
+        "{stdout}\n{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let lines: Vec<&str> = stdout.lines().collect();
+    assert_eq!(lines[0], "pong", "{stdout}");
+    assert!(lines[1].starts_with("direct-refused"), "{stdout}");
+}

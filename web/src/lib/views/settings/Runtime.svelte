@@ -12,6 +12,7 @@
    */
   import { onMount } from "svelte";
   import Icon from "../../components/Icon.svelte";
+  import CommandDownloads from "./CommandDownloads.svelte";
   import StepUpDialog from "../../components/StepUpDialog.svelte";
   import type { StepUpValues } from "../../components/StepUpDialog.svelte";
   import { api, ApiError } from "../../api";
@@ -417,6 +418,8 @@
     </form>
   </details>
 </section>
+
+<CommandDownloads />
 
 <!-- REM-SET-RUNTIME — the page's first job is the execution target and the
      boundary it runs behind, which is the decision an owner comes here to make.

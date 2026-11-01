@@ -714,6 +714,10 @@ export const api = {
     reviewed: { created: string[]; modified: string[]; deleted: string[] },
   ) => contract.promoteTaskWorkspace(workspaceId, reviewed),
   discardTaskWorkspace: (workspaceId: string) => contract.discardTaskWorkspace(workspaceId),
+  // Allow-listed downloads for sandboxed commands (off until the owner turns it on).
+  commandEgress: () => contract.getCommandEgress(),
+  setCommandEgress: (enabled: boolean, domains: string[]) =>
+    contract.putCommandEgress({ enabled, domains }),
   checkpoints: (sessionId?: string, projectId?: string) =>
     contract.listCheckpoints({ session_id: sessionId, project_id: projectId }),
   checkpoint: (id: string) => contract.getCheckpoint(id),

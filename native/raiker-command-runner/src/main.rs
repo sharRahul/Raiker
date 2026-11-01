@@ -21,9 +21,15 @@
 //!   removal path would outlive Raiker itself.
 //! * `--selftest <json>` — the probe's child. Run inside the boundary and again
 //!   outside it; the difference is the measurement.
+//! * `--egress-bridge <socket> <port> -- <argv>` — Linux only, started by the
+//!   boundary *inside* the sandbox: forwards the namespace's loopback port to
+//!   Raiker's egress proxy socket, the command's only network route.
 //! * `--linger <marker>` — the probe's detached grandchild, which exists to
 //!   prove containment reaches descendants and not merely the first executable.
 
+#[cfg(target_os = "linux")]
+#[path = "egress_bridge_linux.rs"]
+mod egress_bridge;
 #[cfg(target_os = "linux")]
 mod lifecycle_linux;
 mod policy;
@@ -105,6 +111,18 @@ fn dispatch(arguments: &[String]) -> Result<i32, String> {
             let test = selftest::SelfTest::from_value(&value).ok_or("runner_arguments_invalid")?;
             selftest::run(&test);
             return Ok(0);
+        }
+        #[cfg(target_os = "linux")]
+        Some("--egress-bridge") => {
+            let socket = arguments.get(1).ok_or("runner_arguments_invalid")?;
+            let port: u16 = arguments
+                .get(2)
+                .and_then(|text| text.parse().ok())
+                .ok_or("runner_arguments_invalid")?;
+            if arguments.get(3).map(String::as_str) != Some("--") {
+                return Err("runner_arguments_invalid".into());
+            }
+            return egress_bridge::run(Path::new(socket), port, &arguments[4..]);
         }
         Some("--linger") => {
             selftest::linger(Path::new(

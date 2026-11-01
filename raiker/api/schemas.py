@@ -1230,6 +1230,13 @@ class ExecutionProfileBindingRequest(StrictRequest):
     profile_id: str | None = Field(default=None, max_length=80)
 
 
+class CommandEgressRequest(StrictRequest):
+    """Turn allow-listed command downloads on or off, and name the hosts."""
+
+    enabled: bool
+    domains: list[str] = Field(default_factory=list, max_length=200)
+
+
 class PromoteTaskWorkspaceRequest(StrictRequest):
     """The exact change set the owner reviewed.
 

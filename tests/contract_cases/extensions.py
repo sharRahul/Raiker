@@ -702,6 +702,8 @@ CASES: Cases = {
     ("GET", "/api/command-runs/{run_id}/output"): _run("/output"),
     ("GET", "/api/command-runs/{run_id}/receipt"): _run("/receipt"),
     ("POST", "/api/command-runs/{run_id}/stop"): _run("/stop"),
+    ("GET", "/api/command-egress"): plain("/api/command-egress"),
+    ("PUT", "/api/command-egress"): plain("/api/command-egress", {"enabled": True, "domains": ["pypi.org"]}),
     ("GET", "/api/command-workspaces"): _task_copies,
     ("POST", "/api/command-workspaces/{workspace_id}/promote"): _task_copy_promoted,
     ("POST", "/api/command-workspaces/{workspace_id}/discard"): _task_copy_discarded,

@@ -12,7 +12,7 @@ operation answers with, and whether OpenAPI describes it (OPT-01/OPT-02 —
 * **deferred** — the body has no declared type; a test fails while any is.
 * **special** — a stream, a file or another non-JSON transport; hand-written.
 
-**498 operations: 484 verified, 0 eligible, 0 deferred, 14 special.**
+**500 operations: 486 verified, 0 eligible, 0 deferred, 14 special.**
 
 | Method | Path | Request | Response | Status | Why |
 |---|---|---|---|---|---|
@@ -118,6 +118,8 @@ operation answers with, and whether OpenAPI describes it (OPT-01/OPT-02 —
 | GET | `/api/code/repos/{repo_id}/target` |  | CodeRepoTargetView | verified | declared CodeRepoTargetView |
 | DELETE | `/api/code/repos/{repo_id}/worktree` |  | CodeRepoWorktreeRemoved | verified | declared by cast |
 | POST | `/api/code/repos/{repo_id}/worktrees` | CreateCodeWorktreeRequest | CodeRepoWorktreeCreated | verified | declared by cast |
+| GET | `/api/command-egress` |  | CommandEgressView | verified | declared CommandEgressView |
+| PUT | `/api/command-egress` | CommandEgressRequest | CommandEgressView | verified | declared CommandEgressView |
 | GET | `/api/command-runs` |  | CommandRunList | verified | declared CommandRunList |
 | GET | `/api/command-runs/{run_id}` |  | CommandRunDetail | verified | declared CommandRunDetail |
 | GET | `/api/command-runs/{run_id}/output` |  | CommandOutput | verified | declared by cast |

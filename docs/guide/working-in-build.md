@@ -251,22 +251,32 @@ An approved `shell` command runs **once**, against an allowlist, inside the
 workspace, under a timeout and an output bound, with secret-like output redacted
 before it is recorded.
 
-**Where it runs is your choice, and the card says what that boundary really
-enforces.** Selecting **Native OS sandbox** runs each command in its own Windows
-AppContainer, Linux bubblewrap, or macOS Seatbelt boundary with no network
-capability, the workspace reachable through a single grant, `.raiker` denied and
-`.git` read-only. What the host actually enforces is measured, not assumed: a
-probe runs a child inside the real boundary attempting six things, each also
-attempted *outside* as a control. Only "worked outside, refused inside" counts;
-if the control arm fails the result is **not proven** and nothing turns green.
+**Every command runs in the native OS sandbox**: a restricted local account
+(or an AppContainer) on Windows, bubblewrap on Linux, Seatbelt on macOS. What
+the host actually enforces is measured, not assumed: a probe runs a child inside
+the real boundary, and each attempt is also made *outside* as a control. Only
+"worked outside, refused inside" counts; if a mandatory observation is not
+enforced, commands are refused rather than run on the host.
 
-`local_native` — explicit host access with reduced isolation — is the default
-selection, and it is where background execution, a POSIX terminal and restart
-reattachment are built. The native sandbox is foreground-only, and its card lists
-what it does *not* have rather than showing disabled controls.
+**The agent works in a copy of your project.** On a project's first edit or
+command, Raiker takes a private copy of the project (without `.git` or
+`.raiker`). The agent's file edits, searches and commands all use that copy, so
+a test run always sees the edit just made. Your project does not change until
+you open **Sandbox changes** under the composer and choose **Apply to
+project**; **Discard** throws the copy away. If a file changed in your project
+since the copy was taken, or the copy changed after you looked, Apply is
+refused and nothing is written. Git tools still describe your real repository,
+because the copy has none.
 
-A container boundary persists for a session, so what one command installs the
-next can use, and **Reset environment** puts it back to a known state.
+**No network unless you allow it.** Settings › Runtime › *Command downloads*
+lets sandboxed commands reach a list of hosts over HTTPS (the package registries
+pip, npm, cargo and Git use are suggested). Each run gets its own proxy, and the
+sandbox can reach nothing else; a host that was refused is named in the
+command's output so you can decide whether to add it. On Windows this needs the
+restricted sandbox account.
+
+The native sandbox is foreground-only for now: background runs and interactive
+terminals are refused rather than run unsandboxed.
 
 ## Committing and pushing
 

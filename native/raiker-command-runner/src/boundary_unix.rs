@@ -484,6 +484,9 @@ fn trusted_system_tool(path: &Path) -> Option<String> {
 // not necessary to start the supported system runtime. Toolchains outside
 // /usr require an explicitly governed mount rather than broad host access.
 const SYSTEM_READ_ONLY: [&str; 1] = ["/usr"];
+/// Public CA bundles, mounted only for a run with filtered egress (Debian and
+/// Ubuntu, then Fedora and RHEL layouts).
+const CA_TRUST_STORES: [&str; 3] = ["/etc/ssl/certs", "/etc/pki/tls/certs", "/etc/pki/ca-trust"];
 const SYSTEM_LINKS: [(&str, &str); 4] = [
     ("usr/bin", "/bin"),
     ("usr/sbin", "/sbin"),
@@ -492,12 +495,19 @@ const SYSTEM_LINKS: [(&str, &str); 4] = [
 ];
 
 fn linux_arguments(policy: &LaunchPolicy, argv: &[String]) -> Result<Vec<String>, String> {
-    if policy.network != NetworkPolicy::Denied {
-        // `--share-net` alone would give the command the host's whole network.
-        // Filtered egress needs the proxy to be the only reachable address,
-        // which is a separate namespace build and is not claimed here.
-        return Err("filtered_egress_namespace_unsupported".into());
-    }
+    // The namespace is never shared: `--share-net` would hand the command the
+    // host's whole network. Filtered egress keeps `--unshare-net` and adds one
+    // bridge from the namespace's loopback to the proxy's socket outside.
+    let bridge = match &policy.network {
+        NetworkPolicy::Denied => None,
+        NetworkPolicy::Proxy {
+            port,
+            socket: Some(socket),
+        } => Some((*port, socket.clone())),
+        NetworkPolicy::Proxy { socket: None, .. } => {
+            return Err("filtered_egress_proxy_socket_required".into());
+        }
+    };
     let root = policy.workspace_root.to_string_lossy().into_owned();
     let mut arguments: Vec<String> = [
         "--unshare-user",
@@ -570,9 +580,50 @@ fn linux_arguments(policy: &LaunchPolicy, argv: &[String]) -> Result<Vec<String>
     arguments.push(sanitised_hostname(&policy.profile_name));
     arguments.push("--chdir".to_owned());
     arguments.push(policy.cwd.to_string_lossy().into_owned());
-    arguments.push("--".to_owned());
+    if let Some((port, socket)) = bridge {
+        // TLS through the proxy needs the system's public CA certificates.
+        // Only the trust stores: `/etc/ssl/private` and the rest of `/etc`
+        // stay hidden.
+        for store in CA_TRUST_STORES {
+            if Path::new(store).is_dir() {
+                arguments.extend(["--ro-bind".to_owned(), store.to_owned(), store.to_owned()]);
+            }
+        }
+        bridge_arguments(&mut arguments, port, &socket)?;
+    } else {
+        arguments.push("--".to_owned());
+    }
     arguments.extend(argv.iter().cloned());
     Ok(arguments)
+}
+
+/// Mount the runner and the proxy socket, and start the command under the
+/// runner's loopback bridge (`egress_bridge_linux.rs`).
+#[cfg(target_os = "linux")]
+fn bridge_arguments(arguments: &mut Vec<String>, port: u16, socket: &Path) -> Result<(), String> {
+    use crate::egress_bridge::{RUNNER_INSIDE, SOCKET_INSIDE};
+    let runner = std::env::current_exe()
+        .map_err(|_| "native_sandbox_egress_bridge_unavailable".to_owned())?;
+    arguments.extend([
+        "--ro-bind".to_owned(),
+        runner.to_string_lossy().into_owned(),
+        RUNNER_INSIDE.to_owned(),
+        "--bind".to_owned(),
+        socket.to_string_lossy().into_owned(),
+        SOCKET_INSIDE.to_owned(),
+        "--".to_owned(),
+        RUNNER_INSIDE.to_owned(),
+        "--egress-bridge".to_owned(),
+        SOCKET_INSIDE.to_owned(),
+        port.to_string(),
+        "--".to_owned(),
+    ]);
+    Ok(())
+}
+
+#[cfg(not(target_os = "linux"))]
+fn bridge_arguments(_: &mut Vec<String>, _: u16, _: &Path) -> Result<(), String> {
+    Err("filtered_egress_namespace_unsupported".into())
 }
 
 /// A hostname is not a free-form string: bounded length, and no separators.
@@ -590,9 +641,6 @@ fn sanitised_hostname(name: &str) -> String {
 }
 
 fn macos_arguments(policy: &LaunchPolicy, argv: &[String]) -> Result<Vec<String>, String> {
-    if policy.network != NetworkPolicy::Denied {
-        return Err("filtered_egress_seatbelt_unsupported".into());
-    }
     let mut arguments = vec!["-p".to_owned(), macos_profile(policy)?];
     arguments.extend(argv.iter().cloned());
     Ok(arguments)
@@ -606,6 +654,13 @@ fn macos_arguments(policy: &LaunchPolicy, argv: &[String]) -> Result<Vec<String>
 pub fn macos_profile(policy: &LaunchPolicy) -> Result<String, String> {
     let root = seatbelt_path(&policy.workspace_root)?;
     let mut profile = String::from("(version 1)\n(deny default)\n(deny network*)\n");
+    // The proxy beside Raiker is the only destination, and only by its port:
+    // it resolves and checks every name itself.
+    if let NetworkPolicy::Proxy { port, .. } = &policy.network {
+        profile.push_str(&format!(
+            "(allow network-outbound (remote ip \"localhost:{port}\"))\n"
+        ));
+    }
     profile.push_str("(allow process-exec* process-fork sysctl-read)\n");
     // Signals and process inspection stay inside this sandbox: an unrestricted
     // `signal` would let a command kill any of the owner's processes.
@@ -926,7 +981,7 @@ mod tests {
     }
 
     #[test]
-    fn a_network_grant_is_refused_rather_than_widened_to_the_host() {
+    fn a_network_grant_without_a_proxy_socket_is_refused_rather_than_widened() {
         let policy = policy::parse(
             r#"{"workspace_root":"/ws","cwd":"/ws","profile_name":"raiker.cmd.test",
                 "network":"proxy:127.0.0.1:9","deny_paths":[]}"#,
@@ -934,8 +989,56 @@ mod tests {
         .unwrap();
         assert_eq!(
             linux_arguments(&policy, &["echo".into()]).unwrap_err(),
-            "filtered_egress_namespace_unsupported"
+            "filtered_egress_proxy_socket_required"
         );
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn filtered_egress_keeps_the_private_namespace_and_bridges_only_the_proxy() {
+        let policy = policy::parse(
+            r#"{"workspace_root":"/ws","cwd":"/ws","profile_name":"raiker.cmd.test",
+                "network":"proxy:127.0.0.1:3128","proxy_socket":"/tmp/rk/egress.sock",
+                "deny_paths":[]}"#,
+        )
+        .unwrap();
+        let arguments = linux_arguments(&policy, &["echo".into()]).unwrap();
+        assert!(arguments.iter().any(|item| item == "--unshare-net"));
+        assert!(!arguments.iter().any(|item| item == "--share-net"));
+        assert!(arguments.windows(3).any(|three| three
+            == [
+                "--bind",
+                "/tmp/rk/egress.sock",
+                crate::egress_bridge::SOCKET_INSIDE
+            ]));
+        let start = arguments
+            .iter()
+            .rposition(|item| item == "--egress-bridge")
+            .unwrap();
+        assert_eq!(
+            &arguments[start - 1..],
+            [
+                crate::egress_bridge::RUNNER_INSIDE,
+                "--egress-bridge",
+                crate::egress_bridge::SOCKET_INSIDE,
+                "3128",
+                "--",
+                "echo"
+            ]
+        );
+    }
+
+    #[test]
+    fn the_macos_profile_allows_only_the_proxy_port() {
+        let mut policy = sample();
+        policy.network = NetworkPolicy::Proxy {
+            port: 4321,
+            socket: None,
+        };
+        let profile = macos_profile(&policy).unwrap();
+        assert!(profile.contains("(deny network*)"));
+        assert!(profile.contains("(allow network-outbound (remote ip \"localhost:4321\"))"));
+        assert_eq!(profile.matches("allow network").count(), 1);
     }
 
     #[test]

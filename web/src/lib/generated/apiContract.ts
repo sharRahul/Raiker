@@ -1288,6 +1288,19 @@ export type CommandChunkView = {
   end_byte_offset: number;
 };
 
+/** Turn allow-listed command downloads on or off, and name the hosts. */
+export type CommandEgressRequest = {
+  enabled: boolean;
+  domains?: string[];
+};
+
+/** The owner's allow-list for sandboxed command downloads. */
+export type CommandEgressView = {
+  enabled: boolean;
+  domains: string[];
+  defaults: string[];
+};
+
 /** Owner-defined, expiry-bound command prefixes for one conversation. */
 export type CommandGrant = {
   session_id: string;
@@ -7098,6 +7111,10 @@ export const contract = {
     call<CodeRepoWorktreeRemoved>("DELETE", `/api/code/repos/${encodeURIComponent(repoId)}/worktree`),
   createCodeWorktree: (repoId: string, body: CreateCodeWorktreeRequest) =>
     call<CodeRepoWorktreeCreated>("POST", `/api/code/repos/${encodeURIComponent(repoId)}/worktrees`, { body }),
+  getCommandEgress: () =>
+    request<CommandEgressView>("/api/command-egress"),
+  putCommandEgress: (body: CommandEgressRequest) =>
+    call<CommandEgressView>("PUT", "/api/command-egress", { body }),
   listCommands: (query: { session_id?: string } = {}) =>
     request<CommandRunList>(withQuery("/api/command-runs", query)),
   getCommand: (runId: string) =>

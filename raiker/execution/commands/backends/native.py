@@ -39,6 +39,8 @@ from typing import Any
 
 from raiker.contracts.ids import utc_now
 from raiker.execution.commands.backends.base import CommandBackendError
+from raiker.execution.commands.egress_runtime import EgressRun, EgressSink
+from raiker.execution.commands.egress_runtime import load_settings as load_egress_settings
 from raiker.execution.commands.models import CommandFeatures, CommandRequest
 from raiker.execution.commands.process_lifetime import bind_to_runtime_lifetime
 from raiker.execution.commands.runner import CommandSink, MemoryCommandSink, StreamingCommandRunner
@@ -402,12 +404,6 @@ class NativeSandboxBackend:
         if binary is None:
             raise CommandBackendError(reason or "native_sandbox_artifact_missing")
 
-        # The policy is Raiker state: it is written beside the original
-        # workspace's own state, never into the copy the command can touch.
-        policy_path = self.driver.policy_path(original)
-        policy_path.write_text(
-            json.dumps(self.driver.policy_document(request), indent=2), encoding="utf-8"
-        )
         environment = sandbox_environment(workspace_root=request.workspace_root)
         executable = shutil.which(request.argv_template[0], path=environment.get("PATH"))
         if executable is None:
@@ -419,6 +415,17 @@ class NativeSandboxBackend:
             # program to run inside a sandbox, and saying so is the honest
             # answer.
             raise CommandBackendError("native_sandbox_executable_unreachable")
+        document = self.driver.policy_document(request)
+        egress = self._egress_for(original)
+        sink = sink or MemoryCommandSink()
+        if egress is not None:
+            document.update(egress.policy_fields)
+            environment.update(egress.environment)
+            sink = EgressSink(sink, egress)
+        # The policy is Raiker state: it is written beside the original
+        # workspace's own state, never into the copy the command can touch.
+        policy_path = self.driver.policy_path(original)
+        policy_path.write_text(json.dumps(document, indent=2), encoding="utf-8")
         argv = [
             str(binary),
             "--policy",
@@ -427,19 +434,36 @@ class NativeSandboxBackend:
             executable,
             *request.argv_template[1:],
         ]
-        process = self._runner(
-            request,
-            argv,
-            request.workspace_root,
-            environment,
-            sink or MemoryCommandSink(),
-            pty=False,
-        )
+        try:
+            process = self._runner(
+                request, argv, request.workspace_root, environment, sink, pty=False
+            )
+        except BaseException:
+            if egress is not None:
+                egress.close()
+            raise
         # The runner must not outlive Raiker. On Windows the kernel reaps it
         # through a job the runtime owns; on Linux the runner sets a parent-death
         # signal itself.
         bind_to_runtime_lifetime(getattr(getattr(process, "process", None), "pid", None))
         return process
+
+    def _egress_for(self, request: CommandRequest) -> EgressRun | None:
+        """This run's allow-listed download proxy, when the owner turned it on.
+
+        Only where the boundary can make the proxy the single route: on Windows
+        that is the restricted account (an AppContainer cannot reach loopback
+        without an elevated exemption), so without it the run keeps no network
+        rather than failing.
+        """
+        settings = load_egress_settings(request.workspace_root)
+        if not settings.enabled:
+            return None
+        if sys.platform == "win32" and self.driver.account_base() is None:
+            return None
+        return EgressRun(request.run_id, request.owner_principal_id, settings).start(
+            request.timeout_seconds + 5
+        )
 
     def _in_task_copy(self, request: CommandRequest) -> CommandRequest:
         """The same request, rooted in this session's disposable copy.

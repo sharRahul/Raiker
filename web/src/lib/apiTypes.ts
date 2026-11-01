@@ -54,6 +54,7 @@ import type {
   ConversionPreview,
   CredentialDeltaView,
   TaskWorkspaceView,
+  CommandEgressView,
   CredentialLifecycleView,
   CriticalApprovalResolved,
   Diagnostic,
@@ -782,6 +783,8 @@ export type { CommandReceiptView };
 export type { CredentialDeltaView };
 
 export type { TaskWorkspaceView };
+
+export type { CommandEgressView };
 
 export type { ModelCapacityEntry };
 

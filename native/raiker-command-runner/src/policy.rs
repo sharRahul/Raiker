@@ -14,9 +14,11 @@ pub enum NetworkPolicy {
     /// No capability, no route. This is the default and the only value a
     /// command receives unless the owner granted filtered egress.
     Denied,
-    /// Egress is permitted only through this loopback proxy address. The
-    /// boundary — not the child — is what makes the proxy the single route.
-    Proxy(String),
+    /// Egress is permitted only to Raiker's proxy on `127.0.0.1:port`. The
+    /// boundary -- not the child -- is what makes the proxy the single route.
+    /// On Linux the proxy listens on `socket` outside the sandbox and a bridge
+    /// inside the network namespace forwards the loopback port to it.
+    Proxy { port: u16, socket: Option<PathBuf> },
 }
 
 #[derive(Debug, Clone)]
@@ -84,10 +86,30 @@ pub fn parse(text: &str) -> Result<LaunchPolicy, &'static str> {
         None => NetworkPolicy::Denied,
         Some(value) => match value.as_str().ok_or("runner_policy_network_invalid")? {
             "none" => NetworkPolicy::Denied,
-            other => match other.strip_prefix("proxy:") {
-                Some(address) if !address.is_empty() => NetworkPolicy::Proxy(address.to_owned()),
-                _ => return Err("runner_policy_network_invalid"),
-            },
+            other => {
+                // Only loopback: the proxy runs beside Raiker, never elsewhere.
+                let port = other
+                    .strip_prefix("proxy:127.0.0.1:")
+                    .and_then(|text| text.parse::<u16>().ok())
+                    .filter(|port| *port != 0)
+                    .ok_or("runner_policy_network_invalid")?;
+                let socket = match object.get("proxy_socket") {
+                    None => None,
+                    Some(value) => {
+                        let path = PathBuf::from(
+                            value.as_str().ok_or("runner_policy_proxy_socket_invalid")?,
+                        );
+                        if !path.is_absolute()
+                            || path.components().any(|part| part == Component::ParentDir)
+                            || !policy_path_text_safe(&path)
+                        {
+                            return Err("runner_policy_proxy_socket_invalid");
+                        }
+                        Some(path)
+                    }
+                };
+                NetworkPolicy::Proxy { port, socket }
+            }
         },
     };
     let pty = match object.get("pty") {
@@ -285,6 +307,45 @@ mod tests {
             "\"network\":\"proxy:\",\"profile_name\"",
         );
         assert_eq!(parse(&text).unwrap_err(), "runner_policy_network_invalid");
+    }
+
+    #[test]
+    fn the_proxy_must_be_on_loopback() {
+        let with = |value: &str| {
+            minimal().replace(
+                "\"profile_name\"",
+                &format!("\"network\":\"{value}\",\"profile_name\""),
+            )
+        };
+        assert_eq!(
+            parse(&with("proxy:127.0.0.1:3128")).unwrap().network,
+            NetworkPolicy::Proxy {
+                port: 3128,
+                socket: None
+            }
+        );
+        for refused in [
+            "proxy:10.0.0.5:3128",
+            "proxy:127.0.0.1:0",
+            "proxy:127.0.0.1:x",
+        ] {
+            assert_eq!(
+                parse(&with(refused)).unwrap_err(),
+                "runner_policy_network_invalid"
+            );
+        }
+    }
+
+    #[test]
+    fn a_relative_proxy_socket_is_refused() {
+        let text = minimal().replace(
+            "\"profile_name\"",
+            "\"network\":\"proxy:127.0.0.1:3128\",\"proxy_socket\":\"egress.sock\",\"profile_name\"",
+        );
+        assert_eq!(
+            parse(&text).unwrap_err(),
+            "runner_policy_proxy_socket_invalid"
+        );
     }
 
     #[test]

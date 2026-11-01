@@ -218,18 +218,20 @@ pub fn launch(policy: &LaunchPolicy, argv: &[String]) -> Result<i32, String> {
     if policy.pty {
         return Err("native_sandbox_pty_unsupported".into());
     }
+    // Task copies under the restricted account's base run as that account,
+    // where ordinary toolchains work; anything else keeps the AppContainer.
+    // The account's outbound firewall block leaves loopback, so it reaches the
+    // egress proxy beside Raiker and nothing else off the machine.
+    if let Ok(base) = account::base()
+        && strip_verbatim(&policy.workspace_root).starts_with(&base)
+    {
+        return account::launch(policy, argv);
+    }
     if policy.network != NetworkPolicy::Denied {
         // Reaching a loopback proxy from an AppContainer needs a loopback
         // exemption, which needs elevation. Claiming filtered egress without
         // that is exactly the kind of green row this boundary exists to avoid.
         return Err("filtered_egress_windows_unsupported".into());
-    }
-    // Task copies under the restricted account's base run as that account,
-    // where ordinary toolchains work; anything else keeps the AppContainer.
-    if let Ok(base) = account::base()
-        && strip_verbatim(&policy.workspace_root).starts_with(&base)
-    {
-        return account::launch(policy, argv);
     }
     let capability = Capability::derive(&capability_name(&policy.workspace_root))?;
     ensure_workspace_grant(policy, &capability)?;

@@ -158,3 +158,12 @@ class TaskWorkspacePromoted(TypedDict):
 class TaskWorkspaceDiscarded(TypedDict):
     ok: bool
     workspace_id: str
+
+
+class CommandEgressView(TypedDict):
+    """The owner's allow-list for sandboxed command downloads."""
+
+    enabled: bool
+    domains: list[str]
+    #: The package registries Raiker suggests, for "restore defaults".
+    defaults: list[str]

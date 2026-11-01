@@ -218,6 +218,29 @@ unavailable until disposable workspaces are wired in (see `TO_BE_FIXED.md`).
 The Python suite still has the same 189 pre-migration host-execution failures
 it had before Docker was removed; none are new.
 
+## Allow-listed downloads (2026-11-01)
+
+Off by default; the owner turns it on and edits the host list in Settings ›
+Runtime › *Command downloads* (`GET/PUT /api/command-egress`, audited as
+`command_egress_changed`). Defaults are the registries pip, npm, cargo and Git
+fetch from. Each run then gets its own proxy (`egress_runtime.EgressRun`) with a
+run-scoped HMAC credential, delivered through `HTTP(S)_PROXY`/`ALL_PROXY`, and
+the boundary makes that proxy the only route:
+
+| Platform | Mechanism | Measured |
+| --- | --- | --- |
+| Linux | `--unshare-net` kept; the runner is bind-mounted and runs as `--egress-bridge` inside the namespace, forwarding `127.0.0.1:3128` to the proxy's Unix socket; public CA stores (`/etc/ssl/certs`, `/etc/pki/...`) mounted read-only | WSL2 Ubuntu 24.04: `curl https://pypi.org/...` 200 through the proxy; `example.com` refused 403; `--noproxy '*'` cannot resolve a name; `tests/linux_probe.rs` asserts the bridge reaches the socket and `1.1.1.1:443` is unreachable |
+| macOS | Seatbelt keeps `(deny network*)` and adds only `(allow network-outbound (remote ip "localhost:<port>"))` | Profile unit test only; needs a macOS run |
+| Windows | Restricted account: its firewall rule blocks every off-machine destination; the runner adds the proxy variables to the account's own environment block (`LogonUserW` + `CreateEnvironmentBlock`). AppContainer refuses, so an AppContainer-only host keeps the run offline | Windows 11: pypi.org 200; example.com 403; `--noproxy '*'` cannot connect; 9 of 9 repeated runs correct |
+
+The proxy checks the host and port against the list **before** any DNS lookup,
+so a sandboxed command cannot use name resolution as a covert channel (found
+in review; the previous order resolved first). It refuses any DNS answer that
+contains a non-public address, connects to the exact address it checked, and
+accepts only `CONNECT` to port 443, so a redirect to another host is a new,
+separately checked tunnel. Refused destinations are appended to the run's
+output so the agent can name the host to ask for.
+
 ## Windows MXC evaluation (2026-10-30)
 
 Microsoft MXC is public (`github.com/microsoft/mxc`). It is a cross-platform

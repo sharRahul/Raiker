@@ -10,9 +10,10 @@ from fastapi import APIRouter, Depends, Query, Request, status
 
 from raiker.api.dependencies import authenticate as _auth
 from raiker.api.dependencies import refusal
-from raiker.api.schemas import PromoteTaskWorkspaceRequest, serialize_dto
+from raiker.api.schemas import CommandEgressRequest, PromoteTaskWorkspaceRequest, serialize_dto
 from raiker.api.sessions import ApiSession
 from raiker.api.wire.commands import (
+    CommandEgressView,
     CommandOutput,
     CommandReceiptAnswer,
     CommandReceiptView,
@@ -217,6 +218,52 @@ def discard_credential_delta(
         "receipt": _service(request).store.get_delta_receipt(auth_data[0].principal_id, run_id),
     }
     return serialize_dto(discarded)
+
+
+# ── Allow-listed downloads for sandboxed commands ────────────────────────────
+
+
+def _egress_view(settings: Any) -> CommandEgressView:
+    from raiker.execution.commands.egress_runtime import DEFAULT_DOWNLOAD_DOMAINS  # noqa: PLC0415
+
+    return {
+        "enabled": settings.enabled,
+        "domains": list(settings.domains),
+        "defaults": list(DEFAULT_DOWNLOAD_DOMAINS),
+    }
+
+
+@router.get("/api/command-egress")
+def get_command_egress(
+    request: Request,
+    auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+) -> dict[str, Any]:
+    from raiker.execution.commands.egress_runtime import load_settings  # noqa: PLC0415
+
+    view: CommandEgressView = _egress_view(load_settings(request.app.state.workspace_root))
+    return serialize_dto(view)
+
+
+@router.put("/api/command-egress")
+def put_command_egress(
+    body: CommandEgressRequest,
+    request: Request,
+    auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+) -> dict[str, Any]:
+    """The owner's choice; every later sandboxed run reads it at launch."""
+    from raiker.execution.commands.egress_runtime import save_settings  # noqa: PLC0415
+
+    owner = auth_data[0].principal_id
+    try:
+        settings = save_settings(request.app.state.workspace_root, body.enabled, body.domains)
+    except ValueError as exc:
+        raise refusal(status.HTTP_422_UNPROCESSABLE_ENTITY, str(exc)) from None
+    _audit_workspace(
+        request, owner, "", "command_egress_changed",
+        {"enabled": settings.enabled, "domain_count": len(settings.domains)},
+    )
+    view: CommandEgressView = _egress_view(settings)
+    return serialize_dto(view)
 
 
 # ── Disposable task workspaces: review, promote, discard ─────────────────────

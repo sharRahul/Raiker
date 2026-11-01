@@ -33,9 +33,11 @@ use windows_sys::Win32::Security::Cryptography::{
     CRYPTPROTECT_UI_FORBIDDEN, CryptProtectData, CryptUnprotectData,
 };
 use windows_sys::Win32::Security::{
-    GetSecurityDescriptorDacl, LookupAccountNameW, SID_NAME_USE, TOKEN_ELEVATION, TokenElevation,
+    GetSecurityDescriptorDacl, LOGON32_LOGON_INTERACTIVE, LOGON32_PROVIDER_DEFAULT, LogonUserW,
+    LookupAccountNameW, SID_NAME_USE, TOKEN_ELEVATION, TokenElevation,
 };
 use windows_sys::Win32::Storage::FileSystem::{GetDriveTypeW, GetLogicalDrives};
+use windows_sys::Win32::System::Environment::{CreateEnvironmentBlock, DestroyEnvironmentBlock};
 use windows_sys::Win32::System::JobObjects::{
     JOB_OBJECT_UILIMIT_DESKTOP, JOB_OBJECT_UILIMIT_DISPLAYSETTINGS, JOB_OBJECT_UILIMIT_EXITWINDOWS,
     JOB_OBJECT_UILIMIT_GLOBALATOMS, JOB_OBJECT_UILIMIT_HANDLES, JOB_OBJECT_UILIMIT_READCLIPBOARD,
@@ -611,6 +613,7 @@ pub fn launch(policy: &LaunchPolicy, argv: &[String]) -> Result<i32, String> {
         return Err("native_sandbox_account_workspace_outside_base".into());
     }
     let password = credential()?;
+    let environment = account_environment(policy, &password)?;
     let _grant = CopyGrant::apply(&root, policy.deadline_seconds)?;
     let job = create_job(policy)?;
     restrict_ui(job)?;
@@ -636,6 +639,8 @@ pub fn launch(policy: &LaunchPolicy, argv: &[String]) -> Result<i32, String> {
     let mut information: PROCESS_INFORMATION = unsafe { std::mem::zeroed() };
     // A null environment is built from the sandbox account's own profile, so
     // no variable of the owner's — token, path or home — reaches the command.
+    // With filtered egress it is that same profile environment plus the proxy
+    // variables Raiker set for this run (`account_environment`).
     let created = unsafe {
         CreateProcessWithLogonW(
             user.as_ptr(),
@@ -645,7 +650,9 @@ pub fn launch(policy: &LaunchPolicy, argv: &[String]) -> Result<i32, String> {
             null(),
             command_line.as_mut_ptr(),
             CREATE_SUSPENDED | 0x0000_0400,
-            null(),
+            environment
+                .as_ref()
+                .map_or(null(), |block| block.as_ptr().cast()),
             directory.as_ptr(),
             &startup,
             &mut information,
@@ -682,6 +689,85 @@ pub fn launch(policy: &LaunchPolicy, argv: &[String]) -> Result<i32, String> {
         return Err("native_sandbox_wait_failed".into());
     }
     Ok(code as i32)
+}
+
+/// The proxy variables a run with filtered egress receives. Only these cross
+/// from Raiker's environment into the account's; nothing else of the owner's.
+const PROXY_VARIABLES: [&str; 6] = [
+    "HTTP_PROXY",
+    "HTTPS_PROXY",
+    "ALL_PROXY",
+    "http_proxy",
+    "https_proxy",
+    "all_proxy",
+];
+
+/// The account's own profile environment plus this run's proxy variables, as a
+/// Unicode environment block; `None` (the profile alone) without egress.
+fn account_environment(policy: &LaunchPolicy, password: &str) -> Result<Option<Vec<u16>>, String> {
+    if policy.network == NetworkPolicy::Denied {
+        return Ok(None);
+    }
+    let user = wide(ACCOUNT);
+    let domain = wide(".");
+    let mut secret = wide(password);
+    let mut token: HANDLE = null_mut();
+    let logged_on = unsafe {
+        LogonUserW(
+            user.as_ptr(),
+            domain.as_ptr(),
+            secret.as_ptr(),
+            LOGON32_LOGON_INTERACTIVE,
+            LOGON32_PROVIDER_DEFAULT,
+            &mut token,
+        )
+    };
+    secret.iter_mut().for_each(|unit| *unit = 0);
+    if logged_on == 0 {
+        let code = std::io::Error::last_os_error().raw_os_error().unwrap_or(0);
+        return Err(format!("native_sandbox_account_logon_failed:{code}"));
+    }
+    let mut block: *mut core::ffi::c_void = null_mut();
+    let created = unsafe { CreateEnvironmentBlock(&mut block, token, 0) };
+    unsafe { CloseHandle(token) };
+    if created == 0 || block.is_null() {
+        let code = std::io::Error::last_os_error().raw_os_error().unwrap_or(0);
+        return Err(format!("native_sandbox_account_environment_failed:{code}"));
+    }
+    let mut entries: Vec<String> = Vec::new();
+    let mut cursor = block as *const u16;
+    loop {
+        let mut length = 0usize;
+        while unsafe { *cursor.add(length) } != 0 {
+            length += 1;
+        }
+        if length == 0 {
+            break;
+        }
+        let entry = String::from_utf16_lossy(unsafe { std::slice::from_raw_parts(cursor, length) });
+        cursor = unsafe { cursor.add(length + 1) };
+        let name = entry.split('=').next().unwrap_or("");
+        if !PROXY_VARIABLES
+            .iter()
+            .any(|known| known.eq_ignore_ascii_case(name))
+        {
+            entries.push(entry);
+        }
+    }
+    unsafe { DestroyEnvironmentBlock(block) };
+    for name in PROXY_VARIABLES {
+        if let Ok(value) = std::env::var(name) {
+            entries.push(format!("{name}={value}"));
+        }
+    }
+    entries.sort_by_key(|entry| entry.to_ascii_uppercase());
+    let mut encoded: Vec<u16> = Vec::new();
+    for entry in entries {
+        encoded.extend(entry.encode_utf16());
+        encoded.push(0);
+    }
+    encoded.push(0);
+    Ok(Some(encoded))
 }
 
 /// No reaching the owner's windows, clipboard, desktop or session settings.

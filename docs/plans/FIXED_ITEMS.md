@@ -1,5 +1,19 @@
 # Fixed items
 
+## Sandboxed commands could not download packages
+
+The native boundary denied all network, so `pip install`, `npm install`,
+`cargo fetch` and `git clone` could not run. The owner can now allow downloads
+from a host list (off by default). Each run gets its own authenticated proxy,
+and the OS makes it the only route: a loopback bridge into the private network
+namespace on Linux, a single-port Seatbelt rule on macOS, and the restricted
+account's firewall on Windows. Measured end-to-end on Linux and Windows; macOS
+still needs a run. The proxy now checks the allow-list before resolving a name,
+which closes a DNS covert channel in the earlier proxy. Covered by
+`tests/test_command_egress_runtime.py`, `tests/test_native_egress.py`,
+`native/raiker-command-runner/tests/linux_probe.rs` and
+`web/src/lib/views/settings/CommandDownloads.test.ts`.
+
 ## File edits and commands worked on two different trees
 
 File tools wrote the real project while commands ran in a copy taken at the

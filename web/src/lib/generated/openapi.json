@@ -6459,6 +6459,59 @@
         "title": "CommandChunkView",
         "type": "object"
       },
+      "CommandEgressRequest": {
+        "additionalProperties": false,
+        "description": "Turn allow-listed command downloads on or off, and name the hosts.",
+        "properties": {
+          "domains": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 200,
+            "title": "Domains",
+            "type": "array"
+          },
+          "enabled": {
+            "title": "Enabled",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "enabled"
+        ],
+        "title": "CommandEgressRequest",
+        "type": "object"
+      },
+      "CommandEgressView": {
+        "description": "The owner's allow-list for sandboxed command downloads.",
+        "properties": {
+          "defaults": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Defaults",
+            "type": "array"
+          },
+          "domains": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Domains",
+            "type": "array"
+          },
+          "enabled": {
+            "title": "Enabled",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "enabled",
+          "domains",
+          "defaults"
+        ],
+        "title": "CommandEgressView",
+        "type": "object"
+      },
       "CommandGrant": {
         "description": "Owner-defined, expiry-bound command prefixes for one conversation.",
         "properties": {
@@ -39953,6 +40006,61 @@
           }
         },
         "summary": "Create Code Worktree"
+      }
+    },
+    "/api/command-egress": {
+      "get": {
+        "operationId": "get_command_egress_api_command_egress_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommandEgressView"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Get Command Egress"
+      },
+      "put": {
+        "description": "The owner's choice; every later sandboxed run reads it at launch.",
+        "operationId": "put_command_egress_api_command_egress_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CommandEgressRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommandEgressView"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Put Command Egress"
       }
     },
     "/api/command-runs": {

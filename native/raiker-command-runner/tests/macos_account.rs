@@ -9,6 +9,17 @@ use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
 use std::time::{Duration, Instant};
 
+/// The account serves one run at a time, and a run's deadline includes its
+/// wait for the account. Run in parallel, these tests queued behind each other
+/// and timed out (`native_sandbox_account_busy`) on the slower Intel runner;
+/// that is the designed behaviour, not what these tests measure.
+fn serial() -> std::sync::MutexGuard<'static, ()> {
+    static ACCOUNT: std::sync::Mutex<()> = std::sync::Mutex::new(());
+    ACCOUNT
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
+}
+
 fn runner() -> &'static str {
     env!("CARGO_BIN_EXE_raiker-command-runner")
 }
@@ -81,6 +92,7 @@ const GIB: u64 = 1024 * 1024 * 1024;
 
 #[test]
 fn the_account_probe_measures_every_control_enforced_including_descendants() {
+    let _serial = serial();
     let Some(_) = configured() else { return };
     let output = Command::new(runner())
         .args(["--probe", "--workspace"])
@@ -104,6 +116,7 @@ fn the_account_probe_measures_every_control_enforced_including_descendants() {
 
 #[test]
 fn a_command_runs_as_the_account_and_writes_only_its_copy() {
+    let _serial = serial();
     let Some(base) = configured() else { return };
     let copy = copy_under(&base, "identity");
     std::fs::write(copy.0.join("input.txt"), "from the owner").unwrap();
@@ -147,6 +160,7 @@ fn a_command_runs_as_the_account_and_writes_only_its_copy() {
 
 #[test]
 fn another_copy_is_out_of_reach_during_a_run_and_the_grant_ends_with_it() {
+    let _serial = serial();
     let Some(base) = configured() else { return };
     let mine = copy_under(&base, "mine");
     let other = copy_under(&base, "other");
@@ -185,6 +199,7 @@ fn another_copy_is_out_of_reach_during_a_run_and_the_grant_ends_with_it() {
 
 #[test]
 fn a_detached_descendant_does_not_outlive_its_run() {
+    let _serial = serial();
     let Some(base) = configured() else { return };
     let copy = copy_under(&base, "detached");
     // Double fork, new session, and outlive the parent: the case Seatbelt
@@ -228,6 +243,7 @@ fn a_detached_descendant_does_not_outlive_its_run() {
 
 #[test]
 fn memory_past_the_limit_stops_the_run_and_under_it_completes() {
+    let _serial = serial();
     let Some(base) = configured() else { return };
     let copy = copy_under(&base, "memory");
     // Touch 600 MB so it counts as footprint, then hold it.
@@ -252,6 +268,7 @@ fn memory_past_the_limit_stops_the_run_and_under_it_completes() {
 
 #[test]
 fn a_copy_outside_the_base_never_runs_as_the_account() {
+    let _serial = serial();
     let Some(_) = configured() else { return };
     let outside =
         std::env::temp_dir().join(format!("raiker-account-outside-{}", std::process::id()));

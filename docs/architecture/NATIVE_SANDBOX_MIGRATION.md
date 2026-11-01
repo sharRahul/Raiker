@@ -251,6 +251,25 @@ the default gateway, and hosted CI networks drop that packet, so egress read
 `indeterminate` and every sandboxed command there was refused. It now connects
 to a listener on the host's own outward address for the length of the probe.
 
+## Process limit and restart recovery on Linux (2026-11-01)
+
+`max_processes` was applied as `RLIMIT_NPROC` before `bwrap` started. Linux
+counts that limit against every task of the real user on the kernel, across
+PID namespaces (WSL's distributions share one kernel), so on a busy session
+`bwrap` itself could not fork: `Creating new namespace failed: Resource
+temporarily unavailable`. Measured in WSL2 with nine tasks of the user
+visible: allowances of 8, 16 and 32 failed, 64 ran. The runner now sets the
+limit from inside the run's user namespace (`--nproc-limit`, an exec shim the
+runner provides read-only at `/run/raiker/runner`), where the kernel counts
+only that namespace's tasks. Allowance 8 now runs beside other processes, and
+a run allowed 6 cannot start 20 children (`linux_probe.rs`).
+
+A background run on Linux is started under the detached supervisor, which runs
+the runner, so the boundary is unchanged and a restart of Raiker reattaches to
+the run instead of recording it `lost` (`test_command_supervisor_reattach.py`,
+on real Bubblewrap). A run with downloads on stays in-process: its proxy lives
+in Raiker.
+
 ## Allow-listed downloads (2026-11-01)
 
 Off by default; the owner turns it on and edits the host list in Settings ›

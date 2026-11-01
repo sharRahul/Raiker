@@ -38628,3 +38628,23 @@ Found live in this round and fixed before it closed: re-applying a listener the 
 
 **Evidence.** CI "Show the native sandbox measurement" now prints `True … 'egress': 'enforced'`; WSL2 probe `connect_destination` is the host's own address.
 
+## FIXED-1278 — Linux sandboxed commands failed to start on a busy session (`RLIMIT_NPROC`)
+
+**Severity: High. Area: Native sandbox (Linux). Status: Fixed 2026-11-01.**
+
+**Observed.** With `max_processes` 64 (commands) or 32 (hooks, MCP, plugins), `bwrap` failed with `Creating new namespace failed: Resource temporarily unavailable` on hosts where the user already ran other tasks: the kernel counts the limit against all of the user's tasks, in every PID namespace.
+
+**Fixed.** The runner sets the limit inside the run's user namespace through its own exec shim (`--nproc-limit`), where only the run's tasks count.
+
+**Evidence.** `linux_probe.rs`: `a_small_process_allowance_still_launches_beside_the_users_other_processes`, `the_process_allowance_still_stops_a_run_that_forks_past_it`; WSL2 measurement in `NATIVE_SANDBOX_MIGRATION.md`.
+
+## FIXED-1279 — Native background runs were lost on every restart of Raiker (BUG-194 regression)
+
+**Severity: Medium. Area: Commands. Status: Fixed 2026-11-01.**
+
+**Observed.** The native backend started background runs in-process, so the detached supervisor the host backend used was gone and a restart recorded each run `lost`.
+
+**Fixed.** On Linux a background run without downloads is started under the detached supervisor, which runs the runner; `restart_recovery` is reported only there.
+
+**Evidence.** `tests/test_command_supervisor_reattach.py` on real Bubblewrap (WSL2).
+

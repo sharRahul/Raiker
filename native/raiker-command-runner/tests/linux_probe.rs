@@ -681,3 +681,82 @@ fn a_toolchain_outside_usr_runs_only_when_its_prefix_is_mounted() {
     );
     assert_eq!(String::from_utf8_lossy(&with.stdout).trim(), "ran");
 }
+
+#[test]
+fn a_small_process_allowance_still_launches_beside_the_users_other_processes() {
+    let stamp = format!(
+        "{}-{}",
+        std::process::id(),
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos()
+    );
+    let workspace = Workspace(std::env::temp_dir().join(format!("raiker-linux-nproc-{stamp}")));
+    std::fs::create_dir(&workspace.0).unwrap();
+    // More of this user's processes than the run is allowed: the limit counts
+    // them all, so an absolute limit would stop bwrap from forking at all.
+    let holders: Vec<_> = (0..12)
+        .map(|_| Command::new("/usr/bin/sleep").arg("30").spawn().unwrap())
+        .collect();
+    let runner = workspace.0.join("runner");
+    std::fs::copy(env!("CARGO_BIN_EXE_raiker-command-runner"), &runner).unwrap();
+    let policy = serde_json::json!({
+        "workspace_root": workspace.0, "cwd": workspace.0,
+        "profile_name": "raiker.nproc.test", "deadline_seconds": 15, "max_processes": 8,
+    });
+    let policy_path = workspace.0.join("policy.json");
+    std::fs::write(&policy_path, policy.to_string()).unwrap();
+    let output = output_after_transient_exec_busy(
+        Command::new(&runner)
+            .arg("--policy")
+            .arg(&policy_path)
+            .arg("--")
+            .args(["/usr/bin/echo", "ran"]),
+    );
+    for mut holder in holders {
+        let _ = holder.kill();
+        let _ = holder.wait();
+    }
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert_eq!(String::from_utf8_lossy(&output.stdout).trim(), "ran");
+}
+
+#[test]
+fn the_process_allowance_still_stops_a_run_that_forks_past_it() {
+    let stamp = format!(
+        "{}-{}",
+        std::process::id(),
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos()
+    );
+    let workspace = Workspace(std::env::temp_dir().join(format!("raiker-linux-fork-{stamp}")));
+    std::fs::create_dir(&workspace.0).unwrap();
+    let runner = workspace.0.join("runner");
+    std::fs::copy(env!("CARGO_BIN_EXE_raiker-command-runner"), &runner).unwrap();
+    let policy = serde_json::json!({
+        "workspace_root": workspace.0, "cwd": workspace.0,
+        "profile_name": "raiker.fork.test", "deadline_seconds": 15, "max_processes": 6,
+    });
+    let policy_path = workspace.0.join("policy.json");
+    std::fs::write(&policy_path, policy.to_string()).unwrap();
+    let script = "import subprocess\nstarted = 0\nfor _ in range(20):\n    try:\n        subprocess.Popen(['/usr/bin/sleep', '3'])\n        started += 1\n    except OSError:\n        pass\nprint(started)\n";
+    let output = output_after_transient_exec_busy(
+        Command::new(&runner)
+            .arg("--policy")
+            .arg(&policy_path)
+            .arg("--")
+            .args(["/usr/bin/python3", "-c", script]),
+    );
+    let started: u32 = String::from_utf8_lossy(&output.stdout)
+        .trim()
+        .parse()
+        .unwrap_or_else(|_| panic!("{}", String::from_utf8_lossy(&output.stderr)));
+    assert!(started < 20, "the run started all {started} children");
+}

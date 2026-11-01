@@ -300,7 +300,13 @@ class TestPricingApi:
         if entry["source"] == "config":
             assert entry["reviewed_at"] == "2026-08-01"
             assert entry["review_due_at"] == "2026-11-01"
-            assert entry["review_status"] == "current"
+            # The shipped list is reviewed by a person against the providers'
+            # pages; once its due date arrives the read must say so.
+            from datetime import UTC, date, datetime
+
+            due = date.fromisoformat(entry["review_due_at"])
+            today = datetime.now(UTC).date()
+            assert entry["review_status"] == ("current" if today < due else "overdue")
 
     def test_pricing_requires_a_bearer_token(self, client: TestClient) -> None:
         assert client.get("/api/models/pricing").status_code in (401, 403)

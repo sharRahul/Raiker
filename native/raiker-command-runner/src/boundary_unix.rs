@@ -398,7 +398,11 @@ fn bound_child(command: &mut Command, policy: &LaunchPolicy) {
                 }
                 Ok(())
             };
+            // Linux applies it inside the namespace (`exec_with_process_limit`).
+            #[cfg(not(target_os = "linux"))]
             apply_limit(libc::RLIMIT_NPROC, processes, 1)?;
+            #[cfg(target_os = "linux")]
+            let _ = processes;
             // XNU rejects a finite RLIMIT_AS with EINVAL and does not enforce
             // address-space limits, so macOS reports memory as unenforced
             // instead of failing every launch or claiming a quota it lacks.
@@ -418,6 +422,32 @@ fn bound_child(command: &mut Command, policy: &LaunchPolicy) {
             Ok(())
         });
     }
+}
+
+/// Set the process limit inside the namespace, then become the command.
+///
+/// Linux counts `RLIMIT_NPROC` against every task of the real user on the
+/// kernel, in every PID namespace (WSL's distributions share one kernel), so a
+/// limit set before `bwrap` made `bwrap` itself fail to fork on any busy
+/// session. Set from inside the run's own user namespace, the kernel counts
+/// only that namespace's tasks against it, which is the run's own bound.
+#[cfg(target_os = "linux")]
+pub fn exec_with_process_limit(limit: libc::rlim_t, argv: &[String]) -> Result<i32, String> {
+    use std::os::unix::process::CommandExt;
+    let mut existing: libc::rlimit = unsafe { std::mem::zeroed() };
+    if unsafe { libc::getrlimit(libc::RLIMIT_NPROC, &mut existing) } != 0 {
+        return Err("native_sandbox_process_limit_failed".into());
+    }
+    let narrowed = narrower_limit(&existing, limit);
+    if unsafe { libc::setrlimit(libc::RLIMIT_NPROC, &narrowed) } != 0 {
+        return Err("native_sandbox_process_limit_failed".into());
+    }
+    let program = argv.first().ok_or("runner_arguments_invalid")?;
+    let error = Command::new(program).args(&argv[1..]).exec();
+    Err(format!(
+        "native_sandbox_exec_failed:{}",
+        error.raw_os_error().unwrap_or(0)
+    ))
 }
 
 // Preserve which limit operation failed through Rust's pre-exec error pipe.
@@ -614,11 +644,45 @@ fn linux_arguments(policy: &LaunchPolicy, argv: &[String]) -> Result<Vec<String>
         }
         bridge_arguments(&mut arguments, port, &socket)?;
     } else {
+        runner_mount(&mut arguments)?;
         arguments.push("--".to_owned());
     }
+    process_limit_arguments(&mut arguments, policy.max_processes);
     arguments.extend(argv.iter().cloned());
     Ok(arguments)
 }
+
+/// The runner, read-only, where the namespace can start it.
+#[cfg(target_os = "linux")]
+fn runner_mount(arguments: &mut Vec<String>) -> Result<(), String> {
+    let runner =
+        std::env::current_exe().map_err(|_| "native_sandbox_runner_unreadable".to_owned())?;
+    arguments.extend([
+        "--ro-bind".to_owned(),
+        runner.to_string_lossy().into_owned(),
+        crate::egress_bridge::RUNNER_INSIDE.to_owned(),
+    ]);
+    Ok(())
+}
+
+#[cfg(not(target_os = "linux"))]
+fn runner_mount(_: &mut Vec<String>) -> Result<(), String> {
+    Ok(())
+}
+
+/// Start the command through the runner's in-namespace process limit.
+#[cfg(target_os = "linux")]
+fn process_limit_arguments(arguments: &mut Vec<String>, limit: u32) {
+    arguments.extend([
+        crate::egress_bridge::RUNNER_INSIDE.to_owned(),
+        "--nproc-limit".to_owned(),
+        limit.to_string(),
+        "--".to_owned(),
+    ]);
+}
+
+#[cfg(not(target_os = "linux"))]
+fn process_limit_arguments(_: &mut Vec<String>, _: u32) {}
 
 /// Mount the runner and the proxy socket, and start the command under the
 /// runner's loopback bridge (`egress_bridge_linux.rs`).
@@ -1067,6 +1131,10 @@ mod tests {
                 "--egress-bridge",
                 crate::egress_bridge::SOCKET_INSIDE,
                 "3128",
+                "--",
+                crate::egress_bridge::RUNNER_INSIDE,
+                "--nproc-limit",
+                "64",
                 "--",
                 "echo"
             ]

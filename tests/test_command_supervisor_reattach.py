@@ -95,15 +95,24 @@ def _text(service: CommandService, run_id: str) -> str:
 
 
 def _fifo(tmp_path: Path, name: str = "pipe") -> Path:
-    """A named pipe inside the workspace, so an allowlisted `cat` can be the run.
+    """A named pipe in the run's task copy, so an allowlisted `cat` can be the run.
 
     The governed allowlist refuses interpreters and refuses `python -c`, which
     is the invariant working — a background test must not be the one thing that
     gets to run arbitrary source. A FIFO gives the same control with none of
     that: the test decides exactly when the run produces output and exactly when
-    it ends, using a program the policy already permits.
+    it ends, using a program the policy already permits. The run executes in
+    the session's disposable copy, which copies regular files only, so the pipe
+    is made there.
     """
-    path = tmp_path / name
+    from raiker.execution.commands.backends.native import (
+        NativeSandboxDriver,
+        task_workspace_registry,
+    )
+
+    registry = task_workspace_registry(tmp_path, NativeSandboxDriver(tmp_path))
+    _, copy = registry.acquire(OWNER, "sess_supervisor", tmp_path)
+    path = copy.root / name
     os.mkfifo(path)  # type: ignore[attr-defined]
     return path
 

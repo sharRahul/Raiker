@@ -46,6 +46,11 @@ from raiker.execution.commands.egress_runtime import load_settings as load_egres
 from raiker.execution.commands.models import CommandFeatures, CommandRequest
 from raiker.execution.commands.process_lifetime import bind_to_runtime_lifetime
 from raiker.execution.commands.runner import CommandSink, MemoryCommandSink, StreamingCommandRunner
+from raiker.execution.commands.supervisor_client import (
+    SupervisorUnavailable,
+    spawn_supervised,
+    supervisor_supported,
+)
 from raiker.execution.workspaces import TaskWorkspaceRegistry, WorkspaceError
 from raiker.runtime.command_policy import (
     ALLOWED_SHELL_COMMANDS,
@@ -100,6 +105,9 @@ class NativeSandboxProof:
         tree_stop = self.observations.get("descendant_reaped") == ENFORCED
         terminal = tree_stop and self.boundary == "bubblewrap"
         background = tree_stop and self.boundary in {"bubblewrap", "restricted_account"}
+        # A background run outlives a restart where a detached supervisor runs
+        # it (POSIX); with downloads on it stays in-process and is still lost.
+        recovery = background and supervisor_supported()
         return CommandFeatures(
             shell=False,
             pty=terminal,
@@ -110,7 +118,7 @@ class NativeSandboxProof:
             filtered_network=False,
             persistent_environment=False,
             persistent=False,
-            restart_recovery=False,
+            restart_recovery=recovery,
             recoverable=False,
             concurrent_runs=False,
             credential_delivery=False,
@@ -449,6 +457,26 @@ class NativeSandboxBackend:
             executable,
             *request.argv_template[1:],
         ]
+        # BUG-194 — a background run goes into a detached supervisor where the
+        # platform has one, so a restart of Raiker reattaches to it instead of
+        # reconciling it to `lost`. The supervisor runs the runner, so the
+        # boundary is the same one. A run with downloads on stays in-process:
+        # its proxy lives in Raiker and would not survive the restart either.
+        if request.background and egress is None and supervisor_supported():
+            try:
+                return spawn_supervised(
+                    workspace_root=original.workspace_root,
+                    run_id=request.run_id,
+                    argv=argv,
+                    cwd=request.workspace_root,
+                    environment=environment,
+                    sink=sink,
+                    deadline_seconds=request.timeout_seconds,
+                    max_output_bytes=request.max_output_bytes,
+                    pty=request.interactive,
+                )
+            except SupervisorUnavailable as exc:
+                raise CommandBackendError(exc.reason_code) from None
         try:
             process = self._runner(
                 request,

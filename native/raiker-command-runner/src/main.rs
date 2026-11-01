@@ -113,6 +113,17 @@ fn dispatch(arguments: &[String]) -> Result<i32, String> {
             return Ok(0);
         }
         #[cfg(target_os = "linux")]
+        Some("--nproc-limit") => {
+            let limit: libc::rlim_t = arguments
+                .get(1)
+                .and_then(|text| text.parse().ok())
+                .ok_or("runner_arguments_invalid")?;
+            if arguments.get(2).map(String::as_str) != Some("--") || arguments.len() < 4 {
+                return Err("runner_arguments_invalid".into());
+            }
+            return boundary::exec_with_process_limit(limit, &arguments[3..]);
+        }
+        #[cfg(target_os = "linux")]
         Some("--egress-bridge") => {
             let socket = arguments.get(1).ok_or("runner_arguments_invalid")?;
             let port: u16 = arguments

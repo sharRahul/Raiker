@@ -68,7 +68,7 @@ def test_governed_command_lifecycle_is_authenticated_durable_and_receipted(tmp_p
     assert run["authority_id"] == "approval_shell"
     receipt = client.get(f"/api/command-runs/{run_id}/receipt", headers=headers).json()["receipt"]
     assert receipt["digest"] == run["receipt_digest"]
-    assert receipt["evidence"]["backend"] == "local_strict"
+    assert receipt["evidence"]["backend"] == "native"
     assert receipt["evidence"]["authority"] == {
         "kind": "approval",
         "id": "approval_shell",

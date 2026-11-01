@@ -131,4 +131,5 @@ def test_unsafe_runtime_paths_remain_disabled(tmp_path: Path) -> None:
     assert get_capability_gate("semantic_memory_writes").runtime_enabled is False
     assert get_capability_gate("external_channels").runtime_enabled is False
     assert get_capability_gate("remote_execution").runtime_enabled is False
-    assert get_capability_gate("container_execution").runtime_enabled is False
+    with pytest.raises(PermissionError, match="unknown_capability:container_execution"):
+        get_capability_gate("container_execution")

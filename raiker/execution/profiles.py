@@ -1,8 +1,6 @@
 from __future__ import annotations
 
 import json
-import shutil
-import subprocess
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field, replace
 from datetime import UTC, datetime
@@ -11,13 +9,15 @@ from typing import Any, Literal, cast
 
 from raiker.execution.commands.models import CommandFeatures
 
-ExecutionKind = Literal["local", "native", "container", "ssh", "daytona"]
-ContainerRuntime = Literal["docker", "podman"]
+ExecutionKind = Literal["local", "native", "ssh", "daytona"]
 RepositoryAccess = Literal["none", "read_only"]
 
-CONTAINER_PROFILE_TOOLS = frozenset(
-    {"glob", "grep", "list_directory", "read_file", "shell", "stat_path"}
-)
+#: Docker and Podman environments were removed by the native sandbox
+#: migration. Stored rows of this type are kept as inert history: they never
+#: run, never fall back to the host, and report this reason until removed.
+RETIRED_CONTAINER_PROFILE_TYPE = "container"
+CONTAINER_ENVIRONMENT_RETIRED = "container_environment_retired"
+RETIRED_PROFILE_IDS = frozenset({"container_default"})
 
 
 @dataclass(frozen=True)
@@ -28,8 +28,6 @@ class ExecutionProfile:
     requires_approval: bool = True
     name: str = ""
     enabled: bool = True
-    runtime: ContainerRuntime | None = None
-    image: str | None = None
     tools: tuple[str, ...] = ()
     repository_access: RepositoryAccess = "none"
     writable_output: bool = False
@@ -52,20 +50,10 @@ class ExecutionProfile:
         if self.kind == "local":
             # BUG-194 — read from the backend rather than restated here, so the
             # card the owner reads describes the product that runs their
-            # command. The import is local because `backends.container` imports
-            # this module.
+            # command. The import is local to keep backends off this import path.
             from raiker.execution.commands.backends.local import LocalStrictBackend
 
             return replace(LocalStrictBackend.features, concurrent_runs=False)
-        if self.kind == "container":
-            from raiker.execution.commands.backends.container import (
-                PersistentContainerBackend,
-            )
-
-            return replace(
-                PersistentContainerBackend.features,
-                shell="shell" in self.tools,
-            )
         if self.kind in {"ssh", "daytona"}:
             from raiker.execution.commands.backends.remote import REMOTE_FEATURES
 
@@ -117,7 +105,6 @@ DEFAULT_EXECUTION_PROFILES = (
         name="Native OS sandbox",
         tools=("shell", "run_command", "process"),
     ),
-    ExecutionProfile("container_default", "container"),
     ExecutionProfile("ssh_default", "ssh"),
     ExecutionProfile("daytona_default", "daytona"),
 )
@@ -127,59 +114,34 @@ def list_execution_profiles() -> list[ExecutionProfile]:
     return list(DEFAULT_EXECUTION_PROFILES)
 
 
-def execution_profiles_from_rows(
-    rows: Sequence[Mapping[str, Any]],
-) -> list[ExecutionProfile]:
-    profiles: list[ExecutionProfile] = []
+def retired_container_tools(rows: Sequence[Mapping[str, Any]]) -> frozenset[str]:
+    """Tools an enabled, retired container profile was assigned.
+
+    Such a tool is refused with :data:`CONTAINER_ENVIRONMENT_RETIRED` rather
+    than quietly placed elsewhere: the owner chose isolation for it, and only
+    the owner removing the retired profile moves it to the native sandbox.
+    """
+    tools: set[str] = set()
     for row in rows:
-        if str(row.get("profile_type")) != "container":
+        if str(row.get("profile_type")) != RETIRED_CONTAINER_PROFILE_TYPE or not row.get("enabled"):
             continue
         try:
             config = json.loads(str(row.get("config_json") or "{}"))
         except (TypeError, ValueError):
             config = {}
         raw_tools = config.get("tools", [])
-        tools = (
-            tuple(str(tool) for tool in raw_tools if isinstance(tool, str))
-            if isinstance(raw_tools, list)
-            else ()
-        )
-        profiles.append(
-            ExecutionProfile(
-                profile_id=str(row.get("profile_id") or ""),
-                kind="container",
-                name=str(row.get("name") or ""),
-                enabled=bool(row.get("enabled")),
-                runtime=cast(ContainerRuntime | None, config.get("runtime")),
-                image=str(config.get("image") or "") or None,
-                tools=tools,
-                repository_access=cast(
-                    RepositoryAccess, config.get("repository_access", "none")
-                ),
-                writable_output=bool(config.get("writable_output", False)),
-            )
-        )
-    return profiles
+        if isinstance(raw_tools, list):
+            tools.update(str(tool) for tool in raw_tools if isinstance(tool, str))
+    return frozenset(tools)
 
 
 def validate_execution_profile(profile: ExecutionProfile) -> str | None:
     if not profile.profile_id.strip():
         return "execution_profile_id_required"
-    if profile.kind not in {"local", "native", "container", "ssh", "daytona"}:
+    if profile.kind not in {"local", "native", "ssh", "daytona"}:
         return f"execution_profile_kind_invalid:{profile.profile_id}"
     if len(set(profile.tools)) != len(profile.tools):
         return f"execution_profile_tools_duplicated:{profile.profile_id}"
-    if profile.kind != "container":
-        return None
-    if profile.runtime not in {"docker", "podman"}:
-        return f"container_runtime_invalid:{profile.profile_id}"
-    if not profile.image or not profile.image.strip():
-        return f"container_image_required:{profile.profile_id}"
-    if profile.repository_access not in {"none", "read_only"}:
-        return f"container_repository_access_invalid:{profile.profile_id}"
-    unsupported = sorted(set(profile.tools) - CONTAINER_PROFILE_TOOLS)
-    if unsupported:
-        return f"container_profile_tool_unsupported:{unsupported[0]}"
     return None
 
 
@@ -209,9 +171,9 @@ def probe_execution_profile(
 ) -> ProfileProbe:
     """Prove the selected profile's minimum command readiness.
 
-    Container readiness includes a daemon and image probe, not merely the
-    presence of a CLI executable. Remote backends keep their command features
-    unavailable until their dedicated supervisor task supplies a proof.
+    The native sandbox is measured by running the real boundary. Remote
+    backends keep their command features unavailable until their dedicated
+    supervisor task supplies a proof.
     """
     checked_at = _checked_at()
     reason = validate_execution_profile(profile)
@@ -242,29 +204,6 @@ def probe_execution_profile(
             features=proof.features,
             runner_trust=proof.runner_trust,
         )
-    if profile.kind == "container":
-        assert profile.runtime is not None and profile.image is not None
-        if shutil.which(profile.runtime) is None:
-            return ProfileProbe(
-                profile, False, f"container_runtime_unavailable:{profile.runtime}", checked_at
-            )
-        try:
-            daemon = subprocess.run(  # noqa: S603 - fixed validated runtime argv
-                [profile.runtime, "info"], capture_output=True, timeout=5, check=False
-            )
-            if daemon.returncode != 0:
-                return ProfileProbe(profile, False, "container_daemon_unreachable", checked_at)
-            image = subprocess.run(  # noqa: S603 - fixed validated runtime argv
-                [profile.runtime, "image", "inspect", profile.image],
-                capture_output=True,
-                timeout=10,
-                check=False,
-            )
-        except (OSError, subprocess.TimeoutExpired):
-            return ProfileProbe(profile, False, "container_daemon_unreachable", checked_at)
-        if image.returncode != 0:
-            return ProfileProbe(profile, False, "container_image_unavailable", checked_at)
-        return ProfileProbe(profile, True, None, checked_at)
     if profile.kind in {"ssh", "daytona"}:
         if workspace_root is None:
             return ProfileProbe(
@@ -294,12 +233,20 @@ def probe_execution_profile(
     return ProfileProbe(profile, False, f"{profile.kind}_command_supervisor_unavailable", checked_at)
 
 
+def selected_profile_retired(store: Any, owner_principal_id: str, profile_id: str) -> bool:
+    """True when the owner's selection names a removed Docker/Podman environment."""
+    if profile_id in RETIRED_PROFILE_IDS:
+        return True
+    row = store.load_remote_execution_profile(profile_id, owner_principal_id=owner_principal_id)
+    return row is not None and str(row.get("profile_type")) == RETIRED_CONTAINER_PROFILE_TYPE
+
+
 def _selected_profile(store: Any, owner_principal_id: str, profile_id: str) -> ExecutionProfile | None:
     known = {profile.profile_id: profile for profile in DEFAULT_EXECUTION_PROFILES}
-    if profile_id in {"local_native", "native_sandbox", "container_default"}:
+    if profile_id in {"local_native", "native_sandbox"}:
         return known[profile_id]
     row = store.load_remote_execution_profile(profile_id, owner_principal_id=owner_principal_id)
-    if row is None:
+    if row is None or str(row.get("profile_type")) == RETIRED_CONTAINER_PROFILE_TYPE:
         return None
     try:
         config = json.loads(str(row.get("config_json") or "{}"))
@@ -314,8 +261,6 @@ def _selected_profile(store: Any, owner_principal_id: str, profile_id: str) -> E
         kind=kind,
         name=str(row.get("name") or ""),
         enabled=bool(row.get("enabled")),
-        runtime=cast(ContainerRuntime | None, config.get("runtime")),
-        image=str(config.get("image") or "") or None,
         tools=tools,
         repository_access=cast(RepositoryAccess, config.get("repository_access", "none")),
         writable_output=bool(config.get("writable_output", False)),
@@ -344,6 +289,10 @@ def resolve_command_environment(
             checked_at,
         )
     profile_id = store.selected_execution_environment(owner_principal_id)
+    if selected_profile_retired(store, owner_principal_id, profile_id):
+        return CommandEnvironmentResolution(
+            None, False, CONTAINER_ENVIRONMENT_RETIRED, True, (), None, checked_at
+        )
     profile = _selected_profile(store, owner_principal_id, profile_id)
     if profile is None or not profile.enabled:
         return CommandEnvironmentResolution(

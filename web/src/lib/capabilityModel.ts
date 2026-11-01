@@ -784,9 +784,9 @@ const CAPABILITY_COPY: Record<string, CapabilityCopy> = {
       "Start bounded local processes in the environment you chose, under the same rules as shell commands.",
   },
   host_network_code_execution: {
-    label: "Code with this machine's network",
+    label: "Code with host-network risk",
     description:
-      "Scripts run by python, node, npm or npx with this machine's network, because there is no sandbox here or you chose to run on the host. Where Raiker has the native sandbox, that code runs inside it instead and this is never asked.",
+      "Controls approval for code classified as having host-network risk. Approval does not permit host execution: a supported native sandbox is still required, and unavailable sandbox capabilities are refused.",
   },
   web_fetch: {
     label: "Web fetch",

@@ -46,6 +46,7 @@ def repo(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     _git(ws, "init", "--initial-branch=main", ".")
     _git(ws, "config", "user.name", "T")
     _git(ws, "config", "user.email", "t@example.com")
+    _git(ws, "config", "commit.gpgsign", "false")
     (ws / "a.txt").write_text("a\n", encoding="utf-8")
     _git(ws, "add", "a.txt")
     _git(ws, "commit", "-m", "a")

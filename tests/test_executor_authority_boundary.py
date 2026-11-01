@@ -168,11 +168,6 @@ _DIRECT_CONSTRUCTIONS: dict[tuple[str, str], str] = {
         "Held by `HostNetworkCodeExecutor` for the `process` half of the same "
         "capability, inside the same guarded dispatch (BUG-308)."
     ),
-    ("raiker/runtime/executors/tier4_plugins.py", "PluginSandboxedRuntimeExecutor"): (
-        "The bare plugin runtime hands a run to the no-network container when "
-        "this machine has one, inside the routed dispatch of `plugin_runtime_cap` "
-        "(BUG-308): only ever a stricter boundary than the one routed."
-    ),
     ("raiker/tools/mcp_tools.py", "McpConnectorExecutor"): (
         "The chat MCP tool applies `mcp_connector_runtime`'s own gate and "
         "decision mode before it constructs the connector, the governed-service "

@@ -1288,6 +1288,19 @@ export type CommandChunkView = {
   end_byte_offset: number;
 };
 
+/** Turn allow-listed command downloads on or off, and name the hosts. */
+export type CommandEgressRequest = {
+  enabled: boolean;
+  domains?: string[];
+};
+
+/** The owner's allow-list for sandboxed command downloads. */
+export type CommandEgressView = {
+  enabled: boolean;
+  domains: string[];
+  defaults: string[];
+};
+
 /** Owner-defined, expiry-bound command prefixes for one conversation. */
 export type CommandGrant = {
   session_id: string;
@@ -1578,12 +1591,6 @@ export type ContainedSubject = {
   contained_at: string | null;
   probe_after: string | null;
   updated_at: string;
-};
-
-export type ContainerOptions = {
-  runtimes: ("docker" | "podman")[];
-  images: string[];
-  supported_tools: string[];
 };
 
 export type ContainmentCapability = {
@@ -2490,7 +2497,7 @@ export type ExecutionEnvironmentSelected = {
 /** One boundary a command could run in, as measured on this host. */
 export type ExecutionEnvironmentView = {
   profile_id: string;
-  kind: "local" | "native" | "container" | "ssh" | "daytona";
+  kind: "native" | "retired" | "ssh" | "daytona";
   name: string;
   enabled: boolean;
   configured: boolean;
@@ -2508,18 +2515,12 @@ export type ExecutionEnvironmentView = {
   boundary?: string;
   probe_observations?: Record<string, "enforced" | "unenforced" | "indeterminate">;
   runner_trust?: "publisher_verified" | "package_relative_integrity" | "development_unverified" | null;
-  runtime?: "docker" | "podman" | null;
-  image?: string | null;
-  repository_access?: "none" | "read_only";
-  writable_output?: boolean;
-  assigned_tool_count?: number;
   config?: Record<string, unknown>;
 };
 
 export type ExecutionEnvironmentsView = {
   selected_profile_id: string;
   environments: ExecutionEnvironmentView[];
-  container_options: ContainerOptions;
 };
 
 export type ExecutionProfileBinding = {
@@ -5093,6 +5094,13 @@ export type ProjectsListView = {
   active_project_id: string | null;
 };
 
+/** The exact change set the owner reviewed. */
+export type PromoteTaskWorkspaceRequest = {
+  created: string[];
+  modified: string[];
+  deleted: string[];
+};
+
 export type PromptRequest = {
   text: string;
   input_mode?: "typed" | "dictated" | "mixed";
@@ -6392,6 +6400,50 @@ export type TaskView = {
   phase: string;
 };
 
+export type TaskWorkspaceDiscarded = {
+  ok: boolean;
+  workspace_id: string;
+};
+
+/** One changed file of a copy, as a unified diff against the project. */
+export type TaskWorkspaceFileDiff = {
+  workspace_id: string;
+  path: string;
+  status: "created" | "modified" | "deleted";
+  diff: string;
+  binary: boolean;
+  truncated: boolean;
+};
+
+export type TaskWorkspaceList = {
+  workspaces: TaskWorkspaceView[];
+};
+
+export type TaskWorkspacePromoted = {
+  ok: boolean;
+  workspace_id: string;
+  created: string[];
+  modified: string[];
+  deleted: string[];
+};
+
+export type TaskWorkspaceRejection = {
+  path: string;
+  reason: string;
+};
+
+/** A session's disposable copy and what its commands changed in it. */
+export type TaskWorkspaceView = {
+  workspace_id: string;
+  session_id: string;
+  source: string;
+  created_at: number;
+  created: string[];
+  modified: string[];
+  deleted: string[];
+  rejected: TaskWorkspaceRejection[];
+};
+
 export type TelemetryCadenceRequest = {
   cadence: string;
 };
@@ -7069,6 +7121,10 @@ export const contract = {
     call<CodeRepoWorktreeRemoved>("DELETE", `/api/code/repos/${encodeURIComponent(repoId)}/worktree`),
   createCodeWorktree: (repoId: string, body: CreateCodeWorktreeRequest) =>
     call<CodeRepoWorktreeCreated>("POST", `/api/code/repos/${encodeURIComponent(repoId)}/worktrees`, { body }),
+  getCommandEgress: () =>
+    request<CommandEgressView>("/api/command-egress"),
+  putCommandEgress: (body: CommandEgressRequest) =>
+    call<CommandEgressView>("PUT", "/api/command-egress", { body }),
   listCommands: (query: { session_id?: string } = {}) =>
     request<CommandRunList>(withQuery("/api/command-runs", query)),
   getCommand: (runId: string) =>
@@ -7079,6 +7135,14 @@ export const contract = {
     request<CommandReceiptAnswer>(`/api/command-runs/${encodeURIComponent(runId)}/receipt`),
   stopCommand: (runId: string) =>
     call<CommandStopped>("POST", `/api/command-runs/${encodeURIComponent(runId)}/stop`),
+  listTaskWorkspaces: () =>
+    request<TaskWorkspaceList>("/api/command-workspaces"),
+  taskWorkspaceFileDiff: (workspaceId: string, query: { path: string }) =>
+    request<TaskWorkspaceFileDiff>(withQuery(`/api/command-workspaces/${encodeURIComponent(workspaceId)}/diff`, query)),
+  discardTaskWorkspace: (workspaceId: string) =>
+    call<TaskWorkspaceDiscarded>("POST", `/api/command-workspaces/${encodeURIComponent(workspaceId)}/discard`),
+  promoteTaskWorkspace: (workspaceId: string, body: PromoteTaskWorkspaceRequest) =>
+    call<TaskWorkspacePromoted>("POST", `/api/command-workspaces/${encodeURIComponent(workspaceId)}/promote`, { body }),
   getConnections: () =>
     request<ConnectionsView>("/api/connections"),
   connectorStore: () =>

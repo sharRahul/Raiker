@@ -85,11 +85,11 @@ def test_the_default_environment_needs_somewhere_else_for_work_to_run(
     assert unknown.reason_code == "unknown_execution_environment"
     assert service.store.selected_execution_environment(owner) == profile_id
 
-    moved = service.remove_execution_environment(profile_id, owner, move_to="local_native")
+    moved = service.remove_execution_environment(profile_id, owner, move_to="native_sandbox")
 
     assert moved.ok, moved.reason_code
-    assert moved.data["selected_profile_id"] == "local_native"
-    assert service.store.selected_execution_environment(owner) == "local_native"
+    assert moved.data["selected_profile_id"] == "native_sandbox"
+    assert service.store.selected_execution_environment(owner) == "native_sandbox"
     assert service.store.load_remote_execution_profile(profile_id, owner_principal_id=owner) is None
 
 

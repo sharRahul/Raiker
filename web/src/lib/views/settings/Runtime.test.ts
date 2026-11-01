@@ -5,12 +5,12 @@ import type { ExecutionEnvironmentsView } from "../../apiTypes";
 import Runtime from "./Runtime.svelte";
 
 const view: ExecutionEnvironmentsView = {
-  selected_profile_id: "local_native",
+  selected_profile_id: "native_sandbox",
   environments: [
     {
-      profile_id: "local_native",
-      kind: "local",
-      name: "Local workspace",
+      profile_id: "native_sandbox",
+      kind: "native",
+      name: "Local sandbox",
       enabled: true,
       configured: true,
       available: true,
@@ -24,15 +24,17 @@ const view: ExecutionEnvironmentsView = {
       features: {},
       probe_checked_at: "2026-08-14T10:00:00Z",
       availability_reason: null,
+      boundary: "appcontainer",
+      probe_observations: {},
     },
     {
       profile_id: "container-review",
-      kind: "container",
+      kind: "retired",
       name: "Repository review",
       enabled: true,
-      configured: true,
+      configured: false,
       available: false,
-      status: "unavailable",
+      status: "retired",
       selected: false,
       credential_configured: true,
       budget: null,
@@ -41,19 +43,11 @@ const view: ExecutionEnvironmentsView = {
       assigned_tools: [],
       features: {},
       probe_checked_at: "2026-08-14T10:00:00Z",
-      runtime: "podman",
-      image: "raiker-tools:approved",
-      repository_access: "read_only",
-      writable_output: true,
-      assigned_tool_count: 2,
-      availability_reason: "container_runtime_unavailable:podman",
+      availability_reason: "container_environment_retired",
+      boundary: "none",
+      probe_observations: {},
     },
   ],
-  container_options: {
-    runtimes: ["docker", "podman"],
-    images: ["raiker-tools:approved"],
-    supported_tools: ["glob", "grep", "list_directory", "read_file", "stat_path"],
-  },
 };
 
 afterEach(() => vi.restoreAllMocks());
@@ -70,54 +64,24 @@ function stubRuntime() {
   vi.spyOn(api, "executionEnvironments").mockResolvedValue(view);
 }
 
-describe("Runtime container profiles", () => {
-  it("shows the runtime boundary and exact unavailable remediation", async () => {
+describe("Runtime environments", () => {
+  it("shows a retired Docker profile as removed, never as a place work runs", async () => {
     stubRuntime();
     render(Runtime);
 
-    expect(await screen.findByText("Repository review")).toBeInTheDocument();
-    expect(screen.getByText("Podman · raiker-tools:approved")).toBeInTheDocument();
-    expect(screen.getByText("Read-only repository → writable output")).toBeInTheDocument();
-    expect(screen.getByText("2 tools")).toBeInTheDocument();
-    expect(screen.getByText("Podman is not available on this host.")).toBeInTheDocument();
+    const card = within((await screen.findByText("Repository review")).closest("article")!);
+    expect(card.getByText("Docker/Podman · removed")).toBeInTheDocument();
+    expect(card.getByText(/Raiker no longer uses Docker or Podman/)).toBeInTheDocument();
+    expect(card.getByRole("button", { name: "Select" })).toBeDisabled();
   });
 
-  it("submits only allowlisted container choices", async () => {
+  it("no longer offers a container boundary to configure", async () => {
     stubRuntime();
-    const configure = vi
-      .spyOn(api, "configureExecutionEnvironment")
-      .mockResolvedValue({ ok: true, profile_id: "container-new" });
     render(Runtime);
 
     await fireEvent.click(await screen.findByText("Add execution profile"));
-    await fireEvent.change(screen.getByLabelText("Environment type"), {
-      target: { value: "container" },
-    });
-    await fireEvent.input(screen.getByLabelText("Display name"), {
-      target: { value: "Safe reads" },
-    });
-    await fireEvent.change(screen.getByLabelText("Container runtime"), {
-      target: { value: "podman" },
-    });
-    await fireEvent.click(screen.getByLabelText("grep"));
-    await fireEvent.click(screen.getByRole("button", { name: "Save environment" }));
-
-    await waitFor(() =>
-      expect(configure).toHaveBeenCalledWith({
-        kind: "container",
-        name: "Safe reads",
-        enabled: true,
-        config: {
-          runtime: "podman",
-          image: "raiker-tools:approved",
-          tools: ["grep"],
-          repository_access: "read_only",
-          writable_output: true,
-          egress_domains: [],
-          egress_ports: [],
-        },
-      }),
-    );
+    const options = [...(screen.getByLabelText("Environment type") as HTMLSelectElement).options];
+    expect(options.map((option) => option.value)).toEqual(["ssh", "daytona"]);
   });
 
   it("requires an exact SSH host key pin and keeps remote capabilities honest", async () => {
@@ -172,13 +136,7 @@ describe("Runtime execution capabilities and reset (BUG-194)", () => {
           ...view.environments[0],
           features: { background: true, pty: true, restart_recovery: true, persistent_environment: false },
         },
-        {
-          ...view.environments[1],
-          available: true,
-          status: "ready",
-          availability_reason: null,
-          features: { persistent_environment: true, process_tree_stop: true },
-        },
+        view.environments[1],
       ],
     });
   }
@@ -189,62 +147,17 @@ describe("Runtime execution capabilities and reset (BUG-194)", () => {
 
     expect(await screen.findByText("Survives a Raiker restart")).toBeInTheDocument();
     expect(screen.getByText("Runs work in the background")).toBeInTheDocument();
-    expect(screen.getByText("Keeps its state between commands")).toBeInTheDocument();
-    const localCard = within(screen.getByText("Local workspace").closest("article")!);
+    expect(screen.queryByText("Keeps its state between commands")).not.toBeInTheDocument();
+    const localCard = within(screen.getByText("Local sandbox").closest("article")!);
     expect(localCard.getByText("Foreground and background command execution")).toBeInTheDocument();
     expect(localCard.queryByText(/background execution.*unavailable/i)).not.toBeInTheDocument();
-    // The local boundary does not persist, so it gets no reset control at all.
-    expect(screen.getAllByRole("button", { name: "Reset environment" })).toHaveLength(1);
+    // No boundary persists between commands, so nothing offers a reset.
+    expect(screen.queryByRole("button", { name: "Reset environment" })).not.toBeInTheDocument();
   });
 
-  it("resets the persistent boundary, and clears the cache only when asked", async () => {
-    stubCapabilities();
-    const reset = vi
-      .spyOn(api, "resetExecutionEnvironment")
-      .mockResolvedValue({ ok: true, profile_id: "container-review", session_id: "settings", recreated: false });
-    vi.stubGlobal("confirm", () => true);
-    render(Runtime);
-
-    await fireEvent.click(await screen.findByRole("button", { name: "Reset environment" }));
-    await waitFor(() =>
-      expect(reset).toHaveBeenCalledWith("container-review", "settings", false),
-    );
-
-    await fireEvent.click(screen.getByRole("button", { name: "Reset and clear cache" }));
-    await waitFor(() =>
-      expect(reset).toHaveBeenCalledWith("container-review", "settings", true),
-    );
-    vi.unstubAllGlobals();
-  });
 });
 
-describe("Runtime filtered egress honesty", () => {
-  it("shows normalized policy but never presents configuration as enforcement", async () => {
-    stubRuntime();
-    vi.spyOn(api, "executionEnvironments").mockResolvedValue({
-      ...view,
-      environments: [
-        view.environments[0],
-        {
-          ...view.environments[1],
-          config: {
-            egress_domains: ["api.example.com", "*.packages.example"],
-            egress_ports: [443],
-            egress_enforcement: "not_proven",
-          },
-          features: { filtered_network: false },
-        },
-      ],
-    });
-    render(Runtime);
-
-    expect(await screen.findByRole("status", { name: "Filtered network status" })).toHaveTextContent(
-      "Filtered network · not proven",
-    );
-    expect(screen.getByText(/api\.example\.com, \*\.packages\.example/)).toBeInTheDocument();
-    expect(screen.queryByText("Filters command network access")).not.toBeInTheDocument();
-  });
-
+describe("Runtime runner integrity", () => {
   it("names package-relative runner integrity without calling it publisher verification", async () => {
     stubRuntime();
     vi.spyOn(api, "executionEnvironments").mockResolvedValue({
@@ -296,19 +209,6 @@ describe("Runtime configuration reading order", () => {
     expect(save).toHaveBeenCalledWith({ "models.readiness_ttl_minutes": 30 });
   });
 
-  it("keeps the container scope preview in the open and the port list below it", async () => {
-    stubRuntime();
-    render(Runtime, { principal: "owner", settings: {}, save: vi.fn() });
-
-    await fireEvent.click(await screen.findByText("Add execution profile"));
-    await fireEvent.change(screen.getByLabelText("Environment type"), {
-      target: { value: "container" },
-    });
-
-    expect(screen.getByText("Read only")).toBeInTheDocument();
-    const ports = screen.getByLabelText(/Allowed outbound ports/);
-    expect(ports.closest("details")?.open).toBe(false);
-  });
 });
 
 // DEC-11 step 6 — a configured target can be turned off, and off stops what runs there.
@@ -322,7 +222,7 @@ describe("Runtime turning a target off", () => {
     render(Runtime);
 
     const card = within((await screen.findByText("Repository review")).closest("article")!);
-    const localCard = within(screen.getByText("Local workspace").closest("article")!);
+    const localCard = within(screen.getByText("Local sandbox").closest("article")!);
     expect(localCard.queryByRole("button", { name: "Turn off" })).not.toBeInTheDocument();
     await fireEvent.click(card.getByRole("button", { name: "Turn off" }));
 
@@ -371,7 +271,7 @@ describe("Runtime removing a target", () => {
     render(Runtime);
 
     const card = within((await screen.findByText("Repository review")).closest("article")!);
-    const localCard = within(screen.getByText("Local workspace").closest("article")!);
+    const localCard = within(screen.getByText("Local sandbox").closest("article")!);
     expect(localCard.queryByRole("button", { name: "Remove" })).not.toBeInTheDocument();
     await fireEvent.click(card.getByRole("button", { name: "Remove" }));
 
@@ -388,12 +288,12 @@ describe("Runtime removing a target", () => {
       selected_profile_id: "container-review",
       environments: [
         { ...view.environments[0], selected: false },
-        { ...view.environments[1], selected: true, available: true, status: "ready" },
+        { ...view.environments[1], selected: true },
       ],
     });
     const remove = vi.spyOn(api, "removeExecutionEnvironment").mockResolvedValue({
       ok: true, profile_id: "container-review", removed: true, name: "Repository review",
-      selected_profile_id: "local_native",
+      selected_profile_id: "native_sandbox",
     });
     const asked: string[] = [];
     vi.stubGlobal("confirm", (text: string) => { asked.push(text); return true; });
@@ -402,8 +302,8 @@ describe("Runtime removing a target", () => {
     const card = within((await screen.findByText("Repository review")).closest("article")!);
     await fireEvent.click(card.getByRole("button", { name: "Remove" }));
 
-    await waitFor(() => expect(remove).toHaveBeenCalledWith("container-review", "local_native"));
-    expect(asked[0]).toMatch(/from now on it runs on Local workspace/);
+    await waitFor(() => expect(remove).toHaveBeenCalledWith("container-review", "native_sandbox"));
+    expect(asked[0]).toMatch(/from now on it runs on Local sandbox/);
     vi.unstubAllGlobals();
   });
 

@@ -10,9 +10,9 @@ are therefore under test together —
 * the **observation surface** (`poll`, `log`, `wait`, `kill`, `input`), which is
   what makes a started run something an agent can finish reasoning about.
 
-Restart reattachment is deliberately *not* claimed here and stays open: a
-restarted Raiker still reconciles an in-flight run to `lost` with an honest
-receipt, which is a different outcome from the one this change adds.
+Restart reattachment is covered separately, in
+`test_command_supervisor_reattach.py`: on POSIX a background run is started
+under the detached supervisor and a restarted Raiker takes it back over.
 """
 from __future__ import annotations
 

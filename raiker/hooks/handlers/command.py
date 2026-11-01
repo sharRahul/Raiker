@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import json
-import os
 import subprocess
 from pathlib import Path
 from typing import Any
@@ -20,24 +19,13 @@ class CommandHookTimeout(TimeoutError):
     pass
 
 
-def _minimal_env() -> dict[str, str]:
-    # Command hooks run with a minimal environment so they cannot read process secrets.
-    return {"PATH": os.environ.get("PATH", ""), "RAIKER_HOOK": "1"}
-
-
 def _resolve_program(workspace_root: str | Path, program: str) -> Path:
-    """Resolve a command-hook program to a real file inside the workspace.
-
-    Command hooks may only run workspace-local scripts (e.g. ``.raiker/hooks/check.sh``). This
-    blocks a hook config from invoking arbitrary system binaries and keeps the subprocess path
-    inside the workspace boundary, reusing the filesystem path-safety helper.
-    """
-
+    """A command hook runs a workspace-local script, never an arbitrary binary."""
     try:
         resolved = resolve_workspace_path(workspace_root, program)
     except FilesystemSafetyError as exc:
         raise CommandHookError(f"command_outside_workspace:{program}") from exc
-    if not resolved.exists() or not resolved.is_file():
+    if not resolved.is_file():
         raise CommandHookError(f"command_not_found:{program}")
     return resolved
 
@@ -45,9 +33,20 @@ def _resolve_program(workspace_root: str | Path, program: str) -> Path:
 def run_command(
     handler: HookHandler, hook_input: HookInput, workspace_root: str | Path
 ) -> HookOutput:
+    """Run the hook's script in the native sandbox, the event on its stdin.
+
+    The script runs alone in a throwaway folder with no network: it can read
+    the event it is handed and decide, but it cannot read or change the
+    project, Raiker's state or anything else on the machine. Where the host's
+    boundary is not enforced the hook is refused (``native_sandbox_required``),
+    never run on the host; an enforcing hook that cannot run still needs the
+    owner's decision.
+    """
+    from raiker.execution.commands.backends.base import CommandBackendError  # noqa: PLC0415
+    from raiker.execution.commands.backends.native import run_sandboxed_program  # noqa: PLC0415
+
     assert handler.command is not None  # guaranteed by HookHandler validation
     program = _resolve_program(workspace_root, handler.command[0])
-    argv = [str(program), *handler.command[1:], *handler.args]
     payload = json.dumps(
         {
             "event_name": hook_input.event_name,
@@ -57,21 +56,22 @@ def run_command(
         }
     )
     try:
-        completed = subprocess.run(
-            argv,
-            cwd=str(workspace_root),
-            input=payload,
-            capture_output=True,
-            text=True,
-            shell=False,
-            env=_minimal_env(),
-            timeout=handler.timeout_ms / 1000,
-            check=False,
+        completed = run_sandboxed_program(
+            workspace_root,
+            program,
+            [*handler.command[1:], *handler.args],
+            stdin=payload,
+            timeout_seconds=handler.timeout_ms / 1000,
         )
     except subprocess.TimeoutExpired as exc:
         raise CommandHookTimeout(f"hook_timeout:{handler.id}") from exc
+    except CommandBackendError as exc:
+        raise CommandHookError("native_sandbox_required") from exc
     except OSError as exc:
         raise CommandHookError(f"hook_exec_failed:{exc}") from exc
+    if completed.returncode == 91 and "raiker_runner_error" in completed.stderr:
+        # The boundary itself refused; that is not the hook's verdict.
+        raise CommandHookError("native_sandbox_required")
     return _parse_output(completed.stdout, completed.stderr, completed.returncode)
 
 

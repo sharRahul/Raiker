@@ -3,7 +3,9 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from raiker.models.conversion import ModelConversionService, docker_command_plan
+import pytest
+
+from raiker.models.conversion import ConversionRefused, ModelConversionService
 
 
 def test_conversion_worker_has_no_network_credentials_or_workspace_mount(tmp_path: Path) -> None:
@@ -27,7 +29,7 @@ def test_conversion_worker_has_no_network_credentials_or_workspace_mount(tmp_pat
     assert worker.timeout_seconds > 0
 
 
-def test_docker_argv_enforces_isolation_without_a_shell(tmp_path: Path) -> None:
+def test_conversion_refuses_until_a_native_toolchain_exists(tmp_path: Path) -> None:
     source = tmp_path / "snapshot"
     source.mkdir()
     (source / "config.json").write_text(
@@ -36,16 +38,114 @@ def test_docker_argv_enforces_isolation_without_a_shell(tmp_path: Path) -> None:
     (source / "model.safetensors").write_bytes(b"safe")
     output = tmp_path / "output"
     output.mkdir()
-    preview = ModelConversionService().preview(source, output, "e" * 40, "Q4_K_M")
+    service = ModelConversionService()
+    preview = service.preview(source, output, "e" * 40, "Q4_K_M")
 
-    convert, quantize = docker_command_plan(preview, "docker")
+    with pytest.raises(ConversionRefused, match="model_conversion_native_toolchain_required"):
+        service.convert(preview)
+    assert list(output.iterdir()) == []
 
-    for argv in (convert, quantize):
-        assert argv[0:2] == ["docker", "run"]
-        assert argv[argv.index("--network") + 1] == "none"
-        assert "--read-only" in argv
-        mounts = [argv[index + 1] for index, value in enumerate(argv) if value == "--mount"]
-        assert len(mounts) == 2
-        assert mounts[0].endswith("dst=/models/source,readonly")
-        assert mounts[1].endswith("dst=/models/output")
-        assert preview.toolchain_image in argv
+
+def _snapshot(tmp_path: Path) -> tuple[Path, Path]:
+    source = tmp_path / "snapshot"
+    source.mkdir()
+    (source / "config.json").write_text(
+        json.dumps({"architectures": ["Qwen2ForCausalLM"]}), encoding="utf-8"
+    )
+    (source / "model.safetensors").write_bytes(b"safe")
+    output = tmp_path / "output"
+    output.mkdir()
+    return source, output
+
+
+@pytest.mark.parametrize(
+    ("present", "reason"),
+    [
+        ((), "model_conversion_converter_missing"),
+        (("convert_hf_to_gguf.py",), "model_conversion_quantizer_missing"),
+        (("convert_hf_to_gguf.py", "llama-quantize"), "model_conversion_python_missing"),
+    ],
+)
+def test_a_named_toolchain_missing_a_part_is_refused_by_name(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, present: tuple[str, ...], reason: str
+) -> None:
+    import sys
+
+    toolchain = tmp_path / "llama.cpp"
+    toolchain.mkdir()
+    for name in present:
+        suffix = ".exe" if name == "llama-quantize" and sys.platform == "win32" else ""
+        (toolchain / f"{name}{suffix}").write_text("", encoding="utf-8")
+    monkeypatch.setenv("RAIKER_LLAMA_CPP_DIR", str(toolchain))
+    with pytest.raises(ConversionRefused, match=reason):
+        ModelConversionService()
+
+
+def test_a_real_conversion_runs_in_the_sandbox_and_writes_only_its_results(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Real boundary (Linux): a stand-in llama.cpp, the model mounted read-only."""
+    import subprocess
+    import sys
+
+    from raiker.execution.commands.backends.native import NativeSandboxDriver
+    from raiker.models.conversion import NativeConversionRunner
+
+    if not sys.platform.startswith("linux"):
+        pytest.skip("the boundary mounts a model read-only on Linux only")
+    if not NativeSandboxDriver(NativeConversionRunner.state_dir()).probe().available:
+        pytest.skip("no enforced native boundary on this host")
+    source, output = _snapshot(tmp_path)
+    toolchain = tmp_path / "llama.cpp"
+    toolchain.mkdir()
+    subprocess.run(["/usr/bin/python3", "-m", "venv", str(toolchain / ".venv")], check=True)
+    # The converter proves the model is readable and not writable.
+    (toolchain / "convert_hf_to_gguf.py").write_text(
+        "import sys, pathlib\n"
+        "source, out = pathlib.Path(sys.argv[1]), pathlib.Path(sys.argv[3])\n"
+        "try:\n"
+        "    (source / 'planted').write_text('x')\n"
+        "    sys.exit(3)\n"
+        "except OSError:\n"
+        "    pass\n"
+        "out.write_bytes(b'GGUF' + (source / 'model.safetensors').read_bytes())\n",
+        encoding="utf-8",
+    )
+    quantize = toolchain / "llama-quantize"
+    quantize.write_text('#!/bin/sh\n/usr/bin/cp "$1" "$2"\n', encoding="utf-8")
+    quantize.chmod(0o755)
+    monkeypatch.setenv("RAIKER_LLAMA_CPP_DIR", str(toolchain))
+
+    service = ModelConversionService()
+    preview = service.preview(source, output, "f" * 40, "Q4_K_M")
+    provenance = service.convert(preview)
+
+    result = Path(provenance.output_path)
+    assert result.read_bytes() == b"GGUFsafe"
+    assert not (source / "planted").exists()
+    assert provenance.toolchain_image.startswith("llama.cpp:sha256:")
+    assert sorted(path.name for path in output.iterdir()) == sorted(
+        [result.name, result.name.replace("Q4_K_M", "bf16"), f"{result.name}.provenance.json"]
+    )
+
+
+def test_conversion_state_that_others_could_write_is_refused(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import sys
+
+    from raiker.models.conversion import NativeConversionRunner
+
+    if sys.platform == "win32":
+        pytest.skip("POSIX ownership and modes")
+    monkeypatch.setattr(Path, "home", staticmethod(lambda: tmp_path))
+    state = NativeConversionRunner.state_dir()
+    assert state == tmp_path / ".cache" / "raiker" / "conversion"
+    state.chmod(0o777)
+    with pytest.raises(ConversionRefused, match="model_conversion_state_unsafe"):
+        NativeConversionRunner.state_dir()
+    state.chmod(0o700)
+    state.rmdir()
+    state.symlink_to(tmp_path)
+    with pytest.raises(ConversionRefused, match="model_conversion_state_unsafe"):
+        NativeConversionRunner.state_dir()

@@ -128,7 +128,7 @@ jobs:
         # tests/test_desktop_release.py fails if the two disagree.
         include:
           - { target: windows-x86_64, runner: windows-2022, os: windows }
-          - { target: macos-arm64, runner: macos-14, os: macos }
+          - { target: macos-arm64, runner: macos-15, os: macos }
           - { target: linux-x86_64, runner: ubuntu-22.04, os: linux }
           - { target: linux-arm64, runner: ubuntu-22.04-arm, os: linux }
     defaults:

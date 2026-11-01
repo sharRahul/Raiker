@@ -16,6 +16,11 @@ from raiker.tools.filesystem import (
 )
 
 _ALLOWED = {"status", "diff", "log"}
+_SAFE_DIFF_OPTIONS = frozenset({
+    "--cached", "--staged", "--stat", "--name-only", "--name-status", "--numstat",
+    "--shortstat", "--summary", "--no-color", "--color=never", "--no-ext-diff",
+    "--no-textconv", "--", "HEAD", "HEAD^", "HEAD~1",
+})
 
 # B11 — a governed git write never runs the repository's own hooks. A commit or a
 # branch switch would otherwise execute whatever `.git/hooks` contains, which is
@@ -115,6 +120,43 @@ _DROPPED_NAMES = frozenset({"SSH_AUTH_SOCK", "GIT_ASKPASS", "SSH_ASKPASS", "GH_E
 _NO_FSMONITOR = ("-c", "core.fsmonitor=false")
 
 
+def no_filter_drivers(root: Path) -> list[str]:
+    """``-c`` overrides that empty every filter driver Git has configured.
+
+    A `.gitattributes` line only *names* a driver; the program it runs comes
+    from configuration. Reading or comparing the working tree (`status`,
+    `diff`, `add`, `switch`) would otherwise run that program on the host. An
+    empty `clean`/`smudge`/`process` is no filter at all, so the comparison
+    sees the raw bytes and nothing is executed. Measured with a positive
+    control: the configured driver ran without these overrides, never with
+    them. Listing configuration only reads it.
+    """
+    listed = subprocess.run(
+        ["git", "-C", str(root), "config", "--null", "--name-only", "--get-regexp", r"^(filter|diff)\."],
+        check=False,
+        capture_output=True,
+        text=True,
+        timeout=10,
+        env=local_git_environment(),
+    )
+    filters: set[str] = set()
+    diffs: set[str] = set()
+    for name in listed.stdout.split("\0"):
+        for prefix, found in (("filter.", filters), ("diff.", diffs)):
+            if name.startswith(prefix) and name.count(".") >= 2:
+                found.add(name[len(prefix):name.rindex(".")])
+    overrides: list[str] = []
+    for driver in sorted(filters):
+        for key in ("clean", "smudge", "process"):
+            overrides += ["-c", f"filter.{driver}.{key}="]
+        overrides += ["-c", f"filter.{driver}.required=false"]
+    # Diff drivers name programs too (`command`, `textconv`). The diff calls
+    # also pass --no-ext-diff/--no-textconv; this covers any that do not.
+    for driver in sorted(diffs):
+        overrides += ["-c", f"diff.{driver}.command=", "-c", f"diff.{driver}.textconv="]
+    return overrides
+
+
 def local_git_environment(source: dict[str, str] | None = None) -> dict[str, str]:
     """The host environment without anything that looks like a credential.
 
@@ -149,7 +191,30 @@ def run_git(
             "error": {"type": "git_subcommand_denied", "subcommand": subcommand},
         }
     root = resolve_workspace_path(repo_root, ".")
-    command = ["git", "-C", str(root), *_NO_FSMONITOR, subcommand, *(args or [])]
+    arguments = list(args or [])
+    if subcommand == "diff":
+        before_paths = True
+        for argument in arguments:
+            if before_paths and argument == "--":
+                before_paths = False
+            elif before_paths and argument not in _SAFE_DIFF_OPTIONS:
+                return {"status": "denied", "error": {"type": "git_diff_argument_denied"}}
+            elif not before_paths:
+                try:
+                    if argument.startswith(":"):
+                        raise ValueError("pathspec_magic_denied")
+                    resolve_workspace_path(root, argument)
+                except (ValueError, OSError):
+                    return {"status": "denied", "error": {"type": "git_diff_path_denied"}}
+        if "--" not in arguments:
+            arguments.append("--")
+        # Exclusions apply even when the caller requests the whole tree or a
+        # parent path, so Raiker state is never part of a diff.
+        arguments.extend([":(top,icase,exclude).raiker", ":(top,icase,exclude).git"])
+        arguments = ["--no-ext-diff", "--no-textconv", *arguments]
+    command = [
+        "git", "-C", str(root), *_NO_FSMONITOR, *no_filter_drivers(root), subcommand, *arguments,
+    ]
     proc = subprocess.run(
         command, check=False, capture_output=True, text=True, timeout=10,
         env=local_git_environment(),
@@ -177,7 +242,7 @@ def _git(
     root: Path, args: list[str], *, timeout: int = _WRITE_TIMEOUT
 ) -> subprocess.CompletedProcess[str]:
     return subprocess.run(
-        ["git", "-C", str(root), *_NO_FSMONITOR, *args],
+        ["git", "-C", str(root), *_NO_FSMONITOR, *no_filter_drivers(root), *args],
         check=False,
         capture_output=True,
         text=True,
@@ -256,7 +321,7 @@ def _is_protected(path: str) -> bool:
     working tree would otherwise write the owner's key material into git
     history, which is the opposite of what approving a commit was for.
     """
-    head = path.replace("\\", "/").split("/", 1)[0]
+    head = path.replace("\\", "/").split("/", 1)[0].lower()
     return head in PROTECTED_WORKSPACE_DIRS
 
 
@@ -333,11 +398,23 @@ def _entry_paths(entries: list[dict[str, str]]) -> list[str]:
 
 def _untracked_diff(root: Path, path: str) -> str:
     """A unified diff for a file git does not track yet, or `""` if it cannot be read."""
+    if _is_protected(path):
+        return ""
     try:
         target = root / path
-        if not target.is_file() or target.stat().st_size > _MAX_DIFF_BYTES:
+        # A link is rendered as nothing rather than followed: its target can be
+        # anywhere, and reading it would put that file's content in the diff.
+        if target.is_symlink() or not target.is_file():
             return ""
-        text = target.read_text(encoding="utf-8")
+        real = target.resolve()
+        if real != root.resolve() and root.resolve() not in real.parents:
+            return ""
+        flags = os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_BINARY", 0)
+        descriptor = os.open(real, flags)
+        with os.fdopen(descriptor, "rb") as handle:
+            if os.fstat(handle.fileno()).st_size > _MAX_DIFF_BYTES:
+                return ""
+            text = handle.read().decode("utf-8")
     except (OSError, UnicodeDecodeError):
         return ""
     return "".join(
@@ -356,7 +433,11 @@ def _commit_diff(root: Path, entries: list[dict[str, str]]) -> str:
     tracked_paths = _entry_paths([e for e in entries if e["state"] != "untracked"])
     parts: list[str] = []
     if tracked_paths:
-        tracked = _git(root, ["diff", "HEAD", "--", *tracked_paths])
+        tracked = _git(
+            root,
+            ["diff", "--no-ext-diff", "--no-textconv", "HEAD", "--", *tracked_paths,
+             ":(top,icase,exclude).raiker", ":(top,icase,exclude).git"],
+        )
         if tracked.returncode == 0:
             parts.append(tracked.stdout)
     for entry in entries:
@@ -738,7 +819,7 @@ def outgoing_secret_findings(root: Path, selection: list[str]) -> list[dict[str,
 
     proc = _git(
         root,
-        ["log", "-p", "--no-color", "--no-ext-diff", "--format=", "--unified=0",
+        ["log", "-p", "--no-color", "--no-ext-diff", "--no-textconv", "--format=", "--unified=0",
          f"-n{_MAX_SCANNED_COMMITS}", *selection],
         timeout=30,
     )

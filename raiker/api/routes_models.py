@@ -1265,7 +1265,7 @@ def _run_model_conversion(
             Path(body.source), Path(body.output), body.revision, body.quantization
         )
         # GCR-24 — the flag is read before the work starts, throughout it, and
-        # after: the runner polls it and stops the container by name, so Cancel
+        # after: the runner polls it and stops the sandboxed step, so Cancel
         # on a conversion that has just begun does not leave the CPU committed.
         op.check_cancelled()
         try:

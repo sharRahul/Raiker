@@ -35,8 +35,9 @@ def test_semantic_memory_status_is_disabled_by_default() -> None:
 
 def test_execution_profiles_are_listable_but_remote_execution_is_denied() -> None:
     profile_ids = {profile.profile_id for profile in list_execution_profiles()}
-    assert "container_default" in profile_ids
-    assert plan_remote_execution("container_default", "echo hi")["can_execute"] is False
+    assert "native_sandbox" in profile_ids
+    assert "container_default" not in profile_ids
+    assert plan_remote_execution("native_sandbox", "echo hi")["can_execute"] is False
 
 
 def test_subagents_and_external_channels_are_planned_but_inert() -> None:
@@ -50,7 +51,7 @@ def test_phase_3_phase_4_terminal_inspection_commands(tmp_path) -> None:  # type
     assert "plugin_execution: disabled" in handle_slash_command(
         "/capabilities", workspace_root=tmp_path
     )
-    assert "container_default" in handle_slash_command(
+    assert "native_sandbox" in handle_slash_command(
         "/execution-profiles", workspace_root=tmp_path
     )
     assert "semantic_writes_enabled: False" in handle_slash_command(

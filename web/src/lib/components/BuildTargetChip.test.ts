@@ -31,6 +31,12 @@ function target(overrides: Record<string, unknown>): Record<string, unknown> {
 }
 
 describe("BuildTargetChip", () => {
+  it("reports an unavailable sandbox without suggesting host execution", async () => {
+    stubFetch({ [ROUTE]: target({ code_placement: "unavailable" }) });
+    render(BuildTargetChip, { repoId: "repo_1" });
+    expect(await screen.findByTestId("build-target")).toHaveTextContent("Sandbox unavailable");
+  });
+
   it("states the branch, commit and where code runs", async () => {
     stubFetch({ [ROUTE]: target({}) });
     render(BuildTargetChip, { repoId: "repo_1" });

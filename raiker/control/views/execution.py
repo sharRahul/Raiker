@@ -32,13 +32,14 @@ class CloudCost(TypedDict):
 class ExecutionEnvironmentView(TypedDict):
     """One boundary a command could run in, as measured on this host.
 
-    The container keys are present for a container profile; ``boundary`` and
-    ``probe_observations`` for the boundaries a probe measures; ``config`` for
-    an owner-configured profile, never with its secrets.
+    ``boundary`` and ``probe_observations`` are present for the boundaries a
+    probe measures; ``config`` for an owner-configured profile, never with its
+    secrets. A ``retired`` entry is a removed Docker/Podman environment kept so
+    the owner can see and remove it; it is never available.
     """
 
     profile_id: str
-    kind: Literal["local", "native", "container", "ssh", "daytona"]
+    kind: Literal["native", "retired", "ssh", "daytona"]
     name: str
     enabled: bool
     configured: bool
@@ -61,24 +62,12 @@ class ExecutionEnvironmentView(TypedDict):
     runner_trust: NotRequired[
         Literal["publisher_verified", "package_relative_integrity", "development_unverified"] | None
     ]
-    runtime: NotRequired[Literal["docker", "podman"] | None]
-    image: NotRequired[str | None]
-    repository_access: NotRequired[Literal["none", "read_only"]]
-    writable_output: NotRequired[bool]
-    assigned_tool_count: NotRequired[int]
     config: NotRequired[dict[str, Any]]
-
-
-class ContainerOptions(TypedDict):
-    runtimes: list[Literal["docker", "podman"]]
-    images: list[str]
-    supported_tools: list[str]
 
 
 class ExecutionEnvironmentsView(TypedDict):
     selected_profile_id: str
     environments: list[ExecutionEnvironmentView]
-    container_options: ContainerOptions
 
 
 BoundaryStep = Literal["project", "repository", "environment", "model"]

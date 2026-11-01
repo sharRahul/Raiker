@@ -707,6 +707,19 @@ export const api = {
     contract.listCredentialDeltas({ environment_profile_id: profileId }),
   discardCredentialDelta: (runId: string, decisionId: string) =>
     contract.discardCredentialDelta(runId, { decision_id: decisionId }),
+  // Sandbox copies: nothing a command wrote is in the project until promoted.
+  taskWorkspaces: () => contract.listTaskWorkspaces(),
+  taskWorkspaceFileDiff: (workspaceId: string, path: string) =>
+    contract.taskWorkspaceFileDiff(workspaceId, { path }),
+  promoteTaskWorkspace: (
+    workspaceId: string,
+    reviewed: { created: string[]; modified: string[]; deleted: string[] },
+  ) => contract.promoteTaskWorkspace(workspaceId, reviewed),
+  discardTaskWorkspace: (workspaceId: string) => contract.discardTaskWorkspace(workspaceId),
+  // Allow-listed downloads for sandboxed commands (off until the owner turns it on).
+  commandEgress: () => contract.getCommandEgress(),
+  setCommandEgress: (enabled: boolean, domains: string[]) =>
+    contract.putCommandEgress({ enabled, domains }),
   checkpoints: (sessionId?: string, projectId?: string) =>
     contract.listCheckpoints({ session_id: sessionId, project_id: projectId }),
   checkpoint: (id: string) => contract.getCheckpoint(id),

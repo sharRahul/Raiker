@@ -1038,7 +1038,7 @@ as BUG-42 and BUG-43 in `docs/plans/TO_BE_FIXED.md`.
 | Anthropic | ✅ credential entered through the password field in Models, Haiku 4.5 selected, real Chat response `ADD01 ANTHROPIC LIVE` |
 | OpenRouter | ✅ credential entered through the password field in Models, provider catalogue used, real Chat response `ADD01 OPENROUTER LIVE` |
 | Ollama | ✅ local `gemma4:31b-cloud` selected from the live catalogue, real Chat response `ADD01 OLLAMA LIVE` |
-| Browser suite | ✅ `add-01-container-providers-live.spec.ts`; provider and Ollama response assertions plus container configuration, selection, and badge readiness |
+| Browser suite | ✅ `add-01-container-providers-live.spec.ts` (since renamed `add-01-providers-live.spec.ts`; its container steps were replaced when Docker was removed); provider and Ollama response assertions plus container configuration, selection, and badge readiness |
 | Visual review | ✅ five 1440×1000 screenshots inspected; no credential value visible, no clipped controls blocking the tested flow |
 
 Evidence: `docs/plans/screenshots/working/add01-providers-connected-live.png`,

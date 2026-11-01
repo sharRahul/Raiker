@@ -32,7 +32,6 @@ PHASE_4_DISABLED_CAPABILITIES = {
     "subagents",
     "multi_agent_teams",
     "remote_execution",
-    "container_execution",
 }
 PHASE_3_DISABLED_CAPABILITIES = {
     "plugin_execution",
@@ -88,12 +87,9 @@ RUNTIME_DOMAIN_CAPABILITIES = {
     "plugin_install",
     "plugin_revocation_cap",
     "plugin_runtime_cap",
-    "plugin_sandboxed_runtime_cap",
-    "plugin_sandbox_image_pull_cap",
     "external_channel_runtime",
     "channel_approval_relay",
     "remote_execution_cap",
-    "container_execution_cap",
     "cloud_execution_cap",
     "graph_indexing_runtime",
     "semantic_memory_runtime",
@@ -237,10 +233,9 @@ def default_capability_gates() -> dict[str, CapabilityGate]:
                              # reaches nothing outside the machine.
                              "code_map_indexing")
     _TIER4_EXECUTED_CAPS = ("plugin_install", "plugin_execution_cap", "plugin_revocation_cap",
-                            "plugin_runtime_cap", "plugin_sandboxed_runtime_cap",
-                            "plugin_sandbox_image_pull_cap")
+                            "plugin_runtime_cap")
     _TIER5_EXECUTED_CAPS = ("external_channel_runtime", "channel_approval_relay",
-                             "remote_execution_cap", "container_execution_cap",
+                             "remote_execution_cap",
                              "cloud_execution_cap", "hosted_model_runtime",
                              "private_network_model_runtime", "advisor_model_runtime",
                              "connector_github_runtime", "connector_gmail_runtime",

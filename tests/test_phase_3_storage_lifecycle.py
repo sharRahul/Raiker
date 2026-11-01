@@ -107,9 +107,9 @@ def test_lifecycle_summary_cli_workspace_and_disabled_gates(tmp_path: Path) -> N
         "semantic_memory_writes",
         "external_channels",
         "remote_execution",
-        "container_execution",
     ):
         assert gates[capability]["runtime_enabled"] is False
+    assert "container_execution" not in gates  # removed with Docker and Podman
     # subagents / multi_agent_teams are integrated (real executors) -> enabled by default.
     assert gates["subagents"]["runtime_enabled"] is True
     assert gates["multi_agent_teams"]["runtime_enabled"] is True

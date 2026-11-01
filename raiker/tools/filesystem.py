@@ -245,16 +245,20 @@ def list_directory(
 # pass's and the explorer's job, both of which already know which root they are
 # in; teaching a glob to span roots would make one pattern mean two trees.
 def glob_paths(
-    workspace_root: str | Path, pattern: str, *, max_results: int = 100
+    workspace_root: str | Path, pattern: str, *, max_results: int = 100, authority: Any = None
 ) -> dict[str, Any]:
     if Path(pattern).is_absolute() or ".." in Path(pattern).parts:
         raise FilesystemSafetyError("outside_workspace")
     root = Path(workspace_root).resolve()
-    matches = sorted(
-        str(path.relative_to(root)) + ("/" if path.is_dir() else "")
+    found = {
+        str(path.relative_to(root)) + ("/" if path.is_dir() else ""): path
         for path in root.glob(pattern)
         if resolve_workspace_path(root, path).exists()
-    )
+    }
+    # A session's task copy answers for the subtree it holds (task_tree).
+    from raiker.execution.task_tree import overlay_glob
+
+    matches = sorted(overlay_glob(authority, root, pattern, found))
     return {
         "status": "success",
         "matches": matches[:max_results],
@@ -317,6 +321,7 @@ def grep_files(
     regex: bool = False,
     ignore_case: bool = False,
     context: int = 0,
+    authority: Any = None,
 ) -> dict[str, Any]:
     """Search file contents; literal by default, a regular expression on request.
 
@@ -331,10 +336,15 @@ def grep_files(
         return matcher
     span = max(0, min(int(context), MAX_GREP_CONTEXT))
     root = Path(workspace_root).resolve()
-    base = resolve_workspace_path(root, path)
+    base = resolve_workspace_path(root, path, authority=authority)
     if not base.exists():
         return {"status": "failed", "error": {"type": "not_found", "path": str(path)}}
     files = [base] if base.is_file() else [p for p in base.rglob("*") if p.is_file()]
+    if base.is_dir():
+        # A session's task copy answers for the subtree it holds (task_tree).
+        from raiker.execution.task_tree import overlay_files
+
+        files = overlay_files(authority, base, files)
     results: list[dict[str, Any]] = []
     for file_path in sorted(files):
         if not fnmatch.fnmatch(file_path.name, include) or not is_text_file(file_path):
@@ -344,7 +354,11 @@ def grep_files(
             if not matcher(line):
                 continue
             match: dict[str, Any] = {
-                "path": str(file_path.relative_to(root)),
+                "path": (
+                    str(file_path.relative_to(root))
+                    if root in file_path.parents
+                    else str(Path(_relative_path(root, file_path, authority=authority)))
+                ),
                 "line": index + 1,
                 "text": line[:500],
             }

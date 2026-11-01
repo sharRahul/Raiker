@@ -22,12 +22,9 @@ def test_known_raiker_internal_writers_use_the_storage_boundary() -> None:
         # file used the helper.
         "raiker/control/dashboard_parts/knowledge.py",
         "raiker/control/dashboard_parts/memory.py",
-        "raiker/execution/container_tools.py",
-        "raiker/execution/commands/backends/container.py",
         "raiker/execution/commands/backends/native.py",
         "raiker/memory/integrity.py",
         "raiker/memory/store.py",
-        "raiker/runtime/executors/containers.py",
         "raiker/storage/sqlcipher_probe.py",
     ]
     offenders: list[str] = []

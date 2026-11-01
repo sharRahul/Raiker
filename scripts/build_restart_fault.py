@@ -261,13 +261,13 @@ def _turn_on(host: Host, capability: str, *, acknowledge: bool = False) -> None:
     host.call("POST", f"/api/capability-gates/{capability}/set", body)
 
 
-def _kill_processes_in(folder: Path) -> list[int]:
-    """Kill every process working in *folder* — the check and its supervisor (Linux)."""
+def _kill_processes_in(*folders: Path) -> list[int]:
+    """Kill every process working in *folders* — the check and its supervisor (Linux)."""
     killed: list[int] = []
     proc = Path("/proc")
     if not proc.is_dir():
         return killed
-    target = str(folder.resolve())
+    targets = [str(folder.resolve()) for folder in folders]
     for entry in proc.iterdir():
         if not entry.name.isdigit() or int(entry.name) == os.getpid():
             continue
@@ -275,7 +275,7 @@ def _kill_processes_in(folder: Path) -> list[int]:
             cwd = os.readlink(entry / "cwd")
         except OSError:
             continue
-        if cwd == target or cwd.startswith(target + os.sep):
+        if any(cwd == target or cwd.startswith(target + os.sep) for target in targets):
             with contextlib.suppress(OSError):
                 os.kill(int(entry.name), signal.SIGKILL)
                 killed.append(int(entry.name))
@@ -327,7 +327,11 @@ def run_scenario(workspace: Path, report: dict[str, Any], *, variant: str) -> bo
         host.kill()
         report["killed"] = True
         if variant == "lost":
-            report["check_processes_killed"] = len(_kill_processes_in(workspace / "app"))
+            # A check runs in the session's disposable copy, not in the project.
+            from raiker.execution.commands.backends.native import task_workspace_registry
+
+            copies = task_workspace_registry(workspace).base
+            report["check_processes_killed"] = len(_kill_processes_in(workspace / "app", copies))
         host.start()
         host.sign_in(register=False)
         time.sleep(2)

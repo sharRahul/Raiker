@@ -54,6 +54,12 @@ def _dispatch(dispatcher: HookDispatcher, session_id: str | None = None) -> obje
     )
 
 
+def test_blocked_command_guard_still_requires_owner_decision(tmp_path: Path) -> None:
+    outcome = _dispatch(HookDispatcher(_registry(authority=True), workspace_root=tmp_path))
+    assert outcome.decision == "ask"  # type: ignore[attr-defined]
+    assert any("guard" in reason for reason in outcome.reasons)  # type: ignore[attr-defined]
+
+
 @pytest.mark.parametrize("failure", [CommandHookTimeout("slow"), CommandHookError("crashed")])
 def test_an_enforcing_hook_that_fails_asks_the_owner(
     monkeypatch: pytest.MonkeyPatch, failure: Exception

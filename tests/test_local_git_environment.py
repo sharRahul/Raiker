@@ -9,7 +9,16 @@ from pathlib import Path
 
 import pytest
 
-from raiker.tools.git import local_git_environment, run_git
+from raiker.control.build_worktrees import create_worktree
+from raiker.tools.git import (
+    create_branch,
+    create_commit,
+    local_git_environment,
+    proposed_commit_snapshot,
+    run_git,
+    working_tree_changes,
+    working_tree_diff,
+)
 
 
 def _git(root: Path, *args: str) -> None:
@@ -23,6 +32,7 @@ def repo(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     _git(tmp_path, "init", "--initial-branch=main", ".")
     _git(tmp_path, "config", "user.name", "T")
     _git(tmp_path, "config", "user.email", "t@example.com")
+    _git(tmp_path, "config", "commit.gpgsign", "false")
     (tmp_path / "a.txt").write_text("a\n", encoding="utf-8")
     _git(tmp_path, "add", "a.txt")
     _git(tmp_path, "commit", "-m", "a")
@@ -54,8 +64,8 @@ def test_a_repository_fsmonitor_does_not_run_on_status(repo: Path) -> None:
     assert not marker.exists()
 
 
-def test_status_does_not_see_the_hosts_token(repo: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """A git child (here an external diff driver) reads the environment it was given."""
+def test_git_diff_does_not_invoke_external_driver_with_host_token(repo: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """An external diff driver cannot observe credentials because it is not run."""
     seen = repo.parent / "seen-env"
     driver = repo.parent / "driver.py"
     driver.write_text(
@@ -70,4 +80,231 @@ def test_status_does_not_see_the_hosts_token(repo: Path, monkeypatch: pytest.Mon
     )
     (repo / "a.txt").write_text("b\n", encoding="utf-8")
     run_git(repo, "diff")
-    assert seen.read_text(encoding="utf-8") == "absent"
+    assert not seen.exists()
+
+
+def test_agent_git_diff_does_not_run_external_diff_driver(
+    repo: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    marker = repo.parent / "external-driver-ran"
+    driver = repo.parent / "external-driver.py"
+    driver.write_text(f"from pathlib import Path\nPath({str(marker)!r}).touch()\n", encoding="utf-8")
+    monkeypatch.setenv(
+        "GIT_EXTERNAL_DIFF", f'"{Path(sys.executable).as_posix()}" "{driver.as_posix()}"'
+    )
+    (repo / "a.txt").write_text("modified\n", encoding="utf-8")
+    _git(repo, "add", "a.txt")
+    result = run_git(repo, "diff", ["--cached"])
+    assert result["status"] == "success"
+    assert not marker.exists()
+
+
+@pytest.mark.parametrize("arg", ["--ext-diff", "--textconv", "--output=outside", "--ext-d"])
+def test_git_diff_refuses_arguments_that_can_launch_or_write(repo: Path, arg: str) -> None:
+    result = run_git(repo, "diff", [arg])
+    assert result["status"] == "denied"
+    assert result["error"]["type"] == "git_diff_argument_denied"
+
+
+@pytest.mark.parametrize("path", ["../outside", ":(top)outside"])
+def test_git_diff_refuses_pathspec_escape(repo: Path, path: str) -> None:
+    result = run_git(repo, "diff", ["--", path])
+    assert result["status"] == "denied"
+    assert result["error"]["type"] == "git_diff_path_denied"
+
+
+def test_git_diff_does_not_run_workspace_filter(repo: Path) -> None:
+    marker = repo.parent / "filter-ran"
+    driver = repo.parent / "filter.py"
+    driver.write_text(
+        "import pathlib,sys\n"
+        f"pathlib.Path({str(marker)!r}).touch()\n"
+        "sys.stdout.buffer.write(sys.stdin.buffer.read())\n",
+        encoding="utf-8",
+    )
+    _git(repo, "config", "filter.raiker-test.clean", f'"{Path(sys.executable).as_posix()}" "{driver.as_posix()}"')
+    (repo / ".gitattributes").write_text("a.txt filter=raiker-test\n", encoding="utf-8")
+    (repo / "a.txt").write_text("staged change\n", encoding="utf-8")
+    _git(repo, "add", ".gitattributes", "a.txt")
+    assert marker.exists(), "control: Git must be able to start the filter"
+    marker.unlink()
+    (repo / "a.txt").write_text("modified\n", encoding="utf-8")
+    result = run_git(repo, "diff")
+    assert result["status"] == "success"
+    assert "+modified" in result["output"]
+    assert not marker.exists()
+    staged = run_git(repo, "diff", ["--cached"])
+    assert staged["status"] == "success"
+    assert not marker.exists()
+
+
+def test_artifact_diff_shows_staged_files_without_running_filter(repo: Path) -> None:
+    marker = repo.parent / "artifact-filter-ran"
+    driver = repo.parent / "artifact-filter.py"
+    driver.write_text(
+        "import pathlib,sys\n"
+        f"pathlib.Path({str(marker)!r}).touch()\n"
+        "sys.stdout.buffer.write(sys.stdin.buffer.read())\n",
+        encoding="utf-8",
+    )
+    _git(repo, "config", "filter.raiker-test.clean", f'"{Path(sys.executable).as_posix()}" "{driver.as_posix()}"')
+    (repo / ".gitattributes").write_text("a.txt filter=raiker-test\n", encoding="utf-8")
+    (repo / "a.txt").write_text("staged change\n", encoding="utf-8")
+    _git(repo, "add", ".gitattributes", "a.txt")
+    (repo / ".raiker").mkdir()
+    (repo / ".raiker" / "secret.txt").write_text("do-not-expose\n", encoding="utf-8")
+    _git(repo, "add", ".raiker/secret.txt")
+    assert marker.exists(), "control: Git must be able to start the filter"
+    marker.unlink()
+    entries = [{"path": "a.txt", "previous_path": "", "state": "modified", "unstaged": ""}]
+    diff = working_tree_diff(repo, entries)
+    assert "+staged change" in diff
+    assert "do-not-expose" not in diff
+    assert not marker.exists()
+    all_staged = run_git(repo, "diff", ["--cached"])
+    assert all_staged["status"] == "success"
+    assert "do-not-expose" not in all_staged["output"]
+    requested_secret = run_git(repo, "diff", ["--cached", "--", ".raiker"])
+    assert requested_secret["status"] == "success"
+    assert "do-not-expose" not in requested_secret["output"]
+
+
+def test_git_status_does_not_run_workspace_filter(repo: Path) -> None:
+    marker = repo.parent / "status-filter-ran"
+    driver = repo.parent / "status-filter.py"
+    driver.write_text(
+        "import pathlib,sys\n"
+        f"pathlib.Path({str(marker)!r}).touch()\n"
+        "sys.stdout.buffer.write(sys.stdin.buffer.read())\n",
+        encoding="utf-8",
+    )
+    _git(repo, "config", "filter.raiker-test.clean", f'"{Path(sys.executable).as_posix()}" "{driver.as_posix()}"')
+    (repo / ".gitattributes").write_text("a.txt filter=raiker-test\n", encoding="utf-8")
+    (repo / "a.txt").write_text("staged change\n", encoding="utf-8")
+    _git(repo, "add", ".gitattributes", "a.txt")
+    assert marker.exists(), "control: Git must be able to start the filter"
+    marker.unlink()
+    (repo / "a.txt").write_text("modified\n", encoding="utf-8")
+    result = run_git(repo, "status", ["--short"])
+    assert result["status"] == "success"
+    assert not marker.exists()
+
+
+def test_commit_preview_and_commit_never_run_a_configured_filter(repo: Path) -> None:
+    marker = repo.parent / "commit-filter-ran"
+    driver = repo.parent / "commit-filter.py"
+    driver.write_text(
+        "import pathlib,sys\n"
+        f"pathlib.Path({str(marker)!r}).touch()\n"
+        "sys.stdout.buffer.write(sys.stdin.buffer.read())\n",
+        encoding="utf-8",
+    )
+    _git(repo, "config", "filter.raiker-test.clean", f'"{Path(sys.executable).as_posix()}" "{driver.as_posix()}"')
+    (repo / ".gitattributes").write_text("a.txt filter=raiker-test\n", encoding="utf-8")
+    (repo / "a.txt").write_text("staged change\n", encoding="utf-8")
+    _git(repo, "add", ".gitattributes", "a.txt")
+    assert marker.exists(), "control: Git must be able to start the filter"
+    marker.unlink()
+    (repo / "a.txt").write_text("modified\n", encoding="utf-8")
+    entries = working_tree_changes(repo)
+    assert "+modified" in working_tree_diff(repo, entries)
+    assert not marker.exists()
+    result = proposed_commit_snapshot(repo, "test")
+    assert result["status"] == "success", result
+    assert not marker.exists()
+    committed = create_commit(repo, "test")
+    assert committed["status"] == "success", committed
+    assert not marker.exists()
+
+
+def test_task_worktree_does_not_run_repository_smudge_filter(repo: Path) -> None:
+    marker = repo.parent / "smudge-filter-ran"
+    driver = repo.parent / "smudge-filter.py"
+    driver.write_text(
+        "import pathlib,sys\n"
+        f"pathlib.Path({str(marker)!r}).touch()\n"
+        "sys.stdout.buffer.write(sys.stdin.buffer.read())\n",
+        encoding="utf-8",
+    )
+    _git(repo, "config", "filter.raiker-test.smudge", f'"{Path(sys.executable).as_posix()}" "{driver.as_posix()}"')
+    (repo / ".gitattributes").write_text("a.txt filter=raiker-test\n", encoding="utf-8")
+    _git(repo, "add", ".gitattributes")
+    _git(repo, "commit", "-m", "add attributes")
+    (repo / "a.txt").unlink()
+    _git(repo, "checkout", "--force", "HEAD", "--", "a.txt")
+    assert marker.exists(), "control: Git must be able to start the smudge filter"
+    marker.unlink()
+    result = create_worktree(repo.parent, repo.name, "sandbox-task")
+    assert result["status"] == "success", result
+    assert not marker.exists()
+
+
+def test_branch_checkout_does_not_run_repository_smudge_filter(repo: Path) -> None:
+    marker = repo.parent / "branch-smudge-ran"
+    driver = repo.parent / "branch-smudge.py"
+    driver.write_text(
+        "import pathlib,sys\n"
+        f"pathlib.Path({str(marker)!r}).touch()\n"
+        "sys.stdout.buffer.write(sys.stdin.buffer.read())\n",
+        encoding="utf-8",
+    )
+    _git(repo, "config", "filter.raiker-test.smudge", f'"{Path(sys.executable).as_posix()}" "{driver.as_posix()}"')
+    (repo / ".gitattributes").write_text("a.txt filter=raiker-test\n", encoding="utf-8")
+    _git(repo, "add", ".gitattributes")
+    _git(repo, "commit", "-m", "attributes")
+    base = subprocess.run(
+        ["git", "-C", str(repo), "rev-parse", "HEAD"], check=True, capture_output=True, text=True
+    ).stdout.strip()
+    (repo / "a.txt").write_text("new version\n", encoding="utf-8")
+    _git(repo, "add", "a.txt")
+    _git(repo, "commit", "-m", "new version")
+    (repo / "a.txt").unlink()
+    _git(repo, "checkout", "--force", "HEAD", "--", "a.txt")
+    assert marker.exists(), "control: Git must be able to start the smudge filter"
+    marker.unlink()
+    result = create_branch(repo, "sandbox-branch", base)
+    assert result["status"] == "success", result
+    assert not marker.exists()
+    at_head = create_branch(repo, "branch-at-head")
+    assert at_head["status"] == "success"
+    assert not marker.exists()
+
+
+def test_commit_diff_never_runs_a_textconv_or_external_diff_driver(repo: Path) -> None:
+    marker = repo.parent / "textconv-ran"
+    driver = repo.parent / "textconv.py"
+    driver.write_text(
+        "import pathlib,sys\n"
+        f"pathlib.Path({str(marker)!r}).touch()\n"
+        "sys.stdout.write(open(sys.argv[1]).read())\n",
+        encoding="utf-8",
+    )
+    program = f'"{Path(sys.executable).as_posix()}" "{driver.as_posix()}"'
+    _git(repo, "config", "diff.raiker-test.textconv", program)
+    _git(repo, "config", "diff.raiker-test.command", program)
+    (repo / ".gitattributes").write_text("a.txt diff=raiker-test\n", encoding="utf-8")
+    _git(repo, "add", ".gitattributes")
+    _git(repo, "commit", "-m", "attributes")
+    (repo / "a.txt").write_text("changed\n", encoding="utf-8")
+    subprocess.run(["git", "-C", str(repo), "diff", "HEAD"], check=True, capture_output=True)
+    assert marker.exists(), "control: Git must be able to start the textconv driver"
+    marker.unlink()
+
+    diff = working_tree_diff(repo, working_tree_changes(repo))
+
+    assert "+changed" in diff
+    assert not marker.exists()
+
+
+def test_an_untracked_link_is_never_followed_into_the_diff(repo: Path, tmp_path: Path) -> None:
+    secret = tmp_path.parent / f"{tmp_path.name}-secret.txt"
+    secret.write_text("PRIVATE KEY MATERIAL\n", encoding="utf-8")
+    try:
+        (repo / "leak.txt").symlink_to(secret)
+    except OSError:
+        pytest.skip("symlink creation is not permitted on this host")
+    try:
+        diff = working_tree_diff(repo, working_tree_changes(repo))
+        assert "PRIVATE KEY MATERIAL" not in diff
+    finally:
+        secret.unlink()

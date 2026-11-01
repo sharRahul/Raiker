@@ -17,7 +17,6 @@ from raiker.runtime.executors.connectors import (
     GmailConnectorExecutor,
     SlackConnectorExecutor,
 )
-from raiker.runtime.executors.containers import ContainerExecutionExecutor
 from raiker.runtime.executors.mcp import McpBuilderExecutor, McpConnectorExecutor
 from raiker.runtime.executors.models_runtime import (
     AdvisorModelRuntimeExecutor,
@@ -57,8 +56,6 @@ from raiker.runtime.executors.tier4_plugins import (
     PluginInstallExecutor,
     PluginRevocationExecutor,
     PluginRuntimeExecutor,
-    PluginSandboxedRuntimeExecutor,
-    PluginSandboxImagePullExecutor,
 )
 from raiker.runtime.executors.tier5_network import (
     CloudExecutionExecutor,
@@ -92,9 +89,9 @@ __all__ = [
     "SemanticMemoryExecutor", "VectorEmbeddingExecutor", "ModelProviderExecutor",
     "SubagentExecutor", "MultiAgentTeamExecutor",
     "PluginInstallExecutor", "PluginExecutionCapExecutor", "PluginRevocationExecutor",
-    "PluginRuntimeExecutor", "PluginSandboxedRuntimeExecutor", "PluginSandboxImagePullExecutor",
+    "PluginRuntimeExecutor",
     "ExternalChannelExecutor", "ChannelApprovalRelayExecutor",
-    "RemoteExecutionExecutor", "ContainerExecutionExecutor", "CloudExecutionExecutor",
+    "RemoteExecutionExecutor", "CloudExecutionExecutor",
     "HostedModelRuntimeExecutor", "PrivateNetworkModelRuntimeExecutor",
     "AdvisorModelRuntimeExecutor", "GithubConnectorExecutor", "GmailConnectorExecutor",
     "GcalConnectorExecutor", "SlackConnectorExecutor", "ScheduledRoutinesExecutor",
@@ -199,8 +196,6 @@ REAL_EXECUTOR_CAPABILITIES: frozenset[str] = frozenset({
     # Phase 4 — reference channel (bounded outbound webhook + metadata-only relay)
     "external_channel_runtime",
     "channel_approval_relay",
-    # Phase 4 — local sandboxed container execution (no network, no host mounts)
-    "container_execution_cap",
     "remote_execution_cap",
     "cloud_execution_cap",
     # Phase 4 — local on-demand scheduled routines (no daemon)
@@ -243,14 +238,12 @@ REAL_EXECUTOR_CAPABILITIES: frozenset[str] = frozenset({
     "connector_slack_runtime",
     # Tier 4 — local manifest validation + brokered read-only plugin tool
     # invocation + revocation off-switch + bounded subprocess code runtime for an
-    # owner-allowlisted installed plugin (slice 14) + network-isolated container
-    # runtime (slice 16). In-process import isolation remains out of scope.
+    # owner-allowlisted installed plugin (slice 14). In-process import isolation
+    # remains out of scope.
     "plugin_install",
     "plugin_execution_cap",
     "plugin_revocation_cap",
     "plugin_runtime_cap",
-    "plugin_sandboxed_runtime_cap",
-    "plugin_sandbox_image_pull_cap",
     # Tier 6 — local-only personal-data stores (no network / no external
     # integration): reminders, a local calendar (no external sync/invites), and
     # local email drafts (never sends). The remaining Tier-6 domains
@@ -314,7 +307,6 @@ def build_default_executor_registry(
     registry.register("multi_agent_teams", MultiAgentTeamExecutor(ws, store))
     registry.register("external_channel_runtime", ExternalChannelExecutor(ws, store))
     registry.register("channel_approval_relay", ChannelApprovalRelayExecutor(ws, store))
-    registry.register("container_execution_cap", ContainerExecutionExecutor(ws))
     registry.register("remote_execution_cap", RemoteExecutionExecutor(ws, store))
     registry.register("cloud_execution_cap", CloudExecutionExecutor(ws, store))
     registry.register("scheduled_routines", ScheduledRoutinesExecutor(ws, store))
@@ -333,8 +325,6 @@ def build_default_executor_registry(
     registry.register("plugin_execution_cap", PluginExecutionCapExecutor(ws, store))
     registry.register("plugin_revocation_cap", PluginRevocationExecutor(ws, store))
     registry.register("plugin_runtime_cap", PluginRuntimeExecutor(ws, store))
-    registry.register("plugin_sandboxed_runtime_cap", PluginSandboxedRuntimeExecutor(ws, store))
-    registry.register("plugin_sandbox_image_pull_cap", PluginSandboxImagePullExecutor(ws))
     registry.register("reminder_runtime", ReminderRuntimeExecutor(ws, store))
     registry.register("calendar_runtime", CalendarRuntimeExecutor(ws, store))
     registry.register("email_runtime", EmailRuntimeExecutor(ws, store))

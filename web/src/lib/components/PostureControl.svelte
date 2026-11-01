@@ -80,7 +80,7 @@
     if (!showEnvironment) return null;
     if (environmentUnavailable) return "Environment unknown";
     if (environment === null) return null;
-    return environment.kind === "container" ? "Sandboxed" : "Local";
+    return environment.kind === "native" ? "Local sandbox" : environment.kind === "retired" ? "Removed environment" : "Remote";
   });
 
   /**

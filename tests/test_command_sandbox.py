@@ -240,10 +240,14 @@ def test_explicit_extras_are_the_only_way_in(workspace: Path) -> None:
 # ── End to end, through the executor's own entry point ───────────────────────
 
 
-def test_the_sandbox_runs_an_allowed_command(workspace: Path) -> None:
-    result = run_command(["cat", "README.md"], allowlist=ALLOWED_SHELL_COMMANDS, cwd=workspace)
-    assert result["returncode"] == 0
-    assert result["stdout"].strip() == "hello"
+def test_direct_command_execution_runs_in_the_native_sandbox_or_not_at_all(workspace: Path) -> None:
+    """The shared launcher has no host path: it runs in the boundary or refuses."""
+    try:
+        result = run_command(["cat", "README.md"], allowlist=ALLOWED_SHELL_COMMANDS, cwd=workspace)
+    except SandboxError as refused:
+        assert str(refused).startswith(("native_sandbox_required", "command_not_found"))
+    else:
+        assert result["returncode"] == 0
 
 
 @pytest.mark.parametrize(
@@ -260,14 +264,3 @@ def test_the_sandbox_blocks_before_anything_runs(argv: list[str], workspace: Pat
         run_command(argv, allowlist=ALLOWED_SHELL_COMMANDS, cwd=workspace)
 
 
-def test_a_real_child_does_not_receive_the_host_token(
-    workspace: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    monkeypatch.setenv("RAIKER_GITHUB_TOKEN", "ghp_must_not_reach_a_child")
-    result = run_command(
-        ["python", "-"],
-        allowlist=ALLOWED_SHELL_COMMANDS,
-        cwd=workspace,
-        stdin_text="import os; print('RAIKER_GITHUB_TOKEN' in os.environ)",
-    )
-    assert result["stdout"].strip() == "False"

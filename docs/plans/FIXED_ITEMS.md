@@ -1,5 +1,209 @@
 # Fixed items
 
+## Windows sandboxed runs were one at a time, so background runs were impossible
+
+The restricted account's grant covered one copy for one run behind a
+machine-wide lock, so a background run would have held every other command.
+Runs in the same copy now overlap (a dev server beside a test run); a run in a
+different copy waits for the copy's last run, so the account still holds at
+most one copy at a time. Each run keeps a holder file open without sharing in
+the owner's profile, which the account cannot write, and a crashed run's holder
+is pruned. Background runs are now offered on Windows. Measured on Windows 11:
+same-copy run started in 1.7 s beside a running one, another copy waited for
+it, no grant was left behind, and killing the runner killed the account's
+process tree. Covered by `native/raiker-command-runner/tests/windows_account.rs`
+and `tests/test_command_backends.py`.
+
+## Command hooks were refused everywhere
+
+Workspace command hooks refused with `native_sandbox_required` because the only
+launcher ran them on the host. A hook's script now runs alone in a throwaway
+folder in the native sandbox, with the event on its stdin and no network: it
+can decide from the event but cannot read or change the project, Raiker's
+state or anything else. A host without an enforced boundary still refuses the
+hook, and an enforcing hook that cannot run still needs the owner's decision.
+Hooks reuse a probe at most 30 seconds old, because they fire on every tool
+call. Measured on Windows 11: a real hook could not see a file in the project
+and its decision came back. Covered by `tests/test_command_hook_isolation.py`.
+
+## Sandboxed commands could not run in the background or with a terminal (Linux)
+
+On Linux, where the probe measures descendant reaping inside Bubblewrap,
+`background_run` and interactive runs now work in the sandbox: Raiker hands the
+runner a pseudo-terminal and bwrap passes it through, with `--new-session`
+keeping the command from injecting terminal input. Stopping the run, or Raiker
+exiting, takes the whole PID namespace down. Windows and macOS keep refusing by
+name (see `TO_BE_FIXED.md`). Covered by
+`tests/test_command_backends.py` and the real-terminal test in
+`native/raiker-command-runner/tests/linux_probe.rs`.
+
+## Sandboxed commands could not download packages
+
+The native boundary denied all network, so `pip install`, `npm install`,
+`cargo fetch` and `git clone` could not run. The owner can now allow downloads
+from a host list (off by default). Each run gets its own authenticated proxy,
+and the OS makes it the only route: a loopback bridge into the private network
+namespace on Linux, a single-port Seatbelt rule on macOS, and the restricted
+account's firewall on Windows. Measured end-to-end on Linux and Windows; macOS
+still needs a run. The proxy now checks the allow-list before resolving a name,
+which closes a DNS covert channel in the earlier proxy. Covered by
+`tests/test_command_egress_runtime.py`, `tests/test_native_egress.py`,
+`native/raiker-command-runner/tests/linux_probe.rs` and
+`web/src/lib/views/settings/CommandDownloads.test.ts`.
+
+## File edits and commands worked on two different trees
+
+File tools wrote the real project while commands ran in a copy taken at the
+first command, so a test run missed the edit just made and a formatter's output
+was invisible to the next read. A session now has one task tree. A project
+turn binds its session to the project root, and the first write or command
+takes one copy of the whole project; every read, write, edit, patch, grep,
+glob and command cwd inside the project then resolves into that copy, under
+the same names, policy and confinement as before. The project changes only
+when the owner applies the reviewed copy. An approved write executed after its
+turn follows the conversation's session (`origin_session_id`), so approval
+cannot write around the copy. A link a sandboxed command plants in the copy is
+never followed (`task_copy_link`), and a copy wider than one the session
+already holds is refused (`task_copy_scope_conflict`) instead of splitting the
+work. Turns without a project keep the old behaviour until a command makes a
+copy, then follow it. Covered by `tests/test_task_tree.py`.
+
+## Windows builds could not run in the AppContainer sandbox
+
+AppContainer blocked Node (`EPERM: lstat 'C:\\'`), Git, MSYS tools and
+virtualenv Python. Windows build commands now run as a dedicated restricted
+local account (`RaikerSandbox`) set up once with the owner's approval, inside a
+copy under `C:\\RaikerSandbox`, in a Job Object with UI restrictions and an
+outbound firewall block. Measured on the owner's PC: every probe observation
+enforced, the toolchains run, and profile, data-drive and network escapes are
+refused. Gaps remain listed in `TO_BE_FIXED.md`.
+
+## Local Git could run repository filter programs; diff, commit and worktrees were blocked
+
+A `.gitattributes` line names a filter driver; the program it runs comes from
+Git configuration, and `status`, `diff`, `add`, `switch` and `worktree add` ran
+it on the host. Every local Git invocation (`run_git` and the governed `_git`)
+now passes `-c filter.<driver>.clean= / smudge= / process=` and
+`required=false` for each configured driver, so no filter program can run;
+`core.fsmonitor` and hooks were already off. A positive control showed the
+configured driver ran without these overrides and never with them. This
+replaces the interim refusals: working-tree diff, untracked-file diffs, commit
+previews and commits, branch creation from a base and task worktrees work
+again, and `tests/test_local_git_environment.py` asserts each succeeds without
+the filter starting. A diff Git refuses is still never reported as a clean
+review. Agent code no longer touches a project's `.git` at all; it runs in a
+disposable copy without one.
+
+## Native commands ran against the owner's project instead of a disposable copy
+
+Governed commands now run in a per-session copy of their working folder, kept
+outside the Raiker workspace. Nothing reaches the project until the owner
+applies the exact change set they reviewed in Build; a stale review, an owner
+edit made after the snapshot, an active run, a link or a nested `.git`/`.raiker`
+is refused, and a failed promotion restores every original. Discard leaves the
+project unchanged. Covered by `tests/test_task_workspaces.py`,
+`tests/test_task_workspace_api.py`, `tests/test_command_backends.py` and
+`web/src/lib/components/TaskWorkspaceReview.test.ts`, plus a real Windows
+AppContainer run. Network mediation, background/PTY execution and toolchain
+provisioning remain open in `TO_BE_FIXED.md`.
+
+## Docker and Podman removed as Raiker execution dependencies
+
+Raiker no longer invokes Docker or Podman. Removed: the persistent container
+command backend, the container tool bridge, `container_execution_cap`, the
+Docker plugin runtime (`plugin_sandboxed_runtime_cap`) and image pull
+(`plugin_sandbox_image_pull_cap`), the Docker model-conversion runner,
+`containers/**`, the container definition and image-scan CI checks, and the
+container options in Settings. Upgrades are safe: a stored container profile is
+listed as *retired*, refuses with `container_environment_retired`, is never
+converted to host execution, and can be removed with its command history kept;
+a tool an owner assigned to it is refused rather than moved. Covered by
+`tests/test_command_backends.py`, `tests/test_execution_environments.py`,
+`tests/test_execution_profiles.py` and `tests/test_tool_broker.py`. This does
+not make native execution available; see the release blockers in
+`TO_BE_FIXED.md`.
+
+## Windows read-only protection bypassed by an all-packages grant
+
+Measured locally and on `windows-2025`: with `ALL APPLICATION PACKAGES:(M)` on
+`.git`, a sandboxed process wrote into `.git` despite the capability deny entry,
+because Windows ignores capability SIDs in deny entries during the AppContainer
+access check. The runner now refuses to launch when a protected path grants
+`ALL APPLICATION PACKAGES` or `ALL RESTRICTED APPLICATION PACKAGES` any write
+right (read-only paths) or any right (masked paths). The adversarial test in
+`native/raiker-command-runner/tests/windows_probe.rs` passes locally and in CI.
+Explicit grants on files below the protected directory are not scanned.
+
+## Seatbelt profile allowed signals to and services outside the sandbox
+
+The macOS profile allowed unrestricted `signal` and `mach-lookup`, so a command
+could signal any of the owner's processes or ask launchd services to act
+outside the sandbox. Signals and process inspection are now limited to the same
+sandbox and Mach lookups to a named allowlist; unit tests assert both. macOS
+also no longer requests `RLIMIT_AS`, which XNU rejects with EINVAL (measured on
+`macos-15`); memory is reported unenforced there rather than every launch
+failing. Real Seatbelt enforcement evidence is still pending.
+
+## Native boundary helpers could be selected from an untrusted search path
+
+The Unix runner selects Bubblewrap and Seatbelt only from fixed system paths,
+requires root-owned, non-writable executable and directory components, and
+rejects a symlink in an untrusted directory. The Windows probe resolves its
+route utility from the system directory. Linux tests exercise fake helper
+rejection and real Bubblewrap execution; Windows tests exercise the system
+route lookup. This does not replace signed runner verification or the other
+open sandbox controls. Unix changes are in checkpoint `f9329835`.
+
+## Native runner policy injection and unrestricted root workspace
+
+Seatbelt profile generation rejects unrepresentable path characters before
+launch, preventing paths from injecting profile expressions. Runner filesystem
+validation also rejects filesystem and Windows drive roots as workspaces.
+Rust unit tests exercise the rejection paths on Linux and Windows. These fixes
+do not establish a disposable workspace or prove macOS enforcement.
+
+## Unix runner deadline ownership and Linux host configuration exposure
+
+The Unix runner handles deadline termination in the child-owner wait loop,
+without a detached PID-targeting watchdog. Bubblewrap no longer exposes whole
+host `/etc`, `/opt` or `/nix` trees. Linux WSL integration tests exercise an
+early exit, deadline termination and denial of a host `/etc` read with an
+outside positive control. Linux helper identity, task-wide quotas and other
+filesystem protections remain open.
+
+## Native runner policy parser silently accepted malformed restrictions
+
+The runner rejects lexical parent traversal, malformed protected-path lists,
+invalid policy field types and out-of-range resource limits instead of silently
+dropping or widening them. Rust policy tests cover these inputs. This is parser
+validation only; symlink containment and OS enforcement remain open.
+
+## Uncontained checkout filters in task worktree and cross-base branch creation
+
+Task worktree creation and branch creation from an explicit base now refuse
+until Git checkout can run inside a verified native boundary. Real Git tests in
+`tests/test_local_git_environment.py` demonstrate that both previous paths
+started a configured smudge filter; the refusal prevents that launch. Branch
+creation at HEAD remains available in the tested scenario. This is containment,
+not a completed sandbox or a restoration of task-worktree functionality.
+
+## Workspace Git configuration used as global configuration
+
+The sanitized process environment now points Git's global configuration at the
+OS null device and disables system configuration, including after extra
+environment values are merged. `tests/test_sandbox_git_config.py` verifies with
+real Git that an agent-written workspace `.gitconfig` is not read as global
+configuration. Repository-local configuration and other launch paths remain
+subject to the open native sandbox migration.
+
+## Agent Git diff external-driver execution
+
+The agent-facing `run_git` diff path now disables external diff and textconv
+drivers and refuses unsafe diff arguments and escaping pathspecs. A control run
+showed the former path could launch an external driver; regression coverage is
+in `tests/test_local_git_environment.py`. This fixes that specific path, not
+other Git subprocesses or the native sandbox migration as a whole.
+
 Every defect and gap that has been **closed**, with the evidence that closed
 it. Split out of [`TO_BE_FIXED.md`](TO_BE_FIXED.md) so that document reads as
 what it is named for — the open work — while the record of what was fixed, and
@@ -1375,6 +1579,14 @@ file you can open. The two capture sets that remain — `screenshots/pages/` and
 | [FIXED-1272](#fixed-1272--host-quit-and-restart-and-the-trays-session-exchange-answered-other-devices-found-building-bug-358) | Medium | Host / remote access | Fixed 2026-10-26 |
 | [FIXED-1273](#fixed-1273--security-settings-showed-their-defaults-as-the-accounts-state-while-loading-found-live) | Low | Settings | Fixed 2026-10-26 |
 | [FIXED-1274](#fixed-1274--a-signed-in-owner-on-another-device-was-rate-limited-within-a-minute-found-live) | Medium | Host / remote access | Fixed 2026-10-26 |
+| [FIXED-1275](#fixed-1275--local-mcp-servers-and-plugin-code-could-not-run-at-all-after-host-launchers-were-blocked-native-sandbox) | High | Execution / MCP / plugins | Fixed 2026-11-01 |
+| [FIXED-1276](#fixed-1276--commands-on-windows-restricted-account-never-received-the-environment-raiker-built-for-them) | High | Native sandbox (Windows) | Fixed 2026-11-01 |
+| [FIXED-1277](#fixed-1277--hosted-linux-ci-measured-egress-as-indeterminate-so-every-sandboxed-command-there-refused) | High | Native sandbox (Linux) | Fixed 2026-11-01 |
+| [FIXED-1278](#fixed-1278--linux-sandboxed-commands-failed-to-start-on-a-busy-session-rlimit_nproc) | High | Native sandbox (Linux) | Fixed 2026-11-01 |
+| [FIXED-1279](#fixed-1279--native-background-runs-were-lost-on-every-restart-of-raiker-bug-194-regression) | Medium | Commands | Fixed 2026-11-01 |
+| [FIXED-1280](#fixed-1280--python--ccode-and-python--ic-code-passed-the-command-policys--c-refusal) | Medium | Command policy | Fixed 2026-11-01 |
+| [FIXED-1281](#fixed-1281--sandboxed-commands-ran-the-first-program-on-raikers-path-or-a-copys-program-looked-up-from-raikers-folder) | Medium | Native sandbox | Fixed 2026-11-01 |
+| [FIXED-1282](#fixed-1282--a-release-could-ship-a-commit-whose-sandbox-was-unproven-and-an-unsigned-beta-carried-no-verifiable-origin) | Medium | Release | Fixed 2026-11-01 |
 
 ---
 
@@ -38393,3 +38605,84 @@ Found live in this round and fixed before it closed: re-applying a listener the 
 **Fixed.** `RateLimitMiddleware` (`raiker/api/security.py`) counts a request that presents a session (a bearer token or the session cookie) in a window of its own, five times wider, per peer. Sign-in, MFA, elevation, recovery and the session mint (`SIGN_IN_PATHS`) stay in the strict window whatever the request carries, so a credential cannot buy more password or code guesses; a forged credential buys only the wider, still bounded, read window and is refused by the auth check. The lock screen says *Too many attempts in the last minute* for a `429` instead of blaming the password.
 
 **Evidence.** `tests/test_api_rest_hardening.py::test_a_signed_in_client_has_a_wider_window_of_its_own` (and the existing limits, adjusted to the two windows); `LoginView.test.ts` (too many attempts); live RT-SEC-07 to RT-SEC-11 in one run with no `429` in the host log.
+
+## FIXED-1275 — Local MCP servers and plugin code could not run at all after host launchers were blocked (native sandbox)
+
+**Severity: High. Area: Execution / MCP / plugins. Status: Fixed 2026-11-01.**
+
+**Observed.** Once host process launchers were blocked, every local stdio MCP session and every plugin entrypoint refused with `native_sandbox_required`, even on hosts whose boundary was enforced.
+
+**Fixed.** Both run in the native sandbox through `raiker/execution/commands/sandboxed_program.py`: the script's folder is copied into a throwaway folder and runs there with no network; output stays bounded while read. Hosts without an enforced boundary still refuse.
+
+**Evidence.** `tests/test_mcp_sandbox.py`, `tests/test_plugin_sandbox.py` (real boundary on Windows 11), the MCP suite (`test_mcp_runtime.py`, `test_mcp_server_secrets.py`, `test_mcp_process_environment.py`, …).
+
+## FIXED-1276 — Commands on Windows' restricted account never received the environment Raiker built for them
+
+**Severity: High. Area: Native sandbox (Windows). Status: Fixed 2026-11-01.**
+
+**Observed.** The account boundary started every command with the account's profile environment only, so `GIT_CONFIG_GLOBAL` (which keeps a planted `.gitconfig` from becoming Git's global configuration), interpreter settings and an MCP server's own secret were dropped.
+
+**Fixed.** The runner overlays its environment on the account's identity and folders, read from the account's `ProfileList` entry; building the block from a logon token failed with `ACCESS_DENIED` while another run held the hive.
+
+**Evidence.** `account_windows.rs` unit test `the_runner_environment_overlays_the_profile_but_not_the_account_identity`; `tests/windows_account.rs` 6/6, three parallel runs; `tests/test_mcp_server_secrets.py` on the real boundary.
+
+## FIXED-1277 — Hosted Linux CI measured egress as indeterminate, so every sandboxed command there refused
+
+**Severity: High. Area: Native sandbox (Linux). Status: Fixed 2026-11-01.**
+
+**Observed.** The probe's egress control arm connected to a closed port on the default gateway; hosted networks drop that packet silently, so the outside arm never answered and `NativeSandboxProof.available` was false on CI.
+
+**Fixed.** The probe listens on the host's own outward (never loopback) address for the length of the measurement; no packet leaves the machine. The gateway remains the fallback without a default route.
+
+**Evidence.** CI "Show the native sandbox measurement" now prints `True … 'egress': 'enforced'`; WSL2 probe `connect_destination` is the host's own address.
+
+## FIXED-1278 — Linux sandboxed commands failed to start on a busy session (`RLIMIT_NPROC`)
+
+**Severity: High. Area: Native sandbox (Linux). Status: Fixed 2026-11-01.**
+
+**Observed.** With `max_processes` 64 (commands) or 32 (hooks, MCP, plugins), `bwrap` failed with `Creating new namespace failed: Resource temporarily unavailable` on hosts where the user already ran other tasks: the kernel counts the limit against all of the user's tasks, in every PID namespace.
+
+**Fixed.** The runner sets the limit inside the run's user namespace through its own exec shim (`--nproc-limit`), where only the run's tasks count.
+
+**Evidence.** `linux_probe.rs`: `a_small_process_allowance_still_launches_beside_the_users_other_processes`, `the_process_allowance_still_stops_a_run_that_forks_past_it`; WSL2 measurement in `NATIVE_SANDBOX_MIGRATION.md`.
+
+## FIXED-1279 — Native background runs were lost on every restart of Raiker (BUG-194 regression)
+
+**Severity: Medium. Area: Commands. Status: Fixed 2026-11-01.**
+
+**Observed.** The native backend started background runs in-process, so the detached supervisor the host backend used was gone and a restart recorded each run `lost`.
+
+**Fixed.** On Linux a background run without downloads is started under the detached supervisor, which runs the runner; `restart_recovery` is reported only there.
+
+**Evidence.** `tests/test_command_supervisor_reattach.py` on real Bubblewrap (WSL2).
+
+## FIXED-1280 — `python -cCODE` and `python -Ic CODE` passed the command policy's `-c` refusal
+
+**Severity: Medium. Area: Command policy. Status: Fixed 2026-11-01.**
+
+**Observed.** The policy compared each whole argument with `-c`, so the attached (`-cCODE`) and clustered (`-Ic`) spellings Python accepts were let through.
+
+**Fixed.** Python's options are parsed as Python parses them, stopping at the script or the module; `-c` in any spelling is refused and `-m` names one of `venv`, `pip`, `pytest`, `unittest`.
+
+**Evidence.** `tests/test_project_setup_policy.py::test_other_code_and_other_cargo_commands_are_refused`.
+
+## FIXED-1281 — Sandboxed commands ran the first program on Raiker's path, or a copy's program looked up from Raiker's folder
+
+**Severity: Medium. Area: Native sandbox. Status: Fixed 2026-11-01.**
+
+**Observed.** A bare `python` resolved to the project's own `.venv` interpreter on another drive, which the Windows sandbox account cannot run; `.venv/bin/python` was looked up from Raiker's working folder rather than the copy; and a virtualenv's linked `bin/python` was refused as outside the workspace.
+
+**Fixed.** `command_executable` resolves a path-like name in the command's folder in the copy and a bare name to the first program the sandbox can reach; the binary check is on where the program sits, not what it links to.
+
+**Evidence.** `tests/test_project_setup_policy.py::test_a_real_copy_gets_its_own_virtualenv_and_promotes_none_of_it` on Windows 11 and WSL2.
+
+---
+## FIXED-1282 — A release could ship a commit whose sandbox was unproven, and an unsigned beta carried no verifiable origin
+
+**Severity: Medium. Area: Release. Status: Fixed 2026-11-01.**
+
+**Observed.** `release.yml` built and published from any commit, including one whose native-runner enforcement tests had failed on a platform it ships to. A beta built without platform identities (`signing: skip`) reached owners with only a SHA-256 in the same release notes to check it against, which proves nothing about who built it.
+
+**Fixed.** The `plan` job refuses a commit unless every `Native runner (<os>)` check from `ci.yml` passed on that exact commit. Both draft jobs sign every download keylessly with the repository's GitHub identity (`actions/attest-build-provenance`, Sigstore, with `id-token: write`) and then run `gh attestation verify --signer-workflow …/release.yml` on each file before the draft exists; the notes tell owners to run the same command.
+
+**Evidence.** `tests/test_release_workflow.py::test_a_release_requires_the_sandbox_enforcement_tests_on_every_platform` (the gate's platform list must match the CI matrix) and `::test_every_published_download_is_signed_with_the_repository_identity`; the gate's query run against `d2d61d37` returned all four platforms `success`.

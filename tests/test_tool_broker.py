@@ -5,12 +5,11 @@ from pathlib import Path
 import pytest
 
 from raiker.cli.principal_resolver import bootstrap_owner
-from raiker.contracts.ids import new_id
-from raiker.contracts.models import ClientMetadata, ToolAction
+from raiker.contracts.ids import new_id, utc_now
+from raiker.contracts.models import ClientMetadata, RemoteExecutionProfile, ToolAction
 from raiker.events.writer import EventLogWriter
 from raiker.execution.commands.store import CommandStore
-from raiker.execution.container_tools import ContainerToolExecutor
-from raiker.execution.profiles import ExecutionProfile, ProfileResolution
+from raiker.execution.profiles import ProfileResolution
 from raiker.models.contracts import ToolCallProposal
 from raiker.models.tool_call_validation import (
     ToolCallRejected,
@@ -49,57 +48,42 @@ def test_broker_routes_list_directory_and_logs(tmp_path) -> None:  # type: ignor
     assert "README.md" in result.output["entries"]  # type: ignore[index]
 
 
-def test_container_assignment_uses_bridge_without_host_handler(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+def test_a_tool_assigned_to_a_retired_container_never_runs_on_the_host(
+    tmp_path: Path,
 ) -> None:
     broker = _broker(tmp_path)
-    profile = ExecutionProfile(
-        "container-review",
-        "container",
-        runtime="docker",
-        image="raiker-tools:approved",
-        tools=("list_directory",),
-        repository_access="read_only",
-        writable_output=True,
+    now = utc_now()
+    broker.store.insert_remote_execution_profile(
+        RemoteExecutionProfile(
+            "container-review", "container", "Review", '{"tools":["list_directory"]}',
+            True, broker.owner_scope or broker.principal_id, now, now,
+        )
     )
     broker.executors["list_directory"] = lambda _args: pytest.fail(
-        "container assignment fell back to the host handler"
-    )
-    monkeypatch.setattr(
-        broker, "_execution_profile", lambda _name: ProfileResolution(profile)
-    )
-    monkeypatch.setattr(
-        ContainerToolExecutor,
-        "execute",
-        lambda _self, _name, _arguments, _action_id: {
-            "status": "success",
-            "path": ".",
-            "entries": ["README.md"],
-        },
+        "retired container assignment fell back to the host handler"
     )
 
-    result, decision = broker.execute(
+    result, _decision = broker.execute(
         ToolAction(new_id("act_"), "list_directory", {"path": "."}, "medium", False),
         session_id=new_id("sess_"),
         turn_id=new_id("turn_"),
     )
 
-    assert decision.decision == "allow"
-    assert result.status == "success"
-    assert result.output == {"status": "success", "path": ".", "entries": ["README.md"]}
+    assert result.status == "failed"
+    assert result.error == {"type": "container_environment_retired"}
 
 
-def test_unavailable_container_assignment_never_falls_back_to_host(
+def test_unavailable_profile_never_falls_back_to_host(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     broker = _broker(tmp_path)
     broker.executors["grep"] = lambda _args: pytest.fail(
-        "unavailable container assignment fell back to the host handler"
+        "unavailable profile fell back to the host handler"
     )
     monkeypatch.setattr(
         broker,
         "_execution_profile",
-        lambda _name: ProfileResolution(None, "container_runtime_unavailable:podman"),
+        lambda _name: ProfileResolution(None, "native_sandbox_not_enforced"),
     )
 
     result, decision = broker.execute(
@@ -116,7 +100,7 @@ def test_unavailable_container_assignment_never_falls_back_to_host(
 
     assert decision.decision == "allow"
     assert result.status == "failed"
-    assert result.error == {"type": "container_runtime_unavailable:podman"}
+    assert result.error == {"type": "native_sandbox_not_enforced"}
 
 
 def test_broker_denied_action_does_not_execute(tmp_path) -> None:  # type: ignore[no-untyped-def]

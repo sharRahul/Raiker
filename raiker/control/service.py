@@ -54,9 +54,8 @@ _DANGEROUS_CAPS = frozenset({
     "investment_runtime", "medical_runtime", "pregnancy_baby_runtime",
     "cctv_runtime", "home_security_runtime", "plugin_execution_cap",
     "plugin_install", "plugin_revocation_cap", "plugin_runtime_cap",
-    "plugin_sandboxed_runtime_cap", "plugin_sandbox_image_pull_cap",
     "external_channel_runtime", "channel_approval_relay",
-    "remote_execution_cap", "container_execution_cap", "cloud_execution_cap",
+    "remote_execution_cap", "cloud_execution_cap",
     "approval_execution_relay", "scheduled_routines", "graph_indexing_runtime",
     "semantic_memory_runtime", "vector_embedding_runtime", "model_provider_runtime",
     "hosted_model_runtime", "private_network_model_runtime",
@@ -242,14 +241,13 @@ class RuntimeControlService:
             return ""
         if sandbox_available(self._workspace_root):
             return (
-                "This machine has the native sandbox: python, node, npm and npx "
-                "commands run inside it, with no network, unless you choose "
-                "another environment."
+                "The native sandbox probe is available. Governed commands require "
+                "the native sandbox with network disabled; unsupported profiles "
+                "and execution modes are refused."
             )
         return (
-            "This machine has no native sandbox: python, node, npm and npx "
-            "commands run with its network, and each one answers to "
-            "Code with this machine's network."
+            "The native sandbox is unavailable. Governed commands are refused "
+            "until the required boundary can be established."
         )
 
     def _enabled_by_connection(self, capability: str, principal_id: str | None) -> bool:

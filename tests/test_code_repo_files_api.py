@@ -337,6 +337,34 @@ class TestWorkingTreeChanges:
             },
         )
 
+    def test_an_untracked_file_is_in_the_diff(
+        self, client: TestClient, headers: dict[str, str], repo_id: str, workspace: Path
+    ) -> None:
+        root = workspace / "project"
+        self._git(root, "init", "--quiet")
+        (root / "new.txt").write_text("change\n", encoding="utf-8")
+        response = client.get(f"/api/code/repos/{repo_id}/changes", headers=headers)
+        assert response.status_code == 200
+        body = response.json()
+        assert body["entries"]
+        assert "+change" in body["diff"]
+        assert body["reason_code"] is None
+
+    def test_staged_only_tree_displays_diff(
+        self, client: TestClient, headers: dict[str, str], repo_id: str, workspace: Path
+    ) -> None:
+        root = workspace / "project"
+        self._git(root, "init", "--quiet")
+        self._git(root, "add", ".")
+        self._git(root, "commit", "--quiet", "-m", "first")
+        (root / "README.md").write_text("# Alpha\nstaged change\n", encoding="utf-8")
+        self._git(root, "add", "README.md")
+        response = client.get(f"/api/code/repos/{repo_id}/changes", headers=headers)
+        assert response.status_code == 200
+        body = response.json()
+        assert body["reason_code"] is None
+        assert "+staged change" in body["diff"]
+
     def test_a_folder_with_no_history_says_so_rather_than_no_changes(
         self, client: TestClient, headers: dict[str, str], repo_id: str
     ) -> None:

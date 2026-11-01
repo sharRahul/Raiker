@@ -46,6 +46,7 @@
 
   const PLACEMENT: Record<string, string> = {
     sandbox: "Sandbox",
+    unavailable: "Sandbox unavailable",
     host_network: "This computer",
     owner_environment: "Your environment",
     not_code: "This computer",

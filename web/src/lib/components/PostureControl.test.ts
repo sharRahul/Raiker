@@ -14,7 +14,7 @@ import { stubFetch } from "../test-helpers";
 
 const ENVIRONMENTS = {
   environments: [
-    { id: "local", name: "Local strict", kind: "local", selected: true, available: true, runtime: null },
+    { profile_id: "native_sandbox", name: "Local sandbox", kind: "native", selected: true, available: true },
   ],
 };
 
@@ -33,7 +33,7 @@ describe("posture control", () => {
 
     await waitFor(() => {
       expect(
-        screen.getByRole("button", { name: /Local · Asks first/i }),
+        screen.getByRole("button", { name: /Local sandbox · Asks first/i }),
       ).toBeInTheDocument();
     });
   });

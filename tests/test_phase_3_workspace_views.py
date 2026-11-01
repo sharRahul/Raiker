@@ -62,7 +62,7 @@ def test_workspace_view_does_not_mutate_or_activate_unsafe_runtime_paths(tmp_pat
     assert after["capability_gates"]["subagents"]["runtime_enabled"] is True
     assert after["capability_gates"]["multi_agent_teams"]["runtime_enabled"] is True
     assert after["capability_gates"]["remote_execution"]["runtime_enabled"] is False
-    assert after["capability_gates"]["container_execution"]["runtime_enabled"] is False
+    assert "container_execution" not in after["capability_gates"]
     assert all(
         profile["state"] != "enabled_runtime"
         for profile in after["execution_profiles"]

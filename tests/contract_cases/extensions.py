@@ -311,6 +311,37 @@ def _runs(ws: Path, _client: TestClient, _h: dict[str, str]) -> Call:
     return "/api/command-runs"
 
 
+def _task_copy(ws: Path) -> str:
+    from raiker.execution.commands.backends.native import task_workspace_registry
+
+    (ws / "contract-app").mkdir(exist_ok=True)
+    (ws / "contract-app" / "main.py").write_text("v1\n", encoding="utf-8")
+    key, copy = task_workspace_registry(ws).acquire(
+        OWNER, "sess_contract", ws / "contract-app"
+    )
+    (copy.root / "main.py").write_text("v2\n", encoding="utf-8")
+    return key
+
+
+def _task_copies(ws: Path, _client: TestClient, _h: dict[str, str]) -> Call:
+    _task_copy(ws)
+    return "/api/command-workspaces"
+
+
+def _task_copy_diff(ws: Path, _client: TestClient, _h: dict[str, str]) -> Call:
+    return f"/api/command-workspaces/{_task_copy(ws)}/diff?path=main.py"
+
+
+def _task_copy_promoted(ws: Path, _client: TestClient, _h: dict[str, str]) -> Call:
+    return f"/api/command-workspaces/{_task_copy(ws)}/promote", {
+        "created": [], "modified": ["main.py"], "deleted": [],
+    }
+
+
+def _task_copy_discarded(ws: Path, _client: TestClient, _h: dict[str, str]) -> Call:
+    return f"/api/command-workspaces/{_task_copy(ws)}/discard"
+
+
 def _delta(ws: Path) -> None:
     from raiker.execution.commands.service import CommandService
 
@@ -675,6 +706,12 @@ CASES: Cases = {
     ("GET", "/api/command-runs/{run_id}/output"): _run("/output"),
     ("GET", "/api/command-runs/{run_id}/receipt"): _run("/receipt"),
     ("POST", "/api/command-runs/{run_id}/stop"): _run("/stop"),
+    ("GET", "/api/command-egress"): plain("/api/command-egress"),
+    ("PUT", "/api/command-egress"): plain("/api/command-egress", {"enabled": True, "domains": ["pypi.org"]}),
+    ("GET", "/api/command-workspaces"): _task_copies,
+    ("GET", "/api/command-workspaces/{workspace_id}/diff"): _task_copy_diff,
+    ("POST", "/api/command-workspaces/{workspace_id}/promote"): _task_copy_promoted,
+    ("POST", "/api/command-workspaces/{workspace_id}/discard"): _task_copy_discarded,
     ("GET", "/api/credential-deltas"): _deltas,
     ("POST", "/api/credential-deltas/{run_id}/discard"): _delta_discarded,
     ("GET", "/api/code/map"): _after_selection("/api/code/map"),

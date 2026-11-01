@@ -19,24 +19,40 @@ refusal. Silently running the command on the host instead would be worse than
 not offering the sandbox at all, because the receipt would still say it ran in
 one.
 """
+
 from __future__ import annotations
 
+import contextlib
+import dataclasses
 import hashlib
 import json
+import os
 import platform
+import re
+import secrets
 import shutil
 import subprocess
 import sys
-from collections.abc import Callable, Mapping
+import tempfile
+import time
+from collections.abc import Callable, Iterator, Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
 from raiker.contracts.ids import utc_now
 from raiker.execution.commands.backends.base import CommandBackendError
+from raiker.execution.commands.egress_runtime import EgressRun, EgressSink
+from raiker.execution.commands.egress_runtime import load_settings as load_egress_settings
 from raiker.execution.commands.models import CommandFeatures, CommandRequest
 from raiker.execution.commands.process_lifetime import bind_to_runtime_lifetime
 from raiker.execution.commands.runner import CommandSink, MemoryCommandSink, StreamingCommandRunner
+from raiker.execution.commands.supervisor_client import (
+    SupervisorUnavailable,
+    spawn_supervised,
+    supervisor_supported,
+)
+from raiker.execution.workspaces import TaskWorkspaceRegistry, WorkspaceError
 from raiker.runtime.command_policy import (
     ALLOWED_SHELL_COMMANDS,
     CommandRejected,
@@ -49,6 +65,8 @@ from raiker.storage.internal_paths import internal_io_path
 #: the runtime's own encrypted state; a command that could read it could read
 #: every approval, receipt and credential reference Raiker has.
 PROTECTED_DENY_PATHS = (".raiker",)
+_ACCOUNT_BASE_TTL_SECONDS = 30.0
+_ACCOUNT_BASE_CACHE: dict[str, tuple[float, Path | None]] = {}
 
 #: Workspace-relative paths a command may read but never write. `.git` changes
 #: only through the separately governed git executors. The known consequence:
@@ -75,18 +93,33 @@ class NativeSandboxProof:
 
     @property
     def features(self) -> CommandFeatures:
-        """Capabilities derived from measurements, never from configuration."""
+        """Capabilities derived from measurements, never from configuration.
+
+        Background and interactive runs need the whole process tree to stop
+        when the run is stopped or Raiker exits. Bubblewrap measures that
+        (`descendant_reaped`; its PID namespace dies with the runner), and so
+        does the Windows restricted account (a kill-on-close Job Object owns
+        the tree; runs in one copy may overlap, other copies wait). Only
+        Bubblewrap offers a terminal: `CreateProcessWithLogonW` cannot attach
+        a pseudo-console. macOS cannot yet contain a detached descendant.
+        """
+        tree_stop = self.observations.get("descendant_reaped") == ENFORCED
+        terminal = tree_stop and self.boundary == "bubblewrap"
+        background = tree_stop and self.boundary in {"bubblewrap", "restricted_account"}
+        # A background run outlives a restart where a detached supervisor runs
+        # it (POSIX); with downloads on it stays in-process and is still lost.
+        recovery = background and supervisor_supported()
         return CommandFeatures(
             shell=False,
-            pty=False,
-            background=False,
-            input=False,
-            process_tree_stop=self.observations.get("descendant_reaped") == ENFORCED,
+            pty=terminal,
+            background=background,
+            input=terminal,
+            process_tree_stop=tree_stop,
             network_escalation=False,
             filtered_network=False,
             persistent_environment=False,
             persistent=False,
-            restart_recovery=False,
+            restart_recovery=recovery,
             recoverable=False,
             concurrent_runs=False,
             credential_delivery=False,
@@ -147,10 +180,13 @@ class NativeSandboxDriver:
         if not manifest.is_file():
             return None, "native_sandbox_runner_digest_missing"
         try:
-            recorded = json.loads(manifest.read_text(encoding="utf-8")).get("sha256")
+            document = json.loads(manifest.read_text(encoding="utf-8"))
+            if not isinstance(document, dict) or not isinstance(document.get("sha256"), str):
+                return None, "native_sandbox_runner_digest_missing"
+            recorded = document["sha256"]
+            actual = hashlib.sha256(binary.read_bytes()).hexdigest()
         except (OSError, ValueError):
             return None, "native_sandbox_runner_digest_missing"
-        actual = hashlib.sha256(binary.read_bytes()).hexdigest()
         if recorded != actual:
             return None, "native_sandbox_runner_digest_mismatch"
         return binary, None
@@ -159,8 +195,17 @@ class NativeSandboxDriver:
 
     @staticmethod
     def _default_probe_runner(argv: list[str]) -> subprocess.CompletedProcess[str]:
+        # The probe is trusted infrastructure, but it launches a sandboxed
+        # child. Do not pass host credentials or loader injection variables to
+        # either process. Home/profile paths are needed for outside controls.
+        allowed = (
+            "PATH", "HOME", "USERPROFILE", "LOCALAPPDATA", "SYSTEMROOT", "WINDIR",
+            "TMP", "TEMP", "TMPDIR", "LANG", "LC_ALL",
+        )
+        environment = {name: os.environ[name] for name in allowed if name in os.environ}
         return subprocess.run(  # noqa: S603 - argv is built from a verified binary path
             argv,
+            env=environment,
             capture_output=True,
             text=True,
             timeout=180,
@@ -173,31 +218,67 @@ class NativeSandboxDriver:
         if binary is None:
             return NativeSandboxProof(False, reason, "none", checked_at)
         try:
-            completed = self._run_probe(
-                [str(binary), "--probe", "--workspace", str(self.workspace_root)]
-            )
-        except (OSError, subprocess.SubprocessError):
+            # Windows probing grants ACLs and modifies protected DACLs. Probe a
+            # private temporary directory and its own runner copy, never the
+            # owner's project or the application's installation directory.
+            with tempfile.TemporaryDirectory(prefix="raiker-native-probe-") as temporary:
+                scratch = Path(temporary)
+                isolated_binary = scratch / binary.name
+                shutil.copy2(binary, isolated_binary)
+                recorded = json.loads(
+                    (self.helper_root / "digest.json").read_text(encoding="utf-8")
+                )["sha256"]
+                if hashlib.sha256(isolated_binary.read_bytes()).hexdigest() != recorded:
+                    raise OSError("native_sandbox_runner_digest_mismatch")
+                try:
+                    completed = self._run_probe(
+                        [str(isolated_binary), "--probe", "--workspace", str(scratch)]
+                    )
+                finally:
+                    if sys.platform == "win32":
+                        cleanup = self._run_probe(
+                            [str(isolated_binary), "--revoke-grant", "--workspace", str(scratch)]
+                        )
+                        if cleanup.returncode != 0:
+                            raise OSError("native_sandbox_probe_cleanup_failed")
+        except (OSError, ValueError, KeyError, TypeError, subprocess.SubprocessError):
             return NativeSandboxProof(False, "native_sandbox_probe_failed", "none", checked_at)
         try:
             report = json.loads(completed.stdout.strip() or "{}")
         except ValueError:
             return NativeSandboxProof(False, "native_sandbox_probe_failed", "none", checked_at)
+        if (
+            completed.returncode != 0
+            or not isinstance(report, dict)
+            or not isinstance(report.get("available"), bool)
+            or not isinstance(report.get("observations"), dict)
+        ):
+            return NativeSandboxProof(False, "native_sandbox_probe_failed", "none", checked_at)
         observations = {
             str(key): str(value) for key, value in dict(report.get("observations", {})).items()
         }
         available = bool(report.get("available"))
-        # The headline row is egress. A host whose firewall service is stopped
-        # measures `unenforced`; a host with no route measures `indeterminate`.
-        # Neither is a sandbox, so neither is offered as one.
-        if observations.get("egress") != ENFORCED:
-            available = False
+        # A headline success cannot substitute for any mandatory observation.
+        # An indeterminate control arm is not evidence of enforcement.
+        required: tuple[str, ...] = (
+            "relay",
+            "workspace_write",
+            "escape_write",
+            "masked_read",
+            "egress",
+            "descendant_reaped",
+        )
+        if sys.platform.startswith("linux") or report.get("platform") == "linux":
+            required += ("seccomp",)
+        # Availability is decided here, from the measurements alone. The
+        # runner's own headline is always false: it cannot know that the
+        # backend runs every command in a disposable task copy, which is what
+        # keeps the owner's project out of reach. Every mandatory observation
+        # must be enforced; an indeterminate control arm is not evidence.
+        available = all(observations.get(name) == ENFORCED for name in required)
         return NativeSandboxProof(
             available=available,
-            reason_code=(
-                str(report.get("reason"))
-                if report.get("reason")
-                else (None if available else "native_sandbox_not_enforced")
-            ),
+            reason_code=None if available else "native_sandbox_not_enforced",
             boundary=str(report.get("boundary") or "none"),
             checked_at=checked_at,
             observations=observations,
@@ -220,8 +301,9 @@ class NativeSandboxDriver:
             "deny_paths": list(PROTECTED_DENY_PATHS),
             "readonly_paths": list(PROTECTED_READONLY_PATHS),
             "network": "none",
-            "pty": False,
+            "pty": request.interactive,
             "deadline_seconds": max(1, int(request.timeout_seconds) + 5),
+            "max_cpu_seconds": max(1, int(request.timeout_seconds) + 5),
             "max_processes": 64,
             "max_memory_bytes": 2 * 1024 * 1024 * 1024,
         }
@@ -238,11 +320,36 @@ class NativeSandboxDriver:
         return f"raiker.cmd.{digest}"
 
     def policy_path(self, request: CommandRequest) -> Path:
-        directory = internal_io_path(
-            request.workspace_root / ".raiker" / "command-policies"
-        )
+        directory = internal_io_path(request.workspace_root / ".raiker" / "command-policies")
         directory.mkdir(parents=True, exist_ok=True)
         return directory / f"{request.run_id}.json"
+
+    def account_base(self) -> Path | None:
+        """The restricted-account copy base, when the owner has set it up (Windows)."""
+        if sys.platform != "win32":
+            return None
+        binary, _ = self.locate()
+        if binary is None:
+            return None
+        # Every turn and every file action asks; the answer changes only when
+        # the owner runs the elevated setup, so a short-lived answer is enough.
+        cached = _ACCOUNT_BASE_CACHE.get(str(binary))
+        if cached is not None and time.monotonic() - cached[0] < _ACCOUNT_BASE_TTL_SECONDS:
+            return cached[1]
+        base = self._account_base_uncached(binary)
+        _ACCOUNT_BASE_CACHE[str(binary)] = (time.monotonic(), base)
+        return base
+
+    def _account_base_uncached(self, binary: Path) -> Path | None:
+        try:
+            completed = self._run_probe([str(binary), "--account-status"])
+            status = json.loads(completed.stdout.strip() or "{}")
+        except (OSError, ValueError, subprocess.SubprocessError):
+            return None
+        if completed.returncode != 0 or status.get("configured") is not True:
+            return None
+        base = status.get("base")
+        return Path(base) if isinstance(base, str) and base else None
 
     def revoke_workspace_grant(self) -> None:
         """Remove the workspace grant.
@@ -275,10 +382,14 @@ class NativeSandboxBackend:
         *,
         driver: NativeSandboxDriver,
         proof: NativeSandboxProof,
+        workspaces: TaskWorkspaceRegistry | None = None,
         runner: Callable[..., Any] | None = None,
     ) -> None:
         self.driver = driver
         self.proof = proof
+        # Without a registry there is no disposable copy, and the command would
+        # write to the owner's project: refuse rather than run there.
+        self.workspaces = workspaces
         self.features = proof.features
         self._runner = runner or StreamingCommandRunner().start
 
@@ -287,14 +398,18 @@ class NativeSandboxBackend:
             raise CommandBackendError(self.proof.reason_code or "native_sandbox_unavailable")
         if request.shell:
             raise CommandBackendError("native_sandbox_shell_source_denied")
-        if request.background:
+        if request.background and not self.features.background:
             raise CommandBackendError("selected_environment_background_unsupported")
-        if request.interactive:
+        if request.interactive and not self.features.pty:
             raise CommandBackendError("selected_environment_pty_unsupported")
         if request.network_policy_id:
             raise CommandBackendError("filtered_egress_windows_unsupported")
         if request.credential_bindings:
             raise CommandBackendError("selected_environment_credential_unsupported")
+        if self.workspaces is None:
+            raise CommandBackendError("native_disposable_workspace_required")
+        original = request
+        request = self._in_task_copy(request)
 
         # The argv policy is applied here *and* the boundary is applied by the
         # runner. Two independent checks of the same rule is deliberate: neither
@@ -312,12 +427,13 @@ class NativeSandboxBackend:
         if binary is None:
             raise CommandBackendError(reason or "native_sandbox_artifact_missing")
 
-        policy_path = self.driver.policy_path(request)
-        policy_path.write_text(
-            json.dumps(self.driver.policy_document(request), indent=2), encoding="utf-8"
-        )
         environment = sandbox_environment(workspace_root=request.workspace_root)
-        executable = shutil.which(request.argv_template[0], path=environment.get("PATH"))
+        executable = command_executable(
+            request.argv_template[0],
+            cwd=request.workspace_root / request.cwd,
+            search_path=environment.get("PATH", ""),
+            project=original.workspace_root,
+        )
         if executable is None:
             # `portable_command`'s Windows shim rewrites `echo` and `cat` into
             # the interpreter Raiker itself runs on. That is right for the host
@@ -327,6 +443,18 @@ class NativeSandboxBackend:
             # program to run inside a sandbox, and saying so is the honest
             # answer.
             raise CommandBackendError("native_sandbox_executable_unreachable")
+        document = self.driver.policy_document(request)
+        document["toolchain_paths"] = toolchain_mounts(executable, request.workspace_root)
+        egress = self._egress_for(original)
+        sink = sink or MemoryCommandSink()
+        if egress is not None:
+            document.update(egress.policy_fields)
+            environment.update(egress.environment)
+            sink = EgressSink(sink, egress)
+        # The policy is Raiker state: it is written beside the original
+        # workspace's own state, never into the copy the command can touch.
+        policy_path = self.driver.policy_path(original)
+        policy_path.write_text(json.dumps(document, indent=2), encoding="utf-8")
         argv = [
             str(binary),
             "--policy",
@@ -335,19 +463,87 @@ class NativeSandboxBackend:
             executable,
             *request.argv_template[1:],
         ]
-        process = self._runner(
-            request,
-            argv,
-            request.workspace_root,
-            environment,
-            sink or MemoryCommandSink(),
-            pty=False,
-        )
+        # BUG-194 — a background run goes into a detached supervisor where the
+        # platform has one, so a restart of Raiker reattaches to it instead of
+        # reconciling it to `lost`. The supervisor runs the runner, so the
+        # boundary is the same one. A run with downloads on stays in-process:
+        # its proxy lives in Raiker and would not survive the restart either.
+        if request.background and egress is None and supervisor_supported():
+            try:
+                return spawn_supervised(
+                    workspace_root=original.workspace_root,
+                    run_id=request.run_id,
+                    argv=argv,
+                    cwd=request.workspace_root,
+                    environment=environment,
+                    sink=sink,
+                    deadline_seconds=request.timeout_seconds,
+                    max_output_bytes=request.max_output_bytes,
+                    pty=request.interactive,
+                )
+            except SupervisorUnavailable as exc:
+                raise CommandBackendError(exc.reason_code) from None
+        try:
+            process = self._runner(
+                request,
+                argv,
+                request.workspace_root,
+                environment,
+                sink,
+                pty=request.interactive,
+            )
+        except BaseException:
+            if egress is not None:
+                egress.close()
+            raise
         # The runner must not outlive Raiker. On Windows the kernel reaps it
         # through a job the runtime owns; on Linux the runner sets a parent-death
         # signal itself.
         bind_to_runtime_lifetime(getattr(getattr(process, "process", None), "pid", None))
         return process
+
+    def _egress_for(self, request: CommandRequest) -> EgressRun | None:
+        """This run's allow-listed download proxy, when the owner turned it on.
+
+        Only where the boundary can make the proxy the single route: on Windows
+        that is the restricted account (an AppContainer cannot reach loopback
+        without an elevated exemption), so without it the run keeps no network
+        rather than failing.
+        """
+        settings = load_egress_settings(request.workspace_root)
+        if not settings.enabled:
+            return None
+        if sys.platform == "win32" and self.driver.account_base() is None:
+            return None
+        return EgressRun(request.run_id, request.owner_principal_id, settings).start(
+            request.timeout_seconds + 5
+        )
+
+    def _in_task_copy(self, request: CommandRequest) -> CommandRequest:
+        """The same request, rooted in this session's disposable copy.
+
+        The copy is the session's task tree: the project root a project turn
+        bound, which the agent's file edits use too, so a command sees every
+        edit made before it. Without a binding it holds only the command's
+        working directory. Its parent folders, siblings, `.git` and `.raiker`
+        are not in it at all.
+        """
+        assert self.workspaces is not None
+        root = request.workspace_root.resolve()
+        cwd = (root / request.cwd).resolve()
+        if cwd != root and root not in cwd.parents:
+            raise CommandBackendError("command_cwd_outside_workspace")
+        owner, session = request.owner_principal_id, request.session_id
+        try:
+            _, workspace = self.workspaces.acquire(
+                owner, session, self.workspaces.scope_for(owner, session, cwd)
+            )
+        except WorkspaceError as exc:
+            raise CommandBackendError(exc.reason_code) from None
+        inside = cwd.relative_to(workspace.source.resolve()).as_posix() or "."
+        if not (workspace.root / inside).is_dir():
+            raise CommandBackendError("command_cwd_not_a_directory")
+        return dataclasses.replace(request, workspace_root=workspace.root, cwd=inside)
 
     def isolation_evidence(self, request: CommandRequest) -> dict[str, Any]:
         """What this run's boundary actually was, separate from host readiness.
@@ -364,6 +560,7 @@ class NativeSandboxBackend:
             "deny_paths": list(PROTECTED_DENY_PATHS),
             "readonly_paths": list(PROTECTED_READONLY_PATHS),
             "runner_digest": _runner_digest(self.driver),
+            "workspace": "disposable_task_copy",
         }
         return evidence
 
@@ -380,3 +577,246 @@ def native_sandbox_supported() -> bool:
     if sys.platform in {"win32", "darwin"}:
         return True
     return shutil.which("bwrap") is not None
+
+
+def task_workspace_registry(
+    workspace_root: str | Path, driver: NativeSandboxDriver | None = None
+) -> TaskWorkspaceRegistry:
+    """The registry commands and the review API share.
+
+    On Windows with the restricted account set up, copies live under its base
+    (the only place that account may write); records stay in Raiker's state.
+    """
+    base = (driver or NativeSandboxDriver(workspace_root)).account_base()
+    return TaskWorkspaceRegistry.for_workspace(workspace_root, base=base)
+
+
+
+# ── One-shot sandboxed programs (command hooks) ──────────────────────────────
+
+#: Hooks fire on every tool call. Probing the host each time would cost more
+#: than most hooks take, so a hook reuses a measurement this recent; commands
+#: keep probing per run, because their receipts state what was measured.
+_HOOK_PROOF_TTL_SECONDS = 30.0
+def command_executable(name: str, *, cwd: Path, search_path: str, project: Path) -> str | None:
+    """The program a sandboxed command names, as the sandbox will find it.
+
+    A name with a separator is the copy's own (`.venv/bin/python`), so it is
+    looked up from the command's folder in the copy, not from Raiker's. A bare
+    name is the first on the path the sandbox can reach: never in the project
+    or the owner's home, and on Windows only on the system drive.
+    """
+    from raiker.execution.commands.sandboxed_program import sandbox_interpreter
+
+    if "/" in name or "\\" in name:
+        candidate = cwd / name
+        for option in (candidate, candidate.with_name(candidate.name + ".exe")):
+            if option.is_file():
+                return str(option)
+        return None
+    try:
+        return str(sandbox_interpreter(name, search_path, project.resolve()))
+    except FileNotFoundError:
+        return None
+
+
+#: Interpreters whose install prefix is mounted read-only when it lives
+#: outside `/usr`: a hosted runner's Python, a pyenv or nvm install. Nothing
+#: else is: a tool's prefix in the owner's home can hold its credentials
+#: (`~/.cargo/credentials.toml`), so it needs a governed mount of its own.
+TOOLCHAIN_INTERPRETERS = frozenset({"python", "python3", "pip", "pip3", "node", "npm", "npx"})
+
+
+#: An interpreter's own file name, versioned or not (`python3.12`, `node`).
+_INTERPRETER_NAME = re.compile(r"(python|pip|node|npm|npx)(\d+(\.\d+)*)?")
+
+#: Never mounted, whatever links point there: every user's home, not only the
+#: owner's, and root's.
+_HOME_ROOTS = (Path("/home"), Path("/root"))
+
+
+def toolchain_mounts(executable: str | Path, workspace_root: Path) -> list[str]:
+    """Install prefixes the Linux boundary must mount for *executable* to run.
+
+    `/usr` is always mounted, so an interpreter there needs nothing. One in
+    `/usr/local`, `/opt` or another system folder needs its prefix (the folder
+    above its `bin`), read-only, both as found on the path and after resolving
+    links. Both names must be an interpreter's, and no prefix is ever in a
+    home folder, holding the project, or inside it.
+
+    The link is the reason for the last rules: a command can make a link in
+    its own copy (`.venv/bin/python` to `~/notes/bin/python`), and the prefix
+    of its target would otherwise be mounted into the very sandbox that keeps
+    the owner's home out of reach.
+    """
+    if not sys.platform.startswith("linux"):
+        return []
+    path = Path(executable)
+    if path.name not in TOOLCHAIN_INTERPRETERS:
+        return []
+    homes = (Path.home().resolve(), *_HOME_ROOTS)
+    root = workspace_root.resolve()
+    usr, local = Path("/usr"), Path("/usr/local")
+    mounts: list[str] = []
+    for candidate in (path.absolute(), path.resolve()):
+        if candidate.parent.name != "bin" or not _INTERPRETER_NAME.fullmatch(candidate.name):
+            continue
+        prefix = candidate.parent.parent
+        if root == prefix or root in prefix.parents:
+            continue  # the copy's own, already in the sandbox
+        if prefix in root.parents:
+            return []  # would hold the project
+        if prefix == usr or (usr in prefix.parents and local not in (prefix, *prefix.parents)):
+            continue
+        if len(prefix.parts) < 3 or any(
+            prefix == home or home in prefix.parents or prefix in home.parents for home in homes
+        ):
+            return []  # a home folder, or something holding one: never mounted
+        if str(prefix) not in mounts:
+            mounts.append(str(prefix))
+    return mounts
+
+
+_HOOK_PROOFS: dict[str, tuple[float, NativeSandboxProof]] = {}
+
+
+def _recent_proof(driver: NativeSandboxDriver, workspace_root: Path) -> NativeSandboxProof:
+    key = str(workspace_root)
+    cached = _HOOK_PROOFS.get(key)
+    if cached is not None and time.monotonic() - cached[0] < _HOOK_PROOF_TTL_SECONDS:
+        return cached[1]
+    proof = driver.probe()
+    _HOOK_PROOFS[key] = (time.monotonic(), proof)
+    return proof
+
+
+class ScratchRun:
+    """A throwaway folder under the copy base, and the runner argv for it.
+
+    The caller fills :attr:`folder` with what the program may see, then asks
+    for :meth:`command`. Nothing else of the project is in reach, and there is
+    no network. The folder and its policy are removed when the context ends.
+    """
+
+    def __init__(self, root: Path, binary: Path, folder: Path, label: str, memory_bytes: int,
+                 timeout_seconds: float) -> None:
+        self.folder = folder
+        self._root = root
+        self._binary = binary
+        self._label = label
+        self._memory_bytes = memory_bytes
+        self._deadline = max(1, int(timeout_seconds) + 5)
+        self._policies: list[Path] = []
+
+    def command(
+        self,
+        argv: list[str],
+        *,
+        cwd: Path | None = None,
+        read_only: tuple[Path, ...] = (),
+        max_processes: int = 64,
+    ) -> list[str]:
+        """Write this run's policy and return the runner argv for *argv*.
+
+        *read_only* folders outside the copy are mounted read-only (Linux), for
+        a caller that must hand the program large inputs it may not change.
+        """
+        directory = (cwd or self.folder).resolve()
+        if directory != self.folder.resolve() and self.folder.resolve() not in directory.parents:
+            raise CommandBackendError("sandbox_cwd_outside_folder")
+        document = {
+            "workspace_root": str(self.folder),
+            "cwd": str(directory),
+            "profile_name": f"raiker.{self._label}.{hashlib.sha256(self.folder.name.encode()).hexdigest()[:16]}",
+            "deny_paths": list(PROTECTED_DENY_PATHS),
+            "readonly_paths": list(PROTECTED_READONLY_PATHS),
+            "network": "none",
+            "pty": False,
+            "deadline_seconds": self._deadline,
+            "max_cpu_seconds": self._deadline,
+            "max_processes": max_processes,
+            "max_memory_bytes": self._memory_bytes,
+            "toolchain_paths": [
+                *(toolchain_mounts(argv[0], self.folder) if argv else []),
+                *(str(path) for path in read_only),
+            ],
+        }
+        policies = internal_io_path(self._root / ".raiker" / "command-policies")
+        policies.mkdir(parents=True, exist_ok=True)
+        policy_path = policies / f"{self.folder.name}-{len(self._policies)}.json"
+        policy_path.write_text(json.dumps(document), encoding="utf-8")
+        self._policies.append(policy_path)
+        return [str(self._binary), "--policy", str(policy_path), "--", *argv]
+
+    def environment(self, extra: Mapping[str, str] | None = None) -> dict[str, str]:
+        """The constructed environment, with HOME and the work folder in here."""
+        return sandbox_environment(workspace_root=self.folder, extra=dict(extra or {}))
+
+    def close(self) -> None:
+        for policy in self._policies:
+            with contextlib.suppress(OSError):
+                policy.unlink()
+        shutil.rmtree(self.folder, ignore_errors=True)
+
+
+@contextlib.contextmanager
+def scratch_run(
+    workspace_root: str | Path,
+    label: str,
+    *,
+    timeout_seconds: float,
+    memory_bytes: int = 512 * 1024 * 1024,
+) -> Iterator[ScratchRun]:
+    """A :class:`ScratchRun` for one sandboxed program, removed afterwards.
+
+    Raises :class:`CommandBackendError` when the host's boundary is not
+    enforced, so the caller refuses rather than run the program on the host.
+    """
+    root = Path(workspace_root).resolve()
+    driver = NativeSandboxDriver(root)
+    proof = _recent_proof(driver, root)
+    if not proof.available:
+        raise CommandBackendError(proof.reason_code or "native_sandbox_unavailable")
+    binary, reason = driver.locate()
+    if binary is None:
+        raise CommandBackendError(reason or "native_sandbox_artifact_missing")
+    base = driver.account_base() or task_workspace_registry(root, driver).base
+    base.mkdir(parents=True, exist_ok=True)
+    folder = base / f"{label}_{secrets.token_hex(8)}"
+    folder.mkdir()
+    run = ScratchRun(root, binary, folder, label, memory_bytes, timeout_seconds)
+    try:
+        yield run
+    finally:
+        run.close()
+
+
+def run_sandboxed_program(
+    workspace_root: str | Path,
+    program: Path,
+    args: list[str],
+    *,
+    stdin: str,
+    timeout_seconds: float,
+) -> subprocess.CompletedProcess[str]:
+    """Run one workspace program in the native boundary, fed *stdin*.
+
+    The program is copied alone into a throwaway folder under the copy base and
+    runs there with no network: it sees the event it was handed and itself,
+    never the project or Raiker's state. The folder is removed afterwards.
+    Raises :class:`CommandBackendError` when the host's boundary is not
+    enforced, so a hook is refused rather than run on the host.
+    """
+    with scratch_run(workspace_root, "hook", timeout_seconds=timeout_seconds) as run:
+        copied = run.folder / program.name
+        shutil.copyfile(program, copied)
+        copied.chmod(0o755)
+        return subprocess.run(
+            run.command([str(copied), *args]),
+            input=stdin,
+            capture_output=True,
+            text=True,
+            env=run.environment(),
+            timeout=timeout_seconds,
+            check=False,
+        )

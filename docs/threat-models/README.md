@@ -29,7 +29,6 @@ acknowledging.
 | `git_write_execution` | [Git writes](git-write.md) |
 | `git_push_execution` | [Git push](git-push.md) |
 | `git_fetch_execution` | [Git fetch and clone](git-fetch.md) |
-| `container_execution_cap` | [Local container execution](container.md) |
 | `remote_execution_cap`, `cloud_execution_cap` | [Remote / cloud execution](remote-cloud.md) |
 | `scheduled_routines` | [Scheduled routines](scheduled-routines.md) |
 | `subagents`, `multi_agent_teams` | [Subagents and multi-agent teams](subagents.md) |
@@ -76,8 +75,6 @@ Raiker reaches the internet": [Web read](web-fetch.md).
 | `plugin_install` | [Plugin install](plugins.md) |
 | `plugin_execution_cap` | [Plugin execution](plugin-execution.md) |
 | `plugin_runtime_cap` | [Plugin code runtime](plugin-runtime.md) |
-| `plugin_sandboxed_runtime_cap` | [Sandboxed plugin code runtime](plugin-sandboxed-runtime.md) |
-| `plugin_sandbox_image_pull_cap` | [Sandboxed plugin image pull](plugin-sandbox-image-pull.md) |
 | `plugin_revocation_cap` | [Plugin revocation](plugin-revocation.md) |
 | `mcp_builder_runtime` | [Local MCP builder](mcp-builder.md) |
 | `mcp_connector_runtime` | [Local MCP connector](mcp-connector.md) |

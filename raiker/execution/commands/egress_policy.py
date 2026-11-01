@@ -68,12 +68,20 @@ class EgressPolicy:
         object.__setattr__(self, "domains", normalized)
         object.__setattr__(self, "ports", ports)
 
-    def permits(self, host: str, port: int, addresses: Iterable[str]) -> tuple[str, ...]:
+    def permits_name(self, host: str, port: int) -> None:
+        """Refuse an unlisted host or port *before* anything resolves it.
+
+        Resolving first would turn the proxy into a DNS relay: a sandboxed
+        command could encode data in names it never meant to reach.
+        """
         normalized_host = normalize_domain(host)
         if int(port) not in self.ports or not any(
             domain_matches(rule, normalized_host) for rule in self.domains
         ):
             raise ValueError("egress_destination_denied")
+
+    def permits(self, host: str, port: int, addresses: Iterable[str]) -> tuple[str, ...]:
+        self.permits_name(host, port)
         selected = tuple(sorted({public_address(value) for value in addresses}))
         if not selected:
             raise ValueError("egress_dns_answer_empty")

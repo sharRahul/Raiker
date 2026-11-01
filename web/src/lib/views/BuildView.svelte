@@ -55,6 +55,7 @@
   import { retryConfirmation, retryConsequence } from "../conversationCommands";
   import TurnEvidence from "../components/TurnEvidence.svelte";
   import RewindPanel from "../components/RewindPanel.svelte";
+  import TaskWorkspaceReview from "../components/TaskWorkspaceReview.svelte";
   import ExportConversationDialog from "../components/ExportConversationDialog.svelte";
   import DiffView from "../components/DiffView.svelte";
   import SourceChips from "../components/SourceChips.svelte";
@@ -307,6 +308,8 @@
   let promptSelectionEnd = $state(0);
   let turns = $state<BuildTurn[]>([]);
   let streaming = $state(false);
+  // Bumped when a turn ends, so the sandbox review rereads the task copy.
+  let sandboxRefresh = $state(0);
   // B17/C13 — whether the owner has already asked this turn to stop.
   let stopping = $state(false);
   let sessionId = $state<string | null>(null);
@@ -1594,6 +1597,7 @@
     } finally {
       turn.streaming = false;
       streaming = false;
+      sandboxRefresh += 1;
       // BUG-24 — see ChatView: a turn is only genuinely parked once its stream
       // ends, so that is where it asks whether a decision already exists.
       if (turn.response?.status === "needs_approval") resumeWatcher?.checkNow();
@@ -1708,6 +1712,7 @@
     } finally {
       turn.streaming = false;
       streaming = false;
+      sandboxRefresh += 1;
       // An accepted change is applied by the continuation, not by the turn
       // that proposed it, so this is the moment the working tree moved. Without
       // it Changes — and its patch review — kept showing the tree from before
@@ -2515,6 +2520,8 @@
     {#if compactRail}
       <CommandOutputPane {sessionId} {visible} bind:open={commandPaneOpen} />
     {/if}
+
+    <TaskWorkspaceReview {sessionId} refresh={sandboxRefresh} />
 
     <div class="composer-status">
         <!-- COMPOSER-12 — governance appears when it changes what the next

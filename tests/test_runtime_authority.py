@@ -1105,7 +1105,7 @@ def test_dangerous_capabilities_remain_disabled_by_default(authority: RuntimeAut
         assert cap in REAL_EXECUTOR_CAPABILITIES
         assert authority.get_effective_capability_gate(cap)["state"] == "enabled_runtime"
     # Integrated dangerous capabilities ship enabled (governed by default-ask + env allowlists).
-    for cap in ("shell_execution", "process_execution", "web_fetch", "container_execution_cap"):
+    for cap in ("shell_execution", "process_execution", "web_fetch"):
         assert cap in REAL_EXECUTOR_CAPABILITIES
         gate = authority.get_effective_capability_gate(cap)
         assert gate["state"] == "enabled_runtime", f"{cap} should be enabled, got {gate['state']}"

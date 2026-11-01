@@ -76,6 +76,20 @@ def test_every_test_file_lands_in_exactly_one_shard() -> None:
     assert all(bucket for bucket in shards(3))
 
 
+def test_execution_jobs_provision_native_runner_before_testing() -> None:
+    for job, test_step in (
+        ("python-tests", "Run tests"),
+        ("build-faults", "Kill the host mid-check and read the outcome"),
+    ):
+        steps = _workflow()["jobs"][job]["steps"]
+        names = [step["name"] for step in steps]
+        assert names.index("Install native sandbox prerequisites") < names.index(test_step)
+        assert names.index("Build native runner") < names.index(test_step)
+        runs = {step["name"]: step.get("run", "") for step in steps}
+        assert "bwrap-userns-restrict" in runs["Install native sandbox prerequisites"]
+        assert "scripts/build_native_runner.py" in runs["Build native runner"]
+
+
 def test_a_dependency_with_a_known_vulnerability_fails_ci() -> None:
     """CR-12 — both ecosystems are audited on every change that could ship."""
     job = _workflow()["jobs"]["supply-chain"]

@@ -1033,3 +1033,39 @@ test("composer context is concise and detailed usage is available on demand", as
   await page.keyboard.press("Escape");
   await expect(trigger).toBeFocused();
 });
+
+test("the local sandbox card shows each measured control and the downloads allow-list", async ({ page }) => {
+  // Registered after the shared fixture, so these two answers win.
+  await page.route("http://127.0.0.1:8765/api/execution-environments", (route) =>
+    route.fulfill({
+      json: {
+        selected_profile_id: "native_sandbox",
+        environments: [{
+          profile_id: "native_sandbox", kind: "native", name: "Local sandbox", enabled: true,
+          configured: true, available: true, status: "ready", selected: true,
+          credential_configured: false, budget: null, cost: null, selected_for_commands: true,
+          assigned_tools: [], features: { background: true, pty: true, restart_recovery: true },
+          probe_checked_at: "2026-11-01T00:00:00Z", availability_reason: null, boundary: "bubblewrap",
+          probe_observations: {
+            relay: "enforced", workspace_write: "enforced", escape_write: "enforced",
+            masked_read: "enforced", egress: "enforced", descendant_reaped: "enforced",
+            seccomp: "indeterminate",
+          },
+          runner_trust: "package_relative_integrity",
+        }],
+      },
+    }),
+  );
+  await page.route("http://127.0.0.1:8765/api/command-egress", (route) =>
+    route.fulfill({ json: { enabled: false, domains: ["pypi.org"], defaults: ["pypi.org"] } }),
+  );
+  await page.goto("http://127.0.0.1:8765/#/settings?tab=advanced&kind=runtime");
+  const card = page.getByRole("article").filter({ hasText: "Local sandbox" });
+  await card.getByText("Details").click();
+  const observations = card.locator("ul.observations li");
+  await expect(observations).toHaveCount(7);
+  // A control arm that failed is "not proven", never a softer pass.
+  await expect(observations.filter({ hasText: "Forbidden system calls are refused" })).toContainText("Not proven");
+  await expect(observations.filter({ hasText: "Cannot reach the network" })).toContainText("Enforced");
+  await expect(page.getByText("Command downloads", { exact: false }).first()).toBeVisible();
+});

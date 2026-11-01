@@ -21,13 +21,13 @@ from raiker.contracts.streaming import TOOL, StreamEvent
 from raiker.events.types import make_event
 from raiker.events.writer import EventLogWriter
 from raiker.execution.commands.service import CommandService, CommandServiceError
-from raiker.execution.container_tools import ContainerToolExecutor
 from raiker.execution.profiles import (
+    CONTAINER_ENVIRONMENT_RETIRED,
     ExecutionProfile,
     ProfileResolution,
-    execution_profiles_from_rows,
     list_execution_profiles,
     resolve_tool_profile,
+    retired_container_tools,
 )
 from raiker.goals.store import session_memory_withheld
 from raiker.hooks.contracts import HookInput, HookOutcome
@@ -223,6 +223,7 @@ class ToolBroker:
                 self.workspace_root,
                 str(args.get("pattern", "*")),
                 max_results=int(args.get("max_results", 100)),
+                authority=self.path_authority,
             ),
             "grep": lambda args: grep(
                 self.workspace_root,
@@ -233,6 +234,7 @@ class ToolBroker:
                 regex=args.get("regex") is True,
                 ignore_case=args.get("ignore_case") is True,
                 context=_bounded_int(args.get("context"), 0, 0, 5),
+                authority=self.path_authority,
             ),
             "stat_path": lambda args: stat_path(
                 self.workspace_root, str(args.get("path", ".")), authority=self.path_authority
@@ -265,10 +267,15 @@ class ToolBroker:
                 self.workspace_root,
                 str(args.get("before_path", ".")),
                 str(args.get("after_path", ".")),
+                authority=self.path_authority,
             ),
-            "git_status": lambda args: run_git(self.git_root(), "status", ["--short"]),
-            "git_diff": lambda args: run_git(
-                self.git_root(), "diff", list(args.get("args", []))
+            "git_status": lambda args: self._with_copy_changes(
+                run_git(self.git_root(), "status", ["--short"]), None, with_diffs=False
+            ),
+            "git_diff": lambda args: self._with_copy_changes(
+                run_git(self.git_root(), "diff", list(args.get("args", []))),
+                list(args.get("args", [])),
+                with_diffs=True,
             ),
             "git_log": lambda args: run_git(
                 self.git_root(), "log", ["--oneline", "-n", str(args.get("limit", 10))]
@@ -711,7 +718,13 @@ class ToolBroker:
             resolved = resolve_workspace_path(root, text)
         except Exception:  # noqa: BLE001 — every refusal reads the same to the model
             return ".", "command_cwd_outside_workspace"
-        if not resolved.is_dir():
+        tree = getattr(self.path_authority, "tree", None)
+        try:
+            # A folder the task created exists only in its copy.
+            present = tree.to_copy(resolved, create=False) if tree is not None else resolved
+        except FilesystemSafetyError:
+            return ".", "command_cwd_not_a_directory"
+        if not present.is_dir():
             return ".", "command_cwd_not_a_directory"
         try:
             relative = resolved.relative_to(root).as_posix()
@@ -906,17 +919,16 @@ class ToolBroker:
         }
 
     def _execution_profiles(self) -> list[ExecutionProfile]:
-        profiles = list_execution_profiles()
-        if self.store is None:
-            return profiles
-        rows = self.store.list_remote_execution_profiles(
-            enabled_only=True,
-            owner_principal_id=self.owner_scope or self.principal_id,
-        )
-        profiles.extend(execution_profiles_from_rows(rows))
-        return profiles
+        return list_execution_profiles()
 
     def _execution_profile(self, tool_name: str) -> ProfileResolution:
+        if self.store is not None and tool_name in retired_container_tools(
+            self.store.list_remote_execution_profiles(
+                enabled_only=True,
+                owner_principal_id=self.owner_scope or self.principal_id,
+            )
+        ):
+            return ProfileResolution(None, CONTAINER_ENVIRONMENT_RETIRED)
         return resolve_tool_profile(tool_name, self._execution_profiles())
 
     def _assign_session_project(self, args: dict[str, Any], context: ToolExecutionContext) -> dict[str, Any]:
@@ -1219,6 +1231,34 @@ class ToolBroker:
             context={"status": failed.status},
         )
         return failed, decision
+
+    def _with_copy_changes(
+        self, result: dict[str, Any], args: list[str] | None, *, with_diffs: bool
+    ) -> dict[str, Any]:
+        """Git's answer plus the session's copy, whose edits Git cannot see.
+
+        The repository on disk is the project; this session's edits are in its
+        disposable copy until the owner applies them, so a status or diff that
+        left them out would show the agent none of its own work.
+        """
+        from raiker.execution.task_tree import pending_copy_changes  # noqa: PLC0415
+
+        paths: list[str] | None = None
+        if args and "--" in args:
+            paths = [item for item in args[args.index("--") + 1:] if item]
+        try:
+            pending = pending_copy_changes(self.path_authority, paths=paths, with_diffs=with_diffs)
+        except Exception:  # noqa: BLE001 - Git's answer stands without the copy's half
+            return result
+        if pending and isinstance(result, dict):
+            return {
+                **result,
+                "task_copy": {
+                    "note": "Edits in this session's sandbox copy, not yet applied to the project.",
+                    "changes": pending,
+                },
+            }
+        return result
 
     def _git_credential_method(self) -> str | None:
         """BUG-334 — the owner's selected push credential's method, asked of the broker.
@@ -2409,13 +2449,6 @@ class ToolBroker:
                 "status": "failed",
                 "error": {"type": profile_resolution.reason_code},
             }
-        elif (
-            profile_resolution.profile is not None
-            and profile_resolution.profile.kind == "container"
-        ):
-            raw = ContainerToolExecutor(
-                self.workspace_root, profile_resolution.profile
-            ).execute(action.tool_name, action.arguments, action.action_id)
         elif executor is None and context_executor is None and is_mcp_tool(action.tool_name):
             raw = self._mcp_call(action)
         elif executor is None and context_executor is None:

@@ -143,7 +143,7 @@ _LINUX = SigningIdentity(
 TARGETS: tuple[ReleaseTarget, ...] = (
     # The design allows ".dmg or .pkg"; the pipeline builds ".pkg", which is the
     # one of the two that installs rather than only presenting a folder.
-    ReleaseTarget("macos-arm64", "macos", "arm64", "macos-14", (".pkg",), _APPLE),
+    ReleaseTarget("macos-arm64", "macos", "arm64", "macos-15", (".pkg",), _APPLE),
     ReleaseTarget(
         "windows-x86_64", "windows", "x86_64", "windows-2022", (".msi",), _AUTHENTICODE
     ),

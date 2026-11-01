@@ -672,12 +672,9 @@ No plugin code runs in your browser.
 Each plugin's card also says, under **Code**, where its own code would run on
 this machine, if you allowed it to run at all:
 
-- **not enabled** — it is not on your plugin runtime allowlist, so none runs;
-- **in a container with no network** — the plugin container is set up
-  (`RAIKER_PLUGIN_RUNTIME_IMAGE`, on your image allowlist, and `docker` present),
-  and that is where it would run;
-- **with this machine's network** — no plugin container is set up here, so it
-  would run as a bounded process on this machine.
+- **not enabled** — plugin code does not run yet. The container runtime was
+  removed with Docker, and plugin code will run only once the native sandbox
+  can host it.
 
 Allowing a plugin's code names *which bytes* as well as which plugin:
 `RAIKER_PLUGIN_RUNTIME_DIGESTS` takes `<plugin_id>:<sha256>` entries, and the

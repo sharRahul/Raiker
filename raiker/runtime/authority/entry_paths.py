@@ -191,14 +191,6 @@ _ENTRIES: tuple[CapabilityEntry, ...] = (
         "the retrieval path reads and the one the Memory page shows.",
     ),
     _elsewhere(
-        "container_execution_cap",
-        "Running a tool inside a container is chosen by enabling a container "
-        "execution profile, and every tool call inside it is still brokered "
-        "under that tool's own gate. Configuring the profile is the owner's "
-        "act of authorisation; a second switch in front of it would be a wall "
-        "in front of a choice they already made.",
-    ),
-    _elsewhere(
         "plugin_execution_cap",
         "A plugin's brokered tool call runs through the ordinary tool broker "
         "against the plugin's validated read-only set, so each call answers to "
@@ -215,16 +207,6 @@ _ENTRIES: tuple[CapabilityEntry, ...] = (
         "plugin_runtime_cap",
         "Running an installed plugin's entrypoint has no owner surface. The "
         "executor exists and nothing invokes it.",
-    ),
-    _no_path(
-        "plugin_sandboxed_runtime_cap",
-        "The container-isolated plugin runtime has no owner surface. The "
-        "executor exists and nothing invokes it.",
-    ),
-    _no_path(
-        "plugin_sandbox_image_pull_cap",
-        "Pulling a sandbox image has no owner surface, because nothing runs a "
-        "sandboxed plugin yet.",
     ),
     _no_path(
         "plugin_revocation_cap",

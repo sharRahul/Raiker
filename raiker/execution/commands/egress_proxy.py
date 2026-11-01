@@ -59,6 +59,14 @@ class EgressProxyController:
             self._policies[run_id] = policy
             self._sockets[run_id] = set()
 
+    def check_name(self, run_id: str, host: str, port: int) -> None:
+        """The allow-list decision that must come before any DNS lookup."""
+        with self._lock:
+            if self._states.get(run_id) != "active":
+                raise ValueError("egress_grant_not_active")
+            policy = self._policies[run_id]
+        policy.permits_name(host, port)
+
     def authorize(
         self, run_id: str, host: str, port: int, addresses: tuple[str, ...]
     ) -> EgressVerdict:
@@ -154,6 +162,7 @@ class _ProxyHandler(socketserver.StreamRequestHandler):
             if method.upper() != "CONNECT":
                 raise ValueError("egress_proxy_connect_required")
             host, port = _parse_authority(target)
+            self.server.controller.check_name(run_id, host, port)  # type: ignore[attr-defined]
             addresses = _resolve_public(host, port)
             verdict = self.server.controller.authorize(  # type: ignore[attr-defined]
                 run_id, host, port, addresses

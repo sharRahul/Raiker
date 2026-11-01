@@ -118,3 +118,67 @@ class CredentialDeltaList(TypedDict):
 class CredentialDeltaDiscarded(TypedDict):
     ok: bool
     receipt: dict[str, Any] | None
+
+
+class TaskWorkspaceRejection(TypedDict):
+    path: str
+    reason: str
+
+
+class TaskWorkspaceView(TypedDict):
+    """A session's disposable copy and what its commands changed in it.
+
+    Paths are relative to the copied folder (``source``, itself relative to the
+    Raiker workspace). Nothing here has reached the project until promoted.
+    """
+
+    workspace_id: str
+    session_id: str
+    source: str
+    created_at: float
+    created: list[str]
+    modified: list[str]
+    deleted: list[str]
+    #: Produced by the task but never promotable: links, special files, `.git`.
+    rejected: list[TaskWorkspaceRejection]
+
+
+class TaskWorkspaceList(TypedDict):
+    workspaces: list[TaskWorkspaceView]
+
+
+class TaskWorkspaceFileDiff(TypedDict):
+    """One changed file of a copy, as a unified diff against the project.
+
+    ``binary`` is true when either side is not text, and then ``diff`` is
+    empty; ``truncated`` says the diff was cut at its size bound.
+    """
+
+    workspace_id: str
+    path: str
+    status: Literal["created", "modified", "deleted"]
+    diff: str
+    binary: bool
+    truncated: bool
+
+
+class TaskWorkspacePromoted(TypedDict):
+    ok: bool
+    workspace_id: str
+    created: list[str]
+    modified: list[str]
+    deleted: list[str]
+
+
+class TaskWorkspaceDiscarded(TypedDict):
+    ok: bool
+    workspace_id: str
+
+
+class CommandEgressView(TypedDict):
+    """The owner's allow-list for sandboxed command downloads."""
+
+    enabled: bool
+    domains: list[str]
+    #: The package registries Raiker suggests, for "restore defaults".
+    defaults: list[str]

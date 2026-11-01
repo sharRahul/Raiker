@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import fnmatch
 import os
-import subprocess
 import urllib.request
 from collections.abc import Sequence
 from pathlib import Path
@@ -10,9 +9,6 @@ from typing import Any
 
 from raiker.runtime.command_policy import (
     ALLOWED_SHELL_COMMANDS as _ALLOWED_SHELL_COMMANDS,
-)
-from raiker.runtime.command_policy import (
-    portable_command,
 )
 
 ALLOWED_SHELL_COMMANDS = _ALLOWED_SHELL_COMMANDS
@@ -132,41 +128,49 @@ def run_command(
     env: dict[str, str] | None = None,
     stdin_text: str | None = None,
 ) -> dict[str, Any]:
-    if allowlist is not None:
-        check_command_allowlist(command, allowlist, workspace_root=cwd)
-    # A child gets a constructed environment, never the host's. Inheriting it
-    # would hand every command every credential the host holds — including the
-    # git token this runtime lends for exactly one command at a time.
-    from raiker.runtime.command_policy import sandbox_environment
+    """Run an interpreter on a workspace script inside the native boundary.
 
-    child_env = sandbox_environment(workspace_root=cwd or Path.cwd(), extra=env)
-    launch_command = portable_command(command)
+    The script's folder is copied into a throwaway folder and runs there with
+    no network (:mod:`raiker.execution.commands.sandboxed_program`); a host
+    whose boundary is not enforced refuses with ``native_sandbox_required``
+    and nothing runs on the host. *env* names the variables granted beyond the
+    sandbox's constructed environment.
+    """
+    from raiker.execution.commands.backends.base import CommandBackendError
+    from raiker.execution.commands.sandboxed_program import ProgramRefused, run_bounded
+
+    root = Path(cwd).resolve() if cwd else Path.cwd().resolve()
+    if allowlist is not None:
+        check_command_allowlist(command, allowlist, workspace_root=root)
+    grant = {"PATH": os.environ.get("PATH", ""), **(env or {})}
     try:
-        proc = subprocess.run(
-            launch_command,
-            capture_output=True,
-            text=False,
+        run = run_bounded(
+            list(command),
+            (stdin_text or "").encode("utf-8"),
+            workspace=root,
+            env=grant,
             timeout=timeout,
-            cwd=cwd,
-            env=child_env,
-            input=stdin_text.encode("utf-8") if stdin_text is not None else None,
+            max_stdout=max_output_bytes,
+            stderr_tail=max_output_bytes,
+            label="plugin",
         )
-    except subprocess.TimeoutExpired:
-        raise SandboxError(f"command_timeout:{timeout}s") from None
+    except CommandBackendError:
+        raise SandboxError("native_sandbox_required") from None
+    except ProgramRefused as refused:
+        raise SandboxError(refused.reason_code) from None
     except FileNotFoundError:
         raise SandboxError(f"command_not_found:{command[0]}") from None
     except OSError as exc:
-        raise SandboxError(f"command_failed:{exc}") from None
-
-    stdout_len = len(proc.stdout)
-    stderr_len = len(proc.stderr)
+        raise SandboxError(f"command_failed:{type(exc).__name__}") from None
+    if run.timed_out:
+        raise SandboxError(f"command_timeout:{timeout}s")
     return {
-        "returncode": proc.returncode,
-        "stdout_bytes": stdout_len,
-        "stderr_bytes": stderr_len,
-        "stdout": proc.stdout[:max_output_bytes].decode("utf-8", errors="replace"),
-        "stderr": proc.stderr[:max_output_bytes].decode("utf-8", errors="replace"),
-        "truncated": stdout_len > max_output_bytes or stderr_len > max_output_bytes,
+        "returncode": run.returncode if run.returncode is not None else 1,
+        "stdout_bytes": len(run.stdout),
+        "stderr_bytes": run.stderr_bytes,
+        "stdout": run.stdout.decode("utf-8", errors="replace"),
+        "stderr": run.stderr_tail.decode("utf-8", errors="replace"),
+        "truncated": run.overflowed or run.stderr_bytes > max_output_bytes,
     }
 
 

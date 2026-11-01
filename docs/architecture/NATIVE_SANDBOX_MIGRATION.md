@@ -106,12 +106,12 @@ implementation could launch an external driver. Other Git subprocess paths and
 workspace command hooks still require a complete execution-boundary audit; this
 change does not classify them as safe.
 
-Workspace command hooks are blocked with `native_sandbox_required` until the
-broker supports sandboxed stdio. An enforcing hook that cannot run continues to
-require an owner decision, as verified by `tests/test_hook_fail_closed.py`.
-Restoring hook execution requires bounded stdio and lifecycle containment; this
-is a release blocker and the previous host-execution integration tests remain
-unmet. HTTP and built-in hooks retain their separate behavior.
+Workspace command hooks run in the native sandbox (2026-11-01): the script is
+copied alone into a throwaway folder under the copy base and run there with the
+event on stdin and no network (`run_sandboxed_program`). Without an enforced
+boundary they still refuse with `native_sandbox_required`, and an enforcing hook
+that cannot run requires an owner decision (`tests/test_hook_fail_closed.py`).
+HTTP and built-in hooks retain their separate behavior.
 
 The sanitized command environment now prevents a workspace `.gitconfig` from
 being used as Git global configuration, even if an extra environment requests

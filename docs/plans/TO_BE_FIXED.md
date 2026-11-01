@@ -130,22 +130,13 @@ to the host. What still blocks release, by component:
 | macOS memory and process-tree limits | XNU does not enforce `RLIMIT_AS`; `RLIMIT_NPROC` is per user; detached descendants are not contained | `bound_child`, probe `descendant_reaped` | Probe reports descendant `indeterminate` on macOS | Measured process-tree ownership (e.g. per-run uid or kqueue tracking) or keep macOS unavailable | Yes |
 | Network mediation | Allow-listed downloads exist (off by default) on Linux and on Windows' restricted account; remaining gaps limit where they hold | `egress_runtime.py`, `egress_bridge_linux.rs`, `macos_profile`, `account_windows.rs` | Measured end-to-end on WSL2 Ubuntu 24.04 and Windows 11 (see `NATIVE_SANDBOX_MIGRATION.md`) | macOS Seatbelt rule is unmeasured (needs a macOS run); Windows loopback is unfiltered, so the account can reach any local service, not only the proxy (WFP filter); an AppContainer-only Windows host keeps runs offline; the run credential can appear in a tool's own error output until the run ends; HTTP (non-TLS) and non-443 ports are not offered | Yes |
 | Background, interactive and PTY execution | Available on Linux (Bubblewrap with measured descendant reaping); refused on Windows and macOS | `NativeSandboxProof.features` | Windows: `selected_environment_background_unsupported` / `_pty_unsupported`; macOS likewise | Windows: the restricted account's grant covers one copy at a time (a long run would hold every other command) and `CreateProcessWithLogonW` cannot attach a ConPTY: needs per-copy concurrency and a pseudo-console broker. macOS: process-tree ownership first (item 6). Restart reattachment is not offered on any platform: the runner dies with Raiker | Yes |
-| Plugin code, local MCP stdio, command hooks | Unavailable rather than unsandboxed | `tier4_plugins.py`, `mcp.py`, `hooks/handlers/command.py` | Refuse with `native_sandbox_required` | Bidirectional stdio through the broker | Yes |
+| Plugin code, local MCP stdio | Unavailable rather than unsandboxed | `tier4_plugins.py`, `mcp.py` | Refuse with `native_sandbox_required` | Long-lived bidirectional stdio through the broker (Linux can now supervise one; Windows needs per-copy account concurrency). Command hooks now run sandboxed; hosts without an enforced boundary still refuse them | Yes |
 | Model conversion | Unavailable | `raiker/models/conversion.py` | `model_conversion_native_toolchain_required` | Package llama.cpp converter/quantizer and run them in the native sandbox | No (feature unavailable, safe) |
 | WSL2 backend | Not implemented | — | — | Implement as a separately verified Bubblewrap+seccomp backend inside WSL2 with interop, `/mnt` and host-network restrictions. (MXC was evaluated and rejected: its README disclaims being a security boundary.) | No for native-Windows path |
 | Runner publisher signing | Package-relative SHA-256 is integrity, not authenticity | `scripts/build_native_runner.py` | `runner_trust: package_relative_integrity` | Platform code signing with release credentials | Yes |
 
 The full inventory and checklist are in
 `docs/architecture/NATIVE_SANDBOX_MIGRATION.md`.
-
-## Release blocker: sandboxed command hooks unavailable
-
-Workspace command hooks cannot safely use the legacy host subprocess launcher.
-They now refuse with `native_sandbox_required`; an enforcing hook that cannot
-run requires an owner decision. This prevents unsandboxed hook code but leaves
-command-hook functionality unavailable. Integrate the native broker with
-bounded bidirectional stdio and process-tree cleanup, then verify legitimate
-hook decisions and adversarial escape attempts on each supported platform.
 
 ## Goal
 

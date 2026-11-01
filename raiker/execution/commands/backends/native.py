@@ -22,11 +22,13 @@ one.
 
 from __future__ import annotations
 
+import contextlib
 import dataclasses
 import hashlib
 import json
 import os
 import platform
+import secrets
 import shutil
 import subprocess
 import sys
@@ -552,3 +554,90 @@ def task_workspace_registry(
     base = (driver or NativeSandboxDriver(workspace_root)).account_base()
     return TaskWorkspaceRegistry.for_workspace(workspace_root, base=base)
 
+
+
+# ── One-shot sandboxed programs (command hooks) ──────────────────────────────
+
+#: Hooks fire on every tool call. Probing the host each time would cost more
+#: than most hooks take, so a hook reuses a measurement this recent; commands
+#: keep probing per run, because their receipts state what was measured.
+_HOOK_PROOF_TTL_SECONDS = 30.0
+_HOOK_PROOFS: dict[str, tuple[float, NativeSandboxProof]] = {}
+
+
+def _recent_proof(driver: NativeSandboxDriver, workspace_root: Path) -> NativeSandboxProof:
+    key = str(workspace_root)
+    cached = _HOOK_PROOFS.get(key)
+    if cached is not None and time.monotonic() - cached[0] < _HOOK_PROOF_TTL_SECONDS:
+        return cached[1]
+    proof = driver.probe()
+    _HOOK_PROOFS[key] = (time.monotonic(), proof)
+    return proof
+
+
+def run_sandboxed_program(
+    workspace_root: str | Path,
+    program: Path,
+    args: list[str],
+    *,
+    stdin: str,
+    timeout_seconds: float,
+) -> subprocess.CompletedProcess[str]:
+    """Run one workspace program in the native boundary, fed *stdin*.
+
+    The program is copied alone into a throwaway folder under the copy base and
+    runs there with no network: it sees the event it was handed and itself,
+    never the project or Raiker's state. The folder is removed afterwards.
+    Raises :class:`CommandBackendError` when the host's boundary is not
+    enforced, so a hook is refused rather than run on the host.
+    """
+    root = Path(workspace_root).resolve()
+    driver = NativeSandboxDriver(root)
+    proof = _recent_proof(driver, root)
+    if not proof.available:
+        raise CommandBackendError(proof.reason_code or "native_sandbox_unavailable")
+    binary, reason = driver.locate()
+    if binary is None:
+        raise CommandBackendError(reason or "native_sandbox_artifact_missing")
+    base = driver.account_base() or task_workspace_registry(root, driver).base
+    base.mkdir(parents=True, exist_ok=True)
+    run_id = f"hook_{secrets.token_hex(8)}"
+    folder = base / run_id
+    folder.mkdir()
+    try:
+        copied = folder / program.name
+        shutil.copyfile(program, copied)
+        copied.chmod(0o755)
+        deadline = max(1, int(timeout_seconds) + 5)
+        document = {
+            "workspace_root": str(folder),
+            "cwd": str(folder),
+            "profile_name": f"raiker.hook.{hashlib.sha256(run_id.encode()).hexdigest()[:16]}",
+            "deny_paths": list(PROTECTED_DENY_PATHS),
+            "readonly_paths": list(PROTECTED_READONLY_PATHS),
+            "network": "none",
+            "pty": False,
+            "deadline_seconds": deadline,
+            "max_cpu_seconds": deadline,
+            "max_processes": 64,
+            "max_memory_bytes": 512 * 1024 * 1024,
+        }
+        policies = internal_io_path(root / ".raiker" / "command-policies")
+        policies.mkdir(parents=True, exist_ok=True)
+        policy_path = policies / f"{run_id}.json"
+        policy_path.write_text(json.dumps(document), encoding="utf-8")
+        try:
+            return subprocess.run(
+                [str(binary), "--policy", str(policy_path), "--", str(copied), *args],
+                input=stdin,
+                capture_output=True,
+                text=True,
+                env=sandbox_environment(workspace_root=folder),
+                timeout=timeout_seconds,
+                check=False,
+            )
+        finally:
+            with contextlib.suppress(OSError):
+                policy_path.unlink()
+    finally:
+        shutil.rmtree(folder, ignore_errors=True)

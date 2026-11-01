@@ -1,5 +1,17 @@
 # Fixed items
 
+## Command hooks were refused everywhere
+
+Workspace command hooks refused with `native_sandbox_required` because the only
+launcher ran them on the host. A hook's script now runs alone in a throwaway
+folder in the native sandbox, with the event on its stdin and no network: it
+can decide from the event but cannot read or change the project, Raiker's
+state or anything else. A host without an enforced boundary still refuses the
+hook, and an enforcing hook that cannot run still needs the owner's decision.
+Hooks reuse a probe at most 30 seconds old, because they fire on every tool
+call. Measured on Windows 11: a real hook could not see a file in the project
+and its decision came back. Covered by `tests/test_command_hook_isolation.py`.
+
 ## Sandboxed commands could not run in the background or with a terminal (Linux)
 
 On Linux, where the probe measures descendant reaping inside Bubblewrap,

@@ -961,12 +961,19 @@ fn measure_in(scratch: &Path, nonce: &str, account: &Account) -> Result<Value, S
     if let Some(home) = user_home(unsafe { libc::getuid() }) {
         outside_paths.push(home.join(format!(".{nonce}-escape.tmp")));
     }
+    // A listener on this host's own outward address answers the outside arm
+    // on any network; held open until both arms have run.
+    let listener = local_listener();
+    let connect_address = listener
+        .as_ref()
+        .map(|(_, address)| address.clone())
+        .unwrap_or_else(probe_destination);
     let test = SelfTest {
         nonce: nonce.to_owned(),
         inside_path: scratch.join(format!(".{nonce}-inside.tmp")),
         outside_paths,
         masked_read_path: masked.clone(),
-        connect_address: probe_destination(),
+        connect_address,
         spawn_grandchild: true,
         hold_for_probe: false,
     };
@@ -987,6 +994,7 @@ fn measure_in(scratch: &Path, nonce: &str, account: &Account) -> Result<Value, S
     ];
     // Through the real launch path, stdout captured.
     let output = launch_captured(&parsed, &policy, &argv)?;
+    drop(listener);
     selftest::remove_probe_writes(&test);
     let inside: Value = String::from_utf8_lossy(&output)
         .lines()

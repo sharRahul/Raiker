@@ -278,7 +278,7 @@ Windows `AF_UNIX` proxy socket is not reachable from a WSL2 namespace. The
 restricted-account boundary already runs Windows toolchains, so this is an
 addition for Linux toolchains, not a gap in containment.
 
-## macOS sandbox account (2026-11-01, implemented; CI evidence pending)
+## macOS sandbox account (2026-11-01, implemented; measured on macOS 15 CI)
 
 Built as designed above, with `sudo` in place of a privileged helper. A
 helper (`SMAppService`/`SMJobBless`) must be Developer ID signed, which would
@@ -326,6 +326,16 @@ covers identity, copy isolation, grant removal, a double-forked `setsid`
 descendant and the memory limit (with a control arm under a larger limit). CI's
 macOS jobs run the setup and require these tests, so the release gate's macOS
 check now covers them.
+
+**Measured on hosted `macos-15` (PR #240, commit `707caac`):** the command
+ran as `_raikersandbox`; another session's copy was unreadable and the copy's
+grant was gone after the run; a double-forked `setsid` descendant did not
+outlive its run; 600 MB completed under a 2 GB limit and was stopped under
+256 MB. The probe measured relay, workspace write, escape write, masked read
+and `descendant_reaped` enforced. Egress read `indeterminate` only because
+the control arm aimed at a gateway address the runner does not answer; the
+probe now uses a listener on the host's own outward address on macOS too,
+as on Linux.
 
 Not yet: background runs and terminals on macOS (the account serves one run at
 a time; a small pool of accounts would let runs overlap); Seatbelt's downloads

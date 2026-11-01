@@ -362,6 +362,11 @@ EVENT_TYPES = {
     "task_workspace_promoted",
     "task_workspace_discarded",
     "command_egress_changed",
+    # Windows: which boundary sandboxed commands use (account or WSL2).
+    "command_sandbox_backend_changed",
+    # Raiker's WSL2 distribution was imported and configured, or removed.
+    "command_sandbox_wsl_setup",
+    "command_sandbox_wsl_removed",
     # BR-D04 — a connected model read an exact patch, or its stored reading of
     # the same patch was returned. Provider, model, fingerprint and counts only.
     "patch_model_review_completed",

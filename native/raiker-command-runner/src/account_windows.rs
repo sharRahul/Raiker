@@ -599,14 +599,37 @@ fn revoke_other_copies(base: &Path, root: &Path, account: PSID) -> Result<(), St
         if path == root || !entry.file_type().is_ok_and(|kind| kind.is_dir()) {
             continue;
         }
-        if has_explicit_ace(&path, account, ACE_TYPE_ALLOWED)? {
-            set_entry(&path, account, 0, REVOKE_ACCESS, false)?;
-            if has_explicit_ace(&path, account, ACE_TYPE_ALLOWED)? {
-                return Err("native_sandbox_account_stale_grant".into());
+        // A copy can be discarded while this runs (another session's, or
+        // another test's on CI). A folder that is gone holds no grant, so its
+        // failed ACL read is skipped; one that still exists fails closed.
+        let granted = match has_explicit_ace(&path, account, ACE_TYPE_ALLOWED) {
+            Ok(granted) => granted,
+            Err(_) if vanished(&path) => continue,
+            Err(error) => return Err(error),
+        };
+        if granted {
+            if let Err(error) = set_entry(&path, account, 0, REVOKE_ACCESS, false) {
+                if vanished(&path) {
+                    continue;
+                }
+                return Err(error);
+            }
+            match has_explicit_ace(&path, account, ACE_TYPE_ALLOWED) {
+                Ok(false) => {}
+                Err(_) if vanished(&path) => {}
+                _ => return Err("native_sandbox_account_stale_grant".into()),
             }
         }
     }
     Ok(())
+}
+
+/// Whether a copy folder no longer exists (it was discarded meanwhile).
+fn vanished(path: &Path) -> bool {
+    matches!(
+        fs::symlink_metadata(path),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound
+    )
 }
 
 /// An exclusively opened lock file. No other process can open it until this

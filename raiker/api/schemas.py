@@ -1237,6 +1237,18 @@ class CommandEgressRequest(StrictRequest):
     domains: list[str] = Field(default_factory=list, max_length=200)
 
 
+class CommandSandboxRequest(StrictRequest):
+    """Which boundary sandboxed commands use on Windows."""
+
+    windows_backend: Literal["account", "wsl"]
+
+
+class WslSetupRequest(StrictRequest):
+    """The root filesystem tarball to import as Raiker's WSL2 distribution."""
+
+    rootfs_path: str = Field(min_length=1, max_length=1024)
+
+
 class PromoteTaskWorkspaceRequest(StrictRequest):
     """The exact change set the owner reviewed.
 

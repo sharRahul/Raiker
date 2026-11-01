@@ -175,6 +175,22 @@ class TaskWorkspaceDiscarded(TypedDict):
     workspace_id: str
 
 
+class CommandSandboxView(TypedDict):
+    """Which boundary sandboxed commands use, and whether WSL2 is ready."""
+
+    #: "account" (Windows toolchains) or "wsl" (Linux toolchains in WSL2).
+    windows_backend: str
+    #: Whether this host is Windows, where the choice applies.
+    applies: bool
+    #: Raiker's WSL2 distribution is set up and its Linux runner installed.
+    wsl_configured: bool
+    #: What is missing when it is not, in the runner's own words.
+    wsl_missing: list[str]
+    #: The setup command for this install, with the bundled Linux runner's
+    #: path; None when this install carries no Linux runner.
+    wsl_setup_command: str | None
+
+
 class CommandEgressView(TypedDict):
     """The owner's allow-list for sandboxed command downloads."""
 

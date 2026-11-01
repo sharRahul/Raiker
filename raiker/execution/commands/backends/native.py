@@ -66,6 +66,29 @@ from raiker.storage.internal_paths import internal_io_path
 #: every approval, receipt and credential reference Raiker has.
 PROTECTED_DENY_PATHS = (".raiker",)
 _ACCOUNT_BASE_TTL_SECONDS = 30.0
+#: The boundary the runner reports for Raiker's WSL2 distribution.
+WSL_BOUNDARY = "wsl_bubblewrap"
+
+
+#: Importing the distribution and installing Bubblewrap in it.
+WSL_SETUP_TIMEOUT_SECONDS = 900
+
+
+def _runner_error(stderr: str) -> str | None:
+    """The reason code the runner names on stderr, if any."""
+    for line in reversed(stderr.splitlines()):
+        try:
+            value = json.loads(line)
+        except ValueError:
+            continue
+        if isinstance(value, dict) and isinstance(value.get("raiker_runner_error"), str):
+            return str(value["raiker_runner_error"])[:120]
+    return None
+
+
+def _on_windows() -> bool:
+    """One place the driver asks; tests stand in a Windows host here."""
+    return sys.platform == "win32"
 _ACCOUNT_BASE_CACHE: dict[str, tuple[float, Path | None]] = {}
 
 #: Workspace-relative paths a command may read but never write. `.git` changes
@@ -101,7 +124,11 @@ class NativeSandboxProof:
         does the Windows restricted account (a kill-on-close Job Object owns
         the tree; runs in one copy may overlap, other copies wait). Only
         Bubblewrap offers a terminal: `CreateProcessWithLogonW` cannot attach
-        a pseudo-console. macOS cannot yet contain a detached descendant.
+        a pseudo-console. On macOS the sandbox account owns every process a
+        run starts, so the run's tree stops with it (`macos_account`); plain
+        Seatbelt cannot contain a detached descendant. Background runs stay
+        off there for now: the account serves one run at a time, so a
+        background run would hold every other command.
         """
         tree_stop = self.observations.get("descendant_reaped") == ENFORCED
         terminal = tree_stop and self.boundary == "bubblewrap"
@@ -150,8 +177,10 @@ class NativeSandboxDriver:
         *,
         helper_root: Path | None = None,
         run_probe: Callable[[list[str]], subprocess.CompletedProcess[str]] | None = None,
+        run_setup: Callable[[list[str]], subprocess.CompletedProcess[str]] | None = None,
     ) -> None:
         self.workspace_root = Path(workspace_root).resolve()
+        self._run_setup = run_setup or run_probe or self._default_setup_runner
         self.helper_root = (
             Path(helper_root).resolve()
             if helper_root is not None
@@ -212,8 +241,84 @@ class NativeSandboxDriver:
             check=False,
         )
 
-    def probe(self) -> NativeSandboxProof:
+    @staticmethod
+    def _default_setup_runner(argv: list[str]) -> subprocess.CompletedProcess[str]:
+        # Importing a distribution and installing Bubblewrap in it can take
+        # minutes; the probe's three-minute limit is too short for it.
+        allowed = (
+            "PATH", "HOME", "USERPROFILE", "LOCALAPPDATA", "SYSTEMROOT", "WINDIR",
+            "TMP", "TEMP", "LANG", "LC_ALL",
+        )
+        environment = {name: os.environ[name] for name in allowed if name in os.environ}
+        return subprocess.run(  # noqa: S603 - argv is built from a verified binary path
+            argv,
+            env=environment,
+            capture_output=True,
+            text=True,
+            timeout=WSL_SETUP_TIMEOUT_SECONDS,
+            check=False,
+        )
+
+    def setup_wsl(self, rootfs: Path) -> tuple[bool, str]:
+        """Import and configure Raiker's distribution with the bundled runner.
+
+        Returns ``(True, "")`` or ``(False, reason)``. No elevation: WSL
+        distributions belong to the user. The root filesystem must be a
+        tarball the owner chose; Raiker never exports one of theirs.
+        """
+        if not _on_windows():
+            return False, "native_sandbox_wsl_unavailable"
+        binary, reason = self.locate()
+        if binary is None:
+            return False, reason or "native_sandbox_artifact_missing"
+        linux_runner = self.wsl_runner()
+        if linux_runner is None:
+            return False, "native_sandbox_wsl_runner_missing"
+        if not rootfs.is_file() or not rootfs.name.lower().endswith((".tar", ".tar.gz", ".tgz")):
+            return False, "native_sandbox_wsl_rootfs_invalid"
+        argv = [str(binary), "--setup-wsl", "--linux-runner", str(linux_runner), "--rootfs", str(rootfs)]
+        return self._setup_outcome(argv)
+
+    def reset_wsl(self) -> tuple[bool, str]:
+        """Unregister Raiker's distribution, and every copy inside it."""
+        if not _on_windows():
+            return False, "native_sandbox_wsl_unavailable"
+        binary, reason = self.locate()
+        if binary is None:
+            return False, reason or "native_sandbox_artifact_missing"
+        return self._setup_outcome([str(binary), "--reset-wsl"])
+
+    def _setup_outcome(self, argv: list[str]) -> tuple[bool, str]:
+        try:
+            completed = self._run_setup(argv)
+        except subprocess.TimeoutExpired:
+            return False, "native_sandbox_wsl_setup_timed_out"
+        except (OSError, subprocess.SubprocessError):
+            return False, "native_sandbox_wsl_setup_failed"
+        # Status answers are cached briefly; this one just changed.
+        for key in [key for key in _ACCOUNT_BASE_CACHE if key.startswith("wsl:")]:
+            del _ACCOUNT_BASE_CACHE[key]
+        if completed.returncode == 0:
+            return True, ""
+        return False, _runner_error(completed.stderr) or "native_sandbox_wsl_setup_failed"
+
+    def uses_wsl(self) -> bool:
+        """Whether the owner chose WSL2 for commands (Windows only)."""
+        if not _on_windows():
+            return False
+        from raiker.execution.commands.sandbox_backend import load_windows_backend  # noqa: PLC0415
+
+        return load_windows_backend(self.workspace_root) == "wsl"
+
+    def probe(self, *, for_programs: bool = False) -> NativeSandboxProof:
+        """Measure the boundary commands run in.
+
+        With WSL2 chosen, commands run in Raiker's distribution, so that is
+        what is measured. Hooks, MCP servers and plugin code run Windows
+        interpreters and stay on the account: ``for_programs`` measures that.
+        """
         checked_at = utc_now()
+        boundary_flag = ["--boundary", "wsl"] if self.uses_wsl() and not for_programs else []
         binary, reason = self.locate()
         if binary is None:
             return NativeSandboxProof(False, reason, "none", checked_at)
@@ -232,7 +337,7 @@ class NativeSandboxDriver:
                     raise OSError("native_sandbox_runner_digest_mismatch")
                 try:
                     completed = self._run_probe(
-                        [str(isolated_binary), "--probe", "--workspace", str(scratch)]
+                        [str(isolated_binary), "--probe", "--workspace", str(scratch), *boundary_flag]
                     )
                 finally:
                     if sys.platform == "win32":
@@ -270,6 +375,10 @@ class NativeSandboxDriver:
         )
         if sys.platform.startswith("linux") or report.get("platform") == "linux":
             required += ("seccomp",)
+        if report.get("boundary") == "wsl_bubblewrap":
+            # The Linux boundary, plus the one thing WSL adds: nothing in the
+            # distribution may start a Windows program.
+            required += ("seccomp", "windows_interop")
         # Availability is decided here, from the measurements alone. The
         # runner's own headline is always false: it cannot know that the
         # backend runs every command in a disposable task copy, which is what
@@ -325,8 +434,14 @@ class NativeSandboxDriver:
         return directory / f"{request.run_id}.json"
 
     def account_base(self) -> Path | None:
-        """The restricted-account copy base, when the owner has set it up (Windows)."""
-        if sys.platform != "win32":
+        """The sandbox account's copy base, when the owner has set it up.
+
+        Windows: the restricted account (`C:\\RaikerSandbox`). macOS: the
+        `_raikersandbox` account (`/Library/RaikerSandbox/copies`), whose
+        ownership of every process a run starts is what stops detached
+        descendants there.
+        """
+        if not (_on_windows() or sys.platform == "darwin"):
             return None
         binary, _ = self.locate()
         if binary is None:
@@ -339,6 +454,71 @@ class NativeSandboxDriver:
         base = self._account_base_uncached(binary)
         _ACCOUNT_BASE_CACHE[str(binary)] = (time.monotonic(), base)
         return base
+
+    def wsl_base(self) -> Path | None:
+        """The copy base inside Raiker's WSL distribution, once it is set up."""
+        if not _on_windows():
+            return None
+        binary, _ = self.locate()
+        if binary is None:
+            return None
+        key = f"wsl:{binary}"
+        cached = _ACCOUNT_BASE_CACHE.get(key)
+        if cached is not None and time.monotonic() - cached[0] < _ACCOUNT_BASE_TTL_SECONDS:
+            return cached[1]
+        base = self._status_base([str(binary), "--wsl-status"])
+        _ACCOUNT_BASE_CACHE[key] = (time.monotonic(), base)
+        return base
+
+    def copy_base(self) -> Path | None:
+        """Where task copies for commands and file tools live.
+
+        WSL2's distribution when the owner chose it, else the account's base
+        (or None: copies then sit beside the workspace).
+        """
+        if self.uses_wsl():
+            return self.wsl_base()
+        return self.account_base()
+
+    def wsl_runner(self) -> Path | None:
+        """The static Linux runner shipped for WSL2, digest-checked.
+
+        It sits beside the platform runner in ``raiker/native/wsl-x86_64/``;
+        `--setup-wsl --linux-runner` installs it into Raiker's distribution.
+        """
+        directory = self.helper_root.parent / "wsl-x86_64"
+        binary = directory / "raiker-command-runner"
+        try:
+            recorded = json.loads((directory / "digest.json").read_text(encoding="utf-8"))["sha256"]
+            actual = hashlib.sha256(binary.read_bytes()).hexdigest()
+        except (OSError, ValueError, KeyError, TypeError):
+            return None
+        return binary if recorded == actual else None
+
+    def wsl_status(self) -> dict[str, Any] | None:
+        """`--wsl-status` as reported, or None off Windows or without a runner."""
+        if not _on_windows():
+            return None
+        binary, _ = self.locate()
+        if binary is None:
+            return None
+        try:
+            completed = self._run_probe([str(binary), "--wsl-status"])
+            status = json.loads(completed.stdout.strip() or "{}")
+        except (OSError, ValueError, subprocess.SubprocessError):
+            return None
+        return status if isinstance(status, dict) else None
+
+    def _status_base(self, argv: list[str]) -> Path | None:
+        try:
+            completed = self._run_probe(argv)
+            status = json.loads(completed.stdout.strip() or "{}")
+        except (OSError, ValueError, subprocess.SubprocessError):
+            return None
+        if completed.returncode != 0 or status.get("configured") is not True:
+            return None
+        base = status.get("base")
+        return Path(base) if isinstance(base, str) and base else None
 
     def _account_base_uncached(self, binary: Path) -> Path | None:
         try:
@@ -428,12 +608,19 @@ class NativeSandboxBackend:
             raise CommandBackendError(reason or "native_sandbox_artifact_missing")
 
         environment = sandbox_environment(workspace_root=request.workspace_root)
-        executable = command_executable(
-            request.argv_template[0],
-            cwd=request.workspace_root / request.cwd,
-            search_path=environment.get("PATH", ""),
-            project=original.workspace_root,
-        )
+        in_wsl = self.proof.boundary == WSL_BOUNDARY
+        if in_wsl:
+            # A Linux program, found on the distribution's PATH or relative to
+            # the command's folder by the Linux runner. Nothing of Windows'
+            # PATH applies inside the distribution.
+            executable: str | None = request.argv_template[0]
+        else:
+            executable = command_executable(
+                request.argv_template[0],
+                cwd=request.workspace_root / request.cwd,
+                search_path=environment.get("PATH", ""),
+                project=original.workspace_root,
+            )
         if executable is None:
             # `portable_command`'s Windows shim rewrites `echo` and `cat` into
             # the interpreter Raiker itself runs on. That is right for the host
@@ -444,8 +631,11 @@ class NativeSandboxBackend:
             # answer.
             raise CommandBackendError("native_sandbox_executable_unreachable")
         document = self.driver.policy_document(request)
-        document["toolchain_paths"] = toolchain_mounts(executable, request.workspace_root)
-        egress = self._egress_for(original)
+        document["toolchain_paths"] = (
+            [] if in_wsl else toolchain_mounts(executable, request.workspace_root)
+        )
+        # Downloads stay off in WSL: the proxy's socket is on Windows.
+        egress = None if in_wsl else self._egress_for(original)
         sink = sink or MemoryCommandSink()
         if egress is not None:
             document.update(egress.policy_fields)
@@ -587,7 +777,7 @@ def task_workspace_registry(
     On Windows with the restricted account set up, copies live under its base
     (the only place that account may write); records stay in Raiker's state.
     """
-    base = (driver or NativeSandboxDriver(workspace_root)).account_base()
+    base = (driver or NativeSandboxDriver(workspace_root)).copy_base()
     return TaskWorkspaceRegistry.for_workspace(workspace_root, base=base)
 
 
@@ -685,7 +875,7 @@ def _recent_proof(driver: NativeSandboxDriver, workspace_root: Path) -> NativeSa
     cached = _HOOK_PROOFS.get(key)
     if cached is not None and time.monotonic() - cached[0] < _HOOK_PROOF_TTL_SECONDS:
         return cached[1]
-    proof = driver.probe()
+    proof = driver.probe(for_programs=True)
     _HOOK_PROOFS[key] = (time.monotonic(), proof)
     return proof
 
@@ -780,7 +970,8 @@ def scratch_run(
     binary, reason = driver.locate()
     if binary is None:
         raise CommandBackendError(reason or "native_sandbox_artifact_missing")
-    base = driver.account_base() or task_workspace_registry(root, driver).base
+    # Programs run Windows interpreters, so never in the WSL distribution.
+    base = driver.account_base() or TaskWorkspaceRegistry.for_workspace(root).base
     base.mkdir(parents=True, exist_ok=True)
     folder = base / f"{label}_{secrets.token_hex(8)}"
     folder.mkdir()

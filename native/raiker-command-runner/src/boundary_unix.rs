@@ -23,6 +23,10 @@
 //! leaves the process group and survives — so the probe's descendant
 //! observation reports `unenforced` there, and `process_tree_stop` is false.
 
+#[cfg(target_os = "macos")]
+#[path = "account_macos.rs"]
+pub mod account;
+
 use crate::policy::{LaunchPolicy, NetworkPolicy};
 use crate::selftest::{self, SelfTest};
 use serde_json::{Value, json};
@@ -44,6 +48,17 @@ pub fn revoke_workspace_grant(_workspace: &Path) -> Result<(), String> {
 /// default on several current distributions. So the probe launches a child
 /// through the real boundary and reads back what it could do.
 pub fn probe(workspace: &Path) -> Value {
+    // Once the owner has set up the sandbox account, that is the boundary
+    // macOS commands run in, so it is the one measured.
+    #[cfg(target_os = "macos")]
+    if account::status()["configured"] == true {
+        return account::probe();
+    }
+    probe_kernel_sandbox(workspace)
+}
+
+/// The Bubblewrap or plain Seatbelt measurement, regardless of account setup.
+pub fn probe_kernel_sandbox(workspace: &Path) -> Value {
     let (mechanism, tool) = mechanism();
     let Ok(workspace) = workspace.canonicalize() else {
         return unavailable("native_sandbox_workspace_unreadable");
@@ -70,15 +85,11 @@ pub fn probe(workspace: &Path) -> Value {
     }
 
     // Held open until both arms have run; dropped with this scope.
-    #[cfg(target_os = "linux")]
     let _listener = local_listener();
-    #[cfg(target_os = "linux")]
     let connect_address = _listener
         .as_ref()
         .map(|(_, address)| address.clone())
         .unwrap_or_else(probe_destination);
-    #[cfg(not(target_os = "linux"))]
-    let connect_address = probe_destination();
     let test = SelfTest {
         nonce: nonce.clone(),
         inside_path: workspace.join(format!(".{nonce}-inside.tmp")),
@@ -940,11 +951,16 @@ fn probe_destination() -> String {
 /// leaves the machine. Inside a fresh network namespace that address does not
 /// exist, so the inside arm cannot reach it. The route lookup on an unbound
 /// UDP socket sends nothing.
-#[cfg(target_os = "linux")]
-fn local_listener() -> Option<(std::net::TcpListener, String)> {
-    let gateway = default_gateway()?;
+///
+/// macOS has no `/proc/net/route`, and its hosted CI runners answered nothing
+/// at the fallback gateway address, which left egress indeterminate there.
+/// The route lookup then aims at a documentation address (TEST-NET-1), which
+/// still only consults the routing table. Seatbelt's `(deny network*)` refuses
+/// the inside arm whatever the address.
+pub(crate) fn local_listener() -> Option<(std::net::TcpListener, String)> {
+    let target = default_gateway().unwrap_or_else(|| "192.0.2.1".into());
     let route = std::net::UdpSocket::bind("0.0.0.0:0").ok()?;
-    route.connect(format!("{gateway}:9")).ok()?;
+    route.connect(format!("{target}:9")).ok()?;
     let ip = route.local_addr().ok()?.ip();
     if ip.is_loopback() || ip.is_unspecified() {
         return None;
@@ -1433,7 +1449,6 @@ mod tests {
         );
     }
 
-    #[cfg(target_os = "linux")]
     #[test]
     fn the_local_listener_is_never_loopback_and_answers_from_outside() {
         let Some((_listener, address)) = local_listener() else {

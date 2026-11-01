@@ -30,6 +30,9 @@
 //! * `--account-run <handoff>` — macOS only, started by `sudo` *as* the
 //!   sandbox account: reads the run's handoff, starts Seatbelt and supervises
 //!   the run's memory and lifetime.
+//! * `--setup-wsl --linux-runner <file> [--rootfs <tar>]`, `--reset-wsl`,
+//!   `--wsl-status`, `--probe --boundary wsl` — Windows only: Raiker's own
+//!   WSL2 distribution, where the Linux runner is the boundary.
 //! * `--linger <marker>` — the probe's detached grandchild, which exists to
 //!   prove containment reaches descendants and not merely the first executable.
 
@@ -42,6 +45,11 @@ mod policy;
 #[cfg(target_os = "linux")]
 mod seccomp_linux;
 mod selftest;
+// Pure path and policy logic for the WSL2 backend: used on Windows, and
+// unit-tested everywhere.
+#[cfg(any(windows, test))]
+#[cfg_attr(not(windows), allow(dead_code))]
+mod wsl_paths;
 
 #[cfg(unix)]
 #[path = "boundary_unix.rs"]
@@ -87,6 +95,11 @@ fn dispatch(arguments: &[String]) -> Result<i32, String> {
                 return Ok(0);
             }
             #[cfg(windows)]
+            if named(arguments, "--boundary").as_deref() == Some("wsl") {
+                println!("{}", boundary::wsl::probe());
+                return Ok(0);
+            }
+            #[cfg(windows)]
             if named(arguments, "--boundary").as_deref() == Some("appcontainer") {
                 println!("{}", boundary::probe_appcontainer(Path::new(&workspace)));
                 return Ok(0);
@@ -126,6 +139,26 @@ fn dispatch(arguments: &[String]) -> Result<i32, String> {
                 return Err("runner_arguments_invalid".into());
             }
             return boundary::account::account_run(Path::new(handoff));
+        }
+        #[cfg(windows)]
+        Some("--setup-wsl") => {
+            let runner = named(arguments, "--linux-runner").ok_or("runner_arguments_invalid")?;
+            let rootfs = named(arguments, "--rootfs").map(PathBuf::from);
+            println!(
+                "{}",
+                boundary::wsl::setup(rootfs.as_deref(), Path::new(&runner))?
+            );
+            return Ok(0);
+        }
+        #[cfg(windows)]
+        Some("--reset-wsl") => {
+            boundary::wsl::reset()?;
+            return Ok(0);
+        }
+        #[cfg(windows)]
+        Some("--wsl-status") => {
+            println!("{}", boundary::wsl::status());
+            return Ok(0);
         }
         #[cfg(windows)]
         Some("--setup-account") => {
@@ -200,6 +233,12 @@ fn dispatch(arguments: &[String]) -> Result<i32, String> {
     #[cfg(target_os = "macos")]
     if boundary::account::owns(&launch) {
         return boundary::account::launch(&launch, &text, argv);
+    }
+    // A copy inside Raiker's WSL distribution runs there, under the Linux
+    // runner (Windows, opt-in).
+    #[cfg(windows)]
+    if boundary::wsl::owns(&launch) {
+        return boundary::wsl::launch(&launch, &text, argv);
     }
     boundary::launch(&launch, argv)
 }

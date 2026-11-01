@@ -328,6 +328,50 @@ Not yet: background runs and terminals on macOS (the account serves one run at
 a time; a small pool of accounts would let runs overlap); Seatbelt's downloads
 rule is still unmeasured.
 
+## WSL2 backend (2026-11-01, runner side implemented; unmeasured)
+
+Simplified from the design above: Raiker uses **its own** distribution,
+`RaikerSandbox`, never the owner's, and turns the two risky parts off by
+configuration (`/etc/wsl.conf`):
+
+* `[interop] enabled=false` (and `appendWindowsPath=false`): WSL registers no
+  `binfmt_misc` handler, so nothing in the distribution can start a Windows
+  program. Hiding `/init` would not have done this: the handler is registered
+  with the fix-binary flag and works inside any mount namespace.
+* `[automount] enabled=false`: no `/mnt/c`. Copies live on the
+  distribution's own disk (`/var/lib/raiker/copies`), Windows reaches them as
+  `\\wsl.localhost\RaikerSandbox\var\lib\raiker\copies\…`, and no
+  `/mnt/<drive>` conversion exists to get wrong. It is also faster than 9P.
+
+`raiker-command-runner --setup-wsl --linux-runner <ELF> [--rootfs <tar>]`
+(no elevation; distributions are per user) imports the distribution, creates
+the run user `raiker`, installs the Linux runner root-owned at
+`/opt/raiker/`, installs Bubblewrap if missing, writes `wsl.conf` and restarts
+the distribution. `--wsl-status` and `--reset-wsl` (unregisters it, copies
+included) complete the set. A policy whose workspace is a copy in the
+distribution is rewritten in Linux form (`wsl_paths::translate_policy`),
+written into the distribution and run with `wsl.exe -d RaikerSandbox -u raiker
+--exec /opt/raiker/raiker-command-runner`, so the boundary is exactly the
+Linux one CI measures. At the deadline the backstop kills only the Linux
+runner holding that run's policy (its namespace dies with it).
+`--probe --boundary wsl` runs the Linux probe in a scratch copy and adds
+`windows_interop`: enforced only when no interop handler is enabled, nothing
+is mounted under `/mnt` and no interop socket is named.
+
+Refused rather than half-supported: downloads (Raiker's proxy socket is on
+Windows, unreachable from the namespace), Windows toolchain mounts, terminals.
+
+Not done: Python does not offer WSL as a choice yet (the copy base, Linux
+argv and environment for a run); the release build does not yet ship the
+Linux runner inside the Windows package; and nothing here has run on a
+Windows machine — it type-checks and lints for `x86_64-pc-windows-gnu`, and
+the path, policy, `wsl.conf` and interop logic is unit-tested on Linux. To
+measure on a machine with WSL2: is a file Python creates through
+`\\wsl.localhost` owned by `raiker` (writable by the run), does the Linux
+probe report every observation enforced there, and is `windows_interop`
+enforced after setup. Hosted Windows runners cannot run WSL2, so this backend
+never counts toward the release gate and stays opt-in.
+
 ## MCP servers and plugin code (2026-11-01)
 
 A local stdio MCP server and an installed plugin's entrypoint are both an

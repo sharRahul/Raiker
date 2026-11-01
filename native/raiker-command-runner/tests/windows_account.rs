@@ -358,3 +358,65 @@ fn the_job_process_limit_stops_a_child_past_it_and_not_one_inside_it() {
         "a child past the job's process limit started"
     );
 }
+
+/// The loopback filter is installed by setup from this version on; a machine
+/// set up earlier has none until the owner runs setup again. Where the account
+/// is required (CI runs setup fresh) it is measured; elsewhere it is skipped.
+fn freshly_set_up() -> Option<PathBuf> {
+    std::env::var_os("RAIKER_REQUIRE_ACCOUNT_SANDBOX").and(configured())
+}
+
+#[test]
+fn the_account_reaches_its_own_listeners_and_no_other_local_service() {
+    let Some(_) = freshly_set_up() else { return };
+    let output = Command::new(runner())
+        .args(["--probe", "--workspace"])
+        .arg(std::env::temp_dir())
+        .output()
+        .unwrap();
+    let report: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+    // The owner's control arm connected, the account did not.
+    assert_eq!(report["observations"]["loopback"], "enforced", "{report}");
+    // Toolchains open loopback listeners of their own (asyncio's socket pair).
+    assert_eq!(report["own_loopback"], true, "{report}");
+}
+
+fn connects(copy: &Copy, port: u16) -> bool {
+    let powershell = r"C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe";
+    let script = format!(
+        "try {{ $c = New-Object Net.Sockets.TcpClient; $c.Connect('127.0.0.1', {port}); exit 0 }} catch {{ exit 3 }}"
+    );
+    run(
+        copy,
+        &[
+            powershell,
+            "-NoProfile",
+            "-NonInteractive",
+            "-Command",
+            &script,
+        ],
+    )
+    .status
+    .code()
+        == Some(0)
+}
+
+#[test]
+fn only_the_download_proxy_ports_are_open_to_the_account() {
+    let Some(base) = freshly_set_up() else { return };
+    let copy = copy_under(&base, "loopback");
+    let proxy = (47300..=47363)
+        .find_map(|port| std::net::TcpListener::bind(("127.0.0.1", port)).ok())
+        .expect("a free proxy port");
+    let other = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+    let proxy_port = proxy.local_addr().unwrap().port();
+    let other_port = other.local_addr().unwrap().port();
+    assert!(
+        connects(&copy, proxy_port),
+        "the proxy range must stay reachable"
+    );
+    assert!(
+        !connects(&copy, other_port),
+        "another local service was reachable"
+    );
+}

@@ -41,6 +41,10 @@ pub struct SelfTest {
     pub connect_address: String,
     pub spawn_grandchild: bool,
     pub hold_for_probe: bool,
+    /// A listener on loopback owned by someone other than the sandbox
+    /// (Windows' restricted account): reaching it means local services are
+    /// reachable. `None` leaves both loopback observations out.
+    pub loopback_address: Option<String>,
 }
 
 impl SelfTest {
@@ -65,6 +69,10 @@ impl SelfTest {
                 .get("hold_for_probe")
                 .and_then(Value::as_bool)
                 .unwrap_or(false),
+            loopback_address: value
+                .get("loopback_address")
+                .and_then(Value::as_str)
+                .map(str::to_owned),
         })
     }
 
@@ -79,6 +87,7 @@ impl SelfTest {
             "connect_address": self.connect_address,
             "spawn_grandchild": self.spawn_grandchild,
             "hold_for_probe": self.hold_for_probe,
+            "loopback_address": self.loopback_address,
         })
     }
 }
@@ -99,7 +108,27 @@ pub fn attempt(test: &SelfTest) -> Value {
         "masked_read": read_probe(&test.masked_read_path),
         "connect": connect_probe(&test.connect_address),
         "seccomp_control": seccomp_control(),
+        "loopback": test.loopback_address.as_deref().map(connect_probe),
+        "own_loopback": test.loopback_address.as_ref().map(|_| own_loopback_probe()),
     })
+}
+
+/// Connect to a listener this process opened itself on loopback. Toolchains
+/// rely on it (Python's asyncio builds its wake-up socket pair this way on
+/// Windows), so a loopback filter must leave it working.
+fn own_loopback_probe() -> Value {
+    let listener = match std::net::TcpListener::bind("127.0.0.1:0") {
+        Ok(listener) => listener,
+        Err(error) => return json!({"allowed": false, "error": error.kind().to_string()}),
+    };
+    let address = match listener.local_addr() {
+        Ok(address) => address,
+        Err(error) => return json!({"allowed": false, "error": error.kind().to_string()}),
+    };
+    match TcpStream::connect_timeout(&address, Duration::from_secs(4)) {
+        Ok(_) => json!({"allowed": true, "error": Value::Null}),
+        Err(error) => json!({"allowed": false, "error": error.kind().to_string()}),
+    }
 }
 
 #[cfg(target_os = "linux")]
@@ -331,6 +360,7 @@ mod tests {
             connect_address: "127.0.0.1:9".to_owned(),
             spawn_grandchild: false,
             hold_for_probe: false,
+            loopback_address: None,
         };
         remove_probe_writes(&test);
         assert_eq!(std::fs::read(&path).unwrap(), b"owner data");
@@ -349,6 +379,7 @@ mod tests {
             connect_address: "127.0.0.1:9".to_owned(),
             spawn_grandchild: false,
             hold_for_probe: false,
+            loopback_address: None,
         };
         std::fs::write(&test.inside_path, b"n").unwrap();
         std::fs::write(&test.outside_paths[0], b"n").unwrap();

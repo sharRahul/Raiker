@@ -100,6 +100,7 @@ pub fn probe_kernel_sandbox(workspace: &Path) -> Value {
         // probe child there would leave it running after every status check.
         spawn_grandchild: cfg!(target_os = "linux"),
         hold_for_probe: cfg!(target_os = "linux"),
+        loopback_address: None,
     };
     let outside = selftest::attempt(&test);
     if test.hold_for_probe {
@@ -1107,6 +1108,7 @@ mod tests {
             connect_address: "127.0.0.1:9".into(),
             spawn_grandchild: false,
             hold_for_probe: true,
+            loopback_address: None,
         };
         let failed_control = json!({"outside_writes": [{"allowed": false}]});
         let passed_control = json!({"outside_writes": [{"allowed": true}]});

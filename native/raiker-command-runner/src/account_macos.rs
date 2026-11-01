@@ -976,6 +976,7 @@ fn measure_in(scratch: &Path, nonce: &str, account: &Account) -> Result<Value, S
         connect_address,
         spawn_grandchild: true,
         hold_for_probe: false,
+        loopback_address: None,
     };
     let outside = selftest::attempt(&test);
     selftest::remove_probe_writes(&test);

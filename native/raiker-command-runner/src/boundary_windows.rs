@@ -112,6 +112,9 @@ pub mod account;
 #[path = "wsl_windows.rs"]
 pub mod wsl;
 
+#[path = "wfp_windows.rs"]
+pub mod wfp;
+
 // ---------------------------------------------------------------------------
 // Public entry points
 // ---------------------------------------------------------------------------
@@ -154,6 +157,7 @@ pub fn probe_appcontainer(workspace: &Path) -> Value {
         connect_address: probe_destination(),
         spawn_grandchild: true,
         hold_for_probe: false,
+        loopback_address: None,
     };
     if std::fs::write(&test.masked_read_path, b"raiker-probe-state").is_err() {
         let _ = std::fs::remove_dir(&scratch);

@@ -19,7 +19,8 @@ reach because Windows does not grant one standard user another's files.
 | `RaikerSandbox` local user | Standard user, no group memberships beyond the sandbox group, random 64-character password, "deny interactive and remote logon" rights | One-time elevated setup |
 | `RaikerSandboxUsers` local group | The only principal granted the task copies | One-time elevated setup |
 | `C:\RaikerSandbox` base | Task copies live here (not under the owner's profile, which the account cannot traverse). DACL: SYSTEM, Administrators, owner, `RaikerSandboxUsers` | One-time elevated setup |
-| Outbound firewall rule | Blocks all outbound traffic for the account's SID, loopback included | One-time elevated setup |
+| Outbound firewall rule | Blocks all outbound traffic for the account's SID (Windows Firewall does not filter loopback) | One-time elevated setup |
+| WFP loopback filter | At the listener's accept layer: permits the account's own listeners and the download-proxy ports 47300–47363, blocks every other local connection the account makes | One-time elevated setup (`wfp_windows.rs`) |
 | Credential | Password sealed with DPAPI for the owner's user, stored in Raiker's data directory | Setup |
 
 ## Launch path (no elevation at run time)
@@ -110,8 +111,20 @@ and the profile-escape refusal; CI's Windows job now runs setup and requires it.
 
 ## Known gaps (tracked in TO_BE_FIXED.md)
 
-* **Loopback:** Windows Firewall does not filter loopback; local services are
-  reachable from the sandbox until a WFP filter is added.
+* **Loopback (filter added 2026-11-01, measurement pending):** Windows
+  Firewall does not filter loopback, so setup now installs WFP filters at
+  `ALE_AUTH_RECV_ACCEPT_V4/V6`, matched on the connecting user
+  (`ALE_REMOTE_USER_ID`). The account may still reach its own listeners
+  (Python's asyncio builds its wake-up socket pair over loopback) and the
+  per-run download proxy, which now binds exclusively within ports
+  47300–47363. Measured on this Windows 11 host *before* the filter (setup
+  from an earlier version): the probe's `loopback` row read `unenforced` — the
+  account connected to an owner listener on `127.0.0.1` — while
+  `own_loopback` held and a proxy-range port was reachable. The filter itself
+  is measured by CI's fresh setup (`tests/windows_account.rs`) and on a host
+  once the owner runs setup again. Reported in the probe, not yet required.
+  A local service of the owner's that listens on a proxy-range port is
+  reachable.
 * **Explicit grants under denied drives:** an explicit allow on a folder below a
   denied root outranks the inherited deny; such folders stay reachable.
 * **Persistent account profile:** `C:\Users\RaikerSandbox` persists between

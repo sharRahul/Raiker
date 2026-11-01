@@ -26,6 +26,7 @@ import contextlib
 import json
 import os
 import secrets
+import socket
 import socketserver
 import sys
 import tempfile
@@ -68,6 +69,10 @@ PROXY_VARIABLES: tuple[str, ...] = (
 )
 #: The loopback port the Linux bridge listens on inside the private namespace.
 LINUX_BRIDGE_PORT = 3128
+#: The ports a Windows run's proxy may listen on. The restricted account's
+#: loopback filter permits exactly these (``wfp_windows.rs``), so a command can
+#: reach the proxy and no other local service.
+WINDOWS_PROXY_PORTS = range(47300, 47364)
 PROFILE_ID = "native_sandbox"
 
 
@@ -158,6 +163,31 @@ def _unix_proxy_server(
     return server
 
 
+class _ExclusiveProxyServer(EgressProxyServer):
+    """Bound with ``SO_EXCLUSIVEADDRUSE``: on Windows ``SO_REUSEADDR`` would let
+    another process bind the same port and take the run's connections."""
+
+    allow_reuse_address = False
+
+    def server_bind(self) -> None:
+        exclusive = getattr(socket, "SO_EXCLUSIVEADDRUSE", None)
+        if exclusive is not None:
+            self.socket.setsockopt(socket.SOL_SOCKET, exclusive, 1)
+        super().server_bind()
+
+
+def _windows_proxy_server(**kwargs: Any) -> EgressProxyServer:
+    """A proxy on the first free port of :data:`WINDOWS_PROXY_PORTS`."""
+    ports = list(WINDOWS_PROXY_PORTS)
+    secrets.SystemRandom().shuffle(ports)
+    for port in ports:
+        try:
+            return _ExclusiveProxyServer(("127.0.0.1", port), **kwargs)
+        except OSError:
+            continue
+    raise OSError("command_egress_port_unavailable")
+
+
 @dataclass
 class EgressRun:
     """One run's proxy, credential and boundary fields; closed with the run."""
@@ -200,6 +230,10 @@ class EgressRun:
                 "network": f"proxy:127.0.0.1:{port}",
                 "proxy_socket": str(socket_path),
             }
+        elif sys.platform == "win32":
+            server = _windows_proxy_server(identity=identity, authority=authority, controller=controller)
+            port = int(server.server_address[1])
+            self.policy_fields = {"network": f"proxy:127.0.0.1:{port}"}
         else:
             server = EgressProxyServer(
                 ("127.0.0.1", 0), identity=identity, authority=authority, controller=controller

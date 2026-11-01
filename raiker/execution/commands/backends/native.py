@@ -705,9 +705,14 @@ class NativeSandboxBackend:
             return None
         if sys.platform == "win32" and self.driver.account_base() is None:
             return None
-        return EgressRun(request.run_id, request.owner_principal_id, settings).start(
-            request.timeout_seconds + 5
-        )
+        try:
+            return EgressRun(request.run_id, request.owner_principal_id, settings).start(
+                request.timeout_seconds + 5
+            )
+        except OSError as exc:
+            # Every port the loopback filter permits is taken: refuse by name
+            # rather than run with a proxy the sandbox could not reach.
+            raise CommandBackendError("command_egress_port_unavailable") from exc
 
     def _in_task_copy(self, request: CommandRequest) -> CommandRequest:
         """The same request, rooted in this session's disposable copy.

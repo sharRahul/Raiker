@@ -70,6 +70,22 @@ _ACCOUNT_BASE_TTL_SECONDS = 30.0
 WSL_BOUNDARY = "wsl_bubblewrap"
 
 
+#: Importing the distribution and installing Bubblewrap in it.
+WSL_SETUP_TIMEOUT_SECONDS = 900
+
+
+def _runner_error(stderr: str) -> str | None:
+    """The reason code the runner names on stderr, if any."""
+    for line in reversed(stderr.splitlines()):
+        try:
+            value = json.loads(line)
+        except ValueError:
+            continue
+        if isinstance(value, dict) and isinstance(value.get("raiker_runner_error"), str):
+            return str(value["raiker_runner_error"])[:120]
+    return None
+
+
 def _on_windows() -> bool:
     """One place the driver asks; tests stand in a Windows host here."""
     return sys.platform == "win32"
@@ -161,8 +177,10 @@ class NativeSandboxDriver:
         *,
         helper_root: Path | None = None,
         run_probe: Callable[[list[str]], subprocess.CompletedProcess[str]] | None = None,
+        run_setup: Callable[[list[str]], subprocess.CompletedProcess[str]] | None = None,
     ) -> None:
         self.workspace_root = Path(workspace_root).resolve()
+        self._run_setup = run_setup or run_probe or self._default_setup_runner
         self.helper_root = (
             Path(helper_root).resolve()
             if helper_root is not None
@@ -222,6 +240,67 @@ class NativeSandboxDriver:
             timeout=180,
             check=False,
         )
+
+    @staticmethod
+    def _default_setup_runner(argv: list[str]) -> subprocess.CompletedProcess[str]:
+        # Importing a distribution and installing Bubblewrap in it can take
+        # minutes; the probe's three-minute limit is too short for it.
+        allowed = (
+            "PATH", "HOME", "USERPROFILE", "LOCALAPPDATA", "SYSTEMROOT", "WINDIR",
+            "TMP", "TEMP", "LANG", "LC_ALL",
+        )
+        environment = {name: os.environ[name] for name in allowed if name in os.environ}
+        return subprocess.run(  # noqa: S603 - argv is built from a verified binary path
+            argv,
+            env=environment,
+            capture_output=True,
+            text=True,
+            timeout=WSL_SETUP_TIMEOUT_SECONDS,
+            check=False,
+        )
+
+    def setup_wsl(self, rootfs: Path) -> tuple[bool, str]:
+        """Import and configure Raiker's distribution with the bundled runner.
+
+        Returns ``(True, "")`` or ``(False, reason)``. No elevation: WSL
+        distributions belong to the user. The root filesystem must be a
+        tarball the owner chose; Raiker never exports one of theirs.
+        """
+        if not _on_windows():
+            return False, "native_sandbox_wsl_unavailable"
+        binary, reason = self.locate()
+        if binary is None:
+            return False, reason or "native_sandbox_artifact_missing"
+        linux_runner = self.wsl_runner()
+        if linux_runner is None:
+            return False, "native_sandbox_wsl_runner_missing"
+        if not rootfs.is_file() or not rootfs.name.lower().endswith((".tar", ".tar.gz", ".tgz")):
+            return False, "native_sandbox_wsl_rootfs_invalid"
+        argv = [str(binary), "--setup-wsl", "--linux-runner", str(linux_runner), "--rootfs", str(rootfs)]
+        return self._setup_outcome(argv)
+
+    def reset_wsl(self) -> tuple[bool, str]:
+        """Unregister Raiker's distribution, and every copy inside it."""
+        if not _on_windows():
+            return False, "native_sandbox_wsl_unavailable"
+        binary, reason = self.locate()
+        if binary is None:
+            return False, reason or "native_sandbox_artifact_missing"
+        return self._setup_outcome([str(binary), "--reset-wsl"])
+
+    def _setup_outcome(self, argv: list[str]) -> tuple[bool, str]:
+        try:
+            completed = self._run_setup(argv)
+        except subprocess.TimeoutExpired:
+            return False, "native_sandbox_wsl_setup_timed_out"
+        except (OSError, subprocess.SubprocessError):
+            return False, "native_sandbox_wsl_setup_failed"
+        # Status answers are cached briefly; this one just changed.
+        for key in [key for key in _ACCOUNT_BASE_CACHE if key.startswith("wsl:")]:
+            del _ACCOUNT_BASE_CACHE[key]
+        if completed.returncode == 0:
+            return True, ""
+        return False, _runner_error(completed.stderr) or "native_sandbox_wsl_setup_failed"
 
     def uses_wsl(self) -> bool:
         """Whether the owner chose WSL2 for commands (Windows only)."""

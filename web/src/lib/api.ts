@@ -723,6 +723,9 @@ export const api = {
   commandSandbox: () => contract.getCommandSandbox(),
   setCommandSandbox: (windowsBackend: "account" | "wsl") =>
     contract.putCommandSandbox({ windows_backend: windowsBackend }),
+  setupCommandSandboxWsl: (rootfsPath: string) =>
+    contract.setupCommandSandboxWsl({ rootfs_path: rootfsPath }),
+  removeCommandSandboxWsl: () => contract.removeCommandSandboxWsl(),
   checkpoints: (sessionId?: string, projectId?: string) =>
     contract.listCheckpoints({ session_id: sessionId, project_id: projectId }),
   checkpoint: (id: string) => contract.getCheckpoint(id),

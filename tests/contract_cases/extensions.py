@@ -247,6 +247,43 @@ def _on_mcp(suffix: str, body: Any = None) -> Seed:
     return seed
 
 
+def _sandbox_stand_in(monkeypatch: Any) -> None:
+    """Run the fixture echo server directly instead of in the native sandbox.
+
+    This case checks the shape of the connect answer. Without a stand-in it
+    passed only on hosts with a working sandbox (CI installs Bubblewrap and
+    builds the runner) and failed everywhere else with
+    ``native_sandbox_required`` — the right refusal, but not what this case
+    measures. Enforcement for MCP servers is measured, on the real boundary,
+    in ``tests/test_mcp_sandbox.py``.
+    """
+    import subprocess  # noqa: PLC0415
+    import sys  # noqa: PLC0415
+
+    from raiker.execution.commands import sandboxed_program  # noqa: PLC0415
+
+    def run_bounded(command: list[str], payload: bytes, *, workspace: str | Path, timeout: float,
+                    **_: Any) -> sandboxed_program.BoundedRun:
+        completed = subprocess.run(  # noqa: S603 - the bundled fixture server, fixed argv
+            [sys.executable, *command[1:]], input=payload, cwd=workspace,
+            capture_output=True, timeout=timeout, check=False,
+        )
+        return sandboxed_program.BoundedRun(
+            stdout=completed.stdout, stderr_tail=completed.stderr[-4096:],
+            stderr_bytes=len(completed.stderr), returncode=completed.returncode,
+        )
+
+    monkeypatch.setattr(sandboxed_program, "run_bounded", run_bounded)
+
+
+def _wsl_stand_in(monkeypatch: Any) -> None:
+    """Setup and removal call `wsl.exe` (Windows only); this case checks the answer's shape."""
+    from raiker.execution.commands.backends.native import NativeSandboxDriver  # noqa: PLC0415
+
+    monkeypatch.setattr(NativeSandboxDriver, "setup_wsl", lambda self, rootfs: (True, ""))
+    monkeypatch.setattr(NativeSandboxDriver, "reset_wsl", lambda self: (True, ""))
+
+
 def _mcp_offer(ws: Path, _client: TestClient, _h: dict[str, str]) -> Call:
     """An installed plugin that offers one MCP server."""
     from raiker.plugins.contributions import PLUGIN_HOOKS_DIR, PLUGIN_MCP_FILE
@@ -687,7 +724,7 @@ CASES: Cases = {
     ),
     ("PUT", "/api/mcp/servers/{server_id}"): _on_mcp("", {"name": "echo-two"}),
     ("DELETE", "/api/mcp/servers/{server_id}"): _on_mcp(""),
-    ("POST", "/api/mcp/servers/{server_id}/connect"): _on_mcp("/connect"),
+    ("POST", "/api/mcp/servers/{server_id}/connect"): patched(_on_mcp("/connect"), _sandbox_stand_in),
     ("GET", "/api/mcp/servers/{server_id}/secrets"): _mcp_secrets,
     ("PUT", "/api/mcp/servers/{server_id}/secrets/{name}"): _on_mcp(
         "/secrets/WEATHER_KEY", {"value": "contract-value"}
@@ -710,6 +747,13 @@ CASES: Cases = {
     ("PUT", "/api/command-egress"): plain("/api/command-egress", {"enabled": True, "domains": ["pypi.org"]}),
     ("GET", "/api/command-sandbox"): plain("/api/command-sandbox"),
     ("PUT", "/api/command-sandbox"): plain("/api/command-sandbox", {"windows_backend": "account"}),
+    ("POST", "/api/command-sandbox/wsl/setup"): patched(
+        plain("/api/command-sandbox/wsl/setup", {"rootfs_path": "C:\\Temp\\ubuntu-base.tar.gz"}),
+        _wsl_stand_in,
+    ),
+    ("POST", "/api/command-sandbox/wsl/remove"): patched(
+        plain("/api/command-sandbox/wsl/remove", {}), _wsl_stand_in
+    ),
     ("GET", "/api/command-workspaces"): _task_copies,
     ("GET", "/api/command-workspaces/{workspace_id}/diff"): _task_copy_diff,
     ("POST", "/api/command-workspaces/{workspace_id}/promote"): _task_copy_promoted,

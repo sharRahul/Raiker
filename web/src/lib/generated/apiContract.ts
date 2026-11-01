@@ -6933,6 +6933,11 @@ export type WorkThreadView = {
   tags: string[];
 };
 
+/** The root filesystem tarball to import as Raiker's WSL2 distribution. */
+export type WslSetupRequest = {
+  rootfs_path: string;
+};
+
 /** One typed wrapper per verified operation, on the shared transport core. */
 export const contract = {
   deleteAccount: (query: { confirm?: string } = {}) =>
@@ -7153,6 +7158,10 @@ export const contract = {
     request<CommandSandboxView>("/api/command-sandbox"),
   putCommandSandbox: (body: CommandSandboxRequest) =>
     call<CommandSandboxView>("PUT", "/api/command-sandbox", { body }),
+  removeCommandSandboxWsl: () =>
+    call<CommandSandboxView>("POST", "/api/command-sandbox/wsl/remove"),
+  setupCommandSandboxWsl: (body: WslSetupRequest) =>
+    call<CommandSandboxView>("POST", "/api/command-sandbox/wsl/setup", { body }),
   listTaskWorkspaces: () =>
     request<TaskWorkspaceList>("/api/command-workspaces"),
   taskWorkspaceFileDiff: (workspaceId: string, query: { path: string }) =>

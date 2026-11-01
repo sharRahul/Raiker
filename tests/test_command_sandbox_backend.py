@@ -168,3 +168,70 @@ def test_the_bundled_linux_runner_is_found_only_with_a_matching_digest(tmp_path:
     assert driver.wsl_runner() == binary
     binary.write_bytes(b"\x7fELF replaced")
     assert driver.wsl_runner() is None
+
+
+def _bundled(tmp_path: Path) -> Path:
+    import hashlib
+
+    helper = _installed_runner(tmp_path)
+    wsl = helper.parent / "wsl-x86_64"
+    wsl.mkdir()
+    binary = wsl / "raiker-command-runner"
+    binary.write_bytes(b"\x7fELF linux runner")
+    (wsl / "digest.json").write_text(
+        json.dumps({"sha256": hashlib.sha256(binary.read_bytes()).hexdigest()}), encoding="utf-8"
+    )
+    return helper
+
+
+def test_setup_runs_the_bundled_linux_runner_with_the_owners_tarball(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(native_backend, "_on_windows", lambda: True)
+    helper = _bundled(tmp_path)
+    sent: list[list[str]] = []
+
+    def run_setup(argv: list[str]) -> subprocess.CompletedProcess[str]:
+        sent.append(argv)
+        return subprocess.CompletedProcess(argv, 0, "{}", "")
+
+    driver = native_backend.NativeSandboxDriver(tmp_path, helper_root=helper, run_setup=run_setup)
+    rootfs = tmp_path / "ubuntu-base-24.04-base-amd64.tar.gz"
+    rootfs.write_bytes(b"tar")
+
+    assert driver.setup_wsl(rootfs) == (True, "")
+    [argv] = sent
+    assert argv[1:3] == ["--setup-wsl", "--linux-runner"]
+    assert argv[3] == str(helper.parent / "wsl-x86_64" / "raiker-command-runner")
+    assert argv[4:] == ["--rootfs", str(rootfs)]
+
+    assert driver.setup_wsl(tmp_path / "missing.tar") == (False, "native_sandbox_wsl_rootfs_invalid")
+    notes = tmp_path / "notes.txt"
+    notes.write_text("x")
+    assert driver.setup_wsl(notes) == (False, "native_sandbox_wsl_rootfs_invalid")
+    assert driver.reset_wsl() == (True, "")
+    assert sent[-1][1:] == ["--reset-wsl"]
+
+
+def test_setup_reports_the_runners_own_refusal_and_needs_the_bundled_runner(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(native_backend, "_on_windows", lambda: True)
+    rootfs = tmp_path / "base.tar"
+    rootfs.write_bytes(b"tar")
+    refused = '{"raiker_runner_error":"native_sandbox_wsl_bubblewrap_missing"}\n'
+    driver = native_backend.NativeSandboxDriver(
+        tmp_path,
+        helper_root=_bundled(tmp_path),
+        run_setup=lambda argv: subprocess.CompletedProcess(argv, 91, "", refused),
+    )
+    assert driver.setup_wsl(rootfs) == (False, "native_sandbox_wsl_bubblewrap_missing")
+
+    bare = native_backend.NativeSandboxDriver(tmp_path / "other", helper_root=_installed_runner(tmp_path / "other"))
+    assert bare.setup_wsl(rootfs) == (False, "native_sandbox_wsl_runner_missing")
+
+
+def test_setup_is_refused_off_windows(tmp_path: Path) -> None:
+    driver = native_backend.NativeSandboxDriver(tmp_path, helper_root=_bundled(tmp_path))
+    assert driver.setup_wsl(tmp_path / "base.tar") == (False, "native_sandbox_wsl_unavailable")
+    assert driver.reset_wsl() == (False, "native_sandbox_wsl_unavailable")

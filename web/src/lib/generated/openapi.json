@@ -36030,6 +36030,23 @@
         ],
         "title": "WorkThreadView",
         "type": "object"
+      },
+      "WslSetupRequest": {
+        "additionalProperties": false,
+        "description": "The root filesystem tarball to import as Raiker's WSL2 distribution.",
+        "properties": {
+          "rootfs_path": {
+            "maxLength": 1024,
+            "minLength": 1,
+            "title": "Rootfs Path",
+            "type": "string"
+          }
+        },
+        "required": [
+          "rootfs_path"
+        ],
+        "title": "WslSetupRequest",
+        "type": "object"
       }
     }
   },
@@ -40437,6 +40454,64 @@
           }
         },
         "summary": "Put Command Sandbox"
+      }
+    },
+    "/api/command-sandbox/wsl/remove": {
+      "post": {
+        "description": "Unregister Raiker's WSL2 distribution and every task copy inside it.\n\nCommands move back to the sandbox account, so nothing is left pointing at\na distribution that no longer exists.",
+        "operationId": "remove_command_sandbox_wsl_api_command_sandbox_wsl_remove_post",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommandSandboxView"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Remove Command Sandbox Wsl"
+      }
+    },
+    "/api/command-sandbox/wsl/setup": {
+      "post": {
+        "description": "Import and configure Raiker's own WSL2 distribution (Windows).\n\nRuns the runner's `--setup-wsl` with the Linux runner this install ships.\nNo elevation is needed. It can take several minutes (the import, and\ninstalling Bubblewrap inside), so the answer comes when it is done.",
+        "operationId": "setup_command_sandbox_wsl_api_command_sandbox_wsl_setup_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WslSetupRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommandSandboxView"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Setup Command Sandbox Wsl"
       }
     },
     "/api/command-workspaces": {

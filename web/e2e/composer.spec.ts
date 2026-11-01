@@ -1069,3 +1069,29 @@ test("the local sandbox card shows each measured control and the downloads allow
   await expect(observations.filter({ hasText: "Cannot reach the network" })).toContainText("Enforced");
   await expect(page.getByText("Command downloads", { exact: false }).first()).toBeVisible();
 });
+
+test("on Windows the command sandbox card sets WSL2 up and chooses it", async ({ page }) => {
+  let view = {
+    windows_backend: "account", applies: true, wsl_configured: false,
+    wsl_missing: ["distribution_present"], wsl_setup_command: "runner --setup-wsl",
+  };
+  await page.route("http://127.0.0.1:8765/api/command-sandbox", (route) => {
+    if (route.request().method() === "PUT") {
+      view = { ...view, windows_backend: route.request().postDataJSON().windows_backend };
+    }
+    return route.fulfill({ json: view });
+  });
+  await page.route("http://127.0.0.1:8765/api/command-sandbox/wsl/setup", (route) => {
+    view = { ...view, wsl_configured: true, wsl_missing: [] };
+    return route.fulfill({ json: view });
+  });
+  await page.goto("http://127.0.0.1:8765/#/settings?tab=advanced&kind=runtime");
+  const card = page.getByRole("region", { name: "Command sandbox" });
+  await expect(card).toContainText("Raiker's WSL distribution is not installed");
+  await card.getByRole("textbox", { name: /Linux root filesystem/ }).fill("C:\\Temp\\ubuntu-base.tar.gz");
+  await card.getByRole("button", { name: "Set up WSL2" }).click();
+  await expect(card.getByText("WSL2 is set up.").first()).toBeVisible();
+  await card.getByRole("radio", { name: /WSL2/ }).check();
+  await expect(card.getByText("Commands now run in WSL2.")).toBeVisible();
+  await expect(card.getByRole("button", { name: "Remove WSL2…" })).toBeVisible();
+});

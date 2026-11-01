@@ -382,8 +382,13 @@ only; `GET/PUT /api/command-sandbox`, audited as
 distribution (`copy_base`), and a command's argv is passed through unchanged
 for the Linux runner to resolve, with no toolchain mounts and no downloads.
 Hooks, MCP servers and plugin code keep the account: they run Windows
-interpreters. Choosing WSL2 before it is set up fails closed. The card shows
-what is missing and the exact `--setup-wsl` command for this install.
+interpreters. Choosing WSL2 before it is set up fails closed. The card also sets WSL2 up
+(`POST /api/command-sandbox/wsl/setup`: the owner names a root filesystem
+tarball, Raiker runs `--setup-wsl` with the Linux runner it ships, no
+elevation, up to 15 minutes) and removes it after a confirmation that names
+what is lost (`POST /api/command-sandbox/wsl/remove`: unregisters the
+distribution with its copies and moves commands back to the account). Both
+are audited (`command_sandbox_wsl_setup`, `command_sandbox_wsl_removed`).
 
 **Shipping it.** `scripts/build_native_runner.py --wsl` builds the runner for
 `x86_64-unknown-linux-musl`, statically linked so it runs in any

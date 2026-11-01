@@ -8,7 +8,7 @@
    * allowed and fails closed: commands refuse rather than fall back.
    */
   import { onMount } from "svelte";
-  import { api } from "../../api";
+  import { api, ApiError } from "../../api";
   import type { CommandSandboxView } from "../../apiTypes";
 
   type Backend = "account" | "wsl";
@@ -48,6 +48,47 @@
     }
   }
 
+  // Reasons the runner gives, in words the owner can act on.
+  const REFUSED: Record<string, string> = {
+    native_sandbox_wsl_rootfs_invalid: "That file is not a .tar or .tar.gz root filesystem.",
+    native_sandbox_wsl_runner_missing: "This install does not include the Linux runner WSL2 needs.",
+    native_sandbox_wsl_unavailable: "WSL is not available on this PC. Install it with `wsl --install`, restart, and try again.",
+    native_sandbox_wsl_import_failed: "WSL could not import that file. Check it is a Linux root filesystem.",
+    native_sandbox_wsl_bubblewrap_missing: "Bubblewrap could not be installed in the distribution (it needs the internet once).",
+    native_sandbox_wsl_setup_timed_out: "Setup took longer than 15 minutes and was stopped.",
+  };
+
+  let rootfs = $state("");
+  let confirmingRemove = $state(false);
+
+  async function setUp() {
+    busy = true;
+    notice = { kind: "ok", text: "Setting up WSL2. This can take a few minutes…" };
+    try {
+      view = await api.setupCommandSandboxWsl(rootfs.trim());
+      notice = { kind: "ok", text: view.wsl_configured ? "WSL2 is set up." : "Setup finished, but WSL2 is not ready yet." };
+    } catch (e) {
+      const reason = e instanceof ApiError ? (e.reasonCode ?? "") : "";
+      notice = { kind: "error", text: REFUSED[reason] ?? `WSL2 could not be set up (${reason || "unknown error"}).` };
+    } finally {
+      busy = false;
+    }
+  }
+
+  async function remove() {
+    busy = true;
+    confirmingRemove = false;
+    notice = null;
+    try {
+      view = await api.removeCommandSandboxWsl();
+      notice = { kind: "ok", text: "WSL2 removed. Commands run as the sandbox account." };
+    } catch {
+      notice = { kind: "error", text: "WSL2 could not be removed." };
+    } finally {
+      busy = false;
+    }
+  }
+
   onMount(() => void load());
 </script>
 
@@ -80,16 +121,38 @@
     </fieldset>
     {#if view.wsl_configured}
       <p class="notice notice-ok">WSL2 is set up.</p>
+      {#if confirmingRemove}
+        <p class="notice notice-danger" role="alert">
+          This deletes Raiker's WSL distribution and every task copy inside it, including changes not yet applied.
+        </p>
+        <div class="actions">
+          <button class="btn btn-danger btn-sm" type="button" disabled={busy} onclick={() => void remove()}>Remove WSL2</button>
+          <button class="btn btn-ghost btn-sm" type="button" disabled={busy} onclick={() => (confirmingRemove = false)}>Keep it</button>
+        </div>
+      {:else}
+        <button class="btn btn-ghost btn-sm" type="button" disabled={busy} onclick={() => (confirmingRemove = true)}>Remove WSL2…</button>
+      {/if}
     {:else}
       <p class="notice {view.windows_backend === 'wsl' ? 'notice-danger' : ''}" role="status">
         WSL2 is not set up{view.windows_backend === "wsl" ? ", so commands will be refused until it is" : ""}:
         {view.wsl_missing.map((name) => MISSING[name] ?? name).join("; ")}.
-        {#if view.wsl_setup_command}
-          Set it up from a terminal (no administrator needed): <code>{view.wsl_setup_command}</code>
-        {:else}
-          This install does not include the Linux runner WSL2 needs.
-        {/if}
       </p>
+      {#if view.wsl_setup_command}
+        <form class="setup" onsubmit={(event) => { event.preventDefault(); void setUp(); }}>
+          <label>
+            <span>
+              Linux root filesystem (.tar or .tar.gz), for example the Ubuntu base image from
+              cdimage.ubuntu.com/ubuntu-base. Raiker imports it as its own distribution; your existing
+              WSL distributions are not touched.
+            </span>
+            <input type="text" bind:value={rootfs} placeholder="C:\Users\you\Downloads\ubuntu-base-24.04-base-amd64.tar.gz" disabled={busy} required />
+          </label>
+          <button class="btn btn-primary btn-sm" type="submit" disabled={busy || !rootfs.trim()}>Set up WSL2</button>
+          <small>No administrator rights needed. Setup installs Bubblewrap inside the distribution, which needs the internet once.</small>
+        </form>
+      {:else}
+        <p>This install does not include the Linux runner WSL2 needs.</p>
+      {/if}
     {/if}
     {#if notice}<p class="notice {notice.kind === 'ok' ? 'notice-ok' : 'notice-danger'}" role="status">{notice.text}</p>{/if}
   </section>
@@ -98,4 +161,7 @@
 <style>
   fieldset { border: 0; padding: 0; margin: 0; display: grid; gap: var(--space-2); }
   .option { display: flex; align-items: center; gap: var(--space-2); }
+  .setup { display: grid; gap: var(--space-2); }
+  .setup input { width: 100%; font-family: var(--font-mono); font-size: var(--text-xs); }
+  .actions { display: flex; gap: var(--space-2); }
 </style>

@@ -14,6 +14,7 @@ from raiker.api.schemas import (
     CommandEgressRequest,
     CommandSandboxRequest,
     PromoteTaskWorkspaceRequest,
+    WslSetupRequest,
     serialize_dto,
 )
 from raiker.api.sessions import ApiSession
@@ -345,6 +346,59 @@ def put_command_sandbox(
         request, auth_data[0].principal_id, "", "command_sandbox_backend_changed",
         {"windows_backend": choice},
     )
+    view: CommandSandboxView = _sandbox_view(request, choice)
+    return serialize_dto(view)
+
+
+@router.post("/api/command-sandbox/wsl/setup")
+def setup_command_sandbox_wsl(
+    body: WslSetupRequest,
+    request: Request,
+    auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+) -> dict[str, Any]:
+    """Import and configure Raiker's own WSL2 distribution (Windows).
+
+    Runs the runner's `--setup-wsl` with the Linux runner this install ships.
+    No elevation is needed. It can take several minutes (the import, and
+    installing Bubblewrap inside), so the answer comes when it is done.
+    """
+    from raiker.execution.commands.backends.native import NativeSandboxDriver  # noqa: PLC0415
+    from raiker.execution.commands.sandbox_backend import load_windows_backend  # noqa: PLC0415
+
+    root = request.app.state.workspace_root
+    ok, reason = NativeSandboxDriver(root).setup_wsl(Path(body.rootfs_path))
+    _audit_workspace(
+        request, auth_data[0].principal_id, "", "command_sandbox_wsl_setup",
+        {"ok": ok, "reason_code": reason or None},
+    )
+    if not ok:
+        raise refusal(status.HTTP_422_UNPROCESSABLE_CONTENT, reason)
+    view: CommandSandboxView = _sandbox_view(request, load_windows_backend(root))
+    return serialize_dto(view)
+
+
+@router.post("/api/command-sandbox/wsl/remove")
+def remove_command_sandbox_wsl(
+    request: Request,
+    auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+) -> dict[str, Any]:
+    """Unregister Raiker's WSL2 distribution and every task copy inside it.
+
+    Commands move back to the sandbox account, so nothing is left pointing at
+    a distribution that no longer exists.
+    """
+    from raiker.execution.commands.backends.native import NativeSandboxDriver  # noqa: PLC0415
+    from raiker.execution.commands.sandbox_backend import save_windows_backend  # noqa: PLC0415
+
+    root = request.app.state.workspace_root
+    ok, reason = NativeSandboxDriver(root).reset_wsl()
+    _audit_workspace(
+        request, auth_data[0].principal_id, "", "command_sandbox_wsl_removed",
+        {"ok": ok, "reason_code": reason or None},
+    )
+    if not ok:
+        raise refusal(status.HTTP_422_UNPROCESSABLE_CONTENT, reason)
+    choice = save_windows_backend(root, "account")
     view: CommandSandboxView = _sandbox_view(request, choice)
     return serialize_dto(view)
 

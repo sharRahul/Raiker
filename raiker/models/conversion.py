@@ -1,17 +1,22 @@
 """Converting a model the owner already has into one this machine can serve.
 
 The conversion toolchain (llama.cpp's converter and quantizer) previously ran
-in a Docker container. Docker was removed by the native sandbox migration and a
-native, sandboxed toolchain is not yet packaged, so :class:`UnavailableConversionRunner`
-refuses every conversion with ``model_conversion_native_toolchain_required``.
-Previews, provenance and cleanup remain, so stored operations still read
-correctly and an owner is told exactly why the conversion cannot start.
+in a Docker container, which the native sandbox migration removed. It now runs
+in the native sandbox, from a llama.cpp the owner installed and named in
+``RAIKER_LLAMA_CPP_DIR`` (:class:`NativeConversionRunner`). Without one, or on a
+host whose boundary cannot mount the model read-only, every conversion is
+refused with a named reason. Previews, provenance and cleanup are unchanged.
 """
 from __future__ import annotations
 
 import hashlib
 import json
+import os
 import shutil
+import subprocess
+import sys
+import tempfile
+import time
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
@@ -99,9 +104,159 @@ class UnavailableConversionRunner:
         raise ConversionRefused("model_conversion_native_toolchain_required")
 
 
+#: The variable naming the owner's llama.cpp: a folder holding
+#: `convert_hf_to_gguf.py`, a built `llama-quantize` (or `build/bin/…`), and a
+#: `.venv` with the converter's requirements installed.
+TOOLCHAIN_VARIABLE = "RAIKER_LLAMA_CPP_DIR"
+
+
+@dataclass(frozen=True)
+class LlamaCppToolchain:
+    root: Path
+    python: Path
+    converter: Path
+    quantizer: Path
+
+    @classmethod
+    def locate(cls, root: Path) -> LlamaCppToolchain:
+        """The toolchain in *root*, or a refusal naming the part that is missing."""
+        root = root.resolve()
+        windows = sys.platform == "win32"
+        python = root / ".venv" / ("Scripts/python.exe" if windows else "bin/python")
+        converter = root / "convert_hf_to_gguf.py"
+        name = "llama-quantize.exe" if windows else "llama-quantize"
+        quantizer = next(
+            (path for path in (root / name, root / "build" / "bin" / name) if path.is_file()), None
+        )
+        if not converter.is_file():
+            raise ConversionRefused("model_conversion_converter_missing")
+        if quantizer is None:
+            raise ConversionRefused("model_conversion_quantizer_missing")
+        if not python.is_file():
+            raise ConversionRefused("model_conversion_python_missing")
+        return cls(root, python, converter, quantizer)
+
+    def digest(self) -> str:
+        """What ran, for provenance: the converter and the quantizer, by content."""
+        digest = hashlib.sha256()
+        _feed(digest, b"raiker.conversion.llama_cpp.v1")
+        _feed(digest, _sha256_file(self.converter).encode("ascii"))
+        _feed(digest, _sha256_file(self.quantizer).encode("ascii"))
+        return f"llama.cpp:sha256:{digest.hexdigest()}"
+
+
+class NativeConversionRunner:
+    """llama.cpp's converter and quantizer, each run in the native sandbox.
+
+    The model and the toolchain are mounted read-only and the run writes only
+    its own scratch folder, with no network. The two results are moved into
+    the output folder afterwards, so nothing the sandbox wrote lands anywhere
+    else. Mounting read-only is a Linux capability of the boundary; elsewhere
+    this refuses rather than copying gigabytes or widening the boundary.
+    """
+
+    #: Where the boundary keeps its own state for conversions; never the
+    #: owner's model library.
+    STATE = Path(tempfile.gettempdir()) / "raiker-conversion"
+
+    def __init__(self, toolchain: LlamaCppToolchain) -> None:
+        self.toolchain = toolchain
+
+    def run(
+        self,
+        preview: ConversionPreview,
+        should_cancel: Callable[[], bool] | None = None,
+    ) -> ConversionProvenance:
+        from raiker.execution.commands.backends.base import CommandBackendError
+        from raiker.execution.commands.backends.native import scratch_run
+
+        if not sys.platform.startswith("linux"):
+            raise ConversionRefused("model_conversion_platform_unsupported")
+        source, output = Path(preview.source), Path(preview.output)
+        intermediate, result = _output_paths(preview)
+        isolation = preview.isolation
+        self.STATE.mkdir(parents=True, exist_ok=True)
+        try:
+            with scratch_run(
+                self.STATE, "convert", timeout_seconds=isolation.timeout_seconds,
+                memory_bytes=isolation.max_memory_bytes,
+            ) as run:
+                scratch_bf16 = run.folder / "model.bf16.gguf"
+                scratch_result = run.folder / f"model.{preview.quantization}.gguf"
+                mounts = (source, self.toolchain.root)
+                steps = (
+                    [str(self.toolchain.python), str(self.toolchain.converter), str(source),
+                     "--outfile", str(scratch_bf16), "--outtype", "bf16"],
+                    [str(self.toolchain.quantizer), str(scratch_bf16), str(scratch_result),
+                     preview.quantization],
+                )
+                for argv in steps:
+                    self._step(
+                        run.command(argv, read_only=mounts, max_processes=isolation.max_processes),
+                        run.environment({"PATH": os.environ.get("PATH", "")}),
+                        isolation.timeout_seconds,
+                        should_cancel,
+                    )
+                if not scratch_result.is_file():
+                    raise ConversionRefused("model_conversion_output_missing")
+                shutil.move(str(scratch_bf16), intermediate)
+                shutil.move(str(scratch_result), result)
+        except CommandBackendError:
+            raise ConversionRefused("native_sandbox_required") from None
+        provenance = ConversionProvenance(
+            source_revision=preview.revision,
+            source_fingerprint=_source_fingerprint(source, preview.revision),
+            output_fingerprint=_sha256_file(result),
+            toolchain_image=self.toolchain.digest(),
+            architecture=preview.architecture,
+            quantization=preview.quantization,
+            output_path=str(result),
+        )
+        _provenance_path(output, result).write_text(
+            json.dumps(provenance.to_dict(), indent=2, sort_keys=True),
+            encoding="utf-8",
+        )
+        return provenance
+
+    @staticmethod
+    def _step(
+        argv: list[str],
+        environment: dict[str, str],
+        timeout: float,
+        should_cancel: Callable[[], bool] | None,
+    ) -> None:
+        process = subprocess.Popen(  # noqa: S603 - the runner's own argv, no shell
+            argv, env=environment, stdin=subprocess.DEVNULL,
+            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+        )
+        deadline = time.monotonic() + timeout
+        while process.poll() is None:
+            if should_cancel is not None and should_cancel():
+                process.kill()
+                process.wait()
+                raise ConversionCancelled("model_conversion_cancelled")
+            if time.monotonic() > deadline:
+                process.kill()
+                process.wait()
+                raise ConversionRefused("model_conversion_timeout")
+            time.sleep(0.5)
+        if process.returncode != 0:
+            raise ConversionRefused(f"model_conversion_step_failed:{process.returncode}")
+
+
+def default_conversion_runner() -> UnavailableConversionRunner | NativeConversionRunner:
+    """The owner's llama.cpp when one is named, else the refusing runner."""
+    configured = os.environ.get(TOOLCHAIN_VARIABLE, "").strip()
+    if not configured:
+        return UnavailableConversionRunner()
+    return NativeConversionRunner(LlamaCppToolchain.locate(Path(configured)))
+
+
 class ModelConversionService:
-    def __init__(self, runner: UnavailableConversionRunner | None = None) -> None:
-        self.runner = runner or UnavailableConversionRunner()
+    def __init__(
+        self, runner: UnavailableConversionRunner | NativeConversionRunner | None = None
+    ) -> None:
+        self.runner = runner or default_conversion_runner()
 
     def preview(
         self, source: Path, output: Path, revision: str, quantization: str

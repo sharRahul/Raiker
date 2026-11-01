@@ -690,8 +690,19 @@ class ScratchRun:
         self._deadline = max(1, int(timeout_seconds) + 5)
         self._policies: list[Path] = []
 
-    def command(self, argv: list[str], *, cwd: Path | None = None) -> list[str]:
-        """Write this run's policy and return the runner argv for *argv*."""
+    def command(
+        self,
+        argv: list[str],
+        *,
+        cwd: Path | None = None,
+        read_only: tuple[Path, ...] = (),
+        max_processes: int = 64,
+    ) -> list[str]:
+        """Write this run's policy and return the runner argv for *argv*.
+
+        *read_only* folders outside the copy are mounted read-only (Linux), for
+        a caller that must hand the program large inputs it may not change.
+        """
         directory = (cwd or self.folder).resolve()
         if directory != self.folder.resolve() and self.folder.resolve() not in directory.parents:
             raise CommandBackendError("sandbox_cwd_outside_folder")
@@ -705,9 +716,12 @@ class ScratchRun:
             "pty": False,
             "deadline_seconds": self._deadline,
             "max_cpu_seconds": self._deadline,
-            "max_processes": 64,
+            "max_processes": max_processes,
             "max_memory_bytes": self._memory_bytes,
-            "toolchain_paths": toolchain_mounts(argv[0], self.folder) if argv else [],
+            "toolchain_paths": [
+                *(toolchain_mounts(argv[0], self.folder) if argv else []),
+                *(str(path) for path in read_only),
+            ],
         }
         policies = internal_io_path(self._root / ".raiker" / "command-policies")
         policies.mkdir(parents=True, exist_ok=True)

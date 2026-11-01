@@ -3,17 +3,30 @@
 //!
 //! Windows Firewall does not filter loopback, so the account's outbound block
 //! left every local service reachable: anything listening on `127.0.0.1` or
-//! on one of this machine's own addresses (a database, a dev server, Raiker's
-//! own API). These filters close that, from the *listener's* side: the accept
-//! layer knows both who is listening (`ALE_USER_ID`) and, for a local
-//! connection, who is connecting (`ALE_REMOTE_USER_ID`). In one sublayer:
+//! on one of this machine's own addresses (a database, a dev server, Ollama,
+//! Raiker's own API).
 //!
-//! * permit when the listener is the account itself, because toolchains
-//!   connect to their own listeners (Python's asyncio builds its wake-up
-//!   socket pair over loopback on Windows);
-//! * permit to Raiker's download-proxy ports, the one local service a run is
-//!   meant to reach;
-//! * block every other local connection the account makes.
+//! The model is Claude Code's sandbox on Linux: a command reaches the
+//! download proxy and servers it started itself, and nothing else on the
+//! host's `localhost`. Windows cannot say whose listener a local connection
+//! reaches when the account opens it, and the accept layer does not know who
+//! is connecting (`ALE_REMOTE_USER_ID` stays empty for loopback: measured on
+//! Windows 11, a filter on it installed and never matched). So the filters sit
+//! at the connect layer, matched on the account (`ALE_USER_ID`, the condition
+//! Windows Firewall's own rule for the account uses), and approximate "its own
+//! servers" by port. In one sublayer:
+//!
+//! * permit the download-proxy ports, the one host service a run may reach;
+//! * permit the OS's dynamic port range, where a server bound to port 0 lands
+//!   (Python's asyncio builds its wake-up socket pair that way on Windows, and
+//!   so do test servers that ask for any free port);
+//! * block every other local connection the account makes, which covers the
+//!   fixed ports host services listen on.
+//!
+//! What this leaves open, and says so: a host service on a dynamic port is
+//! reachable, and a sandboxed server on a fixed port cannot be reached by the
+//! command that started it. The WSL2 backend, a private network namespace,
+//! has neither gap.
 //!
 //! The filters are persistent and keyed by fixed GUIDs, so setup replaces them
 //! and reset removes them. Whether they hold is measured by the probe, with an
@@ -28,24 +41,27 @@ use windows_sys::Win32::NetworkManagement::WindowsFilteringPlatform::{
     FWP_ACTION_BLOCK, FWP_ACTION_PERMIT, FWP_BYTE_BLOB, FWP_CONDITION_FLAG_IS_LOOPBACK,
     FWP_CONDITION_VALUE0, FWP_CONDITION_VALUE0_0, FWP_MATCH_EQUAL, FWP_MATCH_FLAGS_ALL_SET,
     FWP_MATCH_RANGE, FWP_RANGE_TYPE, FWP_RANGE0, FWP_SECURITY_DESCRIPTOR_TYPE, FWP_UINT8,
-    FWP_UINT16, FWP_UINT32, FWP_VALUE0, FWP_VALUE0_0, FWPM_ACTION0,
-    FWPM_CONDITION_ALE_REMOTE_USER_ID, FWPM_CONDITION_ALE_USER_ID, FWPM_CONDITION_FLAGS,
-    FWPM_CONDITION_IP_LOCAL_PORT, FWPM_DISPLAY_DATA0, FWPM_FILTER_CONDITION0,
-    FWPM_FILTER_FLAG_PERSISTENT, FWPM_FILTER0, FWPM_LAYER_ALE_AUTH_RECV_ACCEPT_V4,
-    FWPM_LAYER_ALE_AUTH_RECV_ACCEPT_V6, FWPM_PROVIDER_FLAG_PERSISTENT, FWPM_PROVIDER0,
-    FWPM_SUBLAYER_FLAG_PERSISTENT, FWPM_SUBLAYER0, FwpmEngineClose0, FwpmEngineOpen0,
-    FwpmFilterAdd0, FwpmFilterDeleteByKey0, FwpmProviderAdd0, FwpmProviderDeleteByKey0,
-    FwpmSubLayerAdd0, FwpmSubLayerDeleteByKey0, FwpmTransactionAbort0, FwpmTransactionBegin0,
-    FwpmTransactionCommit0,
+    FWP_UINT16, FWP_UINT32, FWP_VALUE0, FWP_VALUE0_0, FWPM_ACTION0, FWPM_CONDITION_ALE_USER_ID,
+    FWPM_CONDITION_FLAGS, FWPM_CONDITION_IP_REMOTE_PORT, FWPM_DISPLAY_DATA0,
+    FWPM_FILTER_CONDITION0, FWPM_FILTER_FLAG_PERSISTENT, FWPM_FILTER0,
+    FWPM_LAYER_ALE_AUTH_CONNECT_V4, FWPM_LAYER_ALE_AUTH_CONNECT_V6, FWPM_PROVIDER_FLAG_PERSISTENT,
+    FWPM_PROVIDER0, FWPM_SUBLAYER_FLAG_PERSISTENT, FWPM_SUBLAYER0, FwpmEngineClose0,
+    FwpmEngineOpen0, FwpmFilterAdd0, FwpmFilterDeleteByKey0, FwpmProviderAdd0,
+    FwpmProviderDeleteByKey0, FwpmSubLayerAdd0, FwpmSubLayerDeleteByKey0, FwpmTransactionAbort0,
+    FwpmTransactionBegin0, FwpmTransactionCommit0,
 };
 use windows_sys::Win32::Security::GetSecurityDescriptorLength;
 use windows_sys::core::GUID;
 
 /// The ports Raiker's per-run download proxy listens on when commands run as
 /// the account (`raiker/execution/commands/egress_runtime.py` uses the same
-/// range). A run is allowed to reach these and no other local port.
+/// range). Below Windows' dynamic range, so they never collide with it.
 pub const PROXY_PORT_LOW: u16 = 47300;
 pub const PROXY_PORT_HIGH: u16 = 47363;
+
+/// Windows' default dynamic (ephemeral) TCP range, used when the host's own
+/// setting cannot be read.
+pub const DEFAULT_DYNAMIC_PORTS: (u16, u16) = (49152, 65535);
 
 const RPC_C_AUTHN_WINNT: u32 = 10;
 
@@ -64,19 +80,19 @@ const FILTERS: [GUID; 6] = [
 /// What each filter does, before it is turned into WFP structures.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum Rule {
-    /// The listener is the account: its own socket pairs and servers.
-    OwnListener,
-    /// The listener is on a download-proxy port.
+    /// A local connection to a download-proxy port.
     ProxyPort,
-    /// Anything else on this machine, reached by the account.
+    /// A local connection to the dynamic range: servers bound to port 0.
+    DynamicPort,
+    /// Any other local connection the account makes.
     BlockLocal,
 }
 
 impl Rule {
     fn weight(self) -> u8 {
         match self {
-            Rule::OwnListener => 15,
-            Rule::ProxyPort => 14,
+            Rule::ProxyPort => 15,
+            Rule::DynamicPort => 14,
             Rule::BlockLocal => 10,
         }
     }
@@ -87,10 +103,10 @@ pub fn filters() -> Vec<(GUID, GUID, Rule)> {
     let mut out = Vec::new();
     let mut keys = FILTERS.iter();
     for layer in [
-        FWPM_LAYER_ALE_AUTH_RECV_ACCEPT_V4,
-        FWPM_LAYER_ALE_AUTH_RECV_ACCEPT_V6,
+        FWPM_LAYER_ALE_AUTH_CONNECT_V4,
+        FWPM_LAYER_ALE_AUTH_CONNECT_V6,
     ] {
-        for rule in [Rule::OwnListener, Rule::ProxyPort, Rule::BlockLocal] {
+        for rule in [Rule::ProxyPort, Rule::DynamicPort, Rule::BlockLocal] {
             out.push((*keys.next().expect("one key per filter"), layer, rule));
         }
     }
@@ -153,25 +169,64 @@ impl Drop for Descriptor {
     }
 }
 
-/// Install (or replace) the provider, sublayer and filters for *account_sid*.
-pub fn install(account_sid: &str) -> Result<(), String> {
+/// Install (or replace) the provider, sublayer and filters for *account_sid*;
+/// returns the dynamic range the filters permit.
+pub fn install(account_sid: &str) -> Result<(u16, u16), String> {
     let engine = Engine::open()?;
     let descriptor = Descriptor::for_sid(account_sid)?;
+    let dynamic = dynamic_ports();
     transaction(&engine, |engine| {
         remove_all(engine)?;
         add_provider(engine)?;
         add_sublayer(engine)?;
         for (key, layer, rule) in filters() {
-            add_filter(engine, key, layer, rule, &descriptor)?;
+            add_filter(engine, key, layer, rule, &descriptor, dynamic)?;
         }
         Ok(())
-    })
+    })?;
+    Ok(dynamic)
 }
 
 /// Remove everything [`install`] added. Missing pieces are not an error.
 pub fn remove() -> Result<(), String> {
     let engine = Engine::open()?;
     transaction(&engine, remove_all)
+}
+
+/// The host's dynamic TCP port range, from `netsh` (setup is elevated and
+/// runs once), or Windows' default.
+fn dynamic_ports() -> (u16, u16) {
+    let Some(windows) = std::env::var_os("SystemRoot") else {
+        return DEFAULT_DYNAMIC_PORTS;
+    };
+    let netsh = PathBuf::from(windows).join("System32").join("netsh.exe");
+    match std::process::Command::new(netsh)
+        .args(["int", "ipv4", "show", "dynamicport", "tcp"])
+        .output()
+    {
+        Ok(output) if output.status.success() => {
+            parse_dynamic_ports(&String::from_utf8_lossy(&output.stdout))
+                .unwrap_or(DEFAULT_DYNAMIC_PORTS)
+        }
+        _ => DEFAULT_DYNAMIC_PORTS,
+    }
+}
+
+/// `Start Port : 49152` / `Number of Ports : 16384`, read by position so a
+/// localized label does not matter: the first two numbers after a colon. A
+/// range that would include the proxy ports is refused.
+pub fn parse_dynamic_ports(text: &str) -> Option<(u16, u16)> {
+    let numbers: Vec<u32> = text
+        .lines()
+        .filter_map(|line| line.split_once(':'))
+        .filter_map(|(_, value)| value.trim().parse().ok())
+        .collect();
+    let (&start, &count) = (numbers.first()?, numbers.get(1)?);
+    let end = start.checked_add(count)?.checked_sub(1)?;
+    if start <= u32::from(PROXY_PORT_HIGH) || count == 0 || end > 65535 {
+        return None;
+    }
+    Some((start as u16, end as u16))
 }
 
 fn transaction(
@@ -261,14 +316,14 @@ fn added(code: u32) -> Result<(), String> {
     }
 }
 
-fn user_condition(field: GUID, blob: &mut FWP_BYTE_BLOB) -> FWPM_FILTER_CONDITION0 {
-    FWPM_FILTER_CONDITION0 {
-        fieldKey: field,
-        matchType: FWP_MATCH_EQUAL,
-        conditionValue: FWP_CONDITION_VALUE0 {
-            r#type: FWP_SECURITY_DESCRIPTOR_TYPE,
-            Anonymous: FWP_CONDITION_VALUE0_0 { sd: blob },
-        },
+fn port_range(low: u16, high: u16) -> FWP_RANGE0 {
+    let value = |port: u16| FWP_VALUE0 {
+        r#type: FWP_UINT16,
+        Anonymous: FWP_VALUE0_0 { uint16: port },
+    };
+    FWP_RANGE0 {
+        valueLow: value(low),
+        valueHigh: value(high),
     }
 }
 
@@ -278,26 +333,38 @@ fn add_filter(
     layer: GUID,
     rule: Rule,
     descriptor: &Descriptor,
+    dynamic: (u16, u16),
 ) -> Result<(), String> {
     let mut account = descriptor.blob();
-    let mut ports = FWP_RANGE0 {
-        valueLow: FWP_VALUE0 {
-            r#type: FWP_UINT16,
-            Anonymous: FWP_VALUE0_0 {
-                uint16: PROXY_PORT_LOW,
-            },
-        },
-        valueHigh: FWP_VALUE0 {
-            r#type: FWP_UINT16,
-            Anonymous: FWP_VALUE0_0 {
-                uint16: PROXY_PORT_HIGH,
-            },
-        },
+    let mut ports = match rule {
+        Rule::ProxyPort => port_range(PROXY_PORT_LOW, PROXY_PORT_HIGH),
+        _ => port_range(dynamic.0, dynamic.1),
     };
-    let mut conditions: Vec<FWPM_FILTER_CONDITION0> = match rule {
-        Rule::OwnListener => vec![user_condition(FWPM_CONDITION_ALE_USER_ID, &mut account)],
-        Rule::ProxyPort => vec![FWPM_FILTER_CONDITION0 {
-            fieldKey: FWPM_CONDITION_IP_LOCAL_PORT,
+    // Every filter is the account's own local connections; the permits narrow
+    // that to a destination port range.
+    let mut conditions = vec![
+        FWPM_FILTER_CONDITION0 {
+            fieldKey: FWPM_CONDITION_ALE_USER_ID,
+            matchType: FWP_MATCH_EQUAL,
+            conditionValue: FWP_CONDITION_VALUE0 {
+                r#type: FWP_SECURITY_DESCRIPTOR_TYPE,
+                Anonymous: FWP_CONDITION_VALUE0_0 { sd: &mut account },
+            },
+        },
+        FWPM_FILTER_CONDITION0 {
+            fieldKey: FWPM_CONDITION_FLAGS,
+            matchType: FWP_MATCH_FLAGS_ALL_SET,
+            conditionValue: FWP_CONDITION_VALUE0 {
+                r#type: FWP_UINT32,
+                Anonymous: FWP_CONDITION_VALUE0_0 {
+                    uint32: FWP_CONDITION_FLAG_IS_LOOPBACK,
+                },
+            },
+        },
+    ];
+    if rule != Rule::BlockLocal {
+        conditions.push(FWPM_FILTER_CONDITION0 {
+            fieldKey: FWPM_CONDITION_IP_REMOTE_PORT,
             matchType: FWP_MATCH_RANGE,
             conditionValue: FWP_CONDITION_VALUE0 {
                 r#type: FWP_RANGE_TYPE,
@@ -305,24 +372,11 @@ fn add_filter(
                     rangeValue: &mut ports,
                 },
             },
-        }],
-        Rule::BlockLocal => vec![
-            FWPM_FILTER_CONDITION0 {
-                fieldKey: FWPM_CONDITION_FLAGS,
-                matchType: FWP_MATCH_FLAGS_ALL_SET,
-                conditionValue: FWP_CONDITION_VALUE0 {
-                    r#type: FWP_UINT32,
-                    Anonymous: FWP_CONDITION_VALUE0_0 {
-                        uint32: FWP_CONDITION_FLAG_IS_LOOPBACK,
-                    },
-                },
-            },
-            user_condition(FWPM_CONDITION_ALE_REMOTE_USER_ID, &mut account),
-        ],
-    };
+        });
+    }
     let name = wide(match rule {
-        Rule::OwnListener => "Raiker sandbox: permit its own listeners",
         Rule::ProxyPort => "Raiker sandbox: permit the download proxy",
+        Rule::DynamicPort => "Raiker sandbox: permit servers on dynamic ports",
         Rule::BlockLocal => "Raiker sandbox: block local services",
     });
     let mut provider = PROVIDER;
@@ -375,8 +429,25 @@ mod tests {
         keys.sort_unstable();
         keys.dedup();
         assert_eq!(keys.len(), FILTERS.len());
+        assert!(Rule::BlockLocal.weight() < Rule::DynamicPort.weight());
         assert!(Rule::BlockLocal.weight() < Rule::ProxyPort.weight());
-        assert!(Rule::ProxyPort.weight() < Rule::OwnListener.weight());
+    }
+
+    #[test]
+    fn the_dynamic_range_is_read_by_position_and_checked() {
+        let english = "Protocol tcp Dynamic Port Range\n---\nStart Port      : 49152\nNumber of Ports : 16384\n";
+        assert_eq!(parse_dynamic_ports(english), Some((49152, 65535)));
+        let localized = "Startport       : 50000\nAnzahl der Ports: 1000\n";
+        assert_eq!(parse_dynamic_ports(localized), Some((50000, 50999)));
+        // Past 65535, overlapping the proxy ports, or unreadable: refused.
+        assert_eq!(parse_dynamic_ports("A : 60000\nB : 9000\n"), None);
+        assert_eq!(parse_dynamic_ports("A : 10000\nB : 50000\n"), None);
+        assert_eq!(parse_dynamic_ports("nothing here"), None);
+    }
+
+    #[test]
+    fn the_proxy_ports_sit_below_the_default_dynamic_range() {
+        assert!(PROXY_PORT_HIGH < DEFAULT_DYNAMIC_PORTS.0);
     }
 
     #[test]

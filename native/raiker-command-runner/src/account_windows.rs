@@ -144,14 +144,17 @@ pub fn setup() -> Result<Value, String> {
     let account_text = sid_text(account_sid(ACCOUNT)?.as_ptr() as PSID)?;
     create_base(&owner, &account_text)?;
     firewall_block(&account_text)?;
-    super::wfp::install(&account_text)?;
+    let dynamic = super::wfp::install(&account_text)?;
     let denied = deny_other_drives(group.as_ptr() as PSID)?;
     Ok(json!({
         "configured": true,
         "base": base()?.to_string_lossy(),
         "denied_drives": denied,
         "firewall_rule": FIREWALL_RULE,
-        "loopback_filter": true,
+        "loopback_filter": {
+            "proxy_ports": [super::wfp::PROXY_PORT_LOW, super::wfp::PROXY_PORT_HIGH],
+            "dynamic_ports": [dynamic.0, dynamic.1],
+        },
     }))
 }
 
@@ -1102,10 +1105,13 @@ fn measure_in(scratch: &Path, nonce: &str) -> Result<Value, String> {
             .into_iter()
             .map(|drive| drive.join(format!(".{nonce}-escape.tmp"))),
     );
-    // A listener of the owner's on loopback stands for every local service.
-    // Nothing is accepted: a completed handshake is the observation.
-    let owner_listener = std::net::TcpListener::bind("127.0.0.1:0")
-        .map_err(|_| "native_sandbox_probe_storage_unavailable")?;
+    // A listener of the owner's on a fixed loopback port stands for every
+    // local service (they listen on fixed ports; the dynamic range is left
+    // open for the account's own port-0 servers). Nothing is accepted: a
+    // completed handshake is the observation.
+    let owner_listener = (47200..47300)
+        .find_map(|port| std::net::TcpListener::bind(("127.0.0.1", port)).ok())
+        .ok_or("native_sandbox_probe_storage_unavailable")?;
     let loopback_address = owner_listener
         .local_addr()
         .map_err(|_| "native_sandbox_probe_storage_unavailable")?

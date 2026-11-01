@@ -20,7 +20,7 @@ reach because Windows does not grant one standard user another's files.
 | `RaikerSandboxUsers` local group | The only principal granted the task copies | One-time elevated setup |
 | `C:\RaikerSandbox` base | Task copies live here (not under the owner's profile, which the account cannot traverse). DACL: SYSTEM, Administrators, owner, `RaikerSandboxUsers` | One-time elevated setup |
 | Outbound firewall rule | Blocks all outbound traffic for the account's SID (Windows Firewall does not filter loopback) | One-time elevated setup |
-| WFP loopback filter | At the listener's accept layer: permits the account's own listeners and the download-proxy ports 47300–47363, blocks every other local connection the account makes | One-time elevated setup (`wfp_windows.rs`) |
+| WFP loopback filter | At the connect layer, matched on the account (`ALE_USER_ID`): permits local connections to the download-proxy ports 47300–47363 and to the OS dynamic range (49152–65535 by default; read at setup), blocks every other local connection the account makes | One-time elevated setup (`wfp_windows.rs`) |
 | Credential | Password sealed with DPAPI for the owner's user, stored in Raiker's data directory | Setup |
 
 ## Launch path (no elevation at run time)
@@ -111,20 +111,28 @@ and the profile-escape refusal; CI's Windows job now runs setup and requires it.
 
 ## Known gaps (tracked in TO_BE_FIXED.md)
 
-* **Loopback (filter added 2026-11-01, measurement pending):** Windows
-  Firewall does not filter loopback, so setup now installs WFP filters at
-  `ALE_AUTH_RECV_ACCEPT_V4/V6`, matched on the connecting user
-  (`ALE_REMOTE_USER_ID`). The account may still reach its own listeners
-  (Python's asyncio builds its wake-up socket pair over loopback) and the
-  per-run download proxy, which now binds exclusively within ports
-  47300–47363. Measured on this Windows 11 host *before* the filter (setup
-  from an earlier version): the probe's `loopback` row read `unenforced` — the
-  account connected to an owner listener on `127.0.0.1` — while
-  `own_loopback` held and a proxy-range port was reachable. The filter itself
-  is measured by CI's fresh setup (`tests/windows_account.rs`) and on a host
-  once the owner runs setup again. Reported in the probe, not yet required.
-  A local service of the owner's that listens on a proxy-range port is
-  reachable.
+* **Loopback (2026-11-01).** The aim is Claude Code's Linux sandbox: a
+  command reaches the download proxy and servers it started itself, and
+  nothing else on the host's `localhost`. Windows Firewall does not filter
+  loopback. A first filter at the accept layer, matched on the connecting
+  user (`ALE_REMOTE_USER_ID`), installed and **never matched** on Windows 11:
+  WFP leaves that field empty for loopback (the filter dump showed our
+  conditions as written and no hard permit overriding the sublayer). The
+  filter now sits at the connect layer, matched on the account (`ALE_USER_ID`,
+  the condition Windows Firewall's own rule for the account uses). Windows
+  cannot say whose listener a local connection reaches, so "its own servers"
+  is approximated by port: the OS dynamic range, where a server bound to port
+  0 lands (Python 3.13's `socket.socketpair` on Windows is loopback TCP, so
+  every asyncio program needs this), stays open, with the proxy ports; fixed
+  ports, where host services listen (Raiker 8765, Ollama 11434, databases, dev
+  servers), are blocked. **Gaps:** a host service on a dynamic port is
+  reachable, and a sandboxed server on a fixed port cannot be reached by the
+  command that started it. The WSL2 backend (a private network namespace, the
+  same as Claude Code's Linux sandbox) has neither. The probe reports a
+  `loopback` row against an owner listener on a fixed port, and
+  `own_loopback`; reported, not yet required. The download proxy binds
+  exclusively within 47300–47363. A local service of the owner's that listens
+  on a proxy-range port is reachable.
 * **Explicit grants under denied drives:** an explicit allow on a folder below a
   denied root outranks the inherited deny; such folders stay reachable.
 * **Persistent account profile:** `C:\Users\RaikerSandbox` persists between

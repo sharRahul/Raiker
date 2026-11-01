@@ -70,8 +70,8 @@ PROXY_VARIABLES: tuple[str, ...] = (
 #: The loopback port the Linux bridge listens on inside the private namespace.
 LINUX_BRIDGE_PORT = 3128
 #: The ports a Windows run's proxy may listen on. The restricted account's
-#: loopback filter permits exactly these (``wfp_windows.rs``), so a command can
-#: reach the proxy and no other local service.
+#: loopback filter permits these and the OS dynamic range (``wfp_windows.rs``),
+#: so a command reaches the proxy and no host service on a fixed port.
 WINDOWS_PROXY_PORTS = range(47300, 47364)
 PROFILE_ID = "native_sandbox"
 

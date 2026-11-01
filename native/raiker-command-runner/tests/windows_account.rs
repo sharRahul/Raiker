@@ -401,22 +401,35 @@ fn connects(copy: &Copy, port: u16) -> bool {
         == Some(0)
 }
 
+fn free_port_in(ports: std::ops::RangeInclusive<u16>) -> std::net::TcpListener {
+    ports
+        .into_iter()
+        .find_map(|port| std::net::TcpListener::bind(("127.0.0.1", port)).ok())
+        .expect("a free port in the range")
+}
+
 #[test]
-fn only_the_download_proxy_ports_are_open_to_the_account() {
+fn the_account_reaches_the_proxy_and_port_zero_servers_but_no_fixed_port_service() {
     let Some(base) = freshly_set_up() else { return };
     let copy = copy_under(&base, "loopback");
-    let proxy = (47300..=47363)
-        .find_map(|port| std::net::TcpListener::bind(("127.0.0.1", port)).ok())
-        .expect("a free proxy port");
-    let other = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
-    let proxy_port = proxy.local_addr().unwrap().port();
-    let other_port = other.local_addr().unwrap().port();
+    // Owner listeners: the proxy range, a fixed port where services such as
+    // Raiker (8765) or Ollama (11434) listen, and a port-0 server.
+    let proxy = free_port_in(47300..=47363);
+    let fixed = free_port_in(40000..=40100);
+    let ephemeral = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+    let port = |listener: &std::net::TcpListener| listener.local_addr().unwrap().port();
     assert!(
-        connects(&copy, proxy_port),
+        connects(&copy, port(&proxy)),
         "the proxy range must stay reachable"
     );
     assert!(
-        !connects(&copy, other_port),
-        "another local service was reachable"
+        !connects(&copy, port(&fixed)),
+        "a fixed-port local service was reachable"
+    );
+    // The dynamic range stays open for the account's own port-0 servers; a
+    // host service there is the stated gap.
+    assert!(
+        connects(&copy, port(&ephemeral)),
+        "the dynamic range must stay reachable"
     );
 }

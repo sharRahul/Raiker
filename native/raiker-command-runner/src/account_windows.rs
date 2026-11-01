@@ -1163,8 +1163,8 @@ fn measure_in(scratch: &Path, nonce: &str) -> Result<Value, String> {
     );
     let network = selftest::verdict(reached(&inside), reached(&outside));
     drop(owner_listener);
-    // Reported, not yet required: the filters are new, and an older setup has
-    // none until the owner runs setup again.
+    // Required: an older setup has no loopback filter, and such a host
+    // refuses until the owner runs setup again.
     let loopback = selftest::verdict(
         nested_allowed(&inside, "loopback"),
         nested_allowed(&outside, "loopback"),
@@ -1181,7 +1181,8 @@ fn measure_in(scratch: &Path, nonce: &str) -> Result<Value, String> {
         && escape == "enforced"
         && masked_read == "enforced"
         && network == "enforced"
-        && descendant == "enforced";
+        && descendant == "enforced"
+        && loopback == "enforced";
     Ok(json!({
         "platform": "windows",
         "boundary": "restricted_account",

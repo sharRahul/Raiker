@@ -130,7 +130,7 @@ and the profile-escape refusal; CI's Windows job now runs setup and requires it.
   command that started it. The WSL2 backend (a private network namespace, the
   same as Claude Code's Linux sandbox) has neither. The probe reports a
   `loopback` row against an owner listener on a fixed port, and
-  `own_loopback`; reported, not yet required. **Measured on Windows 11
+  `own_loopback`. **Required** for the account boundary: a host set up before this filter refuses (`native_sandbox_not_enforced`) until the owner runs setup again. **Measured on Windows 11
   (2026-11-01, setup rerun with this filter):** every probe row enforced,
   `loopback` included, and `own_loopback` true; the account reached a
   proxy-range port and a port-0 server and not a fixed-port owner listener

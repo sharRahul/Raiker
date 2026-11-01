@@ -375,6 +375,11 @@ class NativeSandboxDriver:
         )
         if sys.platform.startswith("linux") or report.get("platform") == "linux":
             required += ("seccomp",)
+        if report.get("boundary") == "restricted_account":
+            # Windows Firewall does not filter loopback; the account's WFP
+            # filter does, and a host set up before it has none. Such a host
+            # refuses until the owner runs setup again.
+            required += ("loopback",)
         if report.get("boundary") == "wsl_bubblewrap":
             # The Linux boundary, plus the one thing WSL adds: nothing in the
             # distribution may start a Windows program.

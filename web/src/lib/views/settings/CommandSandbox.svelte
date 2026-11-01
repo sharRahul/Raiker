@@ -9,6 +9,7 @@
    */
   import { onMount } from "svelte";
   import { api, ApiError } from "../../api";
+  import { askConfirm } from "../../confirm.svelte";
   import type { CommandSandboxView } from "../../apiTypes";
 
   type Backend = "account" | "wsl";
@@ -59,7 +60,6 @@
   };
 
   let rootfs = $state("");
-  let confirmingRemove = $state(false);
 
   async function setUp() {
     busy = true;
@@ -76,8 +76,14 @@
   }
 
   async function remove() {
+    const confirmed = await askConfirm({
+      title: "Remove WSL2?",
+      body: "This deletes Raiker's WSL distribution and every task copy inside it, including changes not yet applied. Commands go back to the sandbox account.",
+      confirmLabel: "Remove WSL2",
+      danger: true,
+    });
+    if (!confirmed) return;
     busy = true;
-    confirmingRemove = false;
     notice = null;
     try {
       view = await api.removeCommandSandboxWsl();
@@ -95,7 +101,7 @@
 {#if view?.applies}
   <section class="settings-card" aria-label="Command sandbox">
     <div class="card-heading"><h3>Command sandbox</h3></div>
-    <p>Where sandboxed commands run on this PC. Hooks, MCP servers and plugins always use the sandbox account.</p>
+    <p>Where sandboxed commands run on this PC. Hooks, connected tools and plugins always use the sandbox account.</p>
     <fieldset disabled={busy}>
       <legend class="sr-only">Command sandbox</legend>
       <label class="option">
@@ -121,17 +127,7 @@
     </fieldset>
     {#if view.wsl_configured}
       <p class="notice notice-ok">WSL2 is set up.</p>
-      {#if confirmingRemove}
-        <p class="notice notice-danger" role="alert">
-          This deletes Raiker's WSL distribution and every task copy inside it, including changes not yet applied.
-        </p>
-        <div class="actions">
-          <button class="btn btn-danger btn-sm" type="button" disabled={busy} onclick={() => void remove()}>Remove WSL2</button>
-          <button class="btn btn-ghost btn-sm" type="button" disabled={busy} onclick={() => (confirmingRemove = false)}>Keep it</button>
-        </div>
-      {:else}
-        <button class="btn btn-ghost btn-sm" type="button" disabled={busy} onclick={() => (confirmingRemove = true)}>Remove WSL2…</button>
-      {/if}
+      <button class="btn btn-ghost btn-sm" type="button" disabled={busy} onclick={() => void remove()}>Remove WSL2…</button>
     {:else}
       <p class="notice {view.windows_backend === 'wsl' ? 'notice-danger' : ''}" role="status">
         WSL2 is not set up{view.windows_backend === "wsl" ? ", so commands will be refused until it is" : ""}:
@@ -163,5 +159,4 @@
   .option { display: flex; align-items: center; gap: var(--space-2); }
   .setup { display: grid; gap: var(--space-2); }
   .setup input { width: 100%; font-family: var(--font-mono); font-size: var(--text-xs); }
-  .actions { display: flex; gap: var(--space-2); }
 </style>

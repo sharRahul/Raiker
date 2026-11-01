@@ -67,16 +67,20 @@ it("explains a refused setup in words the owner can act on", async () => {
   expect(await screen.findByText("That file is not a .tar or .tar.gz root filesystem.")).toBeInTheDocument();
 });
 
-it("removes WSL2 only after the owner confirms", async () => {
+it("removes WSL2 only after the owner confirms in the shared dialog", async () => {
   vi.spyOn(api, "commandSandbox").mockResolvedValue({ ...windows, windows_backend: "wsl", wsl_configured: true, wsl_missing: [] });
   const remove = vi.spyOn(api, "removeCommandSandboxWsl").mockResolvedValue(windows);
+  // Rendered without the shell, askConfirm asks the browser in the same words.
+  const ask = vi.spyOn(window, "confirm").mockReturnValueOnce(false).mockReturnValueOnce(true);
   render(CommandSandbox);
 
-  await fireEvent.click(await screen.findByRole("button", { name: "Remove WSL2…" }));
+  const button = await screen.findByRole("button", { name: "Remove WSL2…" });
+  await fireEvent.click(button);
+  await waitFor(() => expect(ask).toHaveBeenCalledTimes(1));
+  expect(ask.mock.calls[0][0]).toMatch(/every task copy inside it/);
   expect(remove).not.toHaveBeenCalled();
-  expect(screen.getByRole("alert")).toHaveTextContent(/every task copy inside it/);
-  await fireEvent.click(screen.getByRole("button", { name: "Remove WSL2" }));
 
+  await fireEvent.click(button);
   await waitFor(() => expect(remove).toHaveBeenCalled());
   expect(await screen.findByText("WSL2 removed. Commands run as the sandbox account.")).toBeInTheDocument();
 });

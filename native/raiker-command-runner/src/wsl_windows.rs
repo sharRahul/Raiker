@@ -48,10 +48,8 @@ fn wsl_exe() -> Result<PathBuf, String> {
 /// `wsl.exe` prints UTF-16LE when its output is not a console.
 fn decode(bytes: &[u8]) -> String {
     if bytes.len() >= 2 && bytes.len().is_multiple_of(2) && bytes[1] == 0 {
-        let units: Vec<u16> = bytes
-            .chunks_exact(2)
-            .map(|pair| u16::from_le_bytes([pair[0], pair[1]]))
-            .collect();
+        let (pairs, _) = bytes.as_chunks::<2>();
+        let units: Vec<u16> = pairs.iter().map(|pair| u16::from_le_bytes(*pair)).collect();
         String::from_utf16_lossy(&units)
     } else {
         String::from_utf8_lossy(bytes).into_owned()

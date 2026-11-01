@@ -11,7 +11,7 @@
 //! before. Every process a run starts, detached or not, belongs to that
 //! account, so:
 //!
-//! * **stopping a run** is `kill(-1, SIGKILL)` as the account, which reaches every
+//! * **stopping a run** is killing every process of the account, which reaches every
 //!   one of its processes and nothing else;
 //! * **memory** is the sum of `ri_phys_footprint` over the account's
 //!   processes, polled by the account-side runner, and the run is stopped
@@ -434,10 +434,6 @@ impl Drop for AccountLock {
 /// Every process the account owns, and nothing else, stopped by the installed
 /// runner's `--account-stop` running as the account. Run before a run (a
 /// crashed Raiker can leave one behind) and after it.
-///
-/// Not `/bin/kill -9 -1`: measured on macOS 15, BSD `kill` exits non-zero
-/// through `sudo` there, and its argument rules are not ours to rely on. The
-/// runner calls `kill(-1, SIGKILL)` itself and reports only its own failure.
 fn stop_account_processes() -> Result<(), String> {
     let output = Command::new(SUDO)
         .args(["-n", "-u", ACCOUNT, INSTALLED_RUNNER, "--account-stop"])
@@ -462,20 +458,50 @@ fn stop_account_processes() -> Result<(), String> {
     ))
 }
 
-/// `--account-stop`, started by `sudo` as the account: `kill(-1, SIGKILL)`,
-/// which reaches every process with this uid except the caller. `ESRCH` means
-/// there was nothing to stop.
+/// `--account-stop`, started by `sudo` as the account.
 pub fn account_stop() -> Result<i32, String> {
     let account = account().ok_or("native_sandbox_account_unconfigured")?;
     if unsafe { libc::getuid() } != account.uid || unsafe { libc::geteuid() } != account.uid {
         return Err("native_sandbox_account_identity_mismatch".into());
     }
-    if unsafe { libc::kill(-1, libc::SIGKILL) } != 0
-        && std::io::Error::last_os_error().raw_os_error() != Some(libc::ESRCH)
-    {
-        return Err("native_sandbox_account_stop_failed".into());
+    if kill_account_processes(account.uid) {
+        Ok(0)
+    } else {
+        Err("native_sandbox_account_processes_survived".into())
     }
-    Ok(0)
+}
+
+/// Kill every process of `uid` except this one and its parent, until none
+/// is left. Run *as* the account, so it can signal them.
+///
+/// Not `kill(-1)`: measured on macOS 15 CI, that also kills the `sudo`
+/// process this runs under — its monitor is signalable by the target user —
+/// so the owner side saw `sudo` die by signal and could not tell a stop from
+/// a failure. Listing by uid and sparing the parent keeps `sudo` alive to
+/// report. Each round stops before it kills, so a process forking during
+/// the round is frozen rather than racing; the per-user process limit bounds
+/// how many rounds that can take.
+fn kill_account_processes(uid: u32) -> bool {
+    let spared = [std::process::id() as i32, unsafe { libc::getppid() }];
+    for _ in 0..50 {
+        let targets: Vec<i32> = account_pids(uid)
+            .into_iter()
+            .filter(|pid| !spared.contains(pid))
+            .collect();
+        if targets.is_empty() {
+            return true;
+        }
+        for pid in &targets {
+            unsafe { libc::kill(*pid, libc::SIGSTOP) };
+        }
+        for pid in &targets {
+            unsafe { libc::kill(*pid, libc::SIGKILL) };
+        }
+        std::thread::sleep(Duration::from_millis(10));
+    }
+    account_pids(uid)
+        .into_iter()
+        .all(|pid| spared.contains(&pid))
 }
 
 fn account_has_processes(uid: u32) -> bool {
@@ -800,8 +826,8 @@ pub fn account_run(handoff: &Path) -> Result<i32, String> {
         let owner_gone = unsafe { libc::kill(owner_pid, 0) } != 0
             && std::io::Error::last_os_error().raw_os_error() == Some(libc::ESRCH);
         if over_memory || owner_gone || Instant::now() >= deadline {
-            // Every process of the account except this one.
-            unsafe { libc::kill(-1, libc::SIGKILL) };
+            // Every process of the account except this one and its `sudo`.
+            kill_account_processes(account.uid);
             let _ = child.wait();
             if over_memory {
                 let line = json!({"raiker_runner_notice": "native_sandbox_memory_limit_exceeded"});

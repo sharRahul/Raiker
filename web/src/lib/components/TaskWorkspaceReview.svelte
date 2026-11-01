@@ -165,7 +165,7 @@
   ul { display:grid; gap:.15rem; margin:0; padding:0; list-style:none; max-height:24rem; overflow:auto; font-family:var(--font-mono); font-size:var(--text-xs); }
   .file { all:unset; cursor:pointer; display:block; width:100%; }
   .file:hover, .file:focus-visible { color:var(--text-1); text-decoration:underline; }
-  .diff { margin:var(--space-1) 0; padding:var(--space-2); max-height:18rem; overflow:auto; border-radius:var(--r-sm); background:var(--surface-2); white-space:pre; }
+  .diff { margin:var(--space-1) 0; padding:var(--space-2); max-height:18rem; overflow:auto; border-radius:var(--r-sm); background:var(--surface-raised); white-space:pre; }
   .diff .add { color:var(--ok); }
   .diff .del { color:var(--danger); }
   .diff .hunk, .diff .meta { color:var(--text-3); }

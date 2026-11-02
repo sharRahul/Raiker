@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 #!/usr/bin/env python3
 """Produce a redacted, release-ready verdict from a local egress capture.
 

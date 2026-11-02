@@ -34,6 +34,9 @@ function connector(partial: Partial<StoreConnector> = {}): StoreConnector {
       },
     ],
     ...partial,
+    // The API now always reports a support level. Keep this fixture valid when
+    // callers supply a Partial<StoreConnector> whose optional value is absent.
+    support_level: partial.support_level ?? "supported",
   };
 }
 

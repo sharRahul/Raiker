@@ -29,7 +29,8 @@ def _probe(
     which = which or {}
 
     def run(argv: Sequence[str]) -> str | None:
-        key = " ".join(argv)
+        # Real Windows renders paths with backslashes; the table uses "/".
+        key = " ".join(argv).replace("\\", "/")
         for prefix, output in commands.items():
             if key.startswith(prefix):
                 return output

@@ -19,7 +19,8 @@ reach because Windows does not grant one standard user another's files.
 | `RaikerSandbox` local user | Standard user, no group memberships beyond the sandbox group, random 64-character password, "deny interactive and remote logon" rights | One-time elevated setup |
 | `RaikerSandboxUsers` local group | The only principal granted the task copies | One-time elevated setup |
 | `C:\RaikerSandbox` base | Task copies live here (not under the owner's profile, which the account cannot traverse). DACL: SYSTEM, Administrators, owner, `RaikerSandboxUsers` | One-time elevated setup |
-| Outbound firewall rule | Blocks all outbound traffic for the account's SID, loopback included | One-time elevated setup |
+| Outbound firewall rule | Blocks all outbound traffic for the account's SID (Windows Firewall does not filter loopback) | One-time elevated setup |
+| WFP loopback filter | At the connect layer, matched on the account (`ALE_USER_ID`): permits local connections to the download-proxy ports 47300–47363 and to the OS dynamic range (49152–65535 by default; read at setup), blocks every other local connection the account makes | One-time elevated setup (`wfp_windows.rs`) |
 | Credential | Password sealed with DPAPI for the owner's user, stored in Raiker's data directory | Setup |
 
 ## Launch path (no elevation at run time)
@@ -110,8 +111,35 @@ and the profile-escape refusal; CI's Windows job now runs setup and requires it.
 
 ## Known gaps (tracked in TO_BE_FIXED.md)
 
-* **Loopback:** Windows Firewall does not filter loopback; local services are
-  reachable from the sandbox until a WFP filter is added.
+* **Loopback (2026-11-01).** The aim is Claude Code's Linux sandbox: a
+  command reaches the download proxy and servers it started itself, and
+  nothing else on the host's `localhost`. Windows Firewall does not filter
+  loopback. A first filter at the accept layer, matched on the connecting
+  user (`ALE_REMOTE_USER_ID`), installed and **never matched** on Windows 11:
+  WFP leaves that field empty for loopback (the filter dump showed our
+  conditions as written and no hard permit overriding the sublayer). The
+  filter now sits at the connect layer, matched on the account (`ALE_USER_ID`,
+  the condition Windows Firewall's own rule for the account uses). Windows
+  cannot say whose listener a local connection reaches, so "its own servers"
+  is approximated by port: the OS dynamic range, where a server bound to port
+  0 lands (Python 3.13's `socket.socketpair` on Windows is loopback TCP, so
+  every asyncio program needs this), stays open, with the proxy ports; fixed
+  ports, where host services listen (Raiker 8765, Ollama 11434, databases, dev
+  servers), are blocked. **Gaps:** a host service on a dynamic port is
+  reachable, and a sandboxed server on a fixed port cannot be reached by the
+  command that started it. The WSL2 backend (a private network namespace, the
+  same as Claude Code's Linux sandbox) has neither. The probe reports a
+  `loopback` row against an owner listener on a fixed port, and
+  `own_loopback`. **Required** for the account boundary: a host set up before this filter refuses (`native_sandbox_not_enforced`) until the owner runs setup again. **Measured on Windows 11
+  (2026-11-01, setup rerun with this filter):** every probe row enforced,
+  `loopback` included, and `own_loopback` true; the account reached a
+  proxy-range port and a port-0 server and not a fixed-port owner listener
+  (`tests/windows_account.rs`, 10/10); inside the sandbox a Python 3.13
+  asyncio program served and connected on its own port 55278 while its
+  connection to Raiker's port 8765 was refused with `PermissionError` (the
+  WFP block, not a closed port). The download proxy binds
+  exclusively within 47300–47363. A local service of the owner's that listens
+  on a proxy-range port is reachable.
 * **Explicit grants under denied drives:** an explicit allow on a folder below a
   denied root outranks the inherited deny; such folders stay reachable.
 * **Persistent account profile:** `C:\Users\RaikerSandbox` persists between

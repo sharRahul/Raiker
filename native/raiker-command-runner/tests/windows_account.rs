@@ -358,3 +358,78 @@ fn the_job_process_limit_stops_a_child_past_it_and_not_one_inside_it() {
         "a child past the job's process limit started"
     );
 }
+
+/// The loopback filter is installed by setup from this version on; a machine
+/// set up earlier has none until the owner runs setup again. Where the account
+/// is required (CI runs setup fresh) it is measured; elsewhere it is skipped.
+fn freshly_set_up() -> Option<PathBuf> {
+    std::env::var_os("RAIKER_REQUIRE_ACCOUNT_SANDBOX").and(configured())
+}
+
+#[test]
+fn the_account_reaches_its_own_listeners_and_no_other_local_service() {
+    let Some(_) = freshly_set_up() else { return };
+    let output = Command::new(runner())
+        .args(["--probe", "--workspace"])
+        .arg(std::env::temp_dir())
+        .output()
+        .unwrap();
+    let report: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+    // The owner's control arm connected, the account did not.
+    assert_eq!(report["observations"]["loopback"], "enforced", "{report}");
+    // Toolchains open loopback listeners of their own (asyncio's socket pair).
+    assert_eq!(report["own_loopback"], true, "{report}");
+}
+
+fn connects(copy: &Copy, port: u16) -> bool {
+    let powershell = r"C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe";
+    let script = format!(
+        "try {{ $c = New-Object Net.Sockets.TcpClient; $c.Connect('127.0.0.1', {port}); exit 0 }} catch {{ exit 3 }}"
+    );
+    run(
+        copy,
+        &[
+            powershell,
+            "-NoProfile",
+            "-NonInteractive",
+            "-Command",
+            &script,
+        ],
+    )
+    .status
+    .code()
+        == Some(0)
+}
+
+fn free_port_in(ports: std::ops::RangeInclusive<u16>) -> std::net::TcpListener {
+    ports
+        .into_iter()
+        .find_map(|port| std::net::TcpListener::bind(("127.0.0.1", port)).ok())
+        .expect("a free port in the range")
+}
+
+#[test]
+fn the_account_reaches_the_proxy_and_port_zero_servers_but_no_fixed_port_service() {
+    let Some(base) = freshly_set_up() else { return };
+    let copy = copy_under(&base, "loopback");
+    // Owner listeners: the proxy range, a fixed port where services such as
+    // Raiker (8765) or Ollama (11434) listen, and a port-0 server.
+    let proxy = free_port_in(47300..=47363);
+    let fixed = free_port_in(40000..=40100);
+    let ephemeral = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+    let port = |listener: &std::net::TcpListener| listener.local_addr().unwrap().port();
+    assert!(
+        connects(&copy, port(&proxy)),
+        "the proxy range must stay reachable"
+    );
+    assert!(
+        !connects(&copy, port(&fixed)),
+        "a fixed-port local service was reachable"
+    );
+    // The dynamic range stays open for the account's own port-0 servers; a
+    // host service there is the stated gap.
+    assert!(
+        connects(&copy, port(&ephemeral)),
+        "the dynamic range must stay reachable"
+    );
+}

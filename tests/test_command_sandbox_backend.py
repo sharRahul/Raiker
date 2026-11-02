@@ -31,7 +31,7 @@ WSL_REPORT = {
         name: "enforced"
         for name in (
             "relay", "workspace_write", "escape_write", "masked_read", "egress",
-            "descendant_reaped", "seccomp", "windows_interop",
+            "descendant_reaped", "seccomp", "windows_interop", "loopback",
         )
     },
 }
@@ -235,3 +235,20 @@ def test_setup_is_refused_off_windows(tmp_path: Path) -> None:
     driver = native_backend.NativeSandboxDriver(tmp_path, helper_root=_bundled(tmp_path))
     assert driver.setup_wsl(tmp_path / "base.tar") == (False, "native_sandbox_wsl_unavailable")
     assert driver.reset_wsl() == (False, "native_sandbox_wsl_unavailable")
+
+
+def test_the_account_requires_its_loopback_filter(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A host set up before the WFP loopback filter refuses until setup runs again."""
+    driver = _driver(tmp_path, monkeypatch, [], ACCOUNT_REPORT)
+    observations = ACCOUNT_REPORT["observations"]
+    observations["loopback"] = "unenforced"  # type: ignore[index]
+    try:
+        proof = driver.probe()
+    finally:
+        observations["loopback"] = "enforced"  # type: ignore[index]
+    assert not proof.available
+    assert proof.reason_code == "native_sandbox_not_enforced"
+    assert driver.probe().available
+    native_backend._ACCOUNT_BASE_CACHE.clear()

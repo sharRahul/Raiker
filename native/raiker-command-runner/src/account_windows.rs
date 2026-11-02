@@ -16,10 +16,13 @@
 //! needs no elevation: `CreateProcessWithLogonW`, suspended, assigned to a Job
 //! Object with UI restrictions, then resumed.
 //!
-//! What this does not yet cover, and says so: Windows Firewall does not filter
-//! loopback, so local services remain reachable; and an *explicit* allow on a
-//! folder below a denied drive root outranks the inherited deny. The probe
-//! measures both rather than assuming them.
+//! Windows Firewall does not filter loopback, so setup also installs WFP
+//! filters (`wfp_windows.rs`) that refuse the account's connections to local
+//! services other than its own listeners and the download proxy.
+//!
+//! What this does not yet cover, and says so: an *explicit* allow on a folder
+//! below a denied drive root outranks the inherited deny. The probe measures
+//! both rather than assuming them.
 
 use super::*;
 use std::fs;
@@ -141,12 +144,17 @@ pub fn setup() -> Result<Value, String> {
     let account_text = sid_text(account_sid(ACCOUNT)?.as_ptr() as PSID)?;
     create_base(&owner, &account_text)?;
     firewall_block(&account_text)?;
+    let dynamic = super::wfp::install(&account_text)?;
     let denied = deny_other_drives(group.as_ptr() as PSID)?;
     Ok(json!({
         "configured": true,
         "base": base()?.to_string_lossy(),
         "denied_drives": denied,
         "firewall_rule": FIREWALL_RULE,
+        "loopback_filter": {
+            "proxy_ports": [super::wfp::PROXY_PORT_LOW, super::wfp::PROXY_PORT_HIGH],
+            "dynamic_ports": [dynamic.0, dynamic.1],
+        },
     }))
 }
 
@@ -166,6 +174,9 @@ pub fn reset() -> Result<(), String> {
     let _ = powershell(&format!(
         "Remove-NetFirewallRule -Name '{FIREWALL_RULE}' -ErrorAction SilentlyContinue"
     ));
+    if super::wfp::remove().is_err() {
+        failures.push("loopback_filter".into());
+    }
     if let Ok(path) = base()
         && path.exists()
         && fs::remove_dir_all(&path).is_err()
@@ -1094,6 +1105,17 @@ fn measure_in(scratch: &Path, nonce: &str) -> Result<Value, String> {
             .into_iter()
             .map(|drive| drive.join(format!(".{nonce}-escape.tmp"))),
     );
+    // A listener of the owner's on a fixed loopback port stands for every
+    // local service (they listen on fixed ports; the dynamic range is left
+    // open for the account's own port-0 servers). Nothing is accepted: a
+    // completed handshake is the observation.
+    let owner_listener = (47200..47300)
+        .find_map(|port| std::net::TcpListener::bind(("127.0.0.1", port)).ok())
+        .ok_or("native_sandbox_probe_storage_unavailable")?;
+    let loopback_address = owner_listener
+        .local_addr()
+        .map_err(|_| "native_sandbox_probe_storage_unavailable")?
+        .to_string();
     let test = SelfTest {
         nonce: nonce.to_owned(),
         inside_path: scratch.join(format!(".{nonce}-inside.tmp")),
@@ -1102,6 +1124,7 @@ fn measure_in(scratch: &Path, nonce: &str) -> Result<Value, String> {
         connect_address: probe_destination(),
         spawn_grandchild: true,
         hold_for_probe: false,
+        loopback_address: Some(loopback_address),
     };
     let outside = selftest::attempt(&test);
     selftest::remove_probe_writes(&test);
@@ -1139,6 +1162,14 @@ fn measure_in(scratch: &Path, nonce: &str) -> Result<Value, String> {
         allowed(&outside, "masked_read"),
     );
     let network = selftest::verdict(reached(&inside), reached(&outside));
+    drop(owner_listener);
+    // Required: an older setup has no loopback filter, and such a host
+    // refuses until the owner runs setup again.
+    let loopback = selftest::verdict(
+        nested_allowed(&inside, "loopback"),
+        nested_allowed(&outside, "loopback"),
+    );
+    let own_loopback = nested_allowed(&inside, "own_loopback");
     // The runner closed the job when the command exited: a descendant still
     // alive afterwards escaped it.
     let descendant = match inside.get("descendant_pid").and_then(Value::as_u64) {
@@ -1150,7 +1181,8 @@ fn measure_in(scratch: &Path, nonce: &str) -> Result<Value, String> {
         && escape == "enforced"
         && masked_read == "enforced"
         && network == "enforced"
-        && descendant == "enforced";
+        && descendant == "enforced"
+        && loopback == "enforced";
     Ok(json!({
         "platform": "windows",
         "boundary": "restricted_account",
@@ -1168,10 +1200,20 @@ fn measure_in(scratch: &Path, nonce: &str) -> Result<Value, String> {
             "masked_read": masked_read,
             "egress": network,
             "descendant_reaped": descendant,
+            "loopback": loopback,
         },
+        "own_loopback": own_loopback,
         "connect_destination": test.connect_address,
         "account_base": base()?.to_string_lossy(),
     }))
+}
+
+fn nested_allowed(value: &Value, key: &str) -> bool {
+    value
+        .get(key)
+        .and_then(|item| item.get("allowed"))
+        .and_then(Value::as_bool)
+        .unwrap_or(false)
 }
 
 fn descendant_verdict(pid: u32) -> &'static str {

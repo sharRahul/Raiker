@@ -20,6 +20,7 @@ export const OBSERVATION_ORDER = [
   "escape_write",
   "masked_read",
   "egress",
+  "loopback",
   "descendant_reaped",
   "seccomp",
 ] as const;
@@ -32,6 +33,7 @@ const OBSERVATION_LABEL: Record<ObservationName, string> = {
   escape_write: "Cannot write outside the workspace",
   masked_read: "Cannot read Raiker's own state",
   egress: "Cannot reach the network",
+  loopback: "Cannot reach other services on this computer",
   descendant_reaped: "Stopping ends every descendant",
   seccomp: "Forbidden system calls are refused",
 };

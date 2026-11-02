@@ -144,3 +144,24 @@ def test_settings_are_off_by_default_and_validated(tmp_path: Path) -> None:
         save_settings(tmp_path, True, [])
     with pytest.raises(ValueError):
         save_settings(tmp_path, True, ["not a domain"])
+
+
+@pytest.mark.skipif(sys.platform != "win32", reason="the fixed proxy range is Windows-only")
+def test_a_windows_proxy_takes_a_port_the_loopback_filter_permits_and_holds_it(
+    upstream: list[str],
+) -> None:
+    """The restricted account may reach only WINDOWS_PROXY_PORTS on loopback,
+    and the port is bound exclusively, so no other process can take it."""
+    from raiker.execution.commands.egress_runtime import WINDOWS_PROXY_PORTS
+
+    run = _run()
+    try:
+        port = int(urlsplit(run.environment["HTTPS_PROXY"]).port or 0)
+        assert port in WINDOWS_PROXY_PORTS
+        intruder = socket.socket()
+        intruder.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        with pytest.raises(OSError):
+            intruder.bind(("127.0.0.1", port))
+        intruder.close()
+    finally:
+        run.close()

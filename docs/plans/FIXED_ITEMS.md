@@ -1602,6 +1602,7 @@ file you can open. The two capture sets that remain — `screenshots/pages/` and
 | [FIXED-1280](#fixed-1280--python--ccode-and-python--ic-code-passed-the-command-policys--c-refusal) | Medium | Command policy | Fixed 2026-11-01 |
 | [FIXED-1281](#fixed-1281--sandboxed-commands-ran-the-first-program-on-raikers-path-or-a-copys-program-looked-up-from-raikers-folder) | Medium | Native sandbox | Fixed 2026-11-01 |
 | [FIXED-1282](#fixed-1282--a-release-could-ship-a-commit-whose-sandbox-was-unproven-and-an-unsigned-beta-carried-no-verifiable-origin) | Medium | Release | Fixed 2026-11-01 |
+| [FIXED-1283](#fixed-1283--managed-llamacpp-selected-a-source-only-release-as-a-runtime-download) | Medium | Local models / release | Fixed 2026-11-02 |
 
 ---
 

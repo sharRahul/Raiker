@@ -190,6 +190,20 @@ and are compatible with it:
 
 # To be fixed
 
+## Live specs that predate the Permissions redesign
+
+Found on 2026-11-02 while running the real-model journeys (BETA_RELEASE_PLAN,
+run record). About twenty live specs, including `model-connection-anthropic-live`
+LC-03 and LC-04, still wait for a `"Search capabilities"` field and
+`.cap.card` rows. QUI-L06 replaced both with a category rail and a list-detail
+view. Each times out before testing anything, so it reports nothing about the
+product.
+
+**Fix:** move each spec to `enableCapability` in `web/e2e/hosted-provider.ts`
+(which already walks the category rail), or to its pattern for turning a
+permission off. Re-run every spec against a fresh host. The
+specs updated in PR #245 are the model.
+
 ## Windows high-DPI window restoration
 
 On a Windows display at 150% scaling, the Electron shell geometry test observed

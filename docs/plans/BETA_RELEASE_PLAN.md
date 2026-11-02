@@ -357,7 +357,7 @@ a fresh install.
 | ID | Item | State | P | Effort | Work left |
 |---|---|---|---|---|---|
 | E2E-1 | Seven journeys from fresh install to completion | 🔴 | P0 | L | The beta set: **T-01** first use, **T-03** durable outcome with restart, **T-04** memory correct/forget, **T-08** issue-to-PR, **T-13** stop/resume/budget, **T-14** accessibility, **T-15** security and resilience; plus **V-01** voice dictation once VD-1 lands |
-| E2E-2 | Real models, not only mocks | 🟡 | P0 | M | Each journey runs once with a hosted model and once with a local llama.cpp model (PR #245 makes this automatic) |
+| E2E-2 | Real models, not only mocks | 🟡 | P0 | M | **Hosted path run 2026-11-02** (see [run record](#run-record--2026-11-02-real-hosted-model)): eight real-model specs, 53/53 tests green. Remaining: the same journeys on a local llama.cpp model, and on fresh installers rather than a source host |
 | E2E-3 | Offline, lost connectivity, crashes, restarts, pressure | 🔴 | P0 | M | A fault harness: drop the network mid-turn; kill the host; fill the disk to 98%; cap RAM with a cgroup or Job Object. Assert honest states and no data loss |
 | E2E-4 | Adversarial sandbox, filesystem, credential tests | 🟡 | P0 | M | SB-6 plus MM-3 |
 | E2E-5 | Playwright screenshots and execution evidence | 🟡 | P0 | S | Every journey stores screenshots, a HAR, the event log and receipts under the run record |
@@ -396,6 +396,41 @@ a fresh install.
 | DOC-5 | Beta criteria, known issues, rollback or withdrawal | ✅ | — | — | [Beta release criteria](#beta-release-criteria) below and the beta guide's *Known issues* and *If a beta is withdrawn* |
 
 ---
+
+### Run record — 2026-11-02, real hosted model
+
+- **Host and model:** a fresh `raiker-web` built from PR #245 (`c494e65`), a
+  new encrypted workspace per spec (`scripts/reset_live_workspace.py`), Linux
+  x86-64.
+- **Credential:** Anthropic connected through **Add model** with an
+  identity-linked key and its Workspace ID, typed from the run's environment
+  only. A scan after the run found neither in any file, log or commit; the key
+  file and workspaces were deleted.
+- **Model:** `claude-haiku-4-5-20251001` (the specs' default).
+
+| Spec | Area | Result |
+|---|---|---|
+| `model-connection-anthropic-live` LC-01, LC-02 | 3 (connect, readiness, real turn) | ✅ 2/2 |
+| `quiet-ui-home-chat-live` | 4, 7 | ✅ 9/9 |
+| `goals-execution-profiles-live` | 4 (multi-step goals) | ✅ 7/7 |
+| `mem-brief-recall-mode-live` | 6 | ✅ 6/6 |
+| `quiet-ui-permissions-live` | 4, 7, 9 (approvals) | ✅ 9/9 |
+| `br-d02-d04-build-target-and-review-live` | 5 | ✅ 4/4 (after a spec fix) |
+| `dw-design-documents-live` | 8 | ✅ 6/6 (after a spec fix) |
+| `tool-inventory-live` | 4 (agent tools) | ✅ 10/10 (with the documented `src/` fixture) |
+
+Spec drift found and fixed in the same PR:
+- the Connect dialog now opens over **Add model**;
+- the Permissions page's category rail replaced the search field;
+- the proposal state reads *Accepted*, capitalised.
+
+None was a product failure. Still open: the older `model-connection-anthropic-live`
+LC-03/LC-04 and about twenty pre-Quiet-UI live specs drive the retired
+Permissions search field. They need rewriting against the category rail
+(TO_BE_FIXED, *Live specs that predate the Permissions redesign*).
+
+This covers E2E-2 for the hosted path. The local llama.cpp path is still due
+from the `llama-cpp.yml` live job.
 
 ## Beta release criteria
 

@@ -35,17 +35,19 @@ camera:
 | Stage | Component in the concept | What it does | Raiker equivalent |
 |---|---|---|---|
 | Ears | **Whisper** | Listens: speech to text | Managed whisper.cpp engine (§5.2) |
-| Brain | **qwen3:1.7B** | Interprets and comes up with the response | Any model Raiker serves. The **Lite** profile uses Qwen3-1.7B (Q4_K_M, ~1.1 GB) on the llama.cpp engine from PR #245 |
+| Brain | **qwen3:1.7B** | Interprets and comes up with the response | **Always the owner's choice**: whatever model they selected for the conversation, local (Ollama, LM Studio, the llama.cpp engine from PR #245) or hosted. Voice profiles never choose, install or replace it |
 | Mouth | **Piper** | Answers aloud | Managed Piper engine (§5.3), or Kokoro-82M where there is room |
 | Eyes | **Moondream** + camera | Describes what the camera sees, as text the brain can use | Optional *Look* step (§5.5): a camera frame goes to a local vision model (Moondream 2 GGUF with its projector on llama.cpp, or any vision-capable model the owner serves); the description joins the turn as context |
 
 Two lessons are taken from it.
 
-1. **Small models, chosen per stage, are enough for a natural conversation.**
-   A 1.7B model, a tiny Whisper and Piper fit in about 3 GB and answer in
-   about a second on modest hardware. Raiker therefore ships a **Lite**
-   profile that reproduces this stack for 8 GB laptops, ARM64 Linux boards and
-   machines with no GPU.
+1. **Small speech engines are enough for a natural conversation.** A small
+   Whisper and Piper together need only a few hundred megabytes and keep up
+   in real time on modest hardware. Raiker therefore ships a **Lite** voice
+   profile with that ears-and-mouth stack for 8 GB laptops, ARM64 Linux boards
+   and machines with no GPU. The brain is not part of any profile: it is the
+   model the owner chose, as everywhere else in Raiker. The concept's
+   qwen3:1.7B is simply one model an owner might pick.
 2. **Every stage is a separate local process with a narrow job.** That is
    already how Raiker runs llama.cpp, and it is what makes resource
    management possible: each engine can be placed on CPU or GPU, sized, paused
@@ -82,16 +84,22 @@ Two lessons are taken from it.
 
 ## 4. Profiles
 
+Profiles choose the **speech** components only. The thinking model is never
+part of a profile: it is always the owner's choice, any model Raiker can reach,
+local or hosted. Sizes and memory below are for the voice components alone; a
+local thinking model's own footprint is planned separately by its engine and
+counted in the same resource ledger (§7).
+
 Sizes are approximate download sizes of the quantised files; they are
 re-measured when the catalogue is built (§5.6) and shown from the catalogue,
 never hard-coded in the UI.
 
-| Profile | For | VAD | Speech to text | Speech | Thinking model (if local) | Download | Resident memory |
-|---|---|---|---|---|---|---|---|
-| **Lite** | 8 GB RAM, no GPU, ARM64 boards | Silero v5 (2 MB) | Whisper **base** q5_1 (~60 MB), English-only variant offered | **Piper** medium voice (~60 MB) | Qwen3-1.7B Q4_K_M (~1.1 GB) | ~1.3 GB | ~2.5 GB |
-| **Balanced** *(default recommendation for 16 GB)* | 16 GB RAM, any GPU or none | Silero v5 | Whisper **small** q5_1 (~190 MB), or **large-v3-turbo** q5_0 (~550 MB) when a GPU has room | **Kokoro-82M** int8 (~90 MB + voices) | The owner's choice; on GPU if it fits | 0.3–0.7 GB (+ model) | 1–1.5 GB (+ model) |
-| **High quality** | ≥ 32 GB RAM or ≥ 12 GB VRAM | Silero v5 | Whisper **large-v3-turbo** q8_0 (~870 MB) on GPU | **Kokoro-82M** fp32 (~330 MB) | The owner's choice | ~1.2 GB (+ model) | ~2.5 GB (+ model) |
-| **Custom** | Anyone | Silero v5 | Any catalogue tier: tiny, base, small, medium, large-v3-turbo; multilingual or English-only; q5/q8/f16 | Kokoro (fp32 / fp16 / int8) · Piper (x_low / low / medium / high per voice) · system voice | — | per choice | per choice |
+| Profile | For | VAD | Speech to text | Speech | Download | Resident memory |
+|---|---|---|---|---|---|---|
+| **Lite** | 8 GB RAM, no GPU, ARM64 boards | Silero v5 (2 MB) | Whisper **base** q5_1 (~60 MB), English-only variant offered | **Piper** medium voice (~60 MB) | ~0.1 GB | ~0.4 GB |
+| **Balanced** *(default recommendation for 16 GB)* | 16 GB RAM, any GPU or none | Silero v5 | Whisper **small** q5_1 (~190 MB), or **large-v3-turbo** q5_0 (~550 MB) when a GPU has room | **Kokoro-82M** int8 (~90 MB + voices) | 0.3–0.7 GB | 1–1.5 GB |
+| **High quality** | ≥ 32 GB RAM or ≥ 12 GB VRAM | Silero v5 | Whisper **large-v3-turbo** q8_0 (~870 MB) on GPU | **Kokoro-82M** fp32 (~330 MB) | ~1.2 GB | ~2.5 GB |
+| **Custom** | Anyone | Silero v5 | Any catalogue tier: tiny, base, small, medium, large-v3-turbo; multilingual or English-only; q5/q8/f16 | Kokoro (fp32 / fp16 / int8) · Piper (x_low / low / medium / high per voice) · system voice | per choice | per choice |
 
 The installer and Settings recommend one profile from detected hardware, using
 the same hardware probe as the llama.cpp engine
@@ -223,7 +231,7 @@ the AI provider:
 > Raiker can listen and answer aloud, entirely on this computer.
 >
 > ◯ Not now *(default)*
-> ◯ Lite — 1.3 GB, works on any computer
+> ◯ Lite — 0.1 GB, works on any computer
 > ◉ **Balanced — 0.6 GB · Recommended for this computer** (NVIDIA RTX 4060 detected)
 > ◯ High quality — 1.2 GB
 > ◯ Choose components…
@@ -233,8 +241,10 @@ the AI provider:
 - The choice is stored; downloads run in the background after first start as
   model operations (the durable, cancellable jobs that already back model
   downloads), with progress in Settings → Voice and in Activity.
-- Choosing Lite also offers to install Qwen3-1.7B on the llama.cpp engine as
-  the local thinking model, if no model is configured.
+- No voice profile selects, installs or changes the thinking model. A voice
+  turn uses the model the owner chose for the conversation, local or hosted,
+  exactly as a typed turn does. If no model is configured yet, setup's
+  existing *choose an AI provider* step is where that is decided.
 
 ### 6.2 Settings → Voice
 
@@ -259,7 +269,7 @@ A new Settings page with four sections:
    - Run on: *Automatic / Processor only / Prefer GPU*.
 4. **Resources.** A meter of what voice holds next to the served models (RAM
    and VRAM), and the planner's sentence: *"Speech recognition runs on the
-   processor because the GPU is full with Qwen 14B."*
+   processor because the GPU is busy with the model you chose."*
 
 ## 7. Resource management
 
@@ -273,8 +283,9 @@ the other holds.
   llama.cpp planner already subtracts committed memory (PR #245); voice
   engines use the same planner pattern.
 - **Placement policy.**
-  1. The thinking model keeps priority on the GPU, since generation speed
-     dominates conversation latency.
+  1. When the owner's chosen model runs locally, it keeps priority on the
+     GPU, since generation speed dominates conversation latency. When it is
+     hosted, the GPU is free for the speech engines.
   2. Whisper goes to the GPU only if, after the model's plan, free VRAM covers
      Whisper plus 512 MB. Otherwise it runs on the CPU, with threads set to
      half the physical cores (at most 8).
@@ -421,7 +432,6 @@ catalogue.
 | Piper engine | rhasspy/piper MIT (archived); successor OHF-Voice/piper1-gpl GPL-3.0 ⚠ | Prefer the last MIT release for beta; review the successor |
 | Piper voices | Per voice (dataset licences vary) ⚠ | Catalogue includes only permissive voices |
 | Moondream 2 | Apache-2.0 | V3 |
-| Qwen3-1.7B | Apache-2.0 | Lite thinking model |
 
 ## 12. Delivery phases
 

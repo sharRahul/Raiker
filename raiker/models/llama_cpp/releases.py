@@ -25,6 +25,7 @@ owner asks to install or to check for an update.
 
 from __future__ import annotations
 
+import contextlib
 import os
 import re
 from collections.abc import Sequence
@@ -214,10 +215,18 @@ def parse_release(payload: Any) -> Release:
 
 
 def fetch_release(tag: str | None = None, *, client: httpx.Client | None = None) -> Release:
-    """The latest release, or the one named ``tag``, from the GitHub API."""
+    """A usable official build release, or the one named ``tag``.
+
+    ``/releases/latest`` follows GitHub's stable-release flag, not llama.cpp's
+    binary publishing channel. It can therefore point at a stable source
+    release with no runtime archives while the current ``bNNNN`` prereleases
+    contain the supported binaries. Automatic installation uses the releases
+    collection instead and takes the first valid build release with assets.
+    An explicitly requested tag remains exact.
+    """
     if tag is not None and not _TAG.match(tag):
         raise ReleaseError("llama_cpp_release_tag_invalid")
-    url = f"{API_ROOT}/latest" if tag is None else f"{API_ROOT}/tags/{tag}"
+    url = f"{API_ROOT}?per_page=100" if tag is None else f"{API_ROOT}/tags/{tag}"
     owned = client is None
     client = client or httpx.Client(timeout=20.0, follow_redirects=True)
     try:
@@ -239,7 +248,17 @@ def fetch_release(tag: str | None = None, *, client: httpx.Client | None = None)
     if response.status_code != 200:
         raise ReleaseError("llama_cpp_release_unreachable")
     try:
-        return parse_release(response.json())
+        payload = response.json()
+        if tag is not None:
+            return parse_release(payload)
+        if not isinstance(payload, list):
+            raise ReleaseError("llama_cpp_release_unreadable")
+        for entry in payload:
+            with contextlib.suppress(ReleaseError):
+                release = parse_release(entry)
+                if release.assets:
+                    return release
+        raise ReleaseError("llama_cpp_release_not_found")
     except ValueError as exc:
         if isinstance(exc, ReleaseError):
             raise

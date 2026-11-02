@@ -88,13 +88,13 @@ class ManagedLlamaRuntime(ManagedSlotRuntime):
         the original single-server call shape working; a port outside the table
         still runs, on the first slot. Otherwise the first free slot is used.
         """
+        if profile_id is not None:
+            return self._named_slot(profile_id)
         for slot in self.slots:
             if self._model_paths.get(slot.profile_id) == model_path and self._alive(
                 slot.profile_id
             ):
                 return slot
-        if profile_id is not None:
-            return self._named_slot(profile_id)
         if requested_port is not None:
             return next((slot for slot in self.slots if slot.port == requested_port), self.slots[0])
         return self._free_slot()

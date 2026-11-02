@@ -179,16 +179,38 @@ def test_the_build_set_carries_the_desktop_build_tool() -> None:
     assert set(_locked(ROOT / "requirements" / "release.txt")) <= set(locked)
 
 
-def test_a_release_requires_the_sandbox_enforcement_tests_on_every_platform() -> None:
-    """Item 11 — no release of a commit whose boundary was not proven where it ships."""
+def test_a_release_requires_the_complete_beta_critical_suite() -> None:
+    """Item 11 — no release of a commit whose beta evidence is incomplete."""
     plan = _workflow()["jobs"]["plan"]
     assert plan["permissions"]["checks"] == "read"
-    gate = _step(plan, "Refuse a commit whose sandbox enforcement tests did not pass")["run"]
+    gate = _step(plan, "Refuse a commit whose required verification did not pass")["run"]
     ci = _workflow(ROOT / ".github" / "workflows" / "ci.yml")
     platforms = ci["jobs"]["native"]["strategy"]["matrix"]["os"]
     assert platforms, "the native runner is tested on no platform"
     for platform in platforms:
         assert f'"{platform}"' in gate, f"{platform} is tested in CI but not required here"
+    for required in (
+        "Python 3.11",
+        "Python tests (shard 1 of 3)",
+        "Python tests (shard 2 of 3)",
+        "Python tests (shard 3 of 3)",
+        "Source measurement",
+        "Dependency vulnerabilities",
+        "Windows lifecycle tests",
+        "Remote access (windows-latest)",
+        "Remote access (macos-15)",
+        "Web UI (Node 24)",
+        "Electron shell",
+        "Licensing and SBOM",
+        "Build faults (host killed mid-check)",
+        "Engine tests (ubuntu-24.04)",
+        "Engine tests (macos-14)",
+        "Engine tests (windows-latest)",
+        "Live install and inference (ubuntu-24.04)",
+        "Live install and inference (macos-14)",
+        "Live install and inference (windows-latest)",
+    ):
+        assert f'"{required}"' in gate, f"missing beta-critical check: {required}"
     assert "refused:" in gate
     # Only Actions' own runs count, and the newest run per name decides.
     assert 'app != "github-actions"' in gate

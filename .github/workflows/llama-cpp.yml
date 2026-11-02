@@ -15,6 +15,7 @@ name: llama.cpp engine
 
 on:
   pull_request:
+    types: [opened, synchronize, reopened, labeled]
     paths:
       - "raiker/models/llama_cpp/**"
       - "raiker/models/local_runtime.py"

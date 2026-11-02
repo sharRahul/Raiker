@@ -112,6 +112,18 @@ def test_redeploying_the_same_model_reuses_its_slot(tmp_path: Path) -> None:
     assert len(runtime.statuses()) == 1
 
 
+def test_an_explicit_second_profile_can_serve_the_same_model(tmp_path: Path) -> None:
+    model = tmp_path / "model.gguf"
+    model.write_bytes(b"GGUF")
+    runtime = _runtime([], (tmp_path,))
+
+    first = runtime.start(model, executable=Path("llama-server"), profile_id=LOCAL_SLOTS[0].profile_id)
+    second = runtime.start(model, executable=Path("llama-server"), profile_id=LOCAL_SLOTS[1].profile_id)
+
+    assert (first.slot, second.slot) == (LOCAL_SLOTS[0].profile_id, LOCAL_SLOTS[1].profile_id)
+    assert len(runtime.statuses()) == 2
+
+
 def test_a_full_pool_refuses_rather_than_evicting_a_running_model(tmp_path: Path) -> None:
     runtime = _runtime([], (tmp_path,))
     for index in range(len(LOCAL_SLOTS)):

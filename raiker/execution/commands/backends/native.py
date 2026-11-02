@@ -62,6 +62,7 @@ from raiker.execution.commands.supervisor_client import (
     spawn_supervised,
     supervisor_supported,
 )
+from raiker.execution.runner_publisher import runner_trust
 from raiker.execution.workspaces import TaskWorkspaceRegistry, WorkspaceError
 from raiker.runtime.command_policy import (
     ALLOWED_SHELL_COMMANDS,
@@ -422,10 +423,10 @@ class NativeSandboxDriver:
             connect_destination=(
                 str(report["connect_destination"]) if report.get("connect_destination") else None
             ),
-            # The current package stores the digest beside the binary. It
-            # detects corruption but is replaceable with the binary and is
-            # therefore never called publisher verification.
-            runner_trust="package_relative_integrity",
+            # The package's digest beside the binary detects corruption but is
+            # replaceable with it; only a platform signature by the publisher
+            # pinned in Raiker's code is called publisher verification.
+            runner_trust=runner_trust(binary),
         )
 
     # -- driving a command --------------------------------------------------

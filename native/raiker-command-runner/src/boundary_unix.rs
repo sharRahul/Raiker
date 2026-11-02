@@ -297,10 +297,12 @@ fn host_escape_verdict(test: &SelfTest, outside: &Value) -> &'static str {
 }
 
 pub fn launch(policy: &LaunchPolicy, argv: &[String]) -> Result<i32, String> {
-    // On Linux the terminal is simply the stdio Raiker hands the runner; bwrap
-    // passes it through and `--new-session` keeps the command from injecting
-    // input into it (TIOCSTI). macOS cannot yet contain a detached
-    // descendant, so an interactive session there stays refused.
+    // On Linux the terminal is the stdio Raiker hands the runner; bwrap passes
+    // it through and `--new-session` keeps the command from injecting input
+    // into it (TIOCSTI). Where that stdio is pipes (WSL2, reached through
+    // `wsl.exe`), the runner opens the terminal itself and relays it. Plain
+    // Seatbelt cannot contain a detached descendant, so an interactive
+    // session there stays refused (the macOS sandbox account offers one).
     if policy.pty && !cfg!(target_os = "linux") {
         return Err("native_sandbox_pty_unsupported".into());
     }
@@ -332,15 +334,33 @@ pub fn launch(policy: &LaunchPolicy, argv: &[String]) -> Result<i32, String> {
     #[cfg(target_os = "linux")]
     inherit_linux_filter(&mut command, &filter);
     bound_child(&mut command, policy);
+    #[cfg(target_os = "linux")]
+    let relay = if policy.pty && unsafe { libc::isatty(0) } == 0 {
+        Some(attach_terminal(&mut command)?)
+    } else {
+        None
+    };
     let mut child = command.spawn().map_err(|error| {
         format!(
             "native_sandbox_launch_failed:{}",
             error.raw_os_error().unwrap_or(0)
         )
     })?;
+    // The command's copies of the terminal are its own now; ours would keep
+    // the relay from seeing the end of its output.
+    drop(command);
     #[cfg(target_os = "linux")]
     drop(filter);
+    let outcome = supervise(&mut child, deadline);
+    #[cfg(target_os = "linux")]
+    if let Some(relay) = relay {
+        let _ = relay.join();
+    }
+    outcome
+}
 
+/// Wait for *child* until it exits or *deadline* passes.
+fn supervise(child: &mut std::process::Child, deadline: std::time::Instant) -> Result<i32, String> {
     // Keep the child unreaped until the deadline decision. A detached watchdog
     // using only its numeric PID could otherwise target a reused PID after an
     // early exit. Polling and termination live in the same owner thread.
@@ -364,6 +384,56 @@ pub fn launch(policy: &LaunchPolicy, argv: &[String]) -> Result<i32, String> {
         }
         std::thread::sleep(remaining.min(std::time::Duration::from_millis(20)));
     }
+}
+
+/// A terminal for a run whose own stdio is pipes: the command gets the
+/// replica of a fresh pseudo-terminal as its stdio, and two threads relay the
+/// master to this runner's stdin and stdout. Returns the output relay, which
+/// ends when the command's last copy of the replica closes.
+#[cfg(target_os = "linux")]
+fn attach_terminal(command: &mut Command) -> Result<std::thread::JoinHandle<()>, String> {
+    use std::io::{Read, Write};
+    use std::os::fd::{FromRawFd, OwnedFd};
+    let failure = "native_sandbox_pty_unavailable";
+    let mut master: libc::c_int = -1;
+    let mut replica: libc::c_int = -1;
+    if unsafe {
+        libc::openpty(
+            &mut master,
+            &mut replica,
+            std::ptr::null_mut(),
+            std::ptr::null(),
+            std::ptr::null(),
+        )
+    } != 0
+    {
+        return Err(failure.into());
+    }
+    // The master is the runner's alone; the command must not inherit it.
+    unsafe { libc::fcntl(master, libc::F_SETFD, libc::FD_CLOEXEC) };
+    let replica = unsafe { OwnedFd::from_raw_fd(replica) };
+    let master = unsafe { std::fs::File::from_raw_fd(master) };
+    let duplicate = |fd: &OwnedFd| fd.try_clone().map_err(|_| failure.to_owned());
+    command
+        .stdin(std::process::Stdio::from(duplicate(&replica)?))
+        .stdout(std::process::Stdio::from(duplicate(&replica)?))
+        .stderr(std::process::Stdio::from(replica));
+    let mut input = master.try_clone().map_err(|_| failure.to_owned())?;
+    std::thread::spawn(move || {
+        let _ = std::io::copy(&mut std::io::stdin(), &mut input);
+    });
+    let mut output = master;
+    Ok(std::thread::spawn(move || {
+        let mut stdout = std::io::stdout();
+        let mut buffer = [0u8; 4096];
+        // EIO once no process holds the replica: the command has ended.
+        while let Ok(count) = output.read(&mut buffer) {
+            if count == 0 || stdout.write_all(&buffer[..count]).is_err() {
+                break;
+            }
+            let _ = stdout.flush();
+        }
+    }))
 }
 
 #[cfg(target_os = "linux")]
@@ -898,6 +968,15 @@ pub fn macos_profile(policy: &LaunchPolicy) -> Result<String, String> {
         "(allow file-write* (require-all (subpath \"{root}\"){unwritable}))\n"
     ));
     profile.push_str("(allow file-write* (literal \"/dev/null\"))\n");
+    if policy.pty {
+        // The terminal Raiker handed the run, used through the descriptors it
+        // inherited: reads, writes and terminal ioctls on a pseudo-terminal
+        // device. Opening another user's terminal stays refused by its mode.
+        profile.push_str(
+            "(allow file-read-data file-write-data file-ioctl \
+             (regex #\"^/dev/ttys[0-9]+$\"))\n",
+        );
+    }
     for relative in &policy.deny_paths {
         let path = policy.workspace_root.join(relative);
         profile.push_str(&format!(

@@ -364,6 +364,30 @@ class RunningProcess:
         self.process.terminate_tree()
 
 
+class _RunnerTerminalProcess(_PopenProcess):
+    """The native runner's own terminal, on Windows, reached over pipes.
+
+    The sandbox account's runner builds the pseudo-console itself, as the
+    account, and relays it over its stdio (`conpty_windows.rs`), so Raiker's
+    side is plain pipes: what arrives on stdout is the terminal, and input is
+    written to stdin. Only the native runner offers this; it is not a
+    terminal for an arbitrary program.
+    """
+
+    def __init__(self, argv: Sequence[str], cwd: Path, env: dict[str, str]) -> None:
+        super().__init__(argv, cwd, env, pty=False)
+        self.pty = True
+
+
+def native_runner_process_factory(
+    argv: Sequence[str], cwd: Path, env: dict[str, str], *, pty: bool
+) -> StreamProcess:
+    """For the native runner: on Windows its terminal comes over pipes."""
+    if pty and os.name == "nt":
+        return _RunnerTerminalProcess(argv, cwd, env)
+    return default_process_factory(argv, cwd, env, pty=pty)
+
+
 def default_process_factory(
     argv: Sequence[str], cwd: Path, env: dict[str, str], *, pty: bool
 ) -> StreamProcess:

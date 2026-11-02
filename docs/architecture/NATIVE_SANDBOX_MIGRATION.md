@@ -349,9 +349,38 @@ the control arm aimed at a gateway address the runner does not answer; the
 probe now uses a listener on the host's own outward address on macOS too,
 as on Linux.
 
-Not yet: background runs and terminals on macOS (the account serves one run at
-a time; a small pool of accounts would let runs overlap); Seatbelt's downloads
-rule is still unmeasured.
+**Account pool and terminals (2026-11-02).** Setup creates four accounts
+(`_raikersandbox`, `_raikersandbox1`…`3`), each with its own lock no account can
+open; a run takes the first free one for its whole life, so a stop is still
+"every process of this run's account" and runs in different copies overlap.
+`sudoers` names them through one `Runas_Alias`. A terminal run gets the
+terminal Raiker opened through `sudo` (`!use_pty`); the account side starts the
+command in a session of its own, so XNU refuses `TIOCSTI`, and Seatbelt allows
+reads, writes and ioctls on `/dev/ttys*` only for terminal runs. Raiker offers
+background runs and terminals on `macos_account`. Tests (overlap on two
+accounts; a terminal run sees its tty and cannot type into it) await a macOS
+CI run. Seatbelt's downloads rule is still unmeasured.
+
+## Terminals on every boundary (2026-11-02)
+
+* **Windows restricted account.** `CreateProcessWithLogonW` cannot attach a
+  pseudo-console, so a terminal run starts the runner as a broker
+  (`--conpty-host`) as the account; it builds the pseudo-console in its own
+  context, starts the command attached to it inside the run's Job Object, and
+  relays both directions over stdio. The broker binary is a per-run copy in
+  `C:\RaikerSandbox\.broker` (owner full control, account read and execute),
+  deleted when the run ends. Measured on Windows 11: `isatty` true on both
+  ends, typed input answered, through `CommandService`
+  (`tests/test_sandbox_terminal.py`). Size is fixed at 120x30.
+* **Linux over pipes, and WSL2.** When a terminal is asked for and the
+  runner's stdin is not one (WSL2 reaches it through `wsl.exe`), the runner
+  opens a pty for the command and relays it. Measured in WSL2 Ubuntu under
+  Bubblewrap. WSL2 no longer refuses terminal runs.
+* **Downloads and restarts.** A background run's proxy is started by the
+  detached supervisor, which writes its fields into the policy before the
+  runner reads it and registers the proxy URL (which carries the run's
+  credential) with its redactor, so a run with downloads on survives a restart
+  of Raiker and its credential does not reach output on that path.
 
 ## WSL2 backend (2026-11-01, runner side implemented; measurement incomplete)
 

@@ -789,7 +789,29 @@ pub fn launch(policy: &LaunchPolicy, argv: &[String]) -> Result<i32, String> {
     let user = wide(ACCOUNT);
     let domain = wide(".");
     let mut secret = wide(&password);
-    let mut command_line = wide(&command_line_for(argv));
+    // A terminal run starts the pseudo-console broker as the account, which
+    // starts the command (`conpty_windows.rs`).
+    let broker = if policy.pty {
+        Some(Broker(super::conpty::broker_path(
+            &base,
+            &current_user_sid_text()?,
+            &sid_text(account_sid(ACCOUNT)?.as_ptr() as PSID)?,
+        )?))
+    } else {
+        None
+    };
+    let launched: Vec<String> = match &broker {
+        Some(Broker(path)) => [
+            path.to_string_lossy().into_owned(),
+            "--conpty-host".into(),
+            "--".into(),
+        ]
+        .into_iter()
+        .chain(argv.iter().cloned())
+        .collect(),
+        None => argv.to_vec(),
+    };
+    let mut command_line = wide(&command_line_for(&launched));
     let directory = wide(&policy.cwd.to_string_lossy());
     let mut information: PROCESS_INFORMATION = unsafe { std::mem::zeroed() };
     // The account's own profile environment overlaid with the one Raiker
@@ -841,6 +863,15 @@ pub fn launch(policy: &LaunchPolicy, argv: &[String]) -> Result<i32, String> {
         return Err("native_sandbox_wait_failed".into());
     }
     Ok(code as i32)
+}
+
+/// A run's broker binary, deleted when the run ends.
+struct Broker(PathBuf);
+
+impl Drop for Broker {
+    fn drop(&mut self) {
+        let _ = fs::remove_file(&self.0);
+    }
 }
 
 /// Variables that name the account itself. The account's own profile values

@@ -42,11 +42,20 @@ from typing import Any
 
 from raiker.contracts.ids import utc_now
 from raiker.execution.commands.backends.base import CommandBackendError
-from raiker.execution.commands.egress_runtime import EgressRun, EgressSink
+from raiker.execution.commands.egress_runtime import (
+    CommandEgressSettings,
+    EgressRun,
+    EgressSink,
+)
 from raiker.execution.commands.egress_runtime import load_settings as load_egress_settings
 from raiker.execution.commands.models import CommandFeatures, CommandRequest
 from raiker.execution.commands.process_lifetime import bind_to_runtime_lifetime
-from raiker.execution.commands.runner import CommandSink, MemoryCommandSink, StreamingCommandRunner
+from raiker.execution.commands.runner import (
+    CommandSink,
+    MemoryCommandSink,
+    StreamingCommandRunner,
+    native_runner_process_factory,
+)
 from raiker.execution.commands.supervisor_client import (
     SupervisorUnavailable,
     spawn_supervised,
@@ -123,18 +132,27 @@ class NativeSandboxProof:
         (`descendant_reaped`; its PID namespace dies with the runner), and so
         does the Windows restricted account (a kill-on-close Job Object owns
         the tree; runs in one copy may overlap, other copies wait). Only
-        Bubblewrap offers a terminal: `CreateProcessWithLogonW` cannot attach
-        a pseudo-console. On macOS the sandbox account owns every process a
-        run starts, so the run's tree stops with it (`macos_account`); plain
-        Seatbelt cannot contain a detached descendant. Background runs stay
-        off there for now: the account serves one run at a time, so a
-        background run would hold every other command.
+        Every one of those offers a terminal: on Windows the account's runner
+        builds a pseudo-console as the account and relays it, because
+        `CreateProcessWithLogonW` cannot attach one directly. On macOS a
+        pool of sandbox accounts serves runs, each account one run at a time,
+        and the account owns every process its run starts, so the run's tree
+        stops with it (`macos_account`) and runs in different copies overlap;
+        plain Seatbelt cannot contain a detached descendant.
         """
         tree_stop = self.observations.get("descendant_reaped") == ENFORCED
-        terminal = tree_stop and self.boundary == "bubblewrap"
-        background = tree_stop and self.boundary in {"bubblewrap", "restricted_account"}
+        terminal = tree_stop and self.boundary in {
+            "bubblewrap",
+            "macos_account",
+            "restricted_account",
+        }
+        background = tree_stop and self.boundary in {
+            "bubblewrap",
+            "restricted_account",
+            "macos_account",
+        }
         # A background run outlives a restart where a detached supervisor runs
-        # it (POSIX); with downloads on it stays in-process and is still lost.
+        # it (POSIX), downloads included: the supervisor holds the proxy.
         recovery = background and supervisor_supported()
         return CommandFeatures(
             shell=False,
@@ -576,7 +594,9 @@ class NativeSandboxBackend:
         # write to the owner's project: refuse rather than run there.
         self.workspaces = workspaces
         self.features = proof.features
-        self._runner = runner or StreamingCommandRunner().start
+        self._runner = runner or StreamingCommandRunner(
+            process_factory=native_runner_process_factory
+        ).start
 
     def start(self, request: CommandRequest, sink: CommandSink | None = None) -> Any:
         if not self.proof.available:
@@ -640,7 +660,18 @@ class NativeSandboxBackend:
             [] if in_wsl else toolchain_mounts(executable, request.workspace_root)
         )
         # Downloads stay off in WSL: the proxy's socket is on Windows.
-        egress = None if in_wsl else self._egress_for(original)
+        egress_settings = None if in_wsl else self._egress_settings(original)
+        # BUG-194 — a background run goes into a detached supervisor where the
+        # platform has one, so a restart of Raiker reattaches to it instead of
+        # reconciling it to `lost`. The supervisor runs the runner, so the
+        # boundary is the same one, and it holds the run's download proxy, so
+        # that survives the restart too.
+        supervised = request.background and supervisor_supported()
+        egress = (
+            None
+            if egress_settings is None or supervised
+            else self._start_egress(original, egress_settings)
+        )
         sink = sink or MemoryCommandSink()
         if egress is not None:
             document.update(egress.policy_fields)
@@ -658,12 +689,16 @@ class NativeSandboxBackend:
             executable,
             *request.argv_template[1:],
         ]
-        # BUG-194 — a background run goes into a detached supervisor where the
-        # platform has one, so a restart of Raiker reattaches to it instead of
-        # reconciling it to `lost`. The supervisor runs the runner, so the
-        # boundary is the same one. A run with downloads on stays in-process:
-        # its proxy lives in Raiker and would not survive the restart either.
-        if request.background and egress is None and supervisor_supported():
+        if supervised:
+            supervised_egress = (
+                None
+                if egress_settings is None
+                else {
+                    "run_id": original.run_id,
+                    "owner_principal_id": original.owner_principal_id,
+                    "domains": list(egress_settings.domains),
+                }
+            )
             try:
                 return spawn_supervised(
                     workspace_root=original.workspace_root,
@@ -675,6 +710,9 @@ class NativeSandboxBackend:
                     deadline_seconds=request.timeout_seconds,
                     max_output_bytes=request.max_output_bytes,
                     pty=request.interactive,
+                    egress=supervised_egress,
+                    policy_path=policy_path,
+                    policy=document,
                 )
             except SupervisorUnavailable as exc:
                 raise CommandBackendError(exc.reason_code) from None
@@ -697,8 +735,8 @@ class NativeSandboxBackend:
         bind_to_runtime_lifetime(getattr(getattr(process, "process", None), "pid", None))
         return process
 
-    def _egress_for(self, request: CommandRequest) -> EgressRun | None:
-        """This run's allow-listed download proxy, when the owner turned it on.
+    def _egress_settings(self, request: CommandRequest) -> CommandEgressSettings | None:
+        """The owner's download allow-list, when it is on and can be enforced.
 
         Only where the boundary can make the proxy the single route: on Windows
         that is the restricted account (an AppContainer cannot reach loopback
@@ -710,6 +748,12 @@ class NativeSandboxBackend:
             return None
         if sys.platform == "win32" and self.driver.account_base() is None:
             return None
+        return settings
+
+    def _start_egress(
+        self, request: CommandRequest, settings: CommandEgressSettings
+    ) -> EgressRun:
+        """This run's proxy, in Raiker's process (a run with no supervisor)."""
         try:
             return EgressRun(request.run_id, request.owner_principal_id, settings).start(
                 request.timeout_seconds + 5

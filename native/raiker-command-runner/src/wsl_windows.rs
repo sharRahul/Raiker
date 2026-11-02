@@ -232,10 +232,10 @@ impl Drop for PolicyFile {
 }
 
 /// Run `argv` (Linux argv) in the copy the policy names.
+///
+/// A terminal run passes through: the Linux runner sees pipes from `wsl.exe`
+/// and opens the terminal itself inside the distribution.
 pub fn launch(policy: &LaunchPolicy, policy_text: &str, argv: &[String]) -> Result<i32, String> {
-    if policy.pty {
-        return Err("native_sandbox_pty_unsupported".into());
-    }
     if status()["configured"] != true {
         return Err("native_sandbox_wsl_unconfigured".into());
     }

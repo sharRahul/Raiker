@@ -185,6 +185,7 @@ class CommandSupervisor:
         pty: bool,
         max_output_bytes: int = 100_000,
         registered_secrets: tuple[str, ...] = (),
+        egress: Any = None,
     ) -> None:
         self.socket_path = socket_path
         self.journal = _Journal(journal_path, max_text_bytes=max_output_bytes)
@@ -195,6 +196,10 @@ class CommandSupervisor:
         self.deadline_seconds = deadline_seconds
         self.pty = pty
         self._registered_secrets = registered_secrets
+        # The run's download proxy, when it has one: started before the
+        # child, closed when the child ends, owned by this process so a
+        # restart of Raiker does not take it away.
+        self._egress = egress
         self._process: Any = None
         self._state = "running"
         self._returncode: int | None = None
@@ -253,7 +258,22 @@ class CommandSupervisor:
                 if self._state == "running":
                     self._state = "failed"
         finally:
+            self._close_egress()
             self._finished.set()
+
+    def _close_egress(self) -> None:
+        """Stop the proxy and say which hosts it refused, as Raiker's sink would."""
+        if self._egress is None:
+            return
+        with contextlib.suppress(Exception):
+            denied = self._egress.close()
+            if denied:
+                note = (
+                    "\n[raiker] network access refused (not on the download allow-list): "
+                    + ", ".join(denied)
+                    + "\n"
+                )
+                self.journal.append("system", note, 0)
 
     def _deadline(self) -> None:
         if self._finished.wait(self.deadline_seconds):
@@ -390,19 +410,56 @@ def main(argv: list[str] | None = None) -> int:
         specification = codec.decode(_read_stdin_frame()).payload
     except (SupervisorProtocolError, ValueError):
         return 3
+    environment = {str(k): str(v) for k, v in dict(specification.get("env", {})).items()}
+    deadline_seconds = float(int(specification.get("deadline_seconds", 3600)))
+    secrets = tuple(str(item) for item in specification.get("secrets", []))
+    try:
+        egress = _start_egress(specification, environment, deadline_seconds)
+    except OSError:
+        return 4
+    if egress is not None:
+        # The proxy URL carries the run's credential; it never reaches output.
+        secrets += tuple(egress.environment.values())
     supervisor = CommandSupervisor(
         socket_path=Path(str(arguments.socket)),
         journal_path=Path(str(arguments.journal)),
         codec=codec,
         argv=[str(item) for item in specification.get("argv", [])],
         cwd=Path(str(specification.get("cwd", "."))),
-        environment={str(k): str(v) for k, v in dict(specification.get("env", {})).items()},
-        deadline_seconds=float(int(specification.get("deadline_seconds", 3600))),
+        environment=environment,
+        deadline_seconds=deadline_seconds,
         pty=bool(specification.get("pty", False)),
         max_output_bytes=int(specification.get("max_output_bytes", 100_000)),
-        registered_secrets=tuple(str(item) for item in specification.get("secrets", [])),
+        registered_secrets=secrets,
+        egress=egress,
     )
     return supervisor.run()
+
+
+def _start_egress(
+    specification: dict[str, Any], environment: dict[str, str], deadline_seconds: float
+) -> Any:
+    """The run's proxy, started here, with its fields written into the policy.
+
+    The policy file is Raiker state beside the original workspace; the runner
+    reads it after this returns, so it sees the proxy this process holds.
+    """
+    settings = specification.get("egress")
+    policy_path = specification.get("policy_path")
+    policy = specification.get("policy")
+    if not settings or not policy_path or not isinstance(policy, dict):
+        return None
+    from raiker.execution.commands.egress_runtime import CommandEgressSettings, EgressRun
+
+    egress = EgressRun(
+        str(settings["run_id"]),
+        str(settings["owner_principal_id"]),
+        CommandEgressSettings(True, tuple(str(item) for item in settings["domains"])),
+    ).start(deadline_seconds + 5)
+    policy = {**policy, **egress.policy_fields}
+    Path(str(policy_path)).write_text(json.dumps(policy, indent=2), encoding="utf-8")
+    environment.update(egress.environment)
+    return egress
 
 
 def _read_stdin_frame() -> bytes:

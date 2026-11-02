@@ -310,8 +310,16 @@ def spawn_supervised(
     max_output_bytes: int,
     pty: bool = False,
     registered_secrets: tuple[str, ...] = (),
+    egress: dict[str, Any] | None = None,
+    policy_path: Path | None = None,
+    policy: dict[str, Any] | None = None,
 ) -> SupervisedProcess:
-    """Start a detached supervisor and hand back a handle onto its child."""
+    """Start a detached supervisor and hand back a handle onto its child.
+
+    With *egress*, the supervisor starts the run's download proxy itself and
+    writes its fields into *policy* at *policy_path* before the runner reads
+    it, so the proxy lives as long as the run rather than as long as Raiker.
+    """
     if not supervisor_supported():
         raise SupervisorUnavailable("command_supervisor_platform_unsupported")
     import hashlib
@@ -347,6 +355,9 @@ def spawn_supervised(
             "max_output_bytes": int(max_output_bytes),
             "pty": bool(pty),
             "secrets": list(registered_secrets),
+            "egress": egress,
+            "policy_path": str(policy_path) if policy_path is not None else None,
+            "policy": policy,
         },
     )
     child_environment = dict(os.environ)

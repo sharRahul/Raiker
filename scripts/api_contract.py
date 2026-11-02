@@ -75,6 +75,15 @@ INVENTORY_MD = REPO_ROOT / "docs" / "architecture" / "API_CONTRACT_INVENTORY.md"
 VERIFIED: frozenset[tuple[str, str]] = frozenset(
     {
         ("DELETE", "/api/account"),
+        ("GET", "/api/local-runtime/llama-cpp"),
+        ("POST", "/api/local-runtime/llama-cpp/install"),
+        ("POST", "/api/local-runtime/llama-cpp/update-check"),
+        ("DELETE", "/api/local-runtime/llama-cpp/installation"),
+        ("POST", "/api/local-runtime/llama-cpp/slots/{profile_id}/stop"),
+        ("POST", "/api/local-runtime/llama-cpp/slots/{profile_id}/restart"),
+        ("GET", "/api/local-runtime/llama-cpp/models/{model_id}/settings"),
+        ("PUT", "/api/local-runtime/llama-cpp/models/{model_id}/settings"),
+        ("POST", "/api/local-runtime/llama-cpp/models/{model_id}/plan"),
         ("GET", "/api/account/deletion-preview"),
         ("DELETE", "/api/brain/sources"),
         ("DELETE", "/api/brain/sources/grants"),

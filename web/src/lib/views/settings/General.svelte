@@ -1,6 +1,7 @@
 <script lang="ts">
   import { api } from "../../api";
   import { inDesktopShell } from "../../desktopShell";
+  import BetaFeedback from "./BetaFeedback.svelte";
   import { DISPLAY_LOCALES } from "../../format";
   import {
     TIMEZONE_KEY,
@@ -269,6 +270,10 @@
   </section>
 {/if}
 
+
+
+<!-- Beta plan DOC-4 — where an owner reports a problem or an idea. -->
+<BetaFeedback />
 
 <style>
   .section-heading { margin-bottom: var(--space-3); }

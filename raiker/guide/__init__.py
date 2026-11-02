@@ -38,6 +38,7 @@ _READING_ORDER = (
     "tasks-and-projects",
     "extensions-and-mcp",
     "troubleshooting",
+    "beta",
 )
 
 # `README.md` is the guide's own contents page. The product renders a section

@@ -87,6 +87,9 @@ class ManagedSlotRuntime:
         self.slots = slots
         self._by_profile = {slot.profile_id: slot for slot in slots}
         self._launcher = launcher or self._launch
+        #: Whether a test or embedder supplied the launcher; a subclass only
+        #: applies its own process setup (logs, job objects) when it did not.
+        self._custom_launcher = launcher is not None
         self._on_stopped = on_stopped
         self._processes: dict[str, Any] = {}
         self._model_paths: dict[str, str] = {}
@@ -105,6 +108,27 @@ class ManagedSlotRuntime:
             stderr=subprocess.DEVNULL,
             shell=False,
         )
+
+    def _spawn(self, slot: RuntimeSlot, argv: list[str]) -> Any:
+        """Start ``argv`` for ``slot``. A subclass may add logging or limits."""
+        return self._launcher(argv)
+
+    def slot(self, slot_id: str) -> RuntimeSlot | None:
+        """The declared slot named ``slot_id``, or ``None``."""
+        return self._by_profile.get(slot_id)
+
+    def alive(self, slot_id: str) -> bool:
+        """Whether the process launched into ``slot_id`` is still running."""
+        with self._lock:
+            return self._alive(slot_id)
+
+    def exit_code(self, slot_id: str) -> int | None:
+        """The exit status of a slot's process that has ended on its own."""
+        process = self._processes.get(slot_id)
+        if process is None:
+            return None
+        code = process.poll()
+        return int(code) if code is not None else None
 
     def _alive(self, slot_id: str) -> bool:
         process = self._processes.get(slot_id)
@@ -135,7 +159,7 @@ class ManagedSlotRuntime:
             self._stop_locked(slot.profile_id)
         self._reserved.add(slot.profile_id)
         try:
-            process = self._launcher(argv)
+            process = self._spawn(slot, argv)
         except Exception:
             # Rolled back, so a launch that could not start does not cost the
             # pool a slot for the life of the host.

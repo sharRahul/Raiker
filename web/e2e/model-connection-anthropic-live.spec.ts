@@ -36,8 +36,8 @@ test.skip(KEY === "", "RAIKER_LIVE_ANTHROPIC_KEY is unset");
 
 async function setHostedModels(page: Page, on: boolean, reason: string): Promise<void> {
   await page.goto(`${BASE}/#/capabilities`);
-  await page.getByLabel("Search capabilities", { exact: true }).waitFor({ timeout: 60_000 });
-  await page.getByLabel("Search capabilities", { exact: true }).fill("Hosted models");
+  await page.getByLabel("Search permissions", { exact: true }).waitFor({ timeout: 60_000 });
+  await page.getByLabel("Search permissions", { exact: true }).fill("Hosted models");
   const card = page.locator(".cap.card").filter({ hasText: "Hosted models" }).first();
   await expect(card).toBeVisible({ timeout: 60_000 });
   const toggle = card.locator("button.cap-toggle");
@@ -72,7 +72,8 @@ test("LC-01 — connecting Anthropic in the UI is the whole setup", async ({ pag
     await page.getByRole("button", { name: "Advanced" }).click();
     await page.getByPlaceholder("wrkspc_…").fill(WORKSPACE_ID);
   }
-  await capture(page, `${SHOTS}/01-connect-anthropic.png`, page.getByRole("dialog"));
+  // The Connect dialog opens over the Add model dialog; capture the one in front.
+  await capture(page, `${SHOTS}/01-connect-anthropic.png`, page.getByRole("dialog", { name: "Connect to Anthropic" }));
   await page.locator(".signin-connect").click();
   await expect(card.getByText("Connection saved")).toBeVisible({ timeout: 60_000 });
   await keepModelAvailable(page, card, MODEL);
@@ -102,7 +103,7 @@ test("LC-03 — turning Hosted models off refuses the saved connection", async (
   await signInAsOwner(page, BASE);
   // Before revoking: Permissions says the gate is on, and why.
   await page.goto(`${BASE}/#/capabilities`);
-  await page.getByLabel("Search capabilities", { exact: true }).fill("Hosted models");
+  await page.getByLabel("Search permissions", { exact: true }).fill("Hosted models");
   const row = page.locator(".cap.card").filter({ hasText: "Hosted models" }).first();
   await row.locator("button.cap-toggle").click();
   await expect(row.getByText(/on because you connected a provider/i)).toBeVisible({ timeout: 30_000 });

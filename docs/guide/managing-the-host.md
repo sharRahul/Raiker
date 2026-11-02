@@ -270,8 +270,11 @@ failed attempt leaves nothing behind that would refuse the next one.
 | macOS | Quit Raiker (Host → Quit), then move **Raiker** from Applications to the Bin | Kept. To remove it too, first use **Settings → General → Delete my account**, or delete `~/Library/Application Support/Raiker` |
 | Linux | `sudo apt remove raiker`, `sudo dnf remove raiker`, or delete the AppImage | Kept for every user; delete `~/.local/share/raiker` to remove it |
 
+The llama.cpp engine and the speech models Raiker installed for you live inside
+its data folder, so removing the data removes them too.
+
 Never removed by any uninstaller: models and runtimes you installed with other
-tools (Ollama, LM Studio, llama.cpp), folders you attached to projects, and
+tools (Ollama, LM Studio, your own llama.cpp), folders you attached to projects, and
 backups you made to another drive. Removing an instance's data also removes its
 provider-key protection entry from the Keychain or Secret Service.
 

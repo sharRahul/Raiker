@@ -30,6 +30,7 @@ from __future__ import annotations
 import shutil
 from dataclasses import dataclass
 from datetime import datetime, timedelta
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 from raiker.contracts.ids import utc_now
@@ -74,8 +75,18 @@ def _stale(detected_at: str, *, now: datetime) -> bool:
     return now - taken > timedelta(seconds=DETECTION_TTL_SECONDS)
 
 
-def probe(runtime: str) -> tuple[bool, str | None]:
-    """Look for ``runtime``'s executable on this host. No connection is made."""
+def probe(runtime: str, workspace_root: Path | None = None) -> tuple[bool, str | None]:
+    """Look for ``runtime``'s executable on this host. No connection is made.
+
+    llama.cpp is also found where Raiker installed it itself, inside the
+    workspace (``runtimes/llama.cpp``), which is deliberately not on ``PATH``.
+    """
+    if runtime == "llama.cpp" and workspace_root is not None:
+        from raiker.models.llama_cpp.installer import current
+
+        installed = current(workspace_root)
+        if installed is not None:
+            return True, installed.executable
     for name in RUNTIME_EXECUTABLES.get(runtime, ()):
         found = shutil.which(name)
         if found:
@@ -105,7 +116,7 @@ def detect(
                 detected_at=str(row["detected_at"]),
             )
             continue
-        present, executable = probe(runtime)
+        present, executable = probe(runtime, store.paths.workspace_root)
         store.save_local_runtime_presence(runtime, present=present, executable=executable)
         results[runtime] = RuntimePresence(
             runtime=runtime, present=present, executable=executable, detected_at=utc_now()

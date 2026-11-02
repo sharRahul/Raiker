@@ -48,6 +48,7 @@ from raiker.api.routes_instances import router as instances_router
 from raiker.api.routes_knowledge_files import router as knowledge_files_router
 from raiker.api.routes_language import router as language_router
 from raiker.api.routes_library import router as library_router
+from raiker.api.routes_local_runtime import router as local_runtime_router
 from raiker.api.routes_memory import router as memory_router
 from raiker.api.routes_models import router as models_router
 from raiker.api.routes_project_limits import router as project_limits_router
@@ -580,10 +581,16 @@ def create_app(
     # nothing and keeps the resolve path free of "is the host running?" branches.
     app.state.scheduler_wakeup = SchedulerWakeup()
     app.state.loopback_only = loopback_only
+    from raiker.models.llama_cpp.supervisor import LlamaSupervisor
     from raiker.models.local_runtime import ManagedLlamaRuntime
     from raiker.models.mlx_runtime import ManagedMlxRuntime
 
-    app.state.managed_llama_runtime = ManagedLlamaRuntime()
+    app.state.managed_llama_runtime = ManagedLlamaRuntime(workspace_root=app.state.workspace_root)
+    # Watches, restarts and restores the servers above; started with the host's
+    # background work, so a test that never starts the host never spawns it.
+    app.state.llama_supervisor = LlamaSupervisor(
+        app.state.managed_llama_runtime, app.state.workspace_root
+    )
     app.state.managed_mlx_runtime = ManagedMlxRuntime()
     app.state.instance_ui_dir = Path(ui_dir) if ui_dir is not None else None
     # GCR-07 — the child applications this one mounts, and the background
@@ -686,6 +693,7 @@ def create_app(
     app.include_router(code_files_router)
     app.include_router(memory_router)
     app.include_router(models_router)
+    app.include_router(local_runtime_router)
     app.include_router(setup_router)
     app.include_router(tray_router)
     app.include_router(prompts_router)

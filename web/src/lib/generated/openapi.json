@@ -11438,6 +11438,49 @@
         "title": "DesignVersionView",
         "type": "object"
       },
+      "DeviceReport": {
+        "description": "One device ``llama-server --list-devices`` says this build can use.",
+        "properties": {
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "memory_free_bytes": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Memory Free Bytes"
+          },
+          "memory_total_bytes": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Memory Total Bytes"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "memory_total_bytes",
+          "memory_free_bytes"
+        ],
+        "title": "DeviceReport",
+        "type": "object"
+      },
       "DeviceSessionView": {
         "description": "One sign-in of this account, without its token.",
         "properties": {
@@ -15398,6 +15441,70 @@
         "title": "GoalView",
         "type": "object"
       },
+      "GpuDevice": {
+        "properties": {
+          "cuda_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Cuda Version"
+          },
+          "discrete": {
+            "title": "Discrete",
+            "type": "boolean"
+          },
+          "memory_free_bytes": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Memory Free Bytes"
+          },
+          "memory_total_bytes": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Memory Total Bytes"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "unified_memory": {
+            "default": false,
+            "title": "Unified Memory",
+            "type": "boolean"
+          },
+          "vendor": {
+            "title": "Vendor",
+            "type": "string"
+          }
+        },
+        "required": [
+          "vendor",
+          "name",
+          "memory_total_bytes",
+          "memory_free_bytes",
+          "discrete"
+        ],
+        "title": "GpuDevice",
+        "type": "object"
+      },
       "GuideIndex": {
         "description": "The sections this install carries; ``available`` is false when a build shipped none.",
         "properties": {
@@ -15533,6 +15640,94 @@
           }
         },
         "title": "HTTPValidationError",
+        "type": "object"
+      },
+      "HardwareProfile": {
+        "properties": {
+          "arch": {
+            "title": "Arch",
+            "type": "string"
+          },
+          "available_memory_bytes": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Available Memory Bytes"
+          },
+          "backends": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Backends",
+            "type": "array"
+          },
+          "cpu_cores": {
+            "title": "Cpu Cores",
+            "type": "integer"
+          },
+          "detected_at": {
+            "default": 0.0,
+            "title": "Detected At",
+            "type": "number"
+          },
+          "gpus": {
+            "items": {
+              "$ref": "#/components/schemas/GpuDevice"
+            },
+            "title": "Gpus",
+            "type": "array"
+          },
+          "metal_available": {
+            "title": "Metal Available",
+            "type": "boolean"
+          },
+          "os": {
+            "title": "Os",
+            "type": "string"
+          },
+          "reason": {
+            "title": "Reason",
+            "type": "string"
+          },
+          "recommended_backend": {
+            "title": "Recommended Backend",
+            "type": "string"
+          },
+          "total_memory_bytes": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Total Memory Bytes"
+          },
+          "vulkan_available": {
+            "title": "Vulkan Available",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "os",
+          "arch",
+          "cpu_cores",
+          "total_memory_bytes",
+          "available_memory_bytes",
+          "gpus",
+          "vulkan_available",
+          "metal_available",
+          "backends",
+          "recommended_backend",
+          "reason"
+        ],
+        "title": "HardwareProfile",
         "type": "object"
       },
       "HealthView": {
@@ -17491,6 +17686,82 @@
         "title": "InstallPlan",
         "type": "object"
       },
+      "Installation": {
+        "properties": {
+          "arch": {
+            "title": "Arch",
+            "type": "string"
+          },
+          "assets": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Assets",
+            "type": "array"
+          },
+          "backend": {
+            "title": "Backend",
+            "type": "string"
+          },
+          "cuda_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cuda Version"
+          },
+          "devices": {
+            "items": {
+              "$ref": "#/components/schemas/DeviceReport"
+            },
+            "title": "Devices",
+            "type": "array"
+          },
+          "directory": {
+            "title": "Directory",
+            "type": "string"
+          },
+          "executable": {
+            "title": "Executable",
+            "type": "string"
+          },
+          "installed_at": {
+            "title": "Installed At",
+            "type": "string"
+          },
+          "os": {
+            "title": "Os",
+            "type": "string"
+          },
+          "tag": {
+            "title": "Tag",
+            "type": "string"
+          },
+          "version_text": {
+            "title": "Version Text",
+            "type": "string"
+          }
+        },
+        "required": [
+          "tag",
+          "backend",
+          "os",
+          "arch",
+          "cuda_version",
+          "directory",
+          "executable",
+          "version_text",
+          "devices",
+          "installed_at",
+          "assets"
+        ],
+        "title": "Installation",
+        "type": "object"
+      },
       "InstallationView": {
         "description": "BUG-44 — what this installation is, read from the build that produced it.",
         "properties": {
@@ -18393,6 +18664,156 @@
         "title": "LastUpdateCheck",
         "type": "object"
       },
+      "LaunchPlan": {
+        "properties": {
+          "allowed": {
+            "title": "Allowed",
+            "type": "boolean"
+          },
+          "args": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Args",
+            "type": "array"
+          },
+          "backend": {
+            "title": "Backend",
+            "type": "string"
+          },
+          "context_size": {
+            "title": "Context Size",
+            "type": "integer"
+          },
+          "estimated": {
+            "default": true,
+            "title": "Estimated",
+            "type": "boolean"
+          },
+          "flash_attention": {
+            "title": "Flash Attention",
+            "type": "string"
+          },
+          "full_offload": {
+            "title": "Full Offload",
+            "type": "boolean"
+          },
+          "gpu_budget_bytes": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Gpu Budget Bytes"
+          },
+          "gpu_bytes": {
+            "title": "Gpu Bytes",
+            "type": "integer"
+          },
+          "gpu_layers": {
+            "title": "Gpu Layers",
+            "type": "integer"
+          },
+          "kv_cache_bytes": {
+            "title": "Kv Cache Bytes",
+            "type": "integer"
+          },
+          "kv_cache_type": {
+            "title": "Kv Cache Type",
+            "type": "string"
+          },
+          "notes": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Notes",
+            "type": "array"
+          },
+          "settings": {
+            "$ref": "#/components/schemas/RuntimeSettings"
+          },
+          "system_budget_bytes": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "System Budget Bytes"
+          },
+          "system_bytes": {
+            "title": "System Bytes",
+            "type": "integer"
+          },
+          "system_weights_bytes": {
+            "title": "System Weights Bytes",
+            "type": "integer"
+          },
+          "threads": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Threads"
+          },
+          "total_layers": {
+            "title": "Total Layers",
+            "type": "integer"
+          },
+          "trained_context": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Trained Context"
+          },
+          "verdict": {
+            "title": "Verdict",
+            "type": "string"
+          },
+          "weights_bytes": {
+            "title": "Weights Bytes",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "backend",
+          "gpu_layers",
+          "total_layers",
+          "full_offload",
+          "context_size",
+          "trained_context",
+          "threads",
+          "flash_attention",
+          "kv_cache_type",
+          "weights_bytes",
+          "kv_cache_bytes",
+          "gpu_bytes",
+          "system_bytes",
+          "system_weights_bytes",
+          "gpu_budget_bytes",
+          "system_budget_bytes",
+          "verdict",
+          "allowed",
+          "notes",
+          "args"
+        ],
+        "title": "LaunchPlan",
+        "type": "object"
+      },
       "LibraryItem": {
         "properties": {
           "block": {
@@ -18810,9 +19231,140 @@
         "title": "LimitWindow",
         "type": "object"
       },
+      "LlamaCppInstallRequest": {
+        "additionalProperties": false,
+        "description": "Install (or replace) the llama.cpp engine Raiker manages.",
+        "properties": {
+          "backend": {
+            "default": "auto",
+            "enum": [
+              "auto",
+              "cuda",
+              "vulkan",
+              "metal",
+              "cpu"
+            ],
+            "title": "Backend",
+            "type": "string"
+          },
+          "release": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Release"
+          }
+        },
+        "title": "LlamaCppInstallRequest",
+        "type": "object"
+      },
+      "LlamaRuntimeOverview": {
+        "properties": {
+          "executable": {
+            "$ref": "#/components/schemas/ResolvedExecutable"
+          },
+          "hardware": {
+            "$ref": "#/components/schemas/HardwareProfile"
+          },
+          "installation": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Installation"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "license_url": {
+            "title": "License Url",
+            "type": "string"
+          },
+          "release_page": {
+            "title": "Release Page",
+            "type": "string"
+          },
+          "restore_failures": {
+            "items": {
+              "$ref": "#/components/schemas/RestoreFailure"
+            },
+            "title": "Restore Failures",
+            "type": "array"
+          },
+          "slots": {
+            "items": {
+              "$ref": "#/components/schemas/SlotHealth"
+            },
+            "title": "Slots",
+            "type": "array"
+          }
+        },
+        "required": [
+          "installation",
+          "executable",
+          "hardware",
+          "slots",
+          "restore_failures",
+          "release_page",
+          "license_url"
+        ],
+        "title": "LlamaRuntimeOverview",
+        "type": "object"
+      },
+      "LlamaUpdateCheck": {
+        "properties": {
+          "installed_tag": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Installed Tag"
+          },
+          "latest_tag": {
+            "title": "Latest Tag",
+            "type": "string"
+          },
+          "published_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Published At"
+          },
+          "update_available": {
+            "title": "Update Available",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "installed_tag",
+          "latest_tag",
+          "update_available",
+          "published_at"
+        ],
+        "title": "LlamaUpdateCheck",
+        "type": "object"
+      },
       "LocalModelDeployRequest": {
         "additionalProperties": false,
         "properties": {
+          "install_if_missing": {
+            "default": false,
+            "title": "Install If Missing",
+            "type": "boolean"
+          },
           "profile_id": {
             "anyOf": [
               {
@@ -18988,6 +19540,72 @@
           "detected_at"
         ],
         "title": "LocalRuntime",
+        "type": "object"
+      },
+      "LocalRuntimeSettingsRequest": {
+        "additionalProperties": false,
+        "description": "One local model's launch settings; ``null`` means \"let Raiker decide\".",
+        "properties": {
+          "allow_overcommit": {
+            "default": false,
+            "title": "Allow Overcommit",
+            "type": "boolean"
+          },
+          "context_size": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Context Size"
+          },
+          "flash_attention": {
+            "default": "auto",
+            "enum": [
+              "auto",
+              "on",
+              "off"
+            ],
+            "title": "Flash Attention",
+            "type": "string"
+          },
+          "gpu_layers": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Gpu Layers"
+          },
+          "kv_cache_type": {
+            "default": "f16",
+            "enum": [
+              "f16",
+              "q8_0",
+              "q4_0"
+            ],
+            "title": "Kv Cache Type",
+            "type": "string"
+          },
+          "threads": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Threads"
+          }
+        },
+        "title": "LocalRuntimeSettingsRequest",
         "type": "object"
       },
       "LocalRuntimes": {
@@ -23318,6 +23936,46 @@
           }
         },
         "title": "ModelRoutingRequest",
+        "type": "object"
+      },
+      "ModelRuntimeSettingsView": {
+        "properties": {
+          "model_id": {
+            "title": "Model Id",
+            "type": "string"
+          },
+          "plan": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/LaunchPlan"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "plan_error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Plan Error"
+          },
+          "settings": {
+            "$ref": "#/components/schemas/RuntimeSettings"
+          }
+        },
+        "required": [
+          "model_id",
+          "settings",
+          "plan",
+          "plan_error"
+        ],
+        "title": "ModelRuntimeSettingsView",
         "type": "object"
       },
       "ModelSelectionSet": {
@@ -28722,6 +29380,43 @@
         "title": "ResolveApprovalRequest",
         "type": "object"
       },
+      "ResolvedExecutable": {
+        "properties": {
+          "backend": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Backend"
+          },
+          "path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Path"
+          },
+          "source": {
+            "title": "Source",
+            "type": "string"
+          }
+        },
+        "required": [
+          "path",
+          "source",
+          "backend"
+        ],
+        "title": "ResolvedExecutable",
+        "type": "object"
+      },
       "ResolvedFinding": {
         "description": "A finding the previous review raised that this patch no longer has.",
         "properties": {
@@ -28768,6 +29463,34 @@
           "line"
         ],
         "title": "ResolvedFinding",
+        "type": "object"
+      },
+      "RestoreFailure": {
+        "properties": {
+          "model_id": {
+            "title": "Model Id",
+            "type": "string"
+          },
+          "model_path": {
+            "title": "Model Path",
+            "type": "string"
+          },
+          "reason_code": {
+            "title": "Reason Code",
+            "type": "string"
+          },
+          "slot_profile_id": {
+            "title": "Slot Profile Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "slot_profile_id",
+          "model_id",
+          "model_path",
+          "reason_code"
+        ],
+        "title": "RestoreFailure",
         "type": "object"
       },
       "RestorePlan": {
@@ -29371,6 +30094,74 @@
           "mode"
         ],
         "title": "RuntimeReadinessView",
+        "type": "object"
+      },
+      "RuntimeSettings": {
+        "description": "Per-model launch settings. ``None`` means *let Raiker decide*.",
+        "properties": {
+          "allow_overcommit": {
+            "default": false,
+            "title": "Allow Overcommit",
+            "type": "boolean"
+          },
+          "context_size": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Context Size"
+          },
+          "flash_attention": {
+            "default": "auto",
+            "enum": [
+              "auto",
+              "on",
+              "off"
+            ],
+            "title": "Flash Attention",
+            "type": "string"
+          },
+          "gpu_layers": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Gpu Layers"
+          },
+          "kv_cache_type": {
+            "default": "f16",
+            "enum": [
+              "f16",
+              "q8_0",
+              "q4_0"
+            ],
+            "title": "Kv Cache Type",
+            "type": "string"
+          },
+          "threads": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Threads"
+          }
+        },
+        "title": "RuntimeSettings",
         "type": "object"
       },
       "SaveProjectContextRequest": {
@@ -31602,6 +32393,96 @@
           "already_installed"
         ],
         "title": "SkillVerification",
+        "type": "object"
+      },
+      "SlotHealth": {
+        "properties": {
+          "backend": {
+            "title": "Backend",
+            "type": "string"
+          },
+          "endpoint": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Endpoint"
+          },
+          "last_error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Error"
+          },
+          "log_path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Log Path"
+          },
+          "model_id": {
+            "title": "Model Id",
+            "type": "string"
+          },
+          "model_path": {
+            "title": "Model Path",
+            "type": "string"
+          },
+          "pid": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pid"
+          },
+          "plan": {
+            "$ref": "#/components/schemas/LaunchPlan"
+          },
+          "restarts": {
+            "title": "Restarts",
+            "type": "integer"
+          },
+          "slot_profile_id": {
+            "title": "Slot Profile Id",
+            "type": "string"
+          },
+          "state": {
+            "title": "State",
+            "type": "string"
+          }
+        },
+        "required": [
+          "slot_profile_id",
+          "model_id",
+          "model_path",
+          "state",
+          "endpoint",
+          "pid",
+          "restarts",
+          "last_error",
+          "backend",
+          "plan",
+          "log_path"
+        ],
+        "title": "SlotHealth",
         "type": "object"
       },
       "SourceAnchorView": {
@@ -46121,6 +47002,339 @@
           }
         },
         "summary": "Move Pin"
+      }
+    },
+    "/api/local-runtime/llama-cpp": {
+      "get": {
+        "description": "The engine, this machine's hardware, and every slot's health.",
+        "operationId": "get_llama_runtime_api_local_runtime_llama_cpp_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "refresh",
+            "required": false,
+            "schema": {
+              "default": false,
+              "title": "Refresh",
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LlamaRuntimeOverview"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Llama Runtime"
+      }
+    },
+    "/api/local-runtime/llama-cpp/install": {
+      "post": {
+        "description": "Download, verify and activate the official llama.cpp build.",
+        "operationId": "install_llama_runtime_api_local_runtime_llama_cpp_install_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LlamaCppInstallRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelOperationView"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Install Llama Runtime"
+      }
+    },
+    "/api/local-runtime/llama-cpp/installation": {
+      "delete": {
+        "description": "Remove Raiker's llama.cpp build. Refused while any model is served from it.",
+        "operationId": "uninstall_llama_runtime_api_local_runtime_llama_cpp_installation_delete",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LlamaRuntimeOverview"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Uninstall Llama Runtime"
+      }
+    },
+    "/api/local-runtime/llama-cpp/models/{model_id}/plan": {
+      "post": {
+        "description": "What these settings would start with, and whether they fit. Nothing is saved.",
+        "operationId": "preview_model_runtime_plan_api_local_runtime_llama_cpp_models__model_id__plan_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "model_id",
+            "required": true,
+            "schema": {
+              "title": "Model Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LocalRuntimeSettingsRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelRuntimeSettingsView"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Preview Model Runtime Plan"
+      }
+    },
+    "/api/local-runtime/llama-cpp/models/{model_id}/settings": {
+      "get": {
+        "operationId": "get_model_runtime_settings_api_local_runtime_llama_cpp_models__model_id__settings_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "model_id",
+            "required": true,
+            "schema": {
+              "title": "Model Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelRuntimeSettingsView"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Model Runtime Settings"
+      },
+      "put": {
+        "description": "Save one model's settings. A running slot picks them up on its next start.",
+        "operationId": "save_model_runtime_settings_api_local_runtime_llama_cpp_models__model_id__settings_put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "model_id",
+            "required": true,
+            "schema": {
+              "title": "Model Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LocalRuntimeSettingsRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelRuntimeSettingsView"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Save Model Runtime Settings"
+      }
+    },
+    "/api/local-runtime/llama-cpp/slots/{profile_id}/restart": {
+      "post": {
+        "operationId": "restart_llama_slot_api_local_runtime_llama_cpp_slots__profile_id__restart_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "profile_id",
+            "required": true,
+            "schema": {
+              "title": "Profile Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SlotHealth"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Restart Llama Slot"
+      }
+    },
+    "/api/local-runtime/llama-cpp/slots/{profile_id}/stop": {
+      "post": {
+        "description": "Unload the model in one slot; it will not come back at the next start.",
+        "operationId": "stop_llama_slot_api_local_runtime_llama_cpp_slots__profile_id__stop_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "profile_id",
+            "required": true,
+            "schema": {
+              "title": "Profile Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LlamaRuntimeOverview"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Stop Llama Slot"
+      }
+    },
+    "/api/local-runtime/llama-cpp/update-check": {
+      "post": {
+        "operationId": "check_llama_runtime_update_api_local_runtime_llama_cpp_update_check_post",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LlamaUpdateCheck"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Check Llama Runtime Update"
       }
     },
     "/api/local-runtimes": {

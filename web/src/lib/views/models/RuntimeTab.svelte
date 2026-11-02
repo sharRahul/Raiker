@@ -13,7 +13,9 @@
   import SideTaskModels from "./SideTaskModels.svelte";
   import DownloadsPanel from "./DownloadsPanel.svelte";
   import LocalFrameworkRow from "./LocalFrameworkRow.svelte";
+  import LlamaEnginePanel from "./LlamaEnginePanel.svelte";
   import LocalLibraryPanel from "./LocalLibraryPanel.svelte";
+  import ModelRuntimeSettings from "./ModelRuntimeSettings.svelte";
   import SpeechRuntimePanel from "./SpeechRuntimePanel.svelte";
   import WorkDefaults from "./WorkDefaults.svelte";
 
@@ -52,6 +54,9 @@
      unchanged; what moved is which question they answer. -->
 <div class="local-list local-serving">
   {#if gguf.length > 0}
+    <!-- The engine behind the GGUF slots: installed, sized and supervised by
+         Raiker, so serving a model needs no manual setup. -->
+    <LlamaEnginePanel onchanged={() => void onreload()} />
     <LocalFrameworkRow
       provider="llama.cpp"
       title="GGUF"
@@ -66,6 +71,7 @@
       {selecting}
       testResult={testResults[gguf[0].profile_id] ?? null}
     />
+    <ModelRuntimeSettings />
   {/if}
   {#if mlx.length > 0}
     <LocalFrameworkRow

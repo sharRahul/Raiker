@@ -773,3 +773,69 @@ class ModelStore:
             (principal_id,),
         )
         return str(row["profile_id"]) if row is not None else None
+
+    # ── the managed llama.cpp engine (RAIKER-2130) ─────────────────────────
+
+    def load_local_runtime_settings(
+        self: SQLiteStore, owner_principal_id: str, model_id: str
+    ) -> dict[str, Any]:
+        row = self._row(
+            """SELECT settings_json FROM local_model_runtime_settings
+            WHERE owner_principal_id = ? AND model_id = ?""",
+            (owner_principal_id, model_id),
+        )
+        if row is None:
+            return {}
+        try:
+            value = json.loads(row["settings_json"])
+        except (TypeError, ValueError):
+            return {}
+        return value if isinstance(value, dict) else {}
+
+    def save_local_runtime_settings(
+        self: SQLiteStore, owner_principal_id: str, model_id: str, settings: dict[str, Any]
+    ) -> None:
+        self._execute(
+            """INSERT INTO local_model_runtime_settings
+            (owner_principal_id, model_id, settings_json, updated_at) VALUES (?, ?, ?, ?)
+            ON CONFLICT(owner_principal_id, model_id) DO UPDATE SET
+            settings_json = excluded.settings_json, updated_at = excluded.updated_at""",
+            (owner_principal_id, model_id, json.dumps(settings, sort_keys=True), utc_now()),
+        )
+
+    def save_local_runtime_deployment(
+        self: SQLiteStore, owner_principal_id: str, slot_profile_id: str, model_id: str, model_path: str
+    ) -> None:
+        self._execute(
+            """INSERT INTO local_runtime_deployments
+            (owner_principal_id, slot_profile_id, model_id, model_path, updated_at)
+            VALUES (?, ?, ?, ?, ?)
+            ON CONFLICT(owner_principal_id, slot_profile_id) DO UPDATE SET
+            model_id = excluded.model_id, model_path = excluded.model_path,
+            updated_at = excluded.updated_at""",
+            (owner_principal_id, slot_profile_id, model_id, model_path, utc_now()),
+        )
+
+    def delete_local_runtime_deployment(
+        self: SQLiteStore, owner_principal_id: str, slot_profile_id: str
+    ) -> None:
+        self._execute(
+            """DELETE FROM local_runtime_deployments
+            WHERE owner_principal_id = ? AND slot_profile_id = ?""",
+            (owner_principal_id, slot_profile_id),
+        )
+
+    def list_local_runtime_deployments(self: SQLiteStore) -> list[dict[str, str]]:
+        """Every owner's deployed slots; read once when the host starts."""
+        return [
+            {
+                "owner_principal_id": str(row["owner_principal_id"]),
+                "slot_profile_id": str(row["slot_profile_id"]),
+                "model_id": str(row["model_id"]),
+                "model_path": str(row["model_path"]),
+            }
+            for row in self._rows(
+                """SELECT owner_principal_id, slot_profile_id, model_id, model_path
+                FROM local_runtime_deployments ORDER BY slot_profile_id"""
+            )
+        ]

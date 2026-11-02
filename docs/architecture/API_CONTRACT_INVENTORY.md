@@ -12,7 +12,7 @@ operation answers with, and whether OpenAPI describes it (OPT-01/OPT-02 —
 * **deferred** — the body has no declared type; a test fails while any is.
 * **special** — a stream, a file or another non-JSON transport; hand-written.
 
-**505 operations: 491 verified, 0 eligible, 0 deferred, 14 special.**
+**514 operations: 500 verified, 0 eligible, 0 deferred, 14 special.**
 
 | Method | Path | Request | Response | Status | Why |
 |---|---|---|---|---|---|
@@ -269,6 +269,15 @@ operation answers with, and whether OpenAPI describes it (OPT-01/OPT-02 —
 | POST | `/api/library/pins` | LibraryPinRequest | LibraryPinned | verified | declared LibraryPinned |
 | DELETE | `/api/library/pins/{pin_id}` |  | LibraryPinRemoved | verified | declared LibraryPinRemoved |
 | PUT | `/api/library/pins/{pin_id}/project` | LibraryPinMoveRequest | LibraryPinned | verified | declared LibraryPinned |
+| GET | `/api/local-runtime/llama-cpp` |  | LlamaRuntimeOverview | verified | _overview |
+| POST | `/api/local-runtime/llama-cpp/install` | LlamaCppInstallRequest | ModelOperationView | verified | declared ModelOperationView |
+| DELETE | `/api/local-runtime/llama-cpp/installation` |  | LlamaRuntimeOverview | verified | _overview |
+| POST | `/api/local-runtime/llama-cpp/models/{model_id}/plan` | LocalRuntimeSettingsRequest | ModelRuntimeSettingsView | verified | _settings_view |
+| GET | `/api/local-runtime/llama-cpp/models/{model_id}/settings` |  | ModelRuntimeSettingsView | verified | _settings_view |
+| PUT | `/api/local-runtime/llama-cpp/models/{model_id}/settings` | LocalRuntimeSettingsRequest | ModelRuntimeSettingsView | verified | _settings_view |
+| POST | `/api/local-runtime/llama-cpp/slots/{profile_id}/restart` |  | SlotHealth | verified | LlamaSupervisor.restart_slot |
+| POST | `/api/local-runtime/llama-cpp/slots/{profile_id}/stop` |  | LlamaRuntimeOverview | verified | _overview |
+| POST | `/api/local-runtime/llama-cpp/update-check` |  | LlamaUpdateCheck | verified | built as LlamaUpdateCheck |
 | GET | `/api/local-runtimes` |  | LocalRuntimes | verified | declared LocalRuntimes |
 | POST | `/api/local-runtimes/detect` |  | LocalRuntimes | verified | declared LocalRuntimes |
 | DELETE | `/api/managed-files/{file_id}` |  | ManagedFileChanged | verified | declared by cast |

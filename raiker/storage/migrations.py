@@ -5102,6 +5102,30 @@ class RunnerStep:
 
 MigrationStep = Migration | SearchMigration | RunnerStep
 
+# The llama.cpp engine Raiker manages: each local model's launch settings
+# (GPU layers, context, threads, KV cache, overcommit) as the owner set them in
+# Models, and which model each managed slot was serving, so the servers the
+# owner deployed come back when Raiker starts again. A deployment row is deleted
+# when the owner stops that slot; a crash or a host restart leaves it in place.
+LLAMA_RUNTIME_MIGRATION_ID = "RAIKER-2130-llama-runtime"
+LLAMA_RUNTIME_SQL = """
+CREATE TABLE IF NOT EXISTS local_model_runtime_settings (
+  owner_principal_id TEXT NOT NULL,
+  model_id TEXT NOT NULL,
+  settings_json TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  PRIMARY KEY (owner_principal_id, model_id)
+);
+CREATE TABLE IF NOT EXISTS local_runtime_deployments (
+  owner_principal_id TEXT NOT NULL,
+  slot_profile_id TEXT NOT NULL,
+  model_id TEXT NOT NULL,
+  model_path TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  PRIMARY KEY (owner_principal_id, slot_profile_id)
+);
+"""
+
 MIGRATIONS: tuple[MigrationStep, ...] = (
     Migration(PHASE_2_MIGRATION_ID, PHASE_2_MIGRATION_SQL),
     Migration(MODEL_SESSION_RESOLVED_MODEL_MIGRATION_ID, MODEL_SESSION_RESOLVED_MODEL_SQL),
@@ -5343,6 +5367,7 @@ MIGRATIONS: tuple[MigrationStep, ...] = (
     Migration(PROJECT_LIMITS_MIGRATION_ID, PROJECT_LIMITS_SQL),
     Migration(ROUTINE_DELIVERIES_MIGRATION_ID, ROUTINE_DELIVERIES_SQL),
     Migration(REMOTE_ACCESS_MIGRATION_ID, REMOTE_ACCESS_SQL),
+    Migration(LLAMA_RUNTIME_MIGRATION_ID, LLAMA_RUNTIME_SQL),
 )
 
 #: DEC-17 step 8 — how far along the registry this build is, as one number.

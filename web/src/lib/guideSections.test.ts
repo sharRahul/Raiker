@@ -83,6 +83,7 @@ describe("every page the product navigates to can reach the guide", () => {
     // Chapters that explain the product rather than one page are reached from
     // the guide's own index, which is what it is for.
     const GENERAL = new Set([
+      "beta",
       "getting-started",
       "known-limits",
       "managing-the-host",

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from pathlib import Path
 from typing import Any
 
@@ -46,9 +46,37 @@ class ManagedLlamaRuntime(ManagedSlotRuntime):
         *,
         approved_roots: tuple[Path, ...] = (),
         on_stopped: Callable[[str], None] | None = None,
+        workspace_root: Path | None = None,
+        slots: tuple[LocalSlot, ...] = LOCAL_SLOTS,
     ) -> None:
-        super().__init__(LOCAL_SLOTS, launcher, on_stopped=on_stopped)
+        super().__init__(slots, launcher, on_stopped=on_stopped)
         self._approved_roots = tuple(root.resolve() for root in approved_roots)
+        #: Where each slot's log and pid file go. Without it (tests, embedders)
+        #: the server's output is discarded, as it always was.
+        self.workspace_root = workspace_root
+
+    def log_path(self, slot_id: str) -> Path | None:
+        if self.workspace_root is None:
+            return None
+        from raiker.models.llama_cpp.process import log_dir
+
+        return log_dir(self.workspace_root) / f"{slot_id}.log"
+
+    def _spawn(self, slot: LocalSlot, argv: list[str]) -> Any:
+        log_path = self.log_path(slot.profile_id)
+        if self._custom_launcher or log_path is None:
+            return super()._spawn(slot, argv)
+        from raiker.models.llama_cpp.process import spawn
+
+        return spawn(argv, log_path=log_path, pid_path=log_path.with_suffix(".pid"))
+
+    def _stop_locked(self, slot_id: str | None) -> LocalRuntimeStatus:
+        status = super()._stop_locked(slot_id)
+        if slot_id is not None:
+            log_path = self.log_path(slot_id)
+            if log_path is not None:
+                log_path.with_suffix(".pid").unlink(missing_ok=True)
+        return status
 
     def _assign_slot(
         self, model_path: str, requested_port: int | None, profile_id: str | None = None
@@ -79,6 +107,7 @@ class ManagedLlamaRuntime(ManagedSlotRuntime):
         port: int | None = None,
         profile_id: str | None = None,
         approved_roots: tuple[Path, ...] | None = None,
+        extra_args: Sequence[str] = (),
     ) -> LocalRuntimeStatus:
         model = model_path.resolve()
         if not model.is_file():
@@ -105,5 +134,8 @@ class ManagedLlamaRuntime(ManagedSlotRuntime):
                 "127.0.0.1",
                 "--port",
                 str(bound_port),
+                # The planner's sizing (GPU layers, context, KV cache, threads)
+                # and `--jinja`, without which llama-server refuses tool calls.
+                *extra_args,
             ]
             return self._launch_into(slot, str(model), argv, port=bound_port)

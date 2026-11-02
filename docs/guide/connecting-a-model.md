@@ -13,6 +13,9 @@ made.
 
 > **Local models (llama.cpp, Ollama, LM Studio)**: start the local server, press
 > **Choose a model**, then **Use** the one you want. Nothing leaves your machine.
+> For GGUF files you need not install anything yourself: Raiker installs,
+> sizes and runs llama.cpp for you — see [The llama.cpp engine Raiker
+> manages](#the-llamacpp-engine-raiker-manages).
 > A running Ollama is found on its own; see [Ollama: found running, chosen
 > once, kept checked](#ollama-found-running-chosen-once-kept-checked).
 
@@ -135,8 +138,9 @@ that.
   directory *names* only and grants nothing; approving the folder is still the
   separate act. Raiker scans only approved roots, does not follow escaping
   symlinks, reads a bounded GGUF header, groups shards, and leaves original
-  files in place. **Deploy** starts managed loopback llama.cpp for a complete
-  model.
+  files in place. **Serve** starts managed loopback llama.cpp for a complete
+  model — installing the engine first, with your confirmation, if Raiker has
+  none. See [The llama.cpp engine Raiker manages](#the-llamacpp-engine-raiker-manages).
 - **Hugging Face:** the tab opens on the most-downloaded GGUF repositories, so
   you have somewhere to start without knowing a repository id; search the Hub
   for anything else. Raiker shows immutable revision, files, size, format,
@@ -154,6 +158,61 @@ that.
   runs in a digest-pinned llama.cpp container with no network, a read-only
   source, a separate writable output, and resource limits. Pick GGUF when one
   exists.
+
+### The llama.cpp engine Raiker manages
+
+**Models → Runtime → llama.cpp engine** is where GGUF models get the program
+that runs them. You do not install llama.cpp, put it on `PATH`, or choose
+command-line flags.
+
+- **What it finds.** The card shows your graphics (NVIDIA through
+  `nvidia-smi`; AMD and Intel through the operating system's own records;
+  Apple silicon), your free memory, and the engine build that suits this
+  computer: **CUDA** for an NVIDIA GPU, **Vulkan** for an AMD or Intel GPU
+  (or an NVIDIA driver too old for CUDA), **Metal** on Apple silicon, and the
+  **processor** otherwise. An integrated GPU is offered but not chosen for you.
+- **Install.** Raiker downloads the official build for your operating system,
+  processor and backend from [ggml-org/llama.cpp's
+  releases](https://github.com/ggml-org/llama.cpp/releases) (MIT licence),
+  plus NVIDIA's CUDA runtime libraries beside it for a CUDA build. Every file
+  is checked against the SHA-256 checksum GitHub publishes for it; a release
+  without one, a mismatch, a redirect away from GitHub or an archive with
+  unsafe paths installs nothing. The build is unpacked inside Raiker's data
+  folder (`runtimes/llama.cpp`) — no administrator rights, nothing on `PATH` —
+  and run once (`--version`, `--list-devices`) before it is used. A GPU build
+  that cannot see a GPU is not kept: on **Automatic** the next backend is
+  tried, so a laptop whose Vulkan driver is broken still ends up with a working
+  engine. The previous build keeps serving until the new one has passed.
+- **When it reaches the network.** Only when you press **Install**,
+  **Check for updates**, or confirm **Install and serve**. Opening the page
+  never does. A `llama-server` you installed yourself is still used when
+  Raiker has none of its own.
+- **Sizing each model.** Before a model starts, Raiker reads its GGUF header
+  (layers, attention shape, trained context) and plans the start: how many
+  layers fit in the GPU's free memory, how much context to allocate (up to
+  8K tokens on **Automatic**, never more than the model was trained on,
+  reduced until it fits), and whether the result fits in the memory free right
+  now — after a reserve for the rest of your computer and the models Raiker is
+  already serving. **GPU, context and memory** under the engine card shows
+  that plan for any GGUF model and lets you set GPU layers, context, threads,
+  flash attention and context-memory precision yourself; each change is
+  re-planned before you save. A plan that does not fit is refused with
+  *Not enough free memory* unless you tick **Start even if memory looks
+  short** for that model.
+- **Health and recovery.** A model counts as served only once the server's
+  `/health` answers and it names the model. If loading runs out of GPU memory,
+  Raiker retries with fewer GPU layers, then a shorter context, and says so on
+  the slot. A server that crashes is restarted with growing delays; one that
+  stops answering is restarted; three crashes in ten minutes stop the retries
+  and the slot says why. Each slot has **Restart** and **Stop**, and its log
+  is in Raiker's data folder (`logs/llama-server/`).
+- **Startup and shutdown.** The models you served come back when Raiker
+  starts; **Stop** is how you tell Raiker not to bring one back. When Raiker
+  exits it stops every server. On Windows the servers are tied to Raiker's
+  process, so they end even if Raiker is killed; on macOS and Linux a server
+  left behind by a crash is found and stopped at the next start.
+- **Remove.** Removes the engine (not your models). Refused while a model is
+  being served.
 
 ### Downloads, conversions and other long jobs
 

@@ -27,6 +27,8 @@ import type {
   SettingsView,
   CreateTelemetryDestinationRequest,
   GenerateImageRequest,
+  LlamaCppInstallRequest,
+  LocalRuntimeSettingsRequest,
   ModelPriceRequest,
   RemoteAccessConfigBody,
   TaskCreateRequest,
@@ -223,8 +225,25 @@ export const api = {
   addModelLibraryRoot: (path: string) => contract.addModelLibraryRoot({ path }),
   removeModelLibraryRoot: (path: string) => contract.removeModelLibraryRoot({ path }),
   rescanModelLibrary: () => contract.rescanModelLibrary(),
-  deployLocalModel: (modelId: string, profileId?: string) =>
-    contract.deployLocalModel(modelId, profileId ? { profile_id: profileId } : {}),
+  deployLocalModel: (modelId: string, profileId?: string, installIfMissing = false) =>
+    contract.deployLocalModel(modelId, {
+      ...(profileId ? { profile_id: profileId } : {}),
+      ...(installIfMissing ? { install_if_missing: true } : {}),
+    }),
+  // The llama.cpp engine Raiker installs and supervises. Reading never touches
+  // the network; install and update-check go to ggml-org's GitHub releases.
+  llamaRuntime: (refresh = false) => contract.getLlamaRuntime(refresh ? { refresh } : {}),
+  installLlamaRuntime: (backend: LlamaCppInstallRequest["backend"] = "auto") =>
+    contract.installLlamaRuntime({ backend }),
+  uninstallLlamaRuntime: () => contract.uninstallLlamaRuntime(),
+  checkLlamaRuntimeUpdate: () => contract.checkLlamaRuntimeUpdate(),
+  stopLlamaSlot: (profileId: string) => contract.stopLlamaSlot(profileId),
+  restartLlamaSlot: (profileId: string) => contract.restartLlamaSlot(profileId),
+  modelRuntimeSettings: (modelId: string) => contract.getModelRuntimeSettings(modelId),
+  saveModelRuntimeSettings: (modelId: string, body: LocalRuntimeSettingsRequest) =>
+    contract.saveModelRuntimeSettings(modelId, body),
+  previewModelRuntimePlan: (modelId: string, body: LocalRuntimeSettingsRequest) =>
+    contract.previewModelRuntimePlan(modelId, body),
   deployMlxModel: (modelId: string, profileId?: string) =>
     contract.deployMlxModel(modelId, profileId ? { profile_id: profileId } : {}),
   modelOperations: () => contract.listModelOperations(),

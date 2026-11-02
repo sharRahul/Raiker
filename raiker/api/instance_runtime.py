@@ -275,6 +275,15 @@ class InstanceRuntime:
         watcher = AttachedRootWatcher(self.workspace_root)
         self.app.state.attached_root_watcher = watcher
         self._tasks.append(asyncio.create_task(watcher.run(self._stop)))
+        # The llama.cpp servers the owner deployed come back, and stay watched:
+        # a crash is restarted with backoff, an unanswered health check is
+        # noticed. Restoring runs on its own thread — loading a model can take
+        # minutes and must not hold the host's start.
+        supervisor = getattr(self.app.state, "llama_supervisor", None)
+        if supervisor is not None:
+            with suppress(Exception):
+                supervisor.start()
+                supervisor.restore()
         if self.name:
             _LOG.info("instance %s: background services started", self.name)
 
@@ -294,6 +303,10 @@ class InstanceRuntime:
         self._tasks = []
         from raiker.storage.sqlite import invalidate_workspace_connections
 
+        supervisor = getattr(self.app.state, "llama_supervisor", None)
+        if supervisor is not None:
+            with suppress(Exception):
+                supervisor.shutdown()
         with suppress(Exception):
             self.app.state.managed_llama_runtime.stop()
         with suppress(Exception):

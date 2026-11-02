@@ -1,0 +1,80 @@
+name: Beta problem report
+description: Something in the Raiker beta did not work as expected.
+title: "[beta] "
+labels: ["beta", "bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for testing the Raiker beta. This issue is **public**: do not paste API keys,
+        passwords, private file contents or anything you would not post on a forum.
+        For a security problem, follow [SECURITY.md](https://github.com/sharRahul/Raiker/blob/main/SECURITY.md) instead.
+  - type: input
+    id: version
+    attributes:
+      label: Raiker build
+      description: Filled in when you open this from Settings → General → Beta feedback. Otherwise see Settings → About & updates.
+      placeholder: 0.9.0-beta.1 (abc1234)
+    validations:
+      required: true
+  - type: input
+    id: os
+    attributes:
+      label: Operating system
+      description: For example Windows 11, macOS 15 on Apple silicon, Ubuntu 24.04.
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - Installation or updates
+        - Chat
+        - Build
+        - Design
+        - Models and local AI
+        - Voice
+        - Tasks and schedule
+        - Memory
+        - Extensions and connections
+        - Permissions and sandbox
+        - Settings
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: What you did, what you expected, and what happened instead.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Open …
+        2. Press …
+        3. See …
+  - type: input
+    id: model
+    attributes:
+      label: Model and provider in use
+      description: For example "Claude (hosted)", "Ollama · llama3.2", "llama.cpp · Qwen2.5 7B (CUDA)".
+  - type: textarea
+    id: diagnostics
+    attributes:
+      label: Diagnostics (optional)
+      description: |
+        Settings → General → Beta feedback → **Copy diagnostics** copies Raiker's redacted support bundle.
+        Read it before pasting; remove anything you do not want to share.
+      render: json
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Before submitting
+      options:
+        - label: I removed keys, passwords and private content from everything above.
+          required: true

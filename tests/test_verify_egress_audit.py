@@ -12,9 +12,7 @@ def _run(
 ) -> tuple[subprocess.CompletedProcess[str], dict[str, Any]]:
     capture = tmp_path / "capture.jsonl"
     report = tmp_path / "report.json"
-    capture.write_text("
-".join(json.dumps(record) for record in records) + "
-")
+    capture.write_text("\n".join(json.dumps(record) for record in records) + "\n")
     result = subprocess.run(
         [sys.executable, str(SCRIPT), "--capture", str(capture), "--scope", "local-only", "--output", str(report), *extra],
         check=False,

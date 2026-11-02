@@ -325,7 +325,7 @@ fn a_terminal_run_sees_its_terminal_and_cannot_type_into_it() {
     // `script` gives the runner a pseudo-terminal as its stdio, as Raiker
     // does. TIOCSTI is _IOW('t', 114, char).
     let check = "test -t 0 && test -t 1 && echo tty-ok; \
-                 /usr/bin/perl -e 'ioctl(STDIN, 0x80017472, \"x\") or print \"sti-refused\\n\"'";
+                 /usr/bin/perl -e 'my $c = \"x\"; ioctl(STDIN, 0x80017472, $c) or print \"sti-refused\\n\"'";
     let output = Command::new("/usr/bin/script")
         .args(["-q", "/dev/null", runner(), "--policy"])
         .arg(&policy)

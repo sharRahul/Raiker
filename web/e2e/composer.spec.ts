@@ -1095,3 +1095,66 @@ test("on Windows the command sandbox card sets WSL2 up and chooses it", async ({
   await expect(card.getByText("Commands now run in WSL2.")).toBeVisible();
   await expect(card.getByRole("button", { name: "Remove WSL2…" })).toBeVisible();
 });
+
+// Item 10 — Build's sandbox review: what a session changed in its disposable
+// copy is shown file by file, and the project changes only when the owner
+// applies the exact change set they reviewed.
+function sandboxCopy() {
+  return {
+    workspace_id: "ws_review", session_id: "sess_review", source: "project",
+    created_at: "2026-11-02T00:00:00Z",
+    created: ["notes.md"], modified: ["app.py"], deleted: [], rejected: [],
+  };
+}
+
+async function routeSandbox(page: import("@playwright/test").Page, state: { workspaces: unknown[]; posted: unknown[] }) {
+  await page.route("http://127.0.0.1:8765/api/command-workspaces**", async (route) => {
+    const request = route.request();
+    const url = new URL(request.url());
+    if (url.pathname.endsWith("/diff")) {
+      await route.fulfill({ json: {
+        workspace_id: "ws_review", path: url.searchParams.get("path"), status: "modified",
+        diff: "--- a/app.py\n+++ b/app.py\n@@ -1 +1 @@\n-print('v1')\n+print('v2')\n",
+        binary: false, truncated: false,
+      } });
+      return;
+    }
+    if (request.method() === "POST") {
+      state.posted.push({ path: url.pathname, body: request.postDataJSON() });
+      state.workspaces = [];
+      await route.fulfill({ json: { workspace_id: "ws_review", applied: 2, discarded: true } });
+      return;
+    }
+    await route.fulfill({ json: { workspaces: state.workspaces } });
+  });
+}
+
+test("Build applies exactly the sandbox changes the owner reviewed", async ({ page }) => {
+  const state = { workspaces: [sandboxCopy()] as unknown[], posted: [] as unknown[] };
+  await routeSandbox(page, state);
+  await page.goto("http://127.0.0.1:8765/#/build?session=sess_review");
+  const review = page.getByRole("region", { name: "Sandbox changes" });
+  await expect(review).toBeVisible();
+  await review.getByRole("button", { name: /app\.py/ }).click();
+  await expect(review.getByLabel("Changes to app.py")).toContainText("+print('v2')");
+  await review.getByRole("button", { name: "Apply to project" }).click();
+  await page.getByRole("button", { name: "Apply", exact: true }).click();
+  await expect.poll(() => state.posted.length).toBe(1);
+  expect(state.posted[0]).toEqual({
+    path: "/api/command-workspaces/ws_review/promote",
+    body: { created: ["notes.md"], modified: ["app.py"], deleted: [] },
+  });
+  await expect(page.getByText("Applied to project.")).toBeVisible();
+});
+
+test("Build discards a sandbox copy without touching the project", async ({ page }) => {
+  const state = { workspaces: [sandboxCopy()] as unknown[], posted: [] as unknown[] };
+  await routeSandbox(page, state);
+  await page.goto("http://127.0.0.1:8765/#/build?session=sess_review");
+  const review = page.getByRole("region", { name: "Sandbox changes" });
+  await review.getByRole("button", { name: "Discard" }).click();
+  await page.getByRole("button", { name: "Discard", exact: true }).last().click();
+  await expect.poll(() => state.posted.length).toBe(1);
+  expect((state.posted[0] as { path: string }).path).toBe("/api/command-workspaces/ws_review/discard");
+  await expect(page.getByText("Sandbox copy discarded. Your project was not changed.")).toBeVisible();
+});

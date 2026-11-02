@@ -1,5 +1,13 @@
 ## Release blocker: native sandbox migration incomplete
 
+**Reconciled 2026-11-02.** The managed llama.cpp release-selection defect is
+closed in [FIXED-1283](FIXED_ITEMS.md#fixed-1283--managed-llamacpp-selected-a-source-only-release-as-a-runtime-download)
+(PR #246); its three live platform jobs passed. This document retains the
+unresolved platform-signing, fresh-installer, adversarial, and owner-recorded
+release-evidence gaps. The credential canary, destructive recovery drill, and
+local-only egress recording remain open in
+[DATA_SAFETY_EVIDENCE.md](DATA_SAFETY_EVIDENCE.md).
+
 Real Windows adversarial ACL testing found that an AppContainer can write into
 `.git` when that directory grants `ALL APPLICATION PACKAGES` modify access,
 despite an explicit deny for the workspace capability SID. An experimental

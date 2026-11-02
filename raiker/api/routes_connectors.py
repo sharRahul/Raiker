@@ -148,6 +148,7 @@ async def connector_store(
                 "category": definition.category,
                 "description": definition.description,
                 "auth_type": definition.auth_type,
+                "support_level": definition.support_level,
                 "host": definition.host,
                 "installed": installed is not None,
                 "enabled": bool(installed and installed["enabled"]),

@@ -125,6 +125,7 @@ class ConnectorDefinition:
     category: str
     description: str
     auth_type: str
+    support_level: Literal["supported", "experimental"]
     host: str
 
 
@@ -139,6 +140,10 @@ class ConnectorCatalog:
                 category=str(item["category"]),
                 description=str(item["description"]),
                 auth_type=str(item["auth"]),
+                # A catalogue entry is not beta-supported merely because an
+                # owner can import its manifest and paste a token. Promote it
+                # only after its documented live install/use/revoke evidence.
+                support_level=cast(Literal["supported", "experimental"], item.get("support_level", "experimental")),
                 host=str(item["host"]),
             )
             for item in raw["connectors"]
@@ -366,6 +371,19 @@ def credential_status(expires_at: str | None) -> str:
     return "reauth_required" if expiry <= datetime.now(UTC) else "connected"
 
 
+def mark_reauth_required(
+    vault: ConnectorVault, principal_id: str, credential_key: str, credential: dict[str, str]
+) -> None:
+    """Retain the encrypted record but stop further calls after a 401.
+
+    A 401 is the provider's definitive statement that this bearer is no longer
+    usable (for example, after the owner revoked it). Do not repeatedly present
+    it on later calls. The owner may replace it through the normal connection
+    flow; no provider-specific revoke endpoint is fabricated here.
+    """
+    vault.put(principal_id, credential_key, credential, utc_now())
+
+
 # GCR-33 — one refresh at a time per (owner, connector).
 #
 # An expired credential is noticed by every invocation that reaches it, and all
@@ -522,6 +540,8 @@ class ConnectorInvoker:
             raise
         if status_code >= 400:
             self._finish_invocation(invocation_id, "failed")
+            if status_code == 401:
+                mark_reauth_required(vault, principal_id, key, credential)
             raise ValueError(f"connector_upstream_error:{status_code}")
         self._finish_invocation(invocation_id, "completed")
         result: ConnectorInvocation = {
@@ -620,6 +640,8 @@ class ConnectorInvoker:
             raise
         if status_code >= 400:
             self._finish_invocation(invocation_id, "failed")
+            if status_code == 401:
+                mark_reauth_required(vault, principal_id, key, credential)
             raise ValueError(f"connector_upstream_error:{status_code}")
         self._finish_invocation(invocation_id, "completed")
         return {

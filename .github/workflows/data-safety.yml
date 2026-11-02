@@ -19,6 +19,8 @@ on:
       - "tests/test_store_key_guard.py"
       - "tests/test_lock_screen_recovery.py"
       - "tests/test_workspace_backups.py"
+      - "tests/test_verify_egress_audit.py"
+      - "scripts/verify_egress_audit.py"
       - ".github/workflows/data-safety.yml"
   push:
     branches: [main]
@@ -49,4 +51,5 @@ jobs:
             tests/test_multipart_egress.py \
             tests/test_store_key_guard.py \
             tests/test_lock_screen_recovery.py \
-            tests/test_workspace_backups.py
+            tests/test_workspace_backups.py \
+            tests/test_verify_egress_audit.py

@@ -60,10 +60,14 @@ These are open at the time of the beta and tracked in
   network. A server that needs to read your project cannot yet.
 - **Model conversion** (safetensors to GGUF) works only on Linux with a
   llama.cpp you installed yourself. Download a GGUF instead where one exists.
-- **Managed llama.cpp is temporarily release-blocked.** Its three live CI jobs
-  exposed a release-selection defect: GitHub's latest stable release has no
-  runtime archives. It must be fixed and evidenced on all three platforms
-  before a public beta claims managed local GGUF support.
+- **Managed llama.cpp passes its cross-platform CI path.** PR #246 corrected
+  source-only stable-release selection, and its live jobs passed on Windows,
+  macOS, and Linux. Remaining beta evidence is an owner-machine CUDA run, an
+  owner-machine Vulkan run, and fresh signed-installer validation on the
+  release candidate.
+- **Release proof is still being completed.** The beta requires an exact-commit
+  credential/privacy canary, destructive recovery drill, and 30-minute
+  local-only egress recording before sign-off.
 - **The workspace encryption key cannot be rotated** in place yet.
 - **Windows window size at 150% display scaling** can drift by a few pixels
   between restarts.

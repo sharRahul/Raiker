@@ -2,14 +2,19 @@ import json
 import subprocess
 import sys
 from pathlib import Path
+from typing import Any
 
 SCRIPT = Path(__file__).parents[1] / "scripts" / "verify_egress_audit.py"
 
 
-def _run(tmp_path, records, *extra):
+def _run(
+    tmp_path: Path, records: list[dict[str, Any]], *extra: str
+) -> tuple[subprocess.CompletedProcess[str], dict[str, Any]]:
     capture = tmp_path / "capture.jsonl"
     report = tmp_path / "report.json"
-    capture.write_text("\n".join(json.dumps(record) for record in records) + "\n")
+    capture.write_text("
+".join(json.dumps(record) for record in records) + "
+")
     result = subprocess.run(
         [sys.executable, str(SCRIPT), "--capture", str(capture), "--scope", "local-only", "--output", str(report), *extra],
         check=False,
@@ -19,7 +24,7 @@ def _run(tmp_path, records, *extra):
     return result, json.loads(report.read_text())
 
 
-def test_egress_audit_approves_a_thirty_minute_local_only_capture(tmp_path):
+def test_egress_audit_approves_a_thirty_minute_local_only_capture(tmp_path: Path) -> None:
     result, report = _run(
         tmp_path,
         [
@@ -35,7 +40,7 @@ def test_egress_audit_approves_a_thirty_minute_local_only_capture(tmp_path):
     assert "authorization" not in json.dumps(report).lower()
 
 
-def test_egress_audit_refuses_unexpected_destination_and_short_capture(tmp_path):
+def test_egress_audit_refuses_unexpected_destination_and_short_capture(tmp_path: Path) -> None:
     result, report = _run(
         tmp_path,
         [

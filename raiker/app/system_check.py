@@ -231,13 +231,13 @@ def recommended_local_model(memory: int | None, acceleration: str) -> dict[str, 
     return {"parameters": tier[0], "download": tier[1], "note": tier[2]}
 
 
-def installed_runtimes() -> list[dict[str, Any]]:
+def installed_runtimes(workspace_root: Path | None = None) -> list[dict[str, Any]]:
     """Local model runtimes already on this machine, by ``PATH`` and install location."""
     from raiker.models.local_presence import RUNTIME_EXECUTABLES, probe
 
     found: list[dict[str, Any]] = []
     for runtime in RUNTIME_EXECUTABLES:
-        present, executable = probe(runtime)
+        present, executable = probe(runtime, workspace_root)
         if not present and runtime == "ollama":
             executable = _ollama_default_location()
             present = executable is not None
@@ -351,7 +351,7 @@ def system_readiness(workspace_root: Path) -> dict[str, Any]:
         data={"backend": keystore.backend},
     ))
 
-    runtimes = installed_runtimes()
+    runtimes = installed_runtimes(workspace_root)
     present = [item["runtime"] for item in runtimes if item["present"]]
     checks.append(Check(
         "local_runtimes", "Local model runtimes", "info",

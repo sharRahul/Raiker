@@ -83,17 +83,29 @@
     return choices.some((choice, choiceIndex) => choiceIndex !== index && choice === modelId);
   }
 
-  async function serve() {
+  /** GGUF only: the engine is missing and the owner must agree to download it. */
+  let confirmInstall = $state(false);
+
+  async function serve(installConfirmed = false) {
     const selected = choices.slice(0, slotCount).filter(Boolean);
     if (selected.length === 0) return;
     busy = true;
     notice = null;
     error = null;
     try {
+      if (format === "gguf" && !installConfirmed) {
+        const engine = await api.llamaRuntime();
+        if (engine.executable.source === "none") {
+          // Downloading an executable is the owner's decision, asked once here.
+          confirmInstall = true;
+          return;
+        }
+      }
+      confirmInstall = false;
       for (let index = 0; index < selected.length; index += 1) {
         const profileId = profiles[index]?.profile_id;
         if (format === "mlx") await api.deployMlxModel(selected[index], profileId);
-        else await api.deployLocalModel(selected[index], profileId);
+        else await api.deployLocalModel(selected[index], profileId, installConfirmed && index === 0);
       }
       notice = `${selected.length} ${title} model${selected.length === 1 ? "" : "s"} queued. Track startup in Activity.`;
       onchanged?.();
@@ -101,7 +113,7 @@
       error =
         format === "mlx"
           ? "The MLX models could not be started. MLX requires Apple silicon and mlx-lm."
-          : "The GGUF models could not be started. llama-server must be installed and on PATH.";
+          : "The GGUF models could not be queued. See the llama.cpp engine above for details.";
     } finally {
       busy = false;
     }
@@ -160,10 +172,20 @@
       <button class="btn btn-ghost btn-sm" type="button" onclick={scan} disabled={scanning || busy}>
         {scanning ? "Scanning…" : "Scan folders"}
       </button>
-      <button class="btn btn-primary btn-sm" type="button" onclick={serve} disabled={busy || selectedCount === 0}>
+      <button class="btn btn-primary btn-sm" type="button" onclick={() => serve()} disabled={busy || selectedCount === 0}>
         {busy ? "Starting…" : `Serve selected (${selectedCount})`}
       </button>
     </div>
+    {#if confirmInstall}
+      <div class="confirm-install" role="alertdialog" aria-label="Install the llama.cpp engine">
+        <p>
+          Serving GGUF models needs the llama.cpp engine. Raiker will download the official build for this
+          computer from ggml-org on GitHub, verify its checksum, and then start your model.
+        </p>
+        <button class="btn btn-primary btn-sm" type="button" onclick={() => serve(true)} disabled={busy}>Install and serve</button>
+        <button class="btn btn-ghost btn-sm" type="button" onclick={() => (confirmInstall = false)}>Not now</button>
+      </div>
+    {/if}
     {#if error}<p class="error" role="alert">{error}</p>{/if}
     {#if notice}<p class="notice" role="status">{notice}</p>{/if}
     {#if testResult}<p class="notice" role="status" data-test-result={profiles[0]?.profile_id}>{testResult}</p>{/if}
@@ -191,6 +213,8 @@
   select { width: 100%; min-width: 0; border: 1px solid var(--border); border-radius: var(--r-sm); background: var(--surface-raised); color: var(--text-1); padding: 0.45rem 0.5rem; }
   .framework-actions { display: flex; gap: 0.4rem; justify-content: flex-end; margin-top: 0.65rem; }
   .error, .notice { margin: 0.55rem 0 0; font-size: var(--text-sm); }
+  .confirm-install { display: flex; flex-wrap: wrap; gap: 0.45rem; align-items: center; margin-top: 0.55rem; font-size: var(--text-sm); }
+  .confirm-install p { margin: 0; flex: 1 1 18rem; color: var(--text-2); }
   .notice { color: var(--text-2); }
   @media (max-width: 900px) { .model-slots { grid-template-columns: repeat(2, minmax(8rem, 1fr)); } }
   @media (max-width: 560px) { .model-slots { grid-template-columns: 1fr; } .framework-heading { display: block; } }

@@ -2285,6 +2285,14 @@ export type DesignVersionView = {
   document: Record<string, unknown>;
 };
 
+/** One device ``llama-server --list-devices`` says this build can use. */
+export type DeviceReport = {
+  id: string;
+  name: string;
+  memory_total_bytes: number | null;
+  memory_free_bytes: number | null;
+};
+
 /** One sign-in of this account, without its token. */
 export type DeviceSessionView = {
   session_id: string;
@@ -3017,6 +3025,16 @@ export type GoalView = {
   events: GoalEvent[];
 };
 
+export type GpuDevice = {
+  vendor: string;
+  name: string;
+  memory_total_bytes: number | null;
+  memory_free_bytes: number | null;
+  discrete: boolean;
+  cuda_version: string | null;
+  unified_memory: boolean;
+};
+
 /** The sections this install carries; ``available`` is false when a build shipped none. */
 export type GuideIndex = {
   available: boolean;
@@ -3046,6 +3064,21 @@ export type GuideSectionSummary = {
   title: string;
   summary: string;
   parts: GuidePart[];
+};
+
+export type HardwareProfile = {
+  os: string;
+  arch: string;
+  cpu_cores: number;
+  total_memory_bytes: number | null;
+  available_memory_bytes: number | null;
+  gpus: GpuDevice[];
+  vulkan_available: boolean;
+  metal_available: boolean;
+  backends: string[];
+  recommended_backend: string;
+  reason: string;
+  detected_at: number;
 };
 
 /** Liveness, and whether the encrypted store opens (BUG-86). */
@@ -3414,6 +3447,20 @@ export type InstallPlan = {
   redistribution: boolean;
 };
 
+export type Installation = {
+  tag: string;
+  backend: string;
+  os: string;
+  arch: string;
+  cuda_version: string | null;
+  directory: string;
+  executable: string;
+  version_text: string;
+  devices: DeviceReport[];
+  installed_at: string;
+  assets: string[];
+};
+
 /** BUG-44 — what this installation is, read from the build that produced it. */
 export type InstallationView = {
   version: string;
@@ -3590,6 +3637,31 @@ export type LastUpdateCheck = {
   checked_at: string | null;
 };
 
+export type LaunchPlan = {
+  backend: string;
+  gpu_layers: number;
+  total_layers: number;
+  full_offload: boolean;
+  context_size: number;
+  trained_context: number | null;
+  threads: number | null;
+  flash_attention: string;
+  kv_cache_type: string;
+  weights_bytes: number;
+  kv_cache_bytes: number;
+  gpu_bytes: number;
+  system_bytes: number;
+  system_weights_bytes: number;
+  gpu_budget_bytes: number | null;
+  system_budget_bytes: number | null;
+  verdict: string;
+  allowed: boolean;
+  notes: string[];
+  args: string[];
+  estimated: boolean;
+  settings: RuntimeSettings;
+};
+
 export type LibraryItem = {
   item_id: string;
   kind: "document" | "image" | "design" | "block" | "pull_request";
@@ -3666,8 +3738,32 @@ export type LimitWindow = {
   resets_at: string | null;
 };
 
+/** Install (or replace) the llama.cpp engine Raiker manages. */
+export type LlamaCppInstallRequest = {
+  backend?: "auto" | "cuda" | "vulkan" | "metal" | "cpu";
+  release?: string | null;
+};
+
+export type LlamaRuntimeOverview = {
+  installation: Installation | null;
+  executable: ResolvedExecutable;
+  hardware: HardwareProfile;
+  slots: SlotHealth[];
+  restore_failures: RestoreFailure[];
+  release_page: string;
+  license_url: string;
+};
+
+export type LlamaUpdateCheck = {
+  installed_tag: string | null;
+  latest_tag: string;
+  update_available: boolean;
+  published_at: string | null;
+};
+
 export type LocalModelDeployRequest = {
   profile_id?: string | null;
+  install_if_missing?: boolean;
 };
 
 /** One model file set found under an approved library root. */
@@ -3702,6 +3798,16 @@ export type LocalRuntime = {
   present: boolean;
   executable: string | null;
   detected_at: string;
+};
+
+/** One local model's launch settings; ``null`` means "let Raiker decide". */
+export type LocalRuntimeSettingsRequest = {
+  gpu_layers?: number | null;
+  context_size?: number | null;
+  threads?: number | null;
+  flash_attention?: "auto" | "on" | "off";
+  kv_cache_type?: "f16" | "q8_0" | "q4_0";
+  allow_overcommit?: boolean;
 };
 
 export type LocalRuntimes = {
@@ -4485,6 +4591,13 @@ export type ModelReadinessView = {
 export type ModelRoutingRequest = {
   data_collection?: "" | "deny";
   sort?: "" | "price" | "throughput" | "latency";
+};
+
+export type ModelRuntimeSettingsView = {
+  model_id: string;
+  settings: RuntimeSettings;
+  plan: LaunchPlan | null;
+  plan_error: string | null;
 };
 
 export type ModelSelectionSet = {
@@ -5515,6 +5628,12 @@ export type ResolveApprovalRequest = {
   accepted_hunks?: string[] | null;
 };
 
+export type ResolvedExecutable = {
+  path: string | null;
+  source: string;
+  backend: string | null;
+};
+
 /** A finding the previous review raised that this patch no longer has. */
 export type ResolvedFinding = {
   rule: string;
@@ -5522,6 +5641,13 @@ export type ResolvedFinding = {
   severity: string;
   path: string | null;
   line: number | null;
+};
+
+export type RestoreFailure = {
+  slot_profile_id: string;
+  model_id: string;
+  model_path: string;
+  reason_code: string;
 };
 
 /** What restoring to a checkpoint would rewrite, delete or skip — computed, not performed. */
@@ -5654,6 +5780,16 @@ export type RuntimeReadinessView = {
   mode: RuntimeModeView;
   gates: CapabilityGateView[];
   summary: Record<string, unknown>;
+};
+
+/** Per-model launch settings. ``None`` means *let Raiker decide*. */
+export type RuntimeSettings = {
+  gpu_layers: number | null;
+  context_size: number | null;
+  threads: number | null;
+  flash_attention: "auto" | "on" | "off";
+  kv_cache_type: "f16" | "q8_0" | "q4_0";
+  allow_overcommit: boolean;
 };
 
 export type SaveProjectContextRequest = {
@@ -6115,6 +6251,20 @@ export type SkillVerification = {
   byte_size: number;
   source_url: string;
   already_installed: boolean;
+};
+
+export type SlotHealth = {
+  slot_profile_id: string;
+  model_id: string;
+  model_path: string;
+  state: string;
+  endpoint: string | null;
+  pid: number | null;
+  restarts: number;
+  last_error: string | null;
+  backend: string;
+  plan: LaunchPlan;
+  log_path: string | null;
 };
 
 /** One exchange a cited search returned. */
@@ -7448,6 +7598,24 @@ export const contract = {
     call<LibraryPinRemoved>("DELETE", `/api/library/pins/${encodeURIComponent(pinId)}`),
   movePin: (pinId: string, body: LibraryPinMoveRequest) =>
     call<LibraryPinned>("PUT", `/api/library/pins/${encodeURIComponent(pinId)}/project`, { body }),
+  getLlamaRuntime: (query: { refresh?: boolean } = {}) =>
+    request<LlamaRuntimeOverview>(withQuery("/api/local-runtime/llama-cpp", query)),
+  installLlamaRuntime: (body: LlamaCppInstallRequest) =>
+    call<ModelOperationView>("POST", "/api/local-runtime/llama-cpp/install", { body }),
+  uninstallLlamaRuntime: () =>
+    call<LlamaRuntimeOverview>("DELETE", "/api/local-runtime/llama-cpp/installation"),
+  previewModelRuntimePlan: (modelId: string, body: LocalRuntimeSettingsRequest) =>
+    call<ModelRuntimeSettingsView>("POST", `/api/local-runtime/llama-cpp/models/${encodeURIComponent(modelId)}/plan`, { body }),
+  getModelRuntimeSettings: (modelId: string) =>
+    request<ModelRuntimeSettingsView>(`/api/local-runtime/llama-cpp/models/${encodeURIComponent(modelId)}/settings`),
+  saveModelRuntimeSettings: (modelId: string, body: LocalRuntimeSettingsRequest) =>
+    call<ModelRuntimeSettingsView>("PUT", `/api/local-runtime/llama-cpp/models/${encodeURIComponent(modelId)}/settings`, { body }),
+  restartLlamaSlot: (profileId: string) =>
+    call<SlotHealth>("POST", `/api/local-runtime/llama-cpp/slots/${encodeURIComponent(profileId)}/restart`),
+  stopLlamaSlot: (profileId: string) =>
+    call<LlamaRuntimeOverview>("POST", `/api/local-runtime/llama-cpp/slots/${encodeURIComponent(profileId)}/stop`),
+  checkLlamaRuntimeUpdate: () =>
+    call<LlamaUpdateCheck>("POST", "/api/local-runtime/llama-cpp/update-check"),
   listLocalRuntimes: () =>
     request<LocalRuntimes>("/api/local-runtimes"),
   detectLocalRuntimes: () =>

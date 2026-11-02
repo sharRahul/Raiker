@@ -1,0 +1,100 @@
+name: llama.cpp engine
+
+# The managed llama.cpp engine — installing, sizing, starting, watching and
+# stopping local models — on all three desktop platforms.
+#
+# * `engine` runs the unit, integration and API suites on Windows, macOS and
+#   Linux. The integration suite starts real server processes (a stand-in
+#   llama-server) on loopback, so process groups, job objects, signals, log
+#   files and ports are exercised on each OS. No network, no GPU.
+# * `live` installs the real llama.cpp release for each runner from GitHub,
+#   downloads llama.cpp's own tiny test model, and drives install → serve →
+#   infer → second slot → resize → restart → stop → shutdown through the API.
+#   It runs on a schedule (so a change to ggml-org's release naming is caught
+#   within a week), on demand, and on any change to the engine code.
+
+on:
+  pull_request:
+    paths:
+      - "raiker/models/llama_cpp/**"
+      - "raiker/models/local_runtime.py"
+      - "raiker/models/slot_runtime.py"
+      - "raiker/api/routes_local_runtime.py"
+      - "raiker/api/routes_models.py"
+      - "tests/test_llama_cpp_*.py"
+      - "tests/test_api_local_runtime.py"
+      - "tests/fixtures/llama_cpp/**"
+      - ".github/workflows/llama-cpp.yml"
+  push:
+    branches:
+      - main
+  schedule:
+    - cron: "17 4 * * 1"
+  workflow_dispatch:
+    inputs:
+      release:
+        description: "llama.cpp release tag to install (blank for latest)"
+        required: false
+        default: ""
+
+permissions:
+  contents: read
+
+jobs:
+  engine:
+    name: Engine tests (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, macos-14, windows-latest]
+    steps:
+      - name: Checkout
+        # actions/checkout v5.0.1 (Node 24 runtime)
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.0.0 (Node 24)
+      - name: Set up Python and install the package
+        uses: ./.github/actions/setup-python
+        with:
+          install: dev
+          cache: pip
+      - name: Unit, integration and API tests
+        shell: bash
+        run: |
+          python -X faulthandler -m pytest -vv -p no:cacheprovider \
+            tests/test_llama_cpp_hardware.py tests/test_llama_cpp_releases.py \
+            tests/test_llama_cpp_installer.py tests/test_llama_cpp_planner.py \
+            tests/test_llama_cpp_supervisor.py tests/test_llama_cpp_integration.py \
+            tests/test_api_local_runtime.py tests/test_managed_llama_runtime.py \
+            tests/test_slot_runtime.py
+
+  live:
+    name: Live install and inference (${{ matrix.os }})
+    if: github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'llama-live')
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 40
+    strategy:
+      fail-fast: false
+      matrix:
+        # Apple silicon (Metal build), Linux x64 and Windows x64 (CPU or
+        # Vulkan builds: hosted runners have no GPU, so the automatic choice
+        # and its fall-through to a backend that works are both exercised).
+        os: [ubuntu-24.04, macos-14, windows-latest]
+    steps:
+      - name: Checkout
+        # actions/checkout v5.0.1 (Node 24 runtime)
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.0.0 (Node 24)
+      - name: Set up Python and install the package
+        uses: ./.github/actions/setup-python
+        with:
+          install: dev
+          cache: pip
+      - name: Install llama.cpp, serve a model, infer, switch, stop
+        shell: bash
+        env:
+          RAIKER_LIVE_LLAMA_CPP: "1"
+          RAIKER_LLAMA_CPP_RELEASE: ${{ github.event.inputs.release }}
+          # Unauthenticated GitHub API calls are rate-limited per runner IP.
+          RAIKER_GITHUB_API_TOKEN: ${{ github.token }}
+        run: |
+          python -X faulthandler -m pytest -vv -s -p no:cacheprovider tests/test_llama_cpp_live.py

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 from collections.abc import Awaitable, Callable, Sequence
 from contextlib import suppress
 from dataclasses import asdict, dataclass
@@ -23,7 +24,11 @@ _STOPPABLE_STATES = ("queued", "running", "cancel_requested")
 # The operation kinds a retry can really dispatch again (BUG-75). `install` is
 # absent on purpose: it has no background worker to reconstruct, so offering
 # Retry for it would be the record-only control this fix exists to remove.
-RETRYABLE_KINDS = frozenset({"download", "convert", "deploy", "pull"})
+#
+# An `install` of the llama.cpp engine is now a real worker (it downloads,
+# verifies and unpacks the official build), so it is retryable like the rest;
+# an install that only opened a vendor page still never creates a row.
+RETRYABLE_KINDS = frozenset({"download", "convert", "deploy", "pull", "install"})
 
 # The states a retry may start from. A running job is not retried, it is
 # already running; a completed one is not retried, it succeeded (GCR-21).
@@ -36,7 +41,8 @@ _PAYLOAD_KEYS = frozenset(
     {
         "repo_id", "revision", "variant", "destination", "model", "source",
         "output", "quantization", "model_path", "model_id",
-        "framework", "profile_id", "artifacts",
+        "framework", "profile_id", "artifacts", "backend", "release",
+        "install_if_missing",
     }
 )
 
@@ -45,6 +51,23 @@ _PAYLOAD_KEYS = frozenset(
 # owner's shared library output directory and is never one of them (GCR-19):
 # a conversion names its exact artifacts instead.
 _OPERATION_OWNED_DESTINATION_KINDS = frozenset({"download"})
+
+#: The shape of a reason code a worker may surface as ``error_detail``.
+_REASON_CODE = re.compile(r"[a-z][a-z0-9_]{2,79}")
+
+
+def bounded_reason(error: BaseException) -> str | None:
+    """The reason code an error *declares* safe to show, or ``None``.
+
+    Only exception classes that set ``bounded_reason = True`` — whose message
+    is by construction a fixed reason code such as
+    ``local_runtime_insufficient_memory`` — qualify. Any other error's text may
+    hold a path or a provider's words, and stays out of the durable row.
+    """
+    if not getattr(type(error), "bounded_reason", False):
+        return None
+    text = str(error)
+    return text if _REASON_CODE.fullmatch(text) else None
 
 
 @dataclass(frozen=True)
@@ -246,7 +269,12 @@ class ModelOperationService:
             return self.cancelled(owner_principal_id, operation_id)
         return settled
 
-    def fail(self, owner_principal_id: str, operation_id: str, *, code: str) -> ModelOperation:
+    def fail(
+        self, owner_principal_id: str, operation_id: str, *, code: str, detail: str | None = None
+    ) -> ModelOperation:
+        """Settle as failed. ``detail`` is a bounded reason code, never an error message."""
+        if detail is not None and not _REASON_CODE.fullmatch(detail):
+            detail = None
         return self._transition(
             owner_principal_id,
             operation_id,
@@ -254,7 +282,7 @@ class ModelOperationService:
             state="failed",
             phase="failed",
             error_code=code,
-            error_detail=None,
+            error_detail=detail,
         )
 
     def cancel(self, owner_principal_id: str, operation_id: str) -> ModelOperation:
@@ -450,7 +478,9 @@ class OperationWorker:
             self.operations.cancelled(self.owner, self.operation_id)
         else:
             # A durable operation exposes only a bounded code, never the error.
-            self.operations.fail(self.owner, self.operation_id, code=failure_code)
+            self.operations.fail(
+                self.owner, self.operation_id, code=failure_code, detail=bounded_reason(error)
+            )
 
 
 def run_operation(

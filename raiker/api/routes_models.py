@@ -61,6 +61,9 @@ from raiker.models.decision import SURFACES as DECISION_SURFACES
 from raiker.models.decision import ModelDecisionService
 from raiker.models.huggingface import HfVariant, HuggingFaceAccessError, HuggingFaceService
 from raiker.models.library import ModelLibraryService
+from raiker.models.llama_cpp import installer
+from raiker.models.llama_cpp.planner import RuntimeSettings
+from raiker.models.llama_cpp.supervisor import LaunchRefused, LlamaSupervisor
 from raiker.models.local_operations import (
     ModelOperation,
     ModelOperationRequest,
@@ -70,7 +73,7 @@ from raiker.models.local_operations import (
     run_operation,
     run_operation_async,
 )
-from raiker.models.local_runtime import LOCAL_SLOTS, ManagedLlamaRuntime, slot_for_profile
+from raiker.models.local_runtime import LOCAL_SLOTS, slot_for_profile
 from raiker.models.mlx_runtime import MLX_SLOTS, ManagedMlxRuntime
 from raiker.models.readiness import ModelReadinessService, ProviderCatalogueProbe
 from raiker.models.runtime_installers import RuntimeInstallerRegistry
@@ -494,12 +497,27 @@ def _dispatch_operation(
             operation_id,
             Path(str(payload.get("model_path", ""))),
             tuple(Path(path) for path in _library_service(request).roots(owner)),
-            request.app.state.managed_llama_runtime,  # type: ignore[attr-defined]
+            request.app.state.llama_supervisor,  # type: ignore[attr-defined]
+        )
+        extra: dict[str, Any] = (
+            {"install_if_missing": True} if payload.get("install_if_missing") else {}
         )
         if payload.get("profile_id"):
-            background.add_task(_run_local_deployment, *arguments, payload["profile_id"])
+            background.add_task(_run_local_deployment, *arguments, payload["profile_id"], **extra)
         else:
-            background.add_task(_run_local_deployment, *arguments)
+            background.add_task(_run_local_deployment, *arguments, **extra)
+        return
+    if operation.kind == "install":
+        from raiker.api.routes_local_runtime import run_llama_cpp_install
+
+        background.add_task(
+            run_llama_cpp_install,
+            workspace,
+            owner,
+            operation_id,
+            str(payload.get("backend") or "auto"),
+            str(payload.get("release") or "") or None,
+        )
         return
     if operation.kind == "download":
         background.add_task(
@@ -770,38 +788,54 @@ def _run_local_deployment(
     operation_id: str,
     model_path: Path,
     approved_roots: tuple[Path, ...],
-    runtime: ManagedLlamaRuntime,
+    supervisor: LlamaSupervisor,
     profile_id: str | None = None,
+    *,
+    install_if_missing: bool = False,
 ) -> None:
     def work(op: OperationWorker) -> None:
-        executable = shutil.which("llama-server")
-        if executable is None:
-            raise RuntimeError("llama_server_missing")
+        from raiker.api.routes_local_runtime import install_engine
+
+        if installer.resolve_executable(workspace).path is None:
+            if not install_if_missing:
+                raise LaunchRefused("llama_server_missing")
+            # The owner confirmed this download when they pressed Serve.
+            install_engine(op, workspace, "auto", None)
+        store = SQLiteStore(workspace)
+        resolved = str(model_path.resolve())
+        model_id = next(
+            (
+                model.model_id
+                for model in ModelLibraryService(store).list_models(owner)
+                if str(Path(model.primary_path).resolve()) == resolved
+            ),
+            model_path.name,
+        )
+        try:
+            settings = RuntimeSettings.from_mapping(store.load_local_runtime_settings(owner, model_id))
+        except ValueError:
+            settings = RuntimeSettings()
+        op.progress(completed_bytes=0, total_bytes=None, phase="starting_llama_cpp")
         # Deploying a second model adds a server rather than replacing the
         # first, so the slot — and therefore the port, the served name, and the
-        # profile the owner will select — is decided by the runtime.
-        started = runtime.start(
-            model_path,
-            executable=Path(executable),
+        # profile the owner will select — is decided by the runtime. The
+        # supervisor sizes the start (GPU layers, context, memory), refuses a
+        # plan that does not fit, waits for readiness, steps down after an
+        # out-of-memory start, and records the deployment so it is restored.
+        started = supervisor.launch(
+            owner=owner,
+            model_id=model_id,
+            model_path=model_path,
+            settings=settings,
             approved_roots=approved_roots,
             profile_id=profile_id,
+            check_cancelled=op.check_cancelled,
         )
         # Only this deployment's own slot is stopped on failure or Cancel.
         # Another model already serving a surface must not be torn down by an
         # unrelated failure, which is exactly what a bare `stop()` would do.
-        op.on_abort(lambda: runtime.stop(started.slot))
-        slot = slot_for_profile(started.slot) or LOCAL_SLOTS[0]
-        origin = f"http://127.0.0.1:{slot.port}"
-
-        def served(client: httpx.Client) -> str | None:
-            health = client.get(f"{origin}/health")
-            models = client.get(f"{origin}/v1/models")
-            ids = [str(item.get("id")) for item in models.json().get("data", [])]
-            ok = health.is_success and models.is_success and slot.alias in ids
-            return slot.alias if ok else None
-
-        _wait_until_serving(op, served=served, budget=30)
-        store = SQLiteStore(workspace)
+        op.on_abort(lambda: supervisor.stop_slot(started.slot_profile_id))
+        slot = slot_for_profile(started.slot_profile_id) or LOCAL_SLOTS[0]
         store.save_configured_model(owner, slot.profile_id, slot.alias)
         store.invalidate_model_readiness(
             owner, slot.profile_id, reason_code="local_runtime_deployed"
@@ -854,6 +888,7 @@ def deploy_local_model(
                 "model_path": model.primary_path,
                 "framework": "llama.cpp",
                 "profile_id": profile_id,
+                "install_if_missing": bool(body and body.install_if_missing),
             },
         )
         .to_dict()
@@ -865,12 +900,13 @@ def deploy_local_model(
         operation["operation_id"],
         Path(model.primary_path),
         roots,
-        request.app.state.managed_llama_runtime,
+        request.app.state.llama_supervisor,
     )
+    extra: dict[str, Any] = {"install_if_missing": True} if body and body.install_if_missing else {}
     if profile_id is not None:
-        background.add_task(_run_local_deployment, *arguments, profile_id)
+        background.add_task(_run_local_deployment, *arguments, profile_id, **extra)
     else:
-        background.add_task(_run_local_deployment, *arguments)
+        background.add_task(_run_local_deployment, *arguments, **extra)
     return serialize_dto(operation)
 
 

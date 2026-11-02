@@ -35,6 +35,28 @@ class StrictModelRequest(StrictRequest):
 
 class LocalModelDeployRequest(StrictRequest):
     profile_id: str | None = None
+    #: The owner confirmed downloading the official llama.cpp build first, if
+    #: Raiker has none and none is on ``PATH``.
+    install_if_missing: bool = False
+
+
+class LlamaCppInstallRequest(StrictRequest):
+    """Install (or replace) the llama.cpp engine Raiker manages."""
+
+    backend: Literal["auto", "cuda", "vulkan", "metal", "cpu"] = "auto"
+    #: A release tag such as ``b6500``; the latest release when absent.
+    release: str | None = None
+
+
+class LocalRuntimeSettingsRequest(StrictRequest):
+    """One local model's launch settings; ``null`` means "let Raiker decide"."""
+
+    gpu_layers: int | None = None
+    context_size: int | None = None
+    threads: int | None = None
+    flash_attention: Literal["auto", "on", "off"] = "auto"
+    kv_cache_type: Literal["f16", "q8_0", "q4_0"] = "f16"
+    allow_overcommit: bool = False
 
 
 @dataclass

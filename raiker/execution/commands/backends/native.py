@@ -48,6 +48,7 @@ from raiker.execution.commands.egress_runtime import (
     EgressSink,
 )
 from raiker.execution.commands.egress_runtime import load_settings as load_egress_settings
+from raiker.execution.commands.home_toolchains import home_toolchain, with_path_entry
 from raiker.execution.commands.models import CommandFeatures, CommandRequest
 from raiker.execution.commands.process_lifetime import bind_to_runtime_lifetime
 from raiker.execution.commands.runner import (
@@ -646,6 +647,17 @@ class NativeSandboxBackend:
                 search_path=environment.get("PATH", ""),
                 project=original.workspace_root,
             )
+        home_install = None
+        if executable is None and not in_wsl:
+            # rustup and nvm install into the owner's home, which is never
+            # mounted; their own folders are, read-only, on governed terms.
+            home_install = home_toolchain(
+                request.argv_template[0], environment.get("PATH", "")
+            )
+            if home_install is not None:
+                executable = home_install.executable
+                environment.update(home_install.environment)
+                with_path_entry(environment, home_install.path_entry)
         if executable is None:
             # `portable_command`'s Windows shim rewrites `echo` and `cat` into
             # the interpreter Raiker itself runs on. That is right for the host
@@ -659,6 +671,11 @@ class NativeSandboxBackend:
         document["toolchain_paths"] = (
             [] if in_wsl else toolchain_mounts(executable, request.workspace_root)
         )
+        if home_install is not None:
+            document["toolchain_paths"] = [
+                *document["toolchain_paths"],
+                *(path for path in home_install.mounts if path not in document["toolchain_paths"]),
+            ]
         # Downloads stay off in WSL: the proxy's socket is on Windows.
         egress_settings = None if in_wsl else self._egress_settings(original)
         # BUG-194 — a background run goes into a detached supervisor where the

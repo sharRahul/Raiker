@@ -696,6 +696,7 @@ fn trusted_system_tool(path: &Path) -> Option<String> {
 // not necessary to start the supported system runtime. Toolchains outside
 // /usr require an explicitly governed mount rather than broad host access.
 const SYSTEM_READ_ONLY: [&str; 1] = ["/usr"];
+const ALTERNATIVES: &str = "/etc/alternatives";
 /// Public CA bundles, mounted only for a run with filtered egress (Debian and
 /// Ubuntu, then Fedora and RHEL layouts).
 const CA_TRUST_STORES: [&str; 3] = ["/etc/ssl/certs", "/etc/pki/tls/certs", "/etc/pki/ca-trust"];
@@ -741,6 +742,16 @@ fn linux_arguments(policy: &LaunchPolicy, argv: &[String]) -> Result<Vec<String>
             arguments.push(path.to_owned());
             arguments.push(path.to_owned());
         }
+    }
+    // Debian's alternatives: links naming which system program answers to
+    // `cc`, `c++`, `java` and the like (`/usr/bin/cc` points here). Links
+    // only, no configuration or data; the rest of `/etc` stays unmounted.
+    if Path::new(ALTERNATIVES).is_dir() {
+        arguments.extend([
+            "--ro-bind".to_owned(),
+            ALTERNATIVES.to_owned(),
+            ALTERNATIVES.to_owned(),
+        ]);
     }
     if Path::new("/usr/local").is_dir() {
         arguments.push("--tmpfs".to_owned());

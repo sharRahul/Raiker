@@ -61,7 +61,14 @@ programs Raiker or the owner chose, with arguments Raiker builds.
 | `app/launcher.py`, `service.py`, `desktop_shell.py`, `desktop_update.py`, `update_handoff.py`, `system_check.py` | The Raiker host, the OS service manager, the desktop window, a verified installer, system queries | Raiker, fixed argv | Trusted infrastructure (installation and lifecycle) |
 | `app/desktop_build.py`, `desktop_smoke.py`, `scripts/` | Build and test tooling | Developer | Not shipped behaviour |
 | `desktop/src/host.ts`, `setup.ts` | The Raiker host and its system check | The desktop shell, fixed argv | Trusted infrastructure |
-| `native/raiker-command-runner` (`Command::new`) | `bwrap`, `sandbox-exec`, `systemd-run --scope`, `CreateProcessWithLogonW`, the probe's own self-test child, `icacls`/PowerShell during account setup | The runner | The boundary itself |
+| `native/raiker-command-runner` (`Command::new`) | `bwrap`, `sandbox-exec`, `systemd-run --scope`, `CreateProcessWithLogonW`, the probe's own self-test child, the egress bridge (itself), `route print` for the probe's control address | The runner, fixed argv | The boundary itself |
+| `account_windows.rs`, `wfp_windows.rs` (setup only, elevated) | `net user`, PowerShell firewall cmdlets, `netsh int ipv4 show dynamicport tcp` | The owner's one-time setup, fixed argv (a password only on `net user`'s command line inside the elevated setup) | Trusted setup |
+| `conpty_windows.rs` `--conpty-host` | `CreateProcessW` for the command, attached to a pseudo-console | The command (agent argv, validated before) | **Native sandbox**: the broker already runs as the pool account inside the run's Job Object |
+| `account_macos.rs` | `sudo -u <pool account>` for `--account-run`/`--account-stop`; `dscl`, `chmod`, `find`, `pkill`, `visudo` | `sudo` only as the `sudoers` rule allows; the rest during root setup or for the copy's ACL grant, fixed argv | Trusted (the command itself runs as the account under Seatbelt) |
+| `wsl_windows.rs` | `wsl.exe` into Raiker's distribution: setup, status, the Linux runner, the probe's interop arms | Raiker, fixed argv; the command is the Linux runner's | The Linux runner's boundary (Bubblewrap) inside the distribution |
+| `raiker/review/classifier.py` | Nothing: it matches the text `subprocess` in code under review | — | Not a launch site |
+
+Rechecked 2026-11-02 (item 13): every launch site found by the same search is in this table; the sites added since 11-01 are the Windows pool's setup, the pseudo-console broker, the macOS account pool and the WSL2 backend's interop probe.
 
 No site runs model-chosen or project-supplied code on the host. The remaining
 work is not a missing boundary but a narrower one: Git operations read the

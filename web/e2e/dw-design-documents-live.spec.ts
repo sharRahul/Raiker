@@ -151,7 +151,8 @@ test("the agent proposes typed operations and nothing applies until accepted", a
   expect(await page.locator(".version").textContent()).toBe(version);
   await capture(page, join(SHOTS, "06-agent-proposal.png"));
   await proposal.getByRole("button", { name: "Accept selected" }).click();
-  await expect(proposal).toContainText(/accepted/, { timeout: 60_000 });
+  // The state reads "Accepted · <model> · <time>".
+  await expect(proposal).toContainText(/accepted/i, { timeout: 60_000 });
   await expect(page.locator(".badge").first()).toHaveText("agent");
   await page.getByRole("tab", { name: "History" }).click();
   await expect(page.getByRole("region", { name: "History" })).toContainText("Agent proposal accepted");

@@ -148,3 +148,17 @@ and the profile-escape refusal; CI's Windows job now runs setup and requires it.
 * **Logon rights:** the account is not yet denied network or remote-desktop
   logon by policy; its random password is known only to Raiker.
 
+## Account pool (2026-11-02)
+
+Setup creates four accounts (`RaikerSandbox`, `RaikerSandbox1`…`3`) in
+`RaikerSandboxUsers`, each with its own DPAPI-sealed password. A copy is served
+by one account while it has a run; a run in another copy takes a free account,
+first revoking any grant that account left elsewhere, so runs in different
+copies overlap instead of waiting, and an account only ever holds one copy's
+grant. Holder files record the account (`key-index-nonce`). The outbound
+firewall rule, the WFP loopback filter and the base's read-attributes entry
+name the group. Containment is still the run's Job Object. Measured on
+Windows 11 after setup: `windows_account` tests 10/10, including two copies
+running at once on different accounts with neither able to read the other's
+files; the terminal, MCP, plugin and project-setup real-boundary tests pass.
+A fifth concurrent copy waits for an account.

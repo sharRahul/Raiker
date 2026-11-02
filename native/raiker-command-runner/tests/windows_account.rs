@@ -235,17 +235,18 @@ fn spawn(copy: &Copy, label: &str, deadline: u64, argv: &[&str]) -> std::process
 }
 
 #[test]
-fn runs_in_one_copy_overlap_while_another_copy_waits_for_the_grant() {
+fn runs_in_two_copies_overlap_on_different_accounts_and_stay_apart() {
     let Some(base) = configured() else { return };
     let ping = r"C:\Windows\System32\PING.EXE";
     let cmd = r"C:\Windows\System32\cmd.exe";
     let first = copy_under(&base, "overlap-a");
     let second = copy_under(&base, "overlap-b");
-    let mut long = spawn(&first, "long", 90, &[ping, "-n", "25", "127.0.0.1"]);
+    std::fs::write(first.0.join("secret.txt"), "first copy").unwrap();
+    let mut long = spawn(&first, "long", 90, &[ping, "-n", "20", "127.0.0.1"]);
     std::thread::sleep(std::time::Duration::from_secs(2));
 
-    // Same copy: runs to completion beside the long run.
-    let same = spawn(&first, "same", 30, &[cmd, "/c", "echo same"])
+    // Same copy: the same account, beside the long run.
+    let same = spawn(&first, "same", 30, &[cmd, "/c", "whoami"])
         .wait_with_output()
         .unwrap();
     assert!(
@@ -258,28 +259,36 @@ fn runs_in_one_copy_overlap_while_another_copy_waits_for_the_grant() {
         "the same-copy run waited for the long run instead of overlapping it"
     );
 
-    // Another copy: the account may hold only one copy's grant, so a run
-    // whose wait ends before the long run does is refused, never granted.
-    let other = spawn(&second, "other", 2, &[cmd, "/c", "echo other"])
-        .wait_with_output()
-        .unwrap();
-    assert!(!other.status.success());
+    // Another copy: another pool account, also beside the long run, and it
+    // cannot read the first copy, whose account is not its own.
+    let target = first.0.join("secret.txt");
+    let other = spawn(
+        &second,
+        "other",
+        30,
+        &[
+            cmd,
+            "/c",
+            &format!("whoami & type \"{}\"", target.display()),
+        ],
+    )
+    .wait_with_output()
+    .unwrap();
+    let other_out = String::from_utf8_lossy(&other.stdout).to_lowercase();
+    let same_out = String::from_utf8_lossy(&same.stdout).to_lowercase();
     assert!(
-        String::from_utf8_lossy(&other.stderr).contains("native_sandbox_account_busy"),
-        "{}",
-        String::from_utf8_lossy(&other.stderr)
+        long.try_wait().unwrap().is_none(),
+        "the other copy waited for the long run instead of overlapping it"
     );
+    assert!(same_out.contains("raikersandbox"), "{same_out}");
+    assert!(other_out.contains("raikersandbox"), "{other_out}");
+    assert_ne!(
+        same_out.trim(),
+        other_out.lines().next().unwrap_or("").trim()
+    );
+    assert!(!other_out.contains("first copy"), "{other_out}");
     let long = long.wait_with_output().unwrap();
     assert!(long.status.success());
-    // With the copy's last run gone, the other copy can run.
-    let after = spawn(&second, "after", 30, &[cmd, "/c", "echo after"])
-        .wait_with_output()
-        .unwrap();
-    assert!(
-        after.status.success(),
-        "{}",
-        String::from_utf8_lossy(&after.stderr)
-    );
 }
 
 fn run_limited(copy: &Copy, limits: serde_json::Value, argv: &[&str]) -> std::process::Output {

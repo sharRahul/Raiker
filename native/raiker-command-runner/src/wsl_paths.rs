@@ -28,14 +28,16 @@ pub const LINUX_POLICIES: &str = "/var/lib/raiker/policies";
 pub fn wsl_conf() -> String {
     format!(
         "# Written by raiker-command-runner --setup-wsl. Raiker's own distribution:\n\
-         # request no interop or drive automount; the probe checks enforcement.\n\
+         # no drive automount and no Windows PATH. Interop stays on so the probe's\n\
+         # control arm can start a Windows program outside the sandbox; inside\n\
+         # Bubblewrap it must not start (no interop socket). The probe measures both.\n\
          [boot]\n\
          systemd=false\n\
          [automount]\n\
          enabled=false\n\
          mountFsTab=true\n\
          [interop]\n\
-         enabled=false\n\
+         enabled=true\n\
          appendWindowsPath=false\n\
          [user]\n\
          default={RUN_USER}\n"
@@ -148,30 +150,6 @@ pub fn translate_policy(text: &str) -> Result<String, &'static str> {
     Ok(value.to_string())
 }
 
-/// What the run user sees of WSL's interop and drives, from the probe script
-/// (`interop_script`). Enforced only when no interop handler is registered
-/// and enabled, no drive is mounted, and no interop socket is named.
-pub fn interop_verdict(report: &str) -> &'static str {
-    let mut sections = report.split("--\n");
-    let binfmt = sections.next().unwrap_or("");
-    let mounts = sections.next().unwrap_or("");
-    let socket = sections.next().unwrap_or("");
-    if binfmt.lines().any(|line| line.trim() == "enabled")
-        || mounts.lines().any(|line| !line.trim().is_empty())
-        || !socket.trim().is_empty()
-    {
-        "unenforced"
-    } else {
-        "enforced"
-    }
-}
-
-/// Printed by the run user, outside the sandbox, so it sees what any process
-/// in the distribution would: each interop handler's state (newer WSL
-/// registers `WSLInterop-late`), any mount under `/mnt`, the interop socket.
-pub const INTEROP_SCRIPT: &str = "cat /proc/sys/fs/binfmt_misc/WSLInterop* 2>/dev/null; \
-     echo --; ls -A /mnt 2>/dev/null; echo --; printf %s \"$WSL_INTEROP\"";
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -180,7 +158,7 @@ mod tests {
     fn the_configuration_turns_off_interop_and_drives() {
         let conf = wsl_conf();
         for line in [
-            "[interop]\nenabled=false\nappendWindowsPath=false",
+            "[interop]\nenabled=true\nappendWindowsPath=false",
             "[automount]\nenabled=false\nmountFsTab=true",
             "default=raiker",
         ] {
@@ -260,20 +238,5 @@ mod tests {
             translate_policy(&sibling.to_string()),
             Err("runner_policy_cwd_outside_workspace")
         );
-    }
-
-    #[test]
-    fn interop_is_enforced_only_with_no_handler_drive_or_socket() {
-        assert_eq!(interop_verdict("--\n--\n"), "enforced");
-        assert_eq!(
-            interop_verdict("disabled\ninterpreter /init\n--\n--\n"),
-            "enforced"
-        );
-        assert_eq!(
-            interop_verdict("enabled\ninterpreter /init\nflags: PF\n--\n--\n"),
-            "unenforced"
-        );
-        assert_eq!(interop_verdict("--\nc\n--\n"), "unenforced");
-        assert_eq!(interop_verdict("--\n--\n/run/WSL/1_interop"), "unenforced");
     }
 }

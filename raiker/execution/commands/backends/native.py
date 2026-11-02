@@ -48,6 +48,7 @@ from raiker.execution.commands.egress_runtime import (
     EgressSink,
 )
 from raiker.execution.commands.egress_runtime import load_settings as load_egress_settings
+from raiker.execution.commands.home_toolchains import home_toolchain, with_path_entry
 from raiker.execution.commands.models import CommandFeatures, CommandRequest
 from raiker.execution.commands.process_lifetime import bind_to_runtime_lifetime
 from raiker.execution.commands.runner import (
@@ -61,6 +62,7 @@ from raiker.execution.commands.supervisor_client import (
     spawn_supervised,
     supervisor_supported,
 )
+from raiker.execution.runner_publisher import runner_trust
 from raiker.execution.workspaces import TaskWorkspaceRegistry, WorkspaceError
 from raiker.runtime.command_policy import (
     ALLOWED_SHELL_COMMANDS,
@@ -141,15 +143,19 @@ class NativeSandboxProof:
         plain Seatbelt cannot contain a detached descendant.
         """
         tree_stop = self.observations.get("descendant_reaped") == ENFORCED
+        # WSL2 runs Bubblewrap in Raiker's distribution: the same tree stop,
+        # and the Linux runner opens the terminal itself over `wsl.exe`'s pipes.
         terminal = tree_stop and self.boundary in {
             "bubblewrap",
             "macos_account",
             "restricted_account",
+            "wsl_bubblewrap",
         }
         background = tree_stop and self.boundary in {
             "bubblewrap",
             "restricted_account",
             "macos_account",
+            "wsl_bubblewrap",
         }
         # A background run outlives a restart where a detached supervisor runs
         # it (POSIX), downloads included: the supervisor holds the proxy.
@@ -417,10 +423,10 @@ class NativeSandboxDriver:
             connect_destination=(
                 str(report["connect_destination"]) if report.get("connect_destination") else None
             ),
-            # The current package stores the digest beside the binary. It
-            # detects corruption but is replaceable with the binary and is
-            # therefore never called publisher verification.
-            runner_trust="package_relative_integrity",
+            # The package's digest beside the binary detects corruption but is
+            # replaceable with it; only a platform signature by the publisher
+            # pinned in Raiker's code is called publisher verification.
+            runner_trust=runner_trust(binary),
         )
 
     # -- driving a command --------------------------------------------------
@@ -646,6 +652,17 @@ class NativeSandboxBackend:
                 search_path=environment.get("PATH", ""),
                 project=original.workspace_root,
             )
+        home_install = None
+        if executable is None and not in_wsl:
+            # rustup and nvm install into the owner's home, which is never
+            # mounted; their own folders are, read-only, on governed terms.
+            home_install = home_toolchain(
+                request.argv_template[0], environment.get("PATH", "")
+            )
+            if home_install is not None:
+                executable = home_install.executable
+                environment.update(home_install.environment)
+                with_path_entry(environment, home_install.path_entry)
         if executable is None:
             # `portable_command`'s Windows shim rewrites `echo` and `cat` into
             # the interpreter Raiker itself runs on. That is right for the host
@@ -659,6 +676,11 @@ class NativeSandboxBackend:
         document["toolchain_paths"] = (
             [] if in_wsl else toolchain_mounts(executable, request.workspace_root)
         )
+        if home_install is not None:
+            document["toolchain_paths"] = [
+                *document["toolchain_paths"],
+                *(path for path in home_install.mounts if path not in document["toolchain_paths"]),
+            ]
         # Downloads stay off in WSL: the proxy's socket is on Windows.
         egress_settings = None if in_wsl else self._egress_settings(original)
         # BUG-194 — a background run goes into a detached supervisor where the

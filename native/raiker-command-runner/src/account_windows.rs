@@ -54,6 +54,20 @@ use windows_sys::Win32::System::Threading::{
 
 pub const ACCOUNT: &str = "RaikerSandbox";
 pub const GROUP: &str = "RaikerSandboxUsers";
+/// How many accounts copies are spread over. A copy is served by one account
+/// while it has a run; runs in different copies take different accounts, so
+/// they no longer wait for each other.
+pub const POOL_SIZE: usize = 4;
+
+/// Pool account *index*; the first keeps the original name, so a host set up
+/// before the pool keeps its account and credential.
+pub fn member_name(index: usize) -> String {
+    if index == 0 {
+        ACCOUNT.to_owned()
+    } else {
+        format!("{ACCOUNT}{index}")
+    }
+}
 const FIREWALL_RULE: &str = "RaikerSandboxBlockOutbound";
 const DRIVE_FIXED: u32 = 3;
 const NERR_SUCCESS: u32 = 0;
@@ -79,22 +93,32 @@ pub fn base() -> Result<PathBuf, String> {
     Ok(system_drive()?.join("RaikerSandbox"))
 }
 
-fn credential_path() -> Result<PathBuf, String> {
+fn credential_path(index: usize) -> Result<PathBuf, String> {
     let data = std::env::var_os("ProgramData")
         .map(PathBuf::from)
         .unwrap_or(system_drive()?.join("ProgramData"));
-    Ok(data.join("Raiker").join("sandbox-account.dat"))
+    let name = if index == 0 {
+        "sandbox-account.dat".to_owned()
+    } else {
+        format!("sandbox-account-{index}.dat")
+    };
+    Ok(data.join("Raiker").join(name))
 }
 
 /// Whether the account boundary is set up for this owner.
 pub fn status() -> Value {
     let base = base().ok();
     let sid = account_sid(GROUP).ok();
-    let password = credential().is_ok();
+    let readable = (0..POOL_SIZE)
+        .filter(|index| credential(*index).is_ok() && account_sid(&member_name(*index)).is_ok())
+        .count();
+    let password = readable == POOL_SIZE;
     let configured = base.as_ref().is_some_and(|path| path.is_dir()) && sid.is_some() && password;
     json!({
         "configured": configured,
         "account": ACCOUNT,
+        "pool_size": POOL_SIZE,
+        "accounts_ready": readable,
         "base": base.map(|path| path.to_string_lossy().into_owned()),
         "group_present": sid.is_some(),
         "credential_readable": password,
@@ -129,28 +153,35 @@ pub fn setup() -> Result<Value, String> {
     }
     let owner = current_user_sid_text()?;
     ensure_group()?;
-    let password = random_password()?;
-    let created = ensure_user(&password)?;
-    if created || credential().is_err() {
-        // A fresh password is set only with a fresh account or a missing
-        // credential; otherwise the stored one keeps working.
-        if !created {
-            set_password(&password)?;
+    for index in 0..POOL_SIZE {
+        let name = member_name(index);
+        let password = random_password()?;
+        let created = ensure_user(&name, &password)?;
+        if created || credential(index).is_err() {
+            // A fresh password is set only with a fresh account or a missing
+            // credential; otherwise the stored one keeps working.
+            if !created {
+                set_password(&name, &password)?;
+            }
+            store_credential(index, &password, &owner)?;
         }
-        store_credential(&password, &owner)?;
+        add_member(&name)?;
     }
-    add_member()?;
     let group = account_sid(GROUP)?;
-    let account_text = sid_text(account_sid(ACCOUNT)?.as_ptr() as PSID)?;
-    create_base(&owner, &account_text)?;
-    firewall_block(&account_text)?;
-    let dynamic = super::wfp::install(&account_text)?;
+    // Everything that is the same for every pool account names the group:
+    // the base's read-attributes entry, the outbound block, the loopback
+    // filter and the drive denies.
+    let group_text = sid_text(group.as_ptr() as PSID)?;
+    create_base(&owner, &group_text)?;
+    firewall_block(&group_text)?;
+    let dynamic = super::wfp::install(&group_text)?;
     let denied = deny_other_drives(group.as_ptr() as PSID)?;
     Ok(json!({
         "configured": true,
         "base": base()?.to_string_lossy(),
         "denied_drives": denied,
         "firewall_rule": FIREWALL_RULE,
+        "pool_size": POOL_SIZE,
         "loopback_filter": {
             "proxy_ports": [super::wfp::PROXY_PORT_LOW, super::wfp::PROXY_PORT_HIGH],
             "dynamic_ports": [dynamic.0, dynamic.1],
@@ -183,13 +214,15 @@ pub fn reset() -> Result<(), String> {
     {
         failures.push("base".into());
     }
-    if let Ok(path) = credential_path() {
-        let _ = fs::remove_file(path);
-    }
-    let user = wide(ACCOUNT);
-    let code = unsafe { NetUserDel(null(), user.as_ptr()) };
-    if code != NERR_SUCCESS && code != NERR_USER_NOT_FOUND {
-        failures.push(format!("user:{code}"));
+    for index in 0..POOL_SIZE {
+        if let Ok(path) = credential_path(index) {
+            let _ = fs::remove_file(path);
+        }
+        let user = wide(&member_name(index));
+        let code = unsafe { NetUserDel(null(), user.as_ptr()) };
+        if code != NERR_SUCCESS && code != NERR_USER_NOT_FOUND {
+            failures.push(format!("user:{code}"));
+        }
     }
     let group = wide(GROUP);
     let code = unsafe { NetLocalGroupDel(null(), group.as_ptr()) };
@@ -220,8 +253,8 @@ fn ensure_group() -> Result<(), String> {
     }
 }
 
-fn ensure_user(password: &str) -> Result<bool, String> {
-    let mut name = wide(ACCOUNT);
+fn ensure_user(account: &str, password: &str) -> Result<bool, String> {
+    let mut name = wide(account);
     let mut secret = wide(password);
     let mut comment = wide("Runs Raiker's sandboxed build commands. Not for sign-in.");
     let info = USER_INFO_1 {
@@ -243,7 +276,7 @@ fn ensure_user(password: &str) -> Result<bool, String> {
     }
 }
 
-fn set_password(password: &str) -> Result<(), String> {
+fn set_password(account: &str, password: &str) -> Result<(), String> {
     // `net user` is the documented administrative interface; the password
     // travels on its command line only inside this elevated setup process.
     let system = system_drive()?
@@ -251,7 +284,7 @@ fn set_password(password: &str) -> Result<(), String> {
         .join("System32")
         .join("net.exe");
     let status = std::process::Command::new(system)
-        .args(["user", ACCOUNT, password])
+        .args(["user", account, password])
         .stdout(std::process::Stdio::null())
         .stderr(std::process::Stdio::null())
         .status()
@@ -263,9 +296,9 @@ fn set_password(password: &str) -> Result<(), String> {
     }
 }
 
-fn add_member() -> Result<(), String> {
+fn add_member(account: &str) -> Result<(), String> {
     let group = wide(GROUP);
-    let mut member = wide(ACCOUNT);
+    let mut member = wide(account);
     let info = LOCALGROUP_MEMBERS_INFO_3 {
         lgrmi3_domainandname: member.as_mut_ptr(),
     };
@@ -340,8 +373,8 @@ fn random_password() -> Result<String, String> {
     Ok(password)
 }
 
-fn store_credential(password: &str, owner: &str) -> Result<(), String> {
-    let path = credential_path()?;
+fn store_credential(index: usize, password: &str, owner: &str) -> Result<(), String> {
+    let path = credential_path(index)?;
     let directory = path
         .parent()
         .ok_or("native_sandbox_account_credential_failed")?;
@@ -381,9 +414,9 @@ fn store_credential(password: &str, owner: &str) -> Result<(), String> {
     fs::write(&path, sealed).map_err(|_| "native_sandbox_account_credential_failed".into())
 }
 
-fn credential() -> Result<String, String> {
+fn credential(index: usize) -> Result<String, String> {
     let mut sealed =
-        fs::read(credential_path()?).map_err(|_| "native_sandbox_account_not_configured")?;
+        fs::read(credential_path(index)?).map_err(|_| "native_sandbox_account_not_configured")?;
     let input = CRYPT_INTEGER_BLOB {
         cbData: sealed.len() as u32,
         pbData: sealed.as_mut_ptr(),
@@ -481,6 +514,8 @@ fn create_base(owner: &str, account: &str) -> Result<(), String> {
 /// carries the account's entry at any moment.
 struct CopyGrant {
     root: PathBuf,
+    /// The pool account serving this copy.
+    index: usize,
     sid: Vec<u8>,
     state: PathBuf,
     holder: PathBuf,
@@ -529,8 +564,10 @@ fn grant_state_dir() -> Result<PathBuf, String> {
     Ok(directory)
 }
 
-/// Remove holder files nobody holds open, then list the live ones' copy keys.
-fn live_holders(holders: &Path) -> Vec<String> {
+/// Remove holder files nobody holds open, then list the live ones as
+/// `(copy key, account index)`. A holder is named `key-index-nonce`; one
+/// written before the pool (`key-nonce`) is the first account's.
+fn live_holders(holders: &Path) -> Vec<(String, usize)> {
     let mut live = Vec::new();
     if let Ok(entries) = fs::read_dir(holders) {
         for entry in entries.flatten() {
@@ -538,14 +575,33 @@ fn live_holders(holders: &Path) -> Vec<String> {
             if fs::remove_file(&path).is_ok() {
                 continue; // nobody had it open: a crashed or finished run
             }
-            if let Some(name) = path.file_name().and_then(|name| name.to_str())
-                && let Some((key, _)) = name.split_once('-')
-            {
-                live.push(key.to_owned());
+            if let Some(name) = path.file_name().and_then(|name| name.to_str()) {
+                live.push(parse_holder(name));
             }
         }
     }
     live
+}
+
+fn parse_holder(name: &str) -> (String, usize) {
+    let parts: Vec<&str> = name.split('-').collect();
+    match parts.as_slice() {
+        [key, index, _] => (
+            (*key).to_owned(),
+            index.parse().ok().filter(|i| *i < POOL_SIZE).unwrap_or(0),
+        ),
+        [key, ..] => ((*key).to_owned(), 0),
+        [] => (String::new(), 0),
+    }
+}
+
+/// The account this copy should use: the one already serving it, else one no
+/// other copy holds. `None` while every account serves another copy.
+fn choose_account(live: &[(String, usize)], key: &str) -> Option<usize> {
+    if let Some((_, index)) = live.iter().find(|(holder, _)| holder == key) {
+        return Some(*index);
+    }
+    (0..POOL_SIZE).find(|index| live.iter().all(|(_, used)| used != index))
 }
 
 impl CopyGrant {
@@ -553,8 +609,6 @@ impl CopyGrant {
         use std::os::windows::fs::OpenOptionsExt;
         let base = base()?;
         let state = grant_state_dir()?;
-        let sid = account_sid(ACCOUNT)?;
-        let account = sid.as_ptr() as PSID;
         let key = copy_key(root);
         let deadline =
             std::time::Instant::now() + std::time::Duration::from_secs(wait_seconds.max(1));
@@ -562,8 +616,12 @@ impl CopyGrant {
             {
                 let _guard = exclusive_lock(&state.join(".lock"), 10)?;
                 let live = live_holders(&state.join("holders"));
-                if live.iter().all(|holder| *holder == key) {
-                    if live.is_empty() {
+                if let Some(index) = choose_account(&live, &key) {
+                    let sid = account_sid(&member_name(index))?;
+                    let account = sid.as_ptr() as PSID;
+                    if !live.iter().any(|(holder, _)| *holder == key) {
+                        // This account's first run in this copy: any entry a
+                        // crashed run of it left on another copy goes first.
                         revoke_other_copies(&base, root, account)?;
                         set_entry(root, account, 0x0013_01bf, SET_ACCESS, false)?;
                     }
@@ -578,7 +636,7 @@ impl CopyGrant {
                     };
                     let holder = state
                         .join("holders")
-                        .join(format!("{key}-{}", u64::from_le_bytes(nonce)));
+                        .join(format!("{key}-{index}-{}", u64::from_le_bytes(nonce)));
                     let handle = fs::OpenOptions::new()
                         .write(true)
                         .create_new(true)
@@ -587,6 +645,7 @@ impl CopyGrant {
                         .map_err(|_| "native_sandbox_account_state_failed")?;
                     return Ok(CopyGrant {
                         root: root.to_path_buf(),
+                        index,
                         sid,
                         state,
                         holder,
@@ -674,7 +733,10 @@ impl Drop for CopyGrant {
         drop(self.handle.take());
         let _ = fs::remove_file(&self.holder);
         let key = copy_key(&self.root);
-        if guard.is_err() || !live_holders(&self.state.join("holders")).contains(&key) {
+        let still_held = live_holders(&self.state.join("holders"))
+            .iter()
+            .any(|(holder, _)| *holder == key);
+        if guard.is_err() || !still_held {
             let _ = set_entry(
                 &self.root,
                 self.sid.as_ptr() as PSID,
@@ -767,15 +829,14 @@ pub fn launch(policy: &LaunchPolicy, argv: &[String]) -> Result<i32, String> {
     if root.parent() != Some(base.as_path()) {
         return Err("native_sandbox_account_workspace_outside_base".into());
     }
-    let password = credential()?;
-    let environment = account_environment(&password)?;
-    let _grant = CopyGrant::apply(&root, policy.deadline_seconds)?;
+    let grant = CopyGrant::apply(&root, policy.deadline_seconds)?;
+    let account = member_name(grant.index);
+    let password = credential(grant.index)?;
+    let environment = account_environment(&account, &password)?;
     let job = create_job(policy)?;
     restrict_ui(job)?;
-    let descriptor = PipeDescriptor::build(
-        &current_user_sid_text()?,
-        &sid_text(account_sid(ACCOUNT)?.as_ptr() as PSID)?,
-    )?;
+    let account_text = sid_text(grant.sid.as_ptr() as PSID)?;
+    let descriptor = PipeDescriptor::build(&current_user_sid_text()?, &account_text)?;
     let stdin = Pipe::create(&descriptor, PipeEnd::Write)?;
     let stdout = Pipe::create(&descriptor, PipeEnd::Read)?;
     let stderr = Pipe::create(&descriptor, PipeEnd::Read)?;
@@ -786,7 +847,7 @@ pub fn launch(policy: &LaunchPolicy, argv: &[String]) -> Result<i32, String> {
     startup.hStdInput = stdin.child;
     startup.hStdOutput = stdout.child;
     startup.hStdError = stderr.child;
-    let user = wide(ACCOUNT);
+    let user = wide(&account);
     let domain = wide(".");
     let mut secret = wide(&password);
     // A terminal run starts the pseudo-console broker as the account, which
@@ -795,7 +856,7 @@ pub fn launch(policy: &LaunchPolicy, argv: &[String]) -> Result<i32, String> {
         Some(Broker(super::conpty::broker_path(
             &base,
             &current_user_sid_text()?,
-            &sid_text(account_sid(ACCOUNT)?.as_ptr() as PSID)?,
+            &account_text,
         )?))
     } else {
         None
@@ -897,26 +958,26 @@ const ACCOUNT_VARIABLES: [&str; 11] = [
 /// guards, the interpreter's encoding, a server's own secret, and this run's
 /// proxy variables. It replaces the profile's values except for the account's
 /// identity and folders, which stay the account's.
-fn account_environment(password: &str) -> Result<Vec<u16>, String> {
+fn account_environment(account: &str, password: &str) -> Result<Vec<u16>, String> {
     // The account's folders come from its profile entry, which needs no logon:
     // building a block from a logon token reads the account's registry hive,
     // and Windows refuses that (ACCESS_DENIED) while another run's process
     // holds the hive loaded. Without a profile entry yet (before the
     // account's first run), the logon path builds the block once.
-    match account_profile_dir() {
+    match account_profile_dir(account) {
         Some(profile) => Ok(encode_environment(merge_environment(
-            account_variables(&profile),
+            account_variables(&profile, account),
             std::env::vars(),
         ))),
-        None => account_environment_once(password),
+        None => account_environment_once(account, password),
     }
 }
 
 /// `ProfileImagePath` of the account's entry under `ProfileList`.
-fn account_profile_dir() -> Option<PathBuf> {
+fn account_profile_dir(account: &str) -> Option<PathBuf> {
     use windows_sys::Win32::Security::Authorization::ConvertSidToStringSidW;
     use windows_sys::Win32::System::Registry::{HKEY_LOCAL_MACHINE, RRF_RT_REG_SZ, RegGetValueW};
-    let sid = account_sid(ACCOUNT).ok()?;
+    let sid = account_sid(account).ok()?;
     let mut text: *mut u16 = null_mut();
     if unsafe { ConvertSidToStringSidW(sid.as_ptr() as PSID, &mut text) } == 0 {
         return None;
@@ -957,7 +1018,7 @@ fn account_profile_dir() -> Option<PathBuf> {
 }
 
 /// The account's identity and folders, as a logon would set them.
-fn account_variables(profile: &Path) -> Vec<String> {
+fn account_variables(profile: &Path, account: &str) -> Vec<String> {
     let local = profile.join("AppData").join("Local");
     let text = |path: &Path| path.to_string_lossy().into_owned();
     let drive = text(profile).chars().take(2).collect::<String>();
@@ -969,15 +1030,15 @@ fn account_variables(profile: &Path) -> Vec<String> {
         format!("LOCALAPPDATA={}", text(&local)),
         format!("TEMP={}", text(&local.join("Temp"))),
         format!("TMP={}", text(&local.join("Temp"))),
-        format!("USERNAME={ACCOUNT}"),
+        format!("USERNAME={account}"),
         format!("USERDOMAIN={domain}"),
         format!("HOMEDRIVE={drive}"),
         format!("HOMEPATH={home}"),
     ]
 }
 
-fn account_environment_once(password: &str) -> Result<Vec<u16>, String> {
-    let user = wide(ACCOUNT);
+fn account_environment_once(account: &str, password: &str) -> Result<Vec<u16>, String> {
+    let user = wide(account);
     let domain = wide(".");
     let mut secret = wide(password);
     let mut token: HANDLE = null_mut();
@@ -1288,5 +1349,36 @@ mod tests {
         assert!(!merged.iter().any(|entry| entry == r"PATH=C:\Windows"));
         assert!(merged.contains(&r"USERPROFILE=C:\Users\RaikerSandbox".to_owned()));
         assert!(merged.contains(&"WEATHER_TOKEN=t".to_owned()));
+    }
+}
+
+#[cfg(test)]
+mod pool_tests {
+    use super::*;
+
+    fn live(entries: &[(&str, usize)]) -> Vec<(String, usize)> {
+        entries
+            .iter()
+            .map(|(key, index)| ((*key).to_owned(), *index))
+            .collect()
+    }
+
+    #[test]
+    fn a_copy_keeps_its_account_and_a_new_copy_takes_a_free_one() {
+        assert_eq!(choose_account(&live(&[]), "a"), Some(0));
+        assert_eq!(choose_account(&live(&[("a", 2)]), "a"), Some(2));
+        assert_eq!(choose_account(&live(&[("a", 0), ("b", 1)]), "c"), Some(2));
+        let full = live(&[("a", 0), ("b", 1), ("c", 2), ("d", 3)]);
+        assert_eq!(choose_account(&full, "e"), None);
+        assert_eq!(choose_account(&full, "c"), Some(2));
+    }
+
+    #[test]
+    fn holders_name_their_account_and_old_ones_mean_the_first() {
+        assert_eq!(parse_holder("abc-3-123"), ("abc".to_owned(), 3));
+        assert_eq!(parse_holder("abc-123"), ("abc".to_owned(), 0));
+        assert_eq!(parse_holder("abc-9-123"), ("abc".to_owned(), 0));
+        assert_eq!(member_name(0), ACCOUNT);
+        assert_eq!(member_name(2), "RaikerSandbox2");
     }
 }

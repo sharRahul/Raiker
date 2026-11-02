@@ -1,11 +1,19 @@
-# Native sandbox migration: initial findings
+# Native sandbox migration
 
-Status: **incomplete and not release-ready**. This is not yet the required
-comprehensive execution-boundary audit. Docker and Podman are no longer invoked
-anywhere in Raiker (see *Docker and Podman removal* below); the command service
-requires the native backend; and native execution stays unavailable until
-disposable task workspaces exist. Release blockers are tracked in
-`docs/plans/TO_BE_FIXED.md`.
+Status (2026-11-02): **native execution is on where measured; not yet
+release-ready.** Docker and Podman are no longer invoked anywhere in Raiker.
+Every command runs in a disposable task copy through the native boundary
+(Bubblewrap, the Windows restricted-account pool, the macOS sandbox-account
+pool, or WSL2), and is refused, never run on the host, wherever any mandatory
+observation is not measured as enforced. The audit of every place Raiker starts
+a process is below. What still blocks release is tracked in
+`docs/plans/TO_BE_FIXED.md`: platform code signing (owner credentials), the
+WSL2 interop check (below), and the remaining rows there.
+
+The sections after *Ordered checklist* are a dated log. Earlier entries record
+refusals and gaps that later entries close; where they disagree, the later
+entry is current (for example, the interim Git refusals are replaced by
+*Git filter programs (2026-10-31)*).
 
 Baseline: `4d7c14dc9161160e10c417a2f3b5b824c1a646fd` on `origin/main`.
 
@@ -53,7 +61,14 @@ programs Raiker or the owner chose, with arguments Raiker builds.
 | `app/launcher.py`, `service.py`, `desktop_shell.py`, `desktop_update.py`, `update_handoff.py`, `system_check.py` | The Raiker host, the OS service manager, the desktop window, a verified installer, system queries | Raiker, fixed argv | Trusted infrastructure (installation and lifecycle) |
 | `app/desktop_build.py`, `desktop_smoke.py`, `scripts/` | Build and test tooling | Developer | Not shipped behaviour |
 | `desktop/src/host.ts`, `setup.ts` | The Raiker host and its system check | The desktop shell, fixed argv | Trusted infrastructure |
-| `native/raiker-command-runner` (`Command::new`) | `bwrap`, `sandbox-exec`, `systemd-run --scope`, `CreateProcessWithLogonW`, the probe's own self-test child, `icacls`/PowerShell during account setup | The runner | The boundary itself |
+| `native/raiker-command-runner` (`Command::new`) | `bwrap`, `sandbox-exec`, `systemd-run --scope`, `CreateProcessWithLogonW`, the probe's own self-test child, the egress bridge (itself), `route print` for the probe's control address | The runner, fixed argv | The boundary itself |
+| `account_windows.rs`, `wfp_windows.rs` (setup only, elevated) | `net user`, PowerShell firewall cmdlets, `netsh int ipv4 show dynamicport tcp` | The owner's one-time setup, fixed argv (a password only on `net user`'s command line inside the elevated setup) | Trusted setup |
+| `conpty_windows.rs` `--conpty-host` | `CreateProcessW` for the command, attached to a pseudo-console | The command (agent argv, validated before) | **Native sandbox**: the broker already runs as the pool account inside the run's Job Object |
+| `account_macos.rs` | `sudo -u <pool account>` for `--account-run`/`--account-stop`; `dscl`, `chmod`, `find`, `pkill`, `visudo` | `sudo` only as the `sudoers` rule allows; the rest during root setup or for the copy's ACL grant, fixed argv | Trusted (the command itself runs as the account under Seatbelt) |
+| `wsl_windows.rs` | `wsl.exe` into Raiker's distribution: setup, status, the Linux runner, the probe's interop arms | Raiker, fixed argv; the command is the Linux runner's | The Linux runner's boundary (Bubblewrap) inside the distribution |
+| `raiker/review/classifier.py` | Nothing: it matches the text `subprocess` in code under review | — | Not a launch site |
+
+Rechecked 2026-11-02 (item 13): every launch site found by the same search is in this table; the sites added since 11-01 are the Windows pool's setup, the pseudo-console broker, the macOS account pool and the WSL2 backend's interop probe.
 
 No site runs model-chosen or project-supplied code on the host. The remaining
 work is not a missing boundary but a narrower one: Git operations read the
@@ -62,8 +77,8 @@ host as owner infrastructure.
 
 ## Ordered checklist
 
-- [ ] Complete the repository-wide inventory and trace each agent entry point to the OS process.
-- [ ] Define and implement one fail-closed broker, disposable workspaces and reviewed promotion.
+- [x] Complete the repository-wide inventory and trace each agent entry point to the OS process (*Every place Raiker starts a process*, 2026-11-01).
+- [x] Define and implement one fail-closed broker, disposable workspaces and reviewed promotion.
   `raiker/execution/workspaces.py` now provides the workspace half: a private
   copy without `.git`, `.raiker`, links or special files; a content manifest;
   a diff that rejects links and protected names the task creates; promotion
@@ -111,11 +126,11 @@ host as owner infrastructure.
   copy. Only the asking owner's copies are found. `git_log` stays the project's
   history: the copy has none of its own. Still open: commits and branches act on
   the project only, and the link check is not a pinned handle.
-- [ ] Verify Windows AppContainer, macOS Seatbelt and Linux Bubblewrap plus real seccomp enforcement.
-- [ ] Implement and measure resource, network, lifecycle and cleanup controls; report only measured capabilities.
-- [ ] Migrate command, plugin, MCP, scheduled and delegated execution without host fallback.
+- [x] Verify Windows AppContainer, macOS Seatbelt and Linux Bubblewrap plus real seccomp enforcement (hosted CI on all four runners, PR #239; the account boundaries since).
+- [x] Implement and measure resource, network, lifecycle and cleanup controls; report only measured capabilities (cgroup scopes, Job Objects, the macOS footprint supervisor, allow-listed downloads, WFP loopback filter, terminals).
+- [x] Migrate command, plugin, MCP, scheduled and delegated execution without host fallback (commands, plugins, local MCP servers and command hooks run in the native sandbox; scheduled and delegated work goes through the same command service).
 - [x] Safely migrate obsolete profiles, then remove container code, UI, packaging and documentation.
-- [ ] Implement actual OS enforcement tests with unsandboxed controls and cross-platform CI evidence.
+- [x] Implement actual OS enforcement tests with unsandboxed controls and cross-platform CI evidence.
 - [ ] Verify installers, upgrades, signing and release gates on supported platforms.
 
 No platform-specific security test, installer test, Playwright test or CI run is
@@ -683,3 +698,30 @@ either a restricted-token boundary under a dedicated low-privilege local
 account (granted only the task copy) or the WSL2 Bubblewrap backend. This is a
 release blocker in `TO_BE_FIXED.md`.
 
+## WSL2 interop, measured from inside the sandbox (2026-11-02)
+
+The WSL2 backend's `windows_interop` check reads the interop handler's state
+from *outside* the sandbox, and fails on any machine where another
+distribution registered `WSLInterop` in the shared kernel (Ubuntu does, with
+the fix-binary flag `F`). Measured in that worst case, Ubuntu with interop on:
+`whoami.exe` copied into a Linux folder ran outside the sandbox (control:
+`niki-rahul\1niki`) and could not start inside the Linux runner's Bubblewrap
+sandbox, with `WSL_INTEROP` kept or unset: WSL's launcher reported
+`UtilConnectUnix: connect failed`, because the sandbox has no `/run/WSL`
+interop socket. So the shared handler is not a route out of the sandbox, and
+the check should be the inside attempt with an outside control rather than the
+handler's state.
+
+**Done and measured on Windows 11 (2026-11-02).** Raiker's distribution was
+set up, without elevation, from Ubuntu Base 24.04.4 (`ubuntu-base-24.04.4-base-amd64.tar.gz`,
+SHA256 checked against Ubuntu's published `SHA256SUMS`). Its `wsl.conf` keeps
+interop on (no Windows PATH, no drive automount) so the check has a real
+control arm: a `whoami.exe` piped into a scratch folder runs as the run user
+outside the sandbox and must not start through the Linux runner inside it. A
+drive is a mount on `/mnt/<letter>` in `/proc/mounts`; WSL's own `/mnt/wsl`,
+`/mnt/wslg` and empty folders left from the first boot are not. Result: every
+observation enforced, `windows_interop` included. Through `CommandService`
+with the Windows backend set to WSL2, a command read the project file from its
+copy, and a terminal run (`cat`) echoed typed input, turned `\r` into a line
+end and ended on Ctrl-D. Raiker now offers background runs and terminals on
+`wsl_bubblewrap`. `id -un` resolves the run user in this distribution.

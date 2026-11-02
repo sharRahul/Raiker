@@ -137,7 +137,10 @@ def test_deletions_are_journalled_without_content(tmp_path: Path) -> None:
     store = SQLiteStore(tmp_path)
     store.create_session("sess_gone", str(tmp_path))
     memory = write_memory(
-        "The vault code is 1234.",
+        # A secret that cannot occur by chance in a hex id or a timestamp: the
+        # journal holds both, and a digit run like "1234" sometimes appears
+        # in a random memory id, which made this test fail one run in ~200.
+        "The vault code is quokka-river.",
         workspace_root=tmp_path,
         store=store,
         governance=_governance(),
@@ -148,7 +151,8 @@ def test_deletions_are_journalled_without_content(tmp_path: Path) -> None:
     kinds = [(entry.kind, entry.object_id) for entry in read_deletions(tmp_path)]
     assert ("memory_forget", memory.memory_id) in kinds
     assert ("session_delete", "sess_gone") in kinds
-    assert "1234" not in journal_path(tmp_path).read_text()
+    journal = journal_path(tmp_path).read_text()
+    assert "quokka" not in journal and "vault code" not in journal
 
 
 def test_a_restore_to_a_new_folder_does_not_bring_back_what_was_deleted_since(tmp_path: Path) -> None:

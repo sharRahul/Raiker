@@ -242,7 +242,9 @@ fn runs_in_two_copies_overlap_on_different_accounts_and_stay_apart() {
     let first = copy_under(&base, "overlap-a");
     let second = copy_under(&base, "overlap-b");
     std::fs::write(first.0.join("secret.txt"), "first copy").unwrap();
-    let mut long = spawn(&first, "long", 90, &[ping, "-n", "20", "127.0.0.1"]);
+    // Long enough to outlast two first logons on a fresh host (each new pool
+    // account builds its profile then); stopped once the checks are done.
+    let mut long = spawn(&first, "long", 300, &[ping, "-n", "240", "127.0.0.1"]);
     std::thread::sleep(std::time::Duration::from_secs(2));
 
     // Same copy: the same account, beside the long run.
@@ -287,8 +289,9 @@ fn runs_in_two_copies_overlap_on_different_accounts_and_stay_apart() {
         other_out.lines().next().unwrap_or("").trim()
     );
     assert!(!other_out.contains("first copy"), "{other_out}");
-    let long = long.wait_with_output().unwrap();
-    assert!(long.status.success());
+    // Stopping the runner closes its kill-on-close job, ending the anchor.
+    long.kill().unwrap();
+    let _ = long.wait();
 }
 
 fn run_limited(copy: &Copy, limits: serde_json::Value, argv: &[&str]) -> std::process::Output {

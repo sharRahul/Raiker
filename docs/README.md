@@ -45,6 +45,8 @@ Canonical technical references:
 |---|---|
 | How should personal-agent UI/UX be implemented? | [UX specification](plans/PERSONAL_AGENT_UX_SPEC.md) and [task decisions](plans/PERSONAL_AUTONOMOUS_AGENT_SPEC.md) |
 | What is the Quiet UI redesign for laptop and desktop? | [Quiet UI redesign plan](plans/quiet-ui/README.md) |
+| What stands between Raiker and its first beta? | [First beta release plan](plans/BETA_RELEASE_PLAN.md) and the [beta guide](guide/beta.md) |
+| How will Raiker hold a spoken conversation on-device? | [Native voice conversation](plans/VOICE_CONVERSATION_SPEC.md) |
 | How should the personal agent coordinate goals, context and proactive work? | [Personal-agent architecture](plans/PERSONAL_AUTONOMOUS_AGENT_SPEC.md) |
 | How does a governed action flow? | [Architecture](architecture/ARCHITECTURE.md) |
 | What is implemented now? | [Implementation status](architecture/IMPLEMENTATION_STATUS.md) |

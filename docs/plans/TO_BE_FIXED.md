@@ -201,6 +201,11 @@ before claiming exact window-size restoration at non-default scale factors.
 
 ## Local voice delivery — release blockers
 
+**2026-11-02 — planned.** The managed speech engines, the install-time voice
+choice and native conversation are specified in
+[VOICE_CONVERSATION_SPEC.md](VOICE_CONVERSATION_SPEC.md) (Phase V1 is beta P0
+VD-1 in [BETA_RELEASE_PLAN.md](BETA_RELEASE_PLAN.md)).
+
 The local-only privacy changes do not complete the requested voice experience.
 Before beta, provide a verified managed speech engine and model installer with
 process lifecycle and recovery; validate Design dictation end to end and make

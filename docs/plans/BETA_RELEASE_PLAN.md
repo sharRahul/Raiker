@@ -1,0 +1,464 @@
+# First beta release plan
+
+**Status:** active plan, opened 2026-11-02. **Owner:** release owner.
+**Target:** Raiker `0.9.0-beta.1`, the first public beta, as soon as the gates in
+[Beta release criteria](#beta-release-criteria) pass on one commit.
+
+This plan turns the beta checklist into tracked work. For each of the twelve
+areas it records what the code does **today** (with the evidence or the
+document that says so), what is left, the UI and UX changes the area needs,
+the evidence that closes it, and the beta decision: **Ship**, **Ship limited**
+(available with a stated limit), **Preview** (off by default, labelled), or
+**Not in beta** (hidden or refused, never half-working).
+
+It does not replace the ledgers. Defects stay in
+[TO_BE_FIXED.md](TO_BE_FIXED.md); closures go to
+[FIXED_ITEMS.md](FIXED_ITEMS.md); scenarios and run records follow
+[TESTING.md](TESTING.md); desktop package evidence lives in
+[RELEASE_ACCEPTANCE_MATRIX.md](RELEASE_ACCEPTANCE_MATRIX.md). Native voice
+conversation has its own specification:
+[VOICE_CONVERSATION_SPEC.md](VOICE_CONVERSATION_SPEC.md).
+
+## How to read this plan
+
+| Mark | Meaning |
+|---|---|
+| ✅ | Done and evidenced (the evidence is named) |
+| 🟡 | Implemented, evidence missing or partial on some platform |
+| 🔴 | Not done; a release blocker for the scope it belongs to |
+| ⚪ | Out of beta scope by decision; the product must refuse or hide it |
+
+Priority: **P0** blocks `beta.1`; **P1** should land in `beta.1` but can slip
+to `beta.2` with a known-issue entry; **P2** is after beta.
+
+Effort: **S** under a day, **M** two to five days, **L** more than a week.
+
+## The beta in one paragraph
+
+`beta.1` is a **local, single-owner desktop app** on Windows 10/11 x64, macOS
+12+ on Apple silicon and Linux x64/arm64. It offers Chat, Build, Models,
+Tasks, Schedule, Memory and Settings. It works with hosted providers and with
+local models (Ollama, LM Studio, and the llama.cpp engine Raiker installs).
+**Command execution runs only where the native sandbox measures as enforced
+on that host, and is refused everywhere else** — that is already the fail-closed
+behaviour, and the beta ships with it rather than waiting for every platform.
+Voice ships as **on-device dictation and read-aloud** (managed engines, see the
+voice spec, Phase V1); hands-free conversation is a **Preview**. Design ships
+limited (no live image provider claim until BUG-287 closes). Remote access,
+plugins that need network, and unverified integrations are **Not in beta** or
+**Preview**.
+
+## Beta scope by area
+
+| # | Area | Beta decision | P0 items left |
+|---|---|---|---|
+| 1 | Native sandbox & security | Ship limited — execution only where measured | Windows ACL gaps, macOS CI evidence, fail-closed audit |
+| 2 | Desktop installation & updates | Ship | Signing identities, clean-machine first launch, signed update |
+| 3 | AI models & local inference | Ship | Live llama.cpp CI evidence, failure-mode tests |
+| 4 | Core autonomous agent | Ship | Restart-recovery scenario, honest-completion tests |
+| 5 | Build & coding agent | Ship limited — disposable copy only | Conflict detection on Apply, iterate-on-failure evidence |
+| 6 | Memory & data protection | Ship | Corruption recovery drill, egress audit |
+| 7 | UI & UX | Ship | Quiet UI open items, error copy audit, accessibility pass |
+| 8 | Voice & design | Ship limited (dictation, read-aloud); conversation Preview | Managed speech engine, permission/cancel tests |
+| 9 | Plugins, integrations & permissions | Ship limited — supported list only | Supported/experimental labels, revoke tests |
+| 10 | End-to-end testing | Gate | Seven journeys with real models and evidence |
+| 11 | CI/CD & release quality | Gate | All workflows green on the release commit |
+| 12 | Documentation & beta operations | Ship | Feedback route, known issues, withdrawal process |
+
+---
+
+## 1. Native sandbox & security
+
+**Today.** The Docker-free native sandbox is **incomplete and not release-ready**
+on every platform (TO_BE_FIXED, *Release blocker: native sandbox migration
+incomplete*). What exists:
+
+- Linux Bubblewrap (and Bubblewrap inside WSL2) measures memory, CPU, process
+  count and wall-time limits against outside controls, and hides host
+  configuration. It passed on hosted Ubuntu once the targeted AppArmor profile
+  was loaded.
+- Windows uses a pool of four restricted accounts with a WFP loopback filter,
+  Job Object limits and ConPTY terminals, measured on Windows 11. Known gaps:
+  per-task profile reset, LSA logon-right denials, explicit ACEs under denied
+  roots, and AppContainer's `ALL APPLICATION PACKAGES` exposure on `.git`.
+- macOS uses a Seatbelt profile plus a sandbox-account pool, but has **no
+  hosted CI evidence**. `RLIMIT_AS` is not enforced by XNU, so the footprint
+  supervisor replaces it.
+- Plugins and local MCP stdio servers run in the native sandbox and are refused
+  on hosts without an enforced boundary.
+- Disposable per-session project copies with reviewed Apply are wired in.
+
+| ID | Item | State | P | Effort | Work left |
+|---|---|---|---|---|---|
+| SB-1 | Windows isolation: ACLs, network, credentials, account cleanup | 🔴 | P0 | L | Per-task profile reset; deny network/remote logon rights; scan explicit ACEs under denied roots; scan explicit grants inside `.git`; measure the WFP filter on hosted and owner machines; account cleanup on uninstall |
+| SB-2 | macOS Seatbelt enforcement, containment, limits | 🔴 | P0 | M | Run `macos_enforcement.rs` and `tests/macos_account.rs` on `macos-15` and `macos-15-intel`; record evidence; prove descendant containment and the footprint supervisor |
+| SB-3 | Linux Bubblewrap and WSL2 enforcement | 🟡 | P0 | S | Re-run on the release commit; document the systemd user-manager requirement for aggregate limits |
+| SB-4 | Commands, plugins, hooks and local MCP use the sandbox or fail closed | 🟡 | P0 | S | **Inventory test landed** (`tests/test_process_spawn_inventory.py`): every process-spawning module in `raiker/` is listed with a reviewed category (sandbox, Raiker-owned program, host lifecycle, read-only facts, owner-approved host operation); a new spawn site or any shell use fails CI. Remaining: one live check per hook type that a hook command is refused on a host without an enforced boundary |
+| SB-5 | Disposable workspaces, reviewed promotion, rollback, crash recovery | 🟡 | P0 | M | Rollback of a promoted Apply; crash in the middle of Apply (kill test); pinned-handle link check (residual race documented today) |
+| SB-6 | No protected-file writes, no limit escape, no direct host execution | 🟡 | P0 | M | Adversarial suite per platform (below), run in CI where hosted runners allow it and recorded from owner machines where they do not |
+
+**Adversarial suite (SB-6), one test per attack:** write `.git/config`,
+`.raiker/`, the user's home dotfiles and a sibling project; follow a symlink
+or junction out of the copy; fork bomb; memory balloon; detached daemon that
+outlives the task; open a socket to a host loopback service; read another
+sandbox account's copy; read the vault key file.
+
+**Beta decision.** Ship limited. Execution is available on a host only when
+`NativeSandboxDriver.probe` reports every mandatory observation enforced. Where
+it is not, Chat, Models, Memory and planning still work, and command-based
+tools refuse with a sentence and a link.
+
+**UI / UX.**
+- Settings → Advanced → Runtime → **Command sandbox** shows a per-observation table (enforced /
+  not enforced / unknown) and one line on what that means: *"Commands run in
+  an isolated copy of your project"*, or *"Commands are turned off on this
+  computer because X could not be confirmed"*.
+- The composer's runtime chip turns amber with *"Commands unavailable here"*
+  when the probe fails. Build's Run button is disabled with that tooltip, not
+  hidden.
+- An approval card for a command always states where it will run (*isolated
+  copy*, *WSL2*, *restricted account*).
+
+---
+
+## 2. Desktop installation & updates
+
+**Today.** `desktop-package.yml` builds and smoke-tests every target unsigned.
+The installers check requirements before copying files, and the first-run
+setup verifies each component (RELEASE_ACCEPTANCE_MATRIX, run 39327713463: all
+seven jobs green). No release has been published, signing secrets are not
+configured, and runner publisher pins are empty (`runner_publisher.py`).
+
+| ID | Item | State | P | Effort | Work left |
+|---|---|---|---|---|---|
+| IN-1 | Working installers per supported OS | 🟡 | P0 | S | Re-run on the release commit; the macOS job moved to `macos-15` and has not yet run green |
+| IN-2 | Dependencies installed or guided | 🟡 | P0 | M | Bubblewrap/AppArmor on Linux: the setup check names the exact package command per distro and offers **Copy command**. WSL2 Ubuntu Base download from Settings with checksum. llama.cpp and the speech engines are installed by Raiker on demand (done for llama.cpp in PR #245) |
+| IN-3 | Signing and runner authenticity | 🔴 | P0 | M | Owner obtains an Apple Developer ID and an Authenticode certificate and adds the secrets; pin the subject, key SHA-256 and Apple team ID in `runner_publisher.py`; release builds require `publisher_verified` |
+| IN-4 | Upgrades, rollback, clean uninstall | 🟡 | P0 | M | Signed-channel update test (0.9.0-beta.1 → beta.2) per platform; a downgrade path that restores the previous app while the schema generation is unchanged (the store already refuses a newer schema — `store_schema_newer`); uninstall removes the sandbox accounts, WFP filter and runner grants on Windows |
+| IN-5 | First launch on clean machines | 🔴 | P0 | M | Run T-01 on fresh VMs: Windows 10 22H2, Windows 11 24H2, macOS 14 and 15, Ubuntu 22.04/24.04, Fedora 40; record in RELEASE_ACCEPTANCE_MATRIX |
+
+**UI / UX.**
+- The installer's *Checking this computer* page gains an optional
+  **Voice & local AI** step: off by default, with sizes and a recommendation
+  from detected hardware (see voice spec §6). It only records the choice; the
+  downloads run inside Raiker after first start, so the installer stays small.
+- First-run setup ends on a **Ready** page listing what was set up and what was
+  skipped, each with a *Set up later in Settings* link.
+- Settings → **About & updates** shows the channel (*Beta*), the installed version,
+  a signature status (*Verified by Raiker* / *Unsigned development build*), and
+  **Roll back to previous version** when one is kept.
+
+---
+
+## 3. AI models & local inference
+
+**Today.**
+- Hosted providers and Ollama/LM Studio have readiness checks, a decision
+  service, fallback sequences and live specs.
+- **PR #245** adds the managed llama.cpp engine:
+  - hardware detection (CUDA, Vulkan, Metal, CPU) and verified installs from
+    ggml-org releases;
+  - GPU-layer, context and memory planning with a memory guard;
+  - a supervisor with health checks, out-of-memory recovery, crash restart,
+    restore at startup and clean shutdown;
+  - Models UI for all of it;
+  - unit, integration, API and UI tests, plus a CI workflow on all three OSes.
+- The live test (real release plus a real model) has not run yet.
+
+| ID | Item | State | P | Effort | Work left |
+|---|---|---|---|---|---|
+| MD-1 | Cloud and local provider connections | 🟡 | P0 | S | One recorded live check per supported provider on the release commit: Anthropic, OpenAI, OpenRouter, Ollama, LM Studio, llama.cpp; unsupported providers marked *Experimental* in the Add list |
+| MD-2 | llama.cpp native install, deploy, GPU config | 🟡 | P0 | S | Merge PR #245; get the `llama-cpp.yml` live job green on Windows, macOS and Linux; one owner-machine run each on an NVIDIA (CUDA) and an AMD (Vulkan) GPU |
+| MD-3 | GGUF downloads, integrity, inference | 🟡 | P0 | S | Hugging Face download: verify the LFS SHA-256 against the file actually written (today a revision is pinned); live test serves a downloaded GGUF |
+| MD-4 | Detection, readiness, selection, fallback | ✅ | — | — | Model decision service, readiness ledger and fallback sequence (FIXED items) |
+| MD-5 | Failures, rate limits, timeouts, recovery | 🟡 | P0 | M | A provider fault-injection matrix (429 with Retry-After, 500, timeout mid-stream, connection reset, malformed stream, quota exhausted) run against a local fault server; assert the turn retries or falls back with a receipt and never claims an answer it did not get |
+
+**UI / UX.**
+- Models → Runtime: the engine card and the GPU/context/memory editor from
+  PR #245 (done).
+- Every provider row shows one state word (*Ready*, *Needs key*, *Not running*,
+  *Rate-limited until 14:32*) with one action button.
+- When a fallback answers, the turn receipt says so in the turn: *"Answered by
+  Llama 3.2 3B (local) because Claude was rate-limited."*
+
+---
+
+## 4. Core autonomous agent capabilities
+
+**Today.**
+- Goals carry multi-step plans under execution profiles.
+- Every tool call passes the governed runtime: capability gates, decision
+  modes and approvals.
+- Emergency stop and cancellation exist.
+- The scheduler recovers abandoned rows at boot
+  (`_recover_abandoned_operations`, DEC-24 step 3).
+- Open: BUG-355 (goal intake, validator-backed criteria, restart scenario) and
+  BUG-356 (profiles cover goal steps only).
+
+| ID | Item | State | P | Effort | Work left |
+|---|---|---|---|---|---|
+| AG-1 | Plan, execute, complete multi-step tasks | 🟡 | P0 | M | T-03 with a real model, five runs on fresh state (TESTING protocol) |
+| AG-2 | Every tool call through permissions and governance | 🟡 | P0 | S | A test that every registered tool resolves to a capability gate (no tool without one); extend `test_governance_entry_paths.py` to voice-originated turns once voice lands |
+| AG-3 | Approve, reject, cancel, emergency stop | ✅ | — | — | Approval relay, STOP and cancel (FIXED items, live specs) |
+| AG-4 | Scheduling, background, restart recovery | 🟡 | P0 | M | BUG-355 restart scenario: kill the host mid-goal, restart, and assert the goal resumes or parks with an honest state; no duplicate effects |
+| AG-5 | Accurate reporting, no false claims | 🟡 | P0 | M | An honesty suite in which the model is told a tool succeeded when it failed (fault injection). Assert the receipt reports the failure and the final message does not claim it; use a real model for one run |
+
+**UI / UX.** The goal page shows a *receipt list* per step (done / failed /
+skipped, each with evidence), and a final summary that is assembled from those
+receipts rather than from model prose alone. STOP is always visible while any
+work runs (top bar), and so is the count of running items.
+
+---
+
+## 5. Build & coding agent
+
+**Today.**
+- File tools and commands share one disposable copy per session.
+- Changes are reviewed and applied by the owner.
+- Commits and branches act on the project only after Apply.
+- Protected files are refused.
+- BR-D02 tests run on Windows CI.
+
+| ID | Item | State | P | Effort | Work left |
+|---|---|---|---|---|---|
+| BD-1 | Repo analysis, editing, test execution | 🟡 | P0 | S | T-08 on a disposable repository with a real model, on Linux and on Windows (restricted account) |
+| BD-2 | Works in disposable copies | ✅ | — | — | Per-session task tree (TO_BE_FIXED sandbox table) |
+| BD-3 | Diffs, review, Apply, Discard | 🟡 | P0 | S | Playwright evidence of Apply and Discard with screenshots |
+| BD-4 | Git safety, protected files, conflicts | 🟡 | P0 | M | The conflict check is advisory today. Make Apply refuse when a file changed in the original since the copy was taken, unless the owner chooses **Overwrite** in a dialog that shows both versions |
+| BD-5 | Diagnose failures, iterate, report | 🟡 | P1 | M | A scripted failing test that the agent must fix within three iterations; the report lists each attempt |
+
+**UI / UX.**
+- The Changes pane groups files by *new / modified / deleted*, with a per-file
+  Apply and Discard as well as *Apply all*.
+- A conflict shows a three-way view (original at copy time, original now, the
+  copy) with **Keep mine**, **Keep theirs** and **Open both**.
+- The Build header always says *"Working in an isolated copy — nothing changes
+  in your project until you Apply."*
+
+---
+
+## 6. Memory & data protection
+
+**Today.**
+- SQLCipher (`sqlcipher3` 0.6.4, SQLCipher 4.19.0) is the store, and the vault
+  key is provisioned at first write.
+- Backups (create, verify, restore to a copy), schema-generation guards and the
+  deletion journal exist.
+- The support bundle refuses to build if anything secret-shaped survives
+  redaction.
+- BUG-354: the workspace key cannot be rotated in place.
+
+| ID | Item | State | P | Effort | Work left |
+|---|---|---|---|---|---|
+| MM-1 | Encrypted storage and configuration | ✅ | — | — | `tests/test_sqlcipher_memory_security.py`, `tests/test_memory_sqlcipher.py` (CI) |
+| MM-2 | Persist, retrieve, correct, delete | ✅ | — | — | T-04 scenario; memory governance tests |
+| MM-3 | No credential or private-data leaks to models or logs | 🟡 | P0 | M | A canary test: plant a fake key, password and card number in a connector, memory and a file; run a turn, a task and a support export; grep every log, event, model request (via a recording provider) and export for the canaries |
+| MM-4 | Backup, migration, corruption recovery | 🟡 | P0 | M | A corruption drill: truncate the database, flip bytes in a page, delete the key file, and fill the disk mid-write. Assert recovery offers the newest verified backup and never silently starts empty |
+| MM-5 | No unexpected cloud transmission | 🟡 | P0 | M | An egress audit run: Local execution profile, local model, all features used for 30 minutes behind a recording proxy; the only allowed destinations are those the owner configured. Recorded as evidence |
+| MM-6 | Key rotation (BUG-354) | 🔴 | P2 | M | After beta; documented as a known limitation |
+
+**UI / UX.**
+- Settings → **Privacy** gains a *"What leaves this computer"* panel, listing
+  each configured destination and what may be sent there (model prompts,
+  connector calls, update checks).
+- Backup reminders appear in the top bar when no verified backup is newer than
+  14 days.
+
+---
+
+## 7. UI & user experience
+
+**Today.**
+- The Quiet UI redesign is largely shipped (quiet-ui/README; FIXED-1150 and
+  later). Open items are listed in TO_BE_FIXED (*Quiet UI round 2*,
+  *approvals round*, *polish round*).
+- Size budgets are measured (QUI-G01) but are still a report, not a gate.
+
+| ID | Item | State | P | Effort | Work left |
+|---|---|---|---|---|---|
+| UX-1 | Quiet UI across retained pages | 🟡 | P0 | M | Close the open rows in TO_BE_FIXED's Quiet UI sections or move them to beta.2 with a known-issue entry; turn the QUI-G01 size budget into a failing check for Chat, Build, Models and Settings |
+| UX-2 | Composer, navigation, model selection consistent | 🟡 | P0 | S | One `ComposerParity` test per surface (Chat, Build, Design) that asserts the same controls in the same order |
+| UX-3 | Permission controls, runtime status, approvals | ✅ | — | — | QUI-P01–P09 (approvals round) |
+| UX-4 | Understandable errors and recovery actions | 🟡 | P0 | M | An **error copy audit**: every `reason_code` a route can return has a sentence and an action in the UI (a test that collects codes from `HTTPException(detail={"reason_code": ...})` and checks a label map). PR #245 does this for the llama.cpp engine |
+| UX-5 | Responsive layouts, accessibility, desktop usability | 🟡 | P0 | M | axe-core run in Playwright on every page at 1440, 1280 and 390 widths with zero serious violations; keyboard-only T-14; screen-reader pass with NVDA and VoiceOver |
+
+**UI / UX deliverables for beta.**
+1. **Beta badge** in the top bar, linking to *Send feedback* (area 12).
+2. **Unavailable is visible, not hidden.** A control that the host cannot run
+   (commands, voice, image generation) stays visible but disabled. It carries a
+   one-line reason and a *Set up* link where something can be done. Controls
+   for features that are **Not in beta** are removed.
+3. **One status vocabulary** across Models, Tasks and Settings: *Ready*,
+   *Working*, *Needs you*, *Unavailable*, *Failed*. Each has one colour token
+   and an icon, never colour alone.
+
+---
+
+## 8. Voice & design
+
+**Today.**
+- Dictation posts audio to an owner-configured local transcription server.
+  Browser speech recognition is never used.
+- Read-aloud uses the operating system's speech engine, limited to voices that
+  report `localService` (`voice.ts`).
+- There is no managed speech engine (TO_BE_FIXED, *Local voice delivery —
+  release blockers*).
+- Design: structured documents, exports and the Build handoff pass
+  (T-11/T-12, 2026-10-19). BUG-287 (live image provider round trip) and
+  BUG-348 (canvas editing, five DW items partial) are open.
+
+| ID | Item | State | P | Effort | Work left |
+|---|---|---|---|---|---|
+| VD-1 | On-device dictation and read-aloud setup | 🔴 | P0 | L | Voice spec Phase V1: a managed whisper.cpp engine with a model tier choice, and a managed Piper/Kokoro TTS, installed and supervised like llama.cpp |
+| VD-2 | Mic permissions, cancellation, audio privacy, no browser speech | 🟡 | P0 | M | Playwright with a fake microphone: permission denied, revoked mid-recording, cancel, the 6-minute limit; a test that `SpeechRecognition` is never constructed; read-aloud refuses non-local voices (done) |
+| VD-3 | Design composer, templates, attachments, image generation | 🟡 | P1 | M | Ship the document editor; label image generation **Preview** until BUG-287 has a real-provider round trip |
+| VD-4 | Disable unfinished capabilities clearly | 🟡 | P0 | S | Audit (area 7, deliverable 2): hands-free conversation stays **Preview** behind Settings → Voice → *Labs*; canvas features from BUG-348 that are partial are removed from menus |
+| VD-5 | Native voice conversation | 🔴 | P1 | L | Voice spec Phases V2–V3; **Preview** in beta |
+
+**UI / UX.** See [VOICE_CONVERSATION_SPEC.md §8](VOICE_CONVERSATION_SPEC.md#8-ui-and-ux).
+The composer microphone has three states (*Set up voice*, *Dictate*,
+*Recording 0:12 — Stop / Cancel*). Read-aloud shows which engine will speak
+(*Kokoro · on this device*).
+
+---
+
+## 9. Plugins, integrations & permissions
+
+**Today.**
+- Plugins and local MCP run sandboxed with no network, and are refused on
+  hosts without an enforced boundary.
+- Connector accounts and OAuth exist; permission grants, revocation and audit
+  records exist (governance tests).
+- The agent tool inventory lists many items as needing their own threat model
+  or connector.
+
+| ID | Item | State | P | Effort | Work left |
+|---|---|---|---|---|---|
+| PL-1 | Install, configure, remove supported integrations | 🟡 | P0 | M | A **supported list** for beta: GitHub, email (IMAP/SMTP), calendar (CalDAV), web search, local MCP stdio. Each gets one live install → use → revoke → remove run |
+| PL-2 | Grants, revocation, audit | ✅ | — | — | Governance suite |
+| PL-3 | OAuth and credential storage | 🟡 | P0 | S | Vault encryption is tested; add expired-token and revoked-token live checks for GitHub |
+| PL-4 | Plugins and MCP cannot bypass the sandbox | 🟡 | P0 | S | Covered by SB-4/SB-6; add an MCP server that tries network, a home read and a spawn outside its folder |
+| PL-5 | Supported vs experimental | 🔴 | P0 | S | A `support_level` field (`supported` / `experimental`) on every connector and MCP catalogue entry, shown as a badge; experimental ones need an extra confirmation to install |
+
+**UI / UX.** The Extensions page has two sections, *Supported* and
+*Experimental*. An experimental card has an amber badge and the install dialog
+says what has not been verified. Each connection's detail shows its grants and
+the last ten audit records with **Revoke**.
+
+---
+
+## 10. End-to-end testing
+
+**Today.** TESTING.md defines T-01–T-16 (sixteen real-user journeys) and the
+run-record protocol. Live specs exist for many rounds, and T-11/T-12 passed
+with a real model. No single release-candidate run covers seven journeys from
+a fresh install.
+
+| ID | Item | State | P | Effort | Work left |
+|---|---|---|---|---|---|
+| E2E-1 | Seven journeys from fresh install to completion | 🔴 | P0 | L | The beta set: **T-01** first use, **T-03** durable outcome with restart, **T-04** memory correct/forget, **T-08** issue-to-PR, **T-13** stop/resume/budget, **T-14** accessibility, **T-15** security and resilience; plus **V-01** voice dictation once VD-1 lands |
+| E2E-2 | Real models, not only mocks | 🟡 | P0 | M | Each journey runs once with a hosted model and once with a local llama.cpp model (PR #245 makes this automatic) |
+| E2E-3 | Offline, lost connectivity, crashes, restarts, pressure | 🔴 | P0 | M | A fault harness: drop the network mid-turn; kill the host; fill the disk to 98%; cap RAM with a cgroup or Job Object. Assert honest states and no data loss |
+| E2E-4 | Adversarial sandbox, filesystem, credential tests | 🟡 | P0 | M | SB-6 plus MM-3 |
+| E2E-5 | Playwright screenshots and execution evidence | 🟡 | P0 | S | Every journey stores screenshots, a HAR, the event log and receipts under the run record |
+
+---
+
+## 11. CI/CD & release quality
+
+**Today.**
+- `ci.yml` runs ruff, mypy, three pytest shards, SAST, secret scan,
+  dependency audit, the web pipeline, Windows lifecycle, Build fault and
+  remote-access jobs.
+- `desktop-package.yml` builds every target; `release.yml` drafts releases.
+- `llama-cpp.yml` (PR #245) adds a three-OS engine job and a weekly live job.
+- TO_BE_FIXED records Python-shard, Windows lifecycle and Build fault failures
+  on recent PR heads.
+
+| ID | Item | State | P | Effort | Work left |
+|---|---|---|---|---|---|
+| CI-1 | All mandatory workflows green on the release commit | 🔴 | P0 | M | Fix the recorded shard, Windows lifecycle and Build fault failures; a `release-gate` job in `release.yml` that refuses to draft unless every required check on the commit is green |
+| CI-2 | Ruff, mypy, lint, unit, integration, security, packaging | 🟡 | P0 | S | Already wired; part of CI-1 |
+| CI-3 | Per-platform artifacts verified independently | 🟡 | P0 | S | Each target downloads its own artifact in a fresh job and runs the installed-host smoke (exists); add signature verification once IN-3 lands |
+| CI-4 | Dependency vulnerability and secret scans | ✅ | — | — | `pip-audit`/`npm audit` and `scan_secrets.py` in CI |
+| CI-5 | Versioned, verified artifacts with reproducible evidence | 🟡 | P0 | M | The release carries `SHA256SUMS.txt` (exists), an SBOM (`licensing_check.py --sbom`), a provenance attestation (`actions/attest-build-provenance`) and a `RELEASE_EVIDENCE.md` linking the run IDs |
+
+---
+
+## 12. Documentation & beta operations
+
+| ID | Item | State | P | Effort | Work left |
+|---|---|---|---|---|---|
+| DOC-1 | Reconcile TO_BE_FIXED, FIXED_ITEMS and architecture docs | 🟡 | P0 | M | A reconciliation pass dated on the release commit; every row in this plan marked ✅ names its FIXED item |
+| DOC-2 | Supported OS, hardware, known limitations | ✅ | — | — | [Beta guide](../guide/beta.md) (this round) with README's requirements and [KNOWN_LIMITS](../architecture/KNOWN_LIMITS.md) |
+| DOC-3 | Install, setup, troubleshooting, uninstall guides | ✅ | — | — | getting-started, troubleshooting, managing-the-host (Uninstall); engine-specific rows added in PR #245 |
+| DOC-4 | In-app bug reporting and feedback route | ✅ | — | — | Settings → General → **Beta feedback** and GitHub issue forms (this round) |
+| DOC-5 | Beta criteria, known issues, rollback or withdrawal | ✅ | — | — | [Beta release criteria](#beta-release-criteria) below and the beta guide's *Known issues* and *If a beta is withdrawn* |
+
+---
+
+## Beta release criteria
+
+`beta.1` is published only when **every** item below is true on one commit,
+and the release owner signs off in `RELEASE_EVIDENCE.md`.
+
+1. **CI.** Every required workflow is green on the exact commit: `ci.yml`,
+   `web` jobs, `desktop-package.yml`, `llama-cpp.yml` (engine and live),
+   SAST, secrets and dependency audit.
+2. **Sandbox.** On each platform, either the native sandbox probe reports
+   every mandatory observation enforced and SB-6 passes, or command execution
+   is refused on that platform and the beta guide says so.
+3. **Installers.** IN-1 to IN-5 pass on clean machines. Builds are signed on
+   macOS and Windows, or the beta guide states the build is unsigned and how to
+   open it. *Unsigned is acceptable for a closed beta only.*
+4. **Journeys.** The seven E2E-1 journeys pass with real models, with evidence
+   stored.
+5. **Data.** MM-3 (canary) and MM-4 (corruption drill) pass; MM-5 egress
+   audit recorded.
+6. **No P0 open.** Every P0 row above is ✅, or is moved to *Not in beta* with
+   the product refusing it and the beta guide listing it.
+7. **Known issues** in the beta guide are current as of the commit.
+
+### Withdrawal and rollback
+
+- **Severity 1** (data loss, a sandbox escape, a credential leak, or remote
+  code execution): the release owner unpublishes the GitHub release within an
+  hour of confirmation. They then mark the update channel's manifest as
+  withdrawn so installed copies stop offering it, and post an advisory on the
+  release page and in SECURITY.md. Installed copies show a banner on next start
+  with the advisory and **Roll back** (IN-4).
+- **Severity 2** (a broken core journey): a fixed `beta.N+1` within seven
+  days, or withdrawal if it is not possible.
+- Rollback keeps data: the store refuses only a *newer* schema, so a beta
+  that added no migration can be rolled back in place. A beta that added one
+  says so in its notes. Rolling back past it restores the pre-update backup
+  that the updater takes before any migration (IN-4 adds this backup).
+
+## Delivery order
+
+1. **Week 1 — gates that cost little.** Merge PR #245 (with this round's beta
+   guide, feedback route, issue forms and spawn inventory test). Add
+   `support_level` (PL-5) and the reason-code label audit (UX-4).
+   Fix the CI failures (CI-1).
+2. **Week 2 — voice V1 and data drills.** Managed whisper.cpp and Piper/Kokoro
+   (VD-1). MM-3 canary, MM-4 corruption drill, MM-5 egress audit. Apply
+   conflict refusal (BD-4).
+3. **Week 3 — platforms.** macOS sandbox CI (SB-2), Windows gaps (SB-1),
+   signing (IN-3), clean-machine runs (IN-5).
+4. **Week 4 — the candidate.** The seven journeys with real models (E2E-1/2),
+   the fault harness (E2E-3), reconciliation (DOC-1), sign-off.
+
+Anything not green at the start of week 4 is moved to *Not in beta* with the
+product refusing it, rather than delaying the date.
+
+## Changelog
+
+- **2026-11-02** — Plan opened. Delivered in the same round:
+  - DOC-2, DOC-3 and DOC-5: the [beta guide](../guide/beta.md), with
+    supported systems, scope, known issues, updating, withdrawal and uninstall,
+    plus these criteria.
+  - DOC-4: Settings → General → **Beta feedback** (prefilled GitHub issue forms,
+    optional redacted diagnostics) and `.github/ISSUE_TEMPLATE/`.
+  - SB-4: the process-spawn inventory test.
+
+  MD-2 is implemented in PR #245 and awaits live CI evidence.

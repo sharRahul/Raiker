@@ -21,7 +21,9 @@ in the top bar, which opens it beside the page you are on.
 If this is your first time using Raiker, read these pages in order:
 
 1. [Getting started](getting-started.md) — requirements, installation, first
-   launch, and the local owner account.
+   launch, and the local owner account. Testing the beta? Read
+   [The Raiker beta](beta.md) for what it covers, known issues and how to send
+   feedback.
 2. [Connecting a model](connecting-a-model.md) — connect a local, home-lab, or
    hosted model and confirm it is ready.
 3. [Permissions and the runtime](permissions-and-runtime-modes.md) — decide

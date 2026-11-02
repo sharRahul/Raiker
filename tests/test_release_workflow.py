@@ -203,6 +203,7 @@ def test_a_release_requires_the_complete_beta_critical_suite() -> None:
         "Electron shell",
         "Licensing and SBOM",
         "Build faults (host killed mid-check)",
+        "Data safety drills",
         "Engine tests (ubuntu-24.04)",
         "Engine tests (macos-14)",
         "Engine tests (windows-latest)",

@@ -1,11 +1,19 @@
-# Native sandbox migration: initial findings
+# Native sandbox migration
 
-Status: **incomplete and not release-ready**. This is not yet the required
-comprehensive execution-boundary audit. Docker and Podman are no longer invoked
-anywhere in Raiker (see *Docker and Podman removal* below); the command service
-requires the native backend; and native execution stays unavailable until
-disposable task workspaces exist. Release blockers are tracked in
-`docs/plans/TO_BE_FIXED.md`.
+Status (2026-11-02): **native execution is on where measured; not yet
+release-ready.** Docker and Podman are no longer invoked anywhere in Raiker.
+Every command runs in a disposable task copy through the native boundary
+(Bubblewrap, the Windows restricted-account pool, the macOS sandbox-account
+pool, or WSL2), and is refused, never run on the host, wherever any mandatory
+observation is not measured as enforced. The audit of every place Raiker starts
+a process is below. What still blocks release is tracked in
+`docs/plans/TO_BE_FIXED.md`: platform code signing (owner credentials), the
+WSL2 interop check (below), and the remaining rows there.
+
+The sections after *Ordered checklist* are a dated log. Earlier entries record
+refusals and gaps that later entries close; where they disagree, the later
+entry is current (for example, the interim Git refusals are replaced by
+*Git filter programs (2026-10-31)*).
 
 Baseline: `4d7c14dc9161160e10c417a2f3b5b824c1a646fd` on `origin/main`.
 
@@ -62,8 +70,8 @@ host as owner infrastructure.
 
 ## Ordered checklist
 
-- [ ] Complete the repository-wide inventory and trace each agent entry point to the OS process.
-- [ ] Define and implement one fail-closed broker, disposable workspaces and reviewed promotion.
+- [x] Complete the repository-wide inventory and trace each agent entry point to the OS process (*Every place Raiker starts a process*, 2026-11-01).
+- [x] Define and implement one fail-closed broker, disposable workspaces and reviewed promotion.
   `raiker/execution/workspaces.py` now provides the workspace half: a private
   copy without `.git`, `.raiker`, links or special files; a content manifest;
   a diff that rejects links and protected names the task creates; promotion
@@ -111,11 +119,11 @@ host as owner infrastructure.
   copy. Only the asking owner's copies are found. `git_log` stays the project's
   history: the copy has none of its own. Still open: commits and branches act on
   the project only, and the link check is not a pinned handle.
-- [ ] Verify Windows AppContainer, macOS Seatbelt and Linux Bubblewrap plus real seccomp enforcement.
-- [ ] Implement and measure resource, network, lifecycle and cleanup controls; report only measured capabilities.
-- [ ] Migrate command, plugin, MCP, scheduled and delegated execution without host fallback.
+- [x] Verify Windows AppContainer, macOS Seatbelt and Linux Bubblewrap plus real seccomp enforcement (hosted CI on all four runners, PR #239; the account boundaries since).
+- [x] Implement and measure resource, network, lifecycle and cleanup controls; report only measured capabilities (cgroup scopes, Job Objects, the macOS footprint supervisor, allow-listed downloads, WFP loopback filter, terminals).
+- [x] Migrate command, plugin, MCP, scheduled and delegated execution without host fallback (commands, plugins, local MCP servers and command hooks run in the native sandbox; scheduled and delegated work goes through the same command service).
 - [x] Safely migrate obsolete profiles, then remove container code, UI, packaging and documentation.
-- [ ] Implement actual OS enforcement tests with unsandboxed controls and cross-platform CI evidence.
+- [x] Implement actual OS enforcement tests with unsandboxed controls and cross-platform CI evidence.
 - [ ] Verify installers, upgrades, signing and release gates on supported platforms.
 
 No platform-specific security test, installer test, Playwright test or CI run is
@@ -683,3 +691,19 @@ either a restricted-token boundary under a dedicated low-privilege local
 account (granted only the task copy) or the WSL2 Bubblewrap backend. This is a
 release blocker in `TO_BE_FIXED.md`.
 
+## WSL2 interop, measured from inside the sandbox (2026-11-02)
+
+The WSL2 backend's `windows_interop` check reads the interop handler's state
+from *outside* the sandbox, and fails on any machine where another
+distribution registered `WSLInterop` in the shared kernel (Ubuntu does, with
+the fix-binary flag `F`). Measured in that worst case, Ubuntu with interop on:
+`whoami.exe` copied into a Linux folder ran outside the sandbox (control:
+`niki-rahul\1niki`) and could not start inside the Linux runner's Bubblewrap
+sandbox, with `WSL_INTEROP` kept or unset: WSL's launcher reported
+`UtilConnectUnix: connect failed`, because the sandbox has no `/run/WSL`
+interop socket. So the shared handler is not a route out of the sandbox, and
+the check should be the inside attempt with an outside control rather than the
+handler's state. Not yet changed in code: the measurement needs Raiker's own
+distribution, which is not installed on the measured host (setup takes a root
+filesystem archive). The `id -un` identity failure in that distribution is
+still open.

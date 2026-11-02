@@ -153,11 +153,24 @@ def test_fetch_release_uses_the_api_and_maps_failures() -> None:
         seen.append(str(request.url))
         if request.url.path.endswith("/tags/b1234"):
             return httpx.Response(404)
+        if request.url.path.endswith("/releases"):
+            # GitHub's stable "latest" can be source-only. Automatic
+            # installation must pass it over and choose the newest official
+            # build release, even when GitHub marks that release prerelease.
+            return httpx.Response(200, json=[
+                {"tag_name": "v0.8.0", "assets": []},
+                {"tag_name": TAG, "assets": [{
+                    "name": NAMES[0],
+                    "browser_download_url": f"https://github.com/x/{NAMES[0]}",
+                    "size": 1,
+                    "digest": DIGEST,
+                }]},
+            ])
         return httpx.Response(200, json={"tag_name": TAG, "assets": []})
 
     client = httpx.Client(transport=httpx.MockTransport(handler))
     assert fetch_release(client=client).tag == TAG
-    assert seen[0] == "https://api.github.com/repos/ggml-org/llama.cpp/releases/latest"
+    assert seen[0] == "https://api.github.com/repos/ggml-org/llama.cpp/releases?per_page=100"
     with pytest.raises(ReleaseError, match="llama_cpp_release_not_found"):
         fetch_release("b1234", client=client)
     with pytest.raises(ReleaseError, match="llama_cpp_release_tag_invalid"):
@@ -168,3 +181,11 @@ def test_fetch_release_uses_the_api_and_maps_failures() -> None:
 
     with pytest.raises(ReleaseError, match="llama_cpp_release_unreachable"):
         fetch_release(client=httpx.Client(transport=httpx.MockTransport(broken)))
+
+
+def test_automatic_release_selection_refuses_when_no_build_release_exists() -> None:
+    client = httpx.Client(transport=httpx.MockTransport(
+        lambda _request: httpx.Response(200, json=[{"tag_name": "v0.8.0", "assets": []}])
+    ))
+    with pytest.raises(ReleaseError, match="llama_cpp_release_not_found"):
+        fetch_release(client=client)

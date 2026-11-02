@@ -95,12 +95,12 @@ jobs:
         run: |
           echo "refused: unsigned artifacts may only be published as a beta draft." >&2
           exit 1
-      # Release gate — the sandbox is what makes running a model's commands
-      # safe, so a commit whose boundary was not proven on every platform it
-      # ships to is not released. CI runs the runner's enforcement tests on
-      # each one (`Native runner (<os>)` in ci.yml); every one must have
-      # passed on this exact commit.
-      - name: Refuse a commit whose sandbox enforcement tests did not pass
+      # Release gate — a release must be made from a commit that passed the
+      # complete beta-critical suite, not merely the sandbox runner tests.
+      # Each name is a GitHub Actions check from CI or llama.cpp engine CI.
+      # The desktop workflow below rebuilds, installs and validates the signed
+      # candidate itself, so it is deliberately not a prerequisite here.
+      - name: Refuse a commit whose required verification did not pass
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GH_REPO: ${{ github.repository }}
@@ -108,8 +108,29 @@ jobs:
         run: |
           python - <<'PY'
           import json, os, subprocess, sys
-          required = {f"Native runner ({os_})" for os_ in
-                      ("ubuntu-24.04", "windows-2025", "macos-15", "macos-15-intel")}
+          required = {
+              "Python 3.11",
+              "Python tests (shard 1 of 3)",
+              "Python tests (shard 2 of 3)",
+              "Python tests (shard 3 of 3)",
+              "Source measurement",
+              "Dependency vulnerabilities",
+              "Windows lifecycle tests",
+              "Remote access (windows-latest)",
+              "Remote access (macos-15)",
+              "Web UI (Node 24)",
+              "Electron shell",
+              "Licensing and SBOM",
+              "Build faults (host killed mid-check)",
+              "Engine tests (ubuntu-24.04)",
+              "Engine tests (macos-14)",
+              "Engine tests (windows-latest)",
+              "Live install and inference (ubuntu-24.04)",
+              "Live install and inference (macos-14)",
+              "Live install and inference (windows-latest)",
+              *{f"Native runner ({os_})" for os_ in
+                ("ubuntu-24.04", "windows-2025", "macos-15", "macos-15-intel")},
+          }
           # Only GitHub Actions' own check runs count: another app with
           # checks:write could post a run under the same name. A job re-run
           # adds a newer run, so the latest one per name decides; an old pass
@@ -129,9 +150,9 @@ jobs:
                     if conclusion == "success"}
           missing = sorted(required - passed)
           if missing:
-              sys.exit("refused: sandbox enforcement tests have not passed on this "
+              sys.exit("refused: required release verification has not passed on this "
                        "commit: " + ", ".join(missing))
-          print("sandbox enforcement tests passed on every platform")
+          print("all required release verification passed on this commit")
           PY
 
   # ── 2. The desktop installers, built, installed and tested per target ─

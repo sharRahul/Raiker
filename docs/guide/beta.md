@@ -51,16 +51,19 @@ These are open at the time of the beta and tracked in
 - **Commands may be unavailable on your computer.**
   - On Windows, the restricted-account sandbox still has open gaps, so
     commands stay off unless every check passes.
-  - On macOS, the sandbox has not yet been verified on GitHub's hosted Macs.
+  - macOS enforcement checks passed on `macos-15` and `macos-15-intel` for
+    the current source commit; signed-installer, upgrade and fresh-machine
+    release evidence is still required.
   - On Linux, install Bubblewrap (`sudo apt install bubblewrap`,
     `sudo dnf install bubblewrap`). **Settings → Advanced → Runtime → Command sandbox** shows each check.
 - **Plugins and local MCP servers see only their own folder** and have no
   network. A server that needs to read your project cannot yet.
 - **Model conversion** (safetensors to GGUF) works only on Linux with a
   llama.cpp you installed yourself. Download a GGUF instead where one exists.
-- **The llama.cpp engine's first live runs** on Windows and macOS happen in
-  this beta's CI. Report anything that goes wrong when Raiker installs or
-  starts it, using the *Models and local AI* area.
+- **Managed llama.cpp is temporarily release-blocked.** Its three live CI jobs
+  exposed a release-selection defect: GitHub's latest stable release has no
+  runtime archives. It must be fixed and evidenced on all three platforms
+  before a public beta claims managed local GGUF support.
 - **The workspace encryption key cannot be rotated** in place yet.
 - **Windows window size at 150% display scaling** can drift by a few pixels
   between restarts.

@@ -91,8 +91,8 @@ incomplete*). What exists:
 | ID | Item | State | P | Effort | Work left |
 |---|---|---|---|---|---|
 | SB-1 | Windows isolation: ACLs, network, credentials, account cleanup | 🔴 | P0 | L | Per-task profile reset; deny network/remote logon rights; scan explicit ACEs under denied roots; scan explicit grants inside `.git`; measure the WFP filter on hosted and owner machines; account cleanup on uninstall |
-| SB-2 | macOS Seatbelt enforcement, containment, limits | 🔴 | P0 | M | Run `macos_enforcement.rs` and `tests/macos_account.rs` on `macos-15` and `macos-15-intel`; record evidence; prove descendant containment and the footprint supervisor |
-| SB-3 | Linux Bubblewrap and WSL2 enforcement | 🟡 | P0 | S | Re-run on the release commit; document the systemd user-manager requirement for aggregate limits |
+| SB-2 | macOS Seatbelt enforcement, containment, limits | 🟡 | P0 | M | Native-runner checks passed on `macos-15` and `macos-15-intel` for `9c532624`. Preserve this evidence on the release commit and add fresh-installer, toolchain and adversarial tests. |
+| SB-3 | Linux Bubblewrap and WSL2 enforcement | 🟡 | P0 | S | WSL2 was measured on Windows 11 and its static runner is packaged. Re-run on the release commit and document the systemd user-manager requirement for aggregate limits. |
 | SB-4 | Commands, plugins, hooks and local MCP use the sandbox or fail closed | 🟡 | P0 | S | **Inventory test landed** (`tests/test_process_spawn_inventory.py`): every process-spawning module in `raiker/` is listed with a reviewed category (sandbox, Raiker-owned program, host lifecycle, read-only facts, owner-approved host operation); a new spawn site or any shell use fails CI. Remaining: one live check per hook type that a hook command is refused on a host without an enforced boundary |
 | SB-5 | Disposable workspaces, reviewed promotion, rollback, crash recovery | 🟡 | P0 | M | Rollback of a promoted Apply; crash in the middle of Apply (kill test); pinned-handle link check (residual race documented today) |
 | SB-6 | No protected-file writes, no limit escape, no direct host execution | 🟡 | P0 | M | Adversarial suite per platform (below), run in CI where hosted runners allow it and recorded from owner machines where they do not |
@@ -131,7 +131,7 @@ configured, and runner publisher pins are empty (`runner_publisher.py`).
 
 | ID | Item | State | P | Effort | Work left |
 |---|---|---|---|---|---|
-| IN-1 | Working installers per supported OS | 🟡 | P0 | S | Re-run on the release commit; the macOS job moved to `macos-15` and has not yet run green |
+| IN-1 | Working installers per supported OS | 🟡 | P0 | S | The current unsigned matrix passed, including `macos-15`; rerun the full signed candidate on the exact release commit. |
 | IN-2 | Dependencies installed or guided | 🟡 | P0 | M | Bubblewrap/AppArmor on Linux: the setup check names the exact package command per distro and offers **Copy command**. WSL2 Ubuntu Base download from Settings with checksum. llama.cpp and the speech engines are installed by Raiker on demand (done for llama.cpp in PR #245) |
 | IN-3 | Signing and runner authenticity | 🔴 | P0 | M | Owner obtains an Apple Developer ID and an Authenticode certificate and adds the secrets; pin the subject, key SHA-256 and Apple team ID in `runner_publisher.py`; release builds require `publisher_verified` |
 | IN-4 | Upgrades, rollback, clean uninstall | 🟡 | P0 | M | Signed-channel update test (0.9.0-beta.1 → beta.2) per platform; a downgrade path that restores the previous app while the schema generation is unchanged (the store already refuses a newer schema — `store_schema_newer`); uninstall removes the sandbox accounts, WFP filter and runner grants on Windows |
@@ -163,12 +163,16 @@ configured, and runner publisher pins are empty (`runner_publisher.py`).
     restore at startup and clean shutdown;
   - Models UI for all of it;
   - unit, integration, API and UI tests, plus a CI workflow on all three OSes.
-- The live test (real release plus a real model) has not run yet.
+- The live test ran on 2026-11-02 but failed on Linux, macOS and Windows before
+  installation: GitHub's stable `v0.8.0` release has no runtime archives while
+  the current binary builds are `bNNNN` prereleases. Automatic selection must
+  choose the newest verified build-bearing release; the live matrix must then
+  be rerun on the release commit.
 
 | ID | Item | State | P | Effort | Work left |
 |---|---|---|---|---|---|
 | MD-1 | Cloud and local provider connections | 🟡 | P0 | S | One recorded live check per supported provider on the release commit: Anthropic, OpenAI, OpenRouter, Ollama, LM Studio, llama.cpp; unsupported providers marked *Experimental* in the Add list |
-| MD-2 | llama.cpp native install, deploy, GPU config | 🟡 | P0 | S | Merge PR #245; get the `llama-cpp.yml` live job green on Windows, macOS and Linux; one owner-machine run each on an NVIDIA (CUDA) and an AMD (Vulkan) GPU |
+| MD-2 | llama.cpp native install, deploy, GPU config | 🔴 | P0 | S | Repair automatic release selection; get the `llama-cpp.yml` live job green on Windows, macOS and Linux; one owner-machine run each on an NVIDIA (CUDA) and an AMD (Vulkan) GPU |
 | MD-3 | GGUF downloads, integrity, inference | 🟡 | P0 | S | Hugging Face download: verify the LFS SHA-256 against the file actually written (today a revision is pinned); live test serves a downloaded GGUF |
 | MD-4 | Detection, readiness, selection, fallback | ✅ | — | — | Model decision service, readiness ledger and fallback sequence (FIXED items) |
 | MD-5 | Failures, rate limits, timeouts, recovery | 🟡 | P0 | M | A provider fault-injection matrix (429 with Retry-After, 500, timeout mid-stream, connection reset, malformed stream, quota exhausted) run against a local fault server; assert the turn retries or falls back with a receipt and never claims an answer it did not get |
@@ -372,12 +376,13 @@ a fresh install.
   remote-access jobs.
 - `desktop-package.yml` builds every target; `release.yml` drafts releases.
 - `llama-cpp.yml` (PR #245) adds a three-OS engine job and a weekly live job.
-- TO_BE_FIXED records Python-shard, Windows lifecycle and Build fault failures
-  on recent PR heads.
+- On `9c532624`, the Python shards, Windows lifecycle, Build fault, native
+  runner and desktop-package checks passed. The three llama.cpp **live** jobs
+  failed because of the release-selection defect above.
 
 | ID | Item | State | P | Effort | Work left |
 |---|---|---|---|---|---|
-| CI-1 | All mandatory workflows green on the release commit | 🔴 | P0 | M | Fix the recorded shard, Windows lifecycle and Build fault failures; a `release-gate` job in `release.yml` that refuses to draft unless every required check on the commit is green |
+| CI-1 | All mandatory workflows green on the release commit | 🔴 | P0 | M | Make the three llama.cpp live jobs green. The release gate must require the complete beta-critical CI and llama.cpp suite, using the latest GitHub Actions result for each check on the exact commit. |
 | CI-2 | Ruff, mypy, lint, unit, integration, security, packaging | 🟡 | P0 | S | Already wired; part of CI-1 |
 | CI-3 | Per-platform artifacts verified independently | 🟡 | P0 | S | Each target downloads its own artifact in a fresh job and runs the installed-host smoke (exists); add signature verification once IN-3 lands |
 | CI-4 | Dependency vulnerability and secret scans | ✅ | — | — | `pip-audit`/`npm audit` and `scan_secrets.py` in CI |

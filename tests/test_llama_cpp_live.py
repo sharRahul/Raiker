@@ -37,7 +37,7 @@ from raiker.api.sessions import ApiSessionStore
 from raiker.app.launcher import port_is_free
 from raiker.cli.principal_resolver import bootstrap_owner
 from raiker.models.contracts import ModelMessage
-from raiker.models.llama_cpp import hardware, installer
+from raiker.models.llama_cpp import hardware
 from raiker.models.local_runtime import LOCAL_SLOTS
 from raiker.models.providers.llama_cpp_server import LlamaCppServerProvider
 
@@ -90,12 +90,7 @@ def test_install_serve_infer_switch_and_stop_with_the_real_engine(tmp_path: Path
         installed = overview["installation"]
         print(f"installed llama.cpp {installed['tag']} ({installed['backend']}): {installed['version_text']}")
         assert overview["executable"]["source"] == "managed"
-        # API responses pass through the secret redactor. A temporary directory
-        # segment can look credential-shaped, so prove the managed executable
-        # from the installation record instead of treating a presentation field
-        # as a filesystem locator.
-        managed = installer.current(workspace)
-        assert managed is not None and Path(managed.executable).is_file()
+        assert Path(installed["executable"]).is_file()
 
         # 2. A model in an approved folder.
         url = os.environ.get("RAIKER_LIVE_GGUF_URL", DEFAULT_MODEL)

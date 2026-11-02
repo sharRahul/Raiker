@@ -500,6 +500,7 @@ def test_feature_contract_refuses_delivery_without_quarantine() -> None:
         # lets a background run proceed beside other commands.
         ("macos_account", "enforced", True, True),
         ("macos_account", "indeterminate", False, False),
+        ("wsl_bubblewrap", "enforced", True, True),
     ),
 )
 def test_background_and_terminals_need_a_measured_tree_stop(

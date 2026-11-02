@@ -703,7 +703,18 @@ sandbox, with `WSL_INTEROP` kept or unset: WSL's launcher reported
 `UtilConnectUnix: connect failed`, because the sandbox has no `/run/WSL`
 interop socket. So the shared handler is not a route out of the sandbox, and
 the check should be the inside attempt with an outside control rather than the
-handler's state. Not yet changed in code: the measurement needs Raiker's own
-distribution, which is not installed on the measured host (setup takes a root
-filesystem archive). The `id -un` identity failure in that distribution is
-still open.
+handler's state.
+
+**Done and measured on Windows 11 (2026-11-02).** Raiker's distribution was
+set up, without elevation, from Ubuntu Base 24.04.4 (`ubuntu-base-24.04.4-base-amd64.tar.gz`,
+SHA256 checked against Ubuntu's published `SHA256SUMS`). Its `wsl.conf` keeps
+interop on (no Windows PATH, no drive automount) so the check has a real
+control arm: a `whoami.exe` piped into a scratch folder runs as the run user
+outside the sandbox and must not start through the Linux runner inside it. A
+drive is a mount on `/mnt/<letter>` in `/proc/mounts`; WSL's own `/mnt/wsl`,
+`/mnt/wslg` and empty folders left from the first boot are not. Result: every
+observation enforced, `windows_interop` included. Through `CommandService`
+with the Windows backend set to WSL2, a command read the project file from its
+copy, and a terminal run (`cat`) echoed typed input, turned `\r` into a line
+end and ended on Ctrl-D. Raiker now offers background runs and terminals on
+`wsl_bubblewrap`. `id -un` resolves the run user in this distribution.

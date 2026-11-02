@@ -142,15 +142,19 @@ class NativeSandboxProof:
         plain Seatbelt cannot contain a detached descendant.
         """
         tree_stop = self.observations.get("descendant_reaped") == ENFORCED
+        # WSL2 runs Bubblewrap in Raiker's distribution: the same tree stop,
+        # and the Linux runner opens the terminal itself over `wsl.exe`'s pipes.
         terminal = tree_stop and self.boundary in {
             "bubblewrap",
             "macos_account",
             "restricted_account",
+            "wsl_bubblewrap",
         }
         background = tree_stop and self.boundary in {
             "bubblewrap",
             "restricted_account",
             "macos_account",
+            "wsl_bubblewrap",
         }
         # A background run outlives a restart where a detached supervisor runs
         # it (POSIX), downloads included: the supervisor holds the proxy.

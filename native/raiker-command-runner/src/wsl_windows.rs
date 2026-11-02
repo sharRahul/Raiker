@@ -289,6 +289,58 @@ pub fn launch(policy: &LaunchPolicy, policy_text: &str, argv: &[String]) -> Resu
     }
 }
 
+/// Whether a sandboxed command can start a Windows program.
+///
+/// A real `whoami.exe` is piped into a scratch folder in the distribution.
+/// The control arm runs it as the run user outside the sandbox, where the
+/// distribution's interop starts it; the inside arm runs it through the Linux
+/// runner, under Bubblewrap, which has no interop socket. Measured this way,
+/// a handler another distribution registered in the shared kernel is not
+/// mistaken for a route out: only an actual start counts. No drive may be
+/// mounted under `/mnt` either.
+fn interop_verdict() -> Result<&'static str, String> {
+    let windows = std::env::var_os("SystemRoot")
+        .map(PathBuf::from)
+        .ok_or("native_sandbox_wsl_unavailable")?;
+    let program = std::fs::read(windows.join("System32").join("whoami.exe"))
+        .map_err(|_| "native_sandbox_wsl_unavailable")?;
+    let scratch = format!("{LINUX_COPIES}/interop-{}", selftest::probe_nonce());
+    in_distro(
+        RUN_USER,
+        &format!("mkdir {scratch} && cat > {scratch}/probe.exe && chmod 755 {scratch}/probe.exe"),
+        Some(&program),
+    )?;
+    let outside = in_distro(RUN_USER, &format!("cd {scratch} && ./probe.exe"), None)
+        .is_ok_and(|output| !output.is_empty());
+    let policy = format!(
+        "{{\"workspace_root\": \"{scratch}\", \"cwd\": \"{scratch}\", \
+         \"profile_name\": \"raiker.interop\", \"deadline_seconds\": 30}}"
+    );
+    let inside = in_distro(
+        RUN_USER,
+        &format!(
+            "printf '%s' '{policy}' > {scratch}.json && \
+             {LINUX_RUNNER} --policy {scratch}.json -- {scratch}/probe.exe"
+        ),
+        None,
+    )
+    .is_ok_and(|output| !output.is_empty());
+    // A Windows drive is a mount on `/mnt/<letter>`; WSL's own shared tmpfs
+    // (`/mnt/wsl`, `/mnt/wslg`) and empty folders left from a first boot
+    // before `wsl.conf` applied are not drives.
+    let mounts = in_distro(
+        RUN_USER,
+        "awk '$2 ~ /^\\/mnt\\/[a-z]$/ {print $2}' /proc/mounts",
+        None,
+    )
+    .unwrap_or_default();
+    let _ = in_distro(RUN_USER, &format!("rm -rf {scratch} {scratch}.json"), None);
+    if !String::from_utf8_lossy(&mounts).trim().is_empty() {
+        return Ok("unenforced");
+    }
+    Ok(selftest::verdict(inside, outside))
+}
+
 /// The Linux runner's probe, in a scratch copy, plus the interop check.
 pub fn probe() -> Value {
     match measure() {
@@ -311,9 +363,7 @@ fn measure() -> Result<Value, String> {
     )?;
     let mut report: Value =
         serde_json::from_slice(&output).map_err(|_| "native_sandbox_probe_no_output")?;
-    let interop = in_distro(RUN_USER, wsl_paths::INTEROP_SCRIPT, None)
-        .map(|bytes| wsl_paths::interop_verdict(&String::from_utf8_lossy(&bytes)))
-        .unwrap_or("indeterminate");
+    let interop = interop_verdict()?;
     report["platform"] = json!("windows");
     report["boundary"] = json!("wsl_bubblewrap");
     report["observations"]["windows_interop"] = json!(interop);

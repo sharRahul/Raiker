@@ -1,0 +1,55 @@
+name: Data safety drills
+
+# The beta release plan requires proof that sensitive values do not cross model
+# boundaries and that an encrypted workspace can recover from damage. Keep
+# these tests as a named job so the release gate can require their evidence.
+on:
+  pull_request:
+    paths:
+      - "raiker/auth/**"
+      - "raiker/api/**"
+      - "raiker/memory/**"
+      - "raiker/models/transport*.py"
+      - "raiker/storage/**"
+      - "tests/test_embedding_trusted_classification.py"
+      - "tests/test_memory_key_never_leaves.py"
+      - "tests/test_memory_semantic_index.py"
+      - "tests/test_model_transport_guard.py"
+      - "tests/test_multipart_egress.py"
+      - "tests/test_store_key_guard.py"
+      - "tests/test_lock_screen_recovery.py"
+      - "tests/test_workspace_backups.py"
+      - "tests/test_verify_egress_audit.py"
+      - "scripts/verify_egress_audit.py"
+      - ".github/workflows/data-safety.yml"
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  drills:
+    name: Data safety drills
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.0.0
+      - name: Set up Python and install the package
+        uses: ./.github/actions/setup-python
+        with:
+          install: dev
+          cache: pip
+      - name: Run credential, backup, recovery and egress drills
+        run: |
+          python -m pytest -vv -p no:cacheprovider \
+            tests/test_embedding_trusted_classification.py \
+            tests/test_memory_key_never_leaves.py \
+            tests/test_memory_semantic_index.py \
+            tests/test_model_transport_guard.py \
+            tests/test_multipart_egress.py \
+            tests/test_store_key_guard.py \
+            tests/test_lock_screen_recovery.py \
+            tests/test_workspace_backups.py \
+            tests/test_verify_egress_audit.py

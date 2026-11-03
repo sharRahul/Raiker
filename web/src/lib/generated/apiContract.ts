@@ -6388,6 +6388,7 @@ export type StoreConnector = {
   category: string;
   description: string;
   auth_type: "oauth2" | "api_key";
+  support_level: "supported" | "experimental";
   host: string;
   installed: boolean;
   enabled: boolean;

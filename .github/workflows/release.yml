@@ -122,6 +122,7 @@ jobs:
               "Electron shell",
               "Licensing and SBOM",
               "Build faults (host killed mid-check)",
+              "Data safety drills",
               "Engine tests (ubuntu-24.04)",
               "Engine tests (macos-14)",
               "Engine tests (windows-latest)",

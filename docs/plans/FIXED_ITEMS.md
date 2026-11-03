@@ -1,5 +1,20 @@
 # Fixed items
 
+## FIXED-1283 — Managed llama.cpp selected a source-only release as a runtime download
+
+**Observed.** The managed llama.cpp installer selected GitHub's newest stable
+release even when it published source archives only. The live engine job then
+failed because no platform runtime archive existed.
+
+**Fixed.** PR #246 selects the newest stable release that has an appropriate
+runtime archive. The live `llama-cpp.yml` jobs passed on Windows, macOS and
+Linux at `aff48e7`.
+
+**Evidence.** The PR #246 GitHub Actions run and
+`tests/test_llama_cpp_releases.py`. CUDA/Vulkan owner-machine runs and
+fresh signed-installer evidence remain release requirements, not closure
+evidence for this defect.
+
 ## Windows sandboxed runs were one at a time, so background runs were impossible
 
 The restricted account's grant covered one copy for one run behind a
@@ -1587,6 +1602,7 @@ file you can open. The two capture sets that remain — `screenshots/pages/` and
 | [FIXED-1280](#fixed-1280--python--ccode-and-python--ic-code-passed-the-command-policys--c-refusal) | Medium | Command policy | Fixed 2026-11-01 |
 | [FIXED-1281](#fixed-1281--sandboxed-commands-ran-the-first-program-on-raikers-path-or-a-copys-program-looked-up-from-raikers-folder) | Medium | Native sandbox | Fixed 2026-11-01 |
 | [FIXED-1282](#fixed-1282--a-release-could-ship-a-commit-whose-sandbox-was-unproven-and-an-unsigned-beta-carried-no-verifiable-origin) | Medium | Release | Fixed 2026-11-01 |
+| [FIXED-1283](#fixed-1283--managed-llamacpp-selected-a-source-only-release-as-a-runtime-download) | Medium | Local models / release | Fixed 2026-11-02 |
 
 ---
 

@@ -127,7 +127,14 @@
     if (!(e instanceof ApiError)) return "The request did not reach Raiker. Nothing was changed. Try again.";
     // RR-MCP-02 — a refused endpoint is explained in words an owner can act on,
     // not shown as its reason code.
-    return endpointRefusal(e.reasonCode) ?? e.reasonCode ?? `The request was refused (HTTP ${e.status}). Nothing was changed.`;
+    const connectorErrors: Record<string, string> = {
+      connector_auth_required: "Connect this account before turning it on. Nothing was sent.",
+      connector_reauth_required: "This sign-in expired or was revoked. Connect the account again before trying it.",
+      connector_oauth_refresh_failed: "Raiker could not refresh this sign-in. Connect the account again before trying it.",
+      connector_oauth_refresh_invalid: "The provider returned an invalid refreshed sign-in. Connect the account again.",
+      connector_not_enabled: "Turn this connection on for this session before using it.",
+    };
+    return endpointRefusal(e.reasonCode) ?? (e.reasonCode ? connectorErrors[e.reasonCode] ?? e.reasonCode : `The request was refused (HTTP ${e.status}). Nothing was changed.`);
   }
 
   async function load() {
@@ -437,6 +444,10 @@
         {@const connector = connectorById(option.id)}
         {#if connector !== null}
           <p>{connector.description}</p>
+          <p class="note"><span class="pill">{connector.support_level === "supported" ? "Supported" : "Experimental"}</span>
+            {connector.support_level === "supported"
+              ? "Included in the beta support commitment."
+              : "Not yet beta-supported; verify it for your account before relying on it."}</p>
           <p class="note">Talks to <span class="mono">{connector.host}</span>. Connecting stores a credential and grants nothing until Permissions allows it.</p>
           {#if error}<div class="notice notice-danger" role="alert">{error}</div>{/if}
           {#if !connector.installed}

@@ -28,6 +28,8 @@ from raiker.runtime.connector_ecosystem import (
     _connector_result,
     _read_bounded,
     compile_manifest,
+    credential_status,
+    mark_reauth_required,
 )
 from raiker.storage.sqlite import SQLiteStore
 
@@ -91,6 +93,19 @@ def test_catalog_contains_every_named_integration() -> None:
     assert len(catalog) == 26
     ids = {item.connector_id for item in catalog}
     assert {"github", "google-drive", "booking", "uber", "ubereats", "olx-india"} <= ids
+    assert {item.support_level for item in catalog} == {"experimental"}
+
+
+def test_provider_unauthorized_marks_the_credential_for_reauthentication(workspace: Path) -> None:
+    store = SQLiteStore(workspace)
+    vault = ConnectorVault(store)
+    vault.put("principal_owner", "github", {"access_token": "revoked-token"})
+
+    mark_reauth_required(vault, "principal_owner", "github", {"access_token": "revoked-token"})
+
+    metadata = vault.metadata("principal_owner", "github")
+    assert metadata is not None
+    assert credential_status(metadata["expires_at"]) == "reauth_required"
 
 
 def test_model_exposes_separate_read_and_write_tools() -> None:

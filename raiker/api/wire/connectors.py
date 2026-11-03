@@ -30,6 +30,8 @@ class StoreConnector(TypedDict):
     category: str
     description: str
     auth_type: Literal["oauth2", "api_key"]
+    #: Honest beta status, not a claim that a catalogue card has been live-validated.
+    support_level: Literal["supported", "experimental"]
     host: str
     installed: bool
     enabled: bool

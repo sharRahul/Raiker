@@ -172,7 +172,7 @@ configured, and runner publisher pins are empty (`runner_publisher.py`).
 | ID | Item | State | P | Effort | Work left |
 |---|---|---|---|---|---|
 | MD-1 | Cloud and local provider connections | 🟡 | P0 | S | One recorded live check per supported provider on the release commit: Anthropic, OpenAI, OpenRouter, Ollama, LM Studio, llama.cpp; unsupported providers marked *Experimental* in the Add list |
-| MD-2 | llama.cpp native install, deploy, GPU config | 🔴 | P0 | S | Repair automatic release selection; get the `llama-cpp.yml` live job green on Windows, macOS and Linux; one owner-machine run each on an NVIDIA (CUDA) and an AMD (Vulkan) GPU |
+| MD-2 | llama.cpp native install, deploy, GPU config | 🟡 | P0 | S | PR #246 repaired automatic source-only stable-release selection; the `llama-cpp.yml` live jobs passed on Windows, macOS and Linux. Still required: one owner-machine run each on NVIDIA (CUDA) and AMD (Vulkan) GPU hardware, plus fresh signed-installer validation on the release candidate. |
 | MD-3 | GGUF downloads, integrity, inference | 🟡 | P0 | S | Hugging Face download: verify the LFS SHA-256 against the file actually written (today a revision is pinned); live test serves a downloaded GGUF |
 | MD-4 | Detection, readiness, selection, fallback | ✅ | — | — | Model decision service, readiness ledger and fallback sequence (FIXED items) |
 | MD-5 | Failures, rate limits, timeouts, recovery | 🟡 | P0 | M | A provider fault-injection matrix (429 with Retry-After, 500, timeout mid-stream, connection reset, malformed stream, quota exhausted) run against a local fault server; assert the turn retries or falls back with a receipt and never claims an answer it did not get |
@@ -256,9 +256,9 @@ work runs (top bar), and so is the count of running items.
 |---|---|---|---|---|---|
 | MM-1 | Encrypted storage and configuration | ✅ | — | — | `tests/test_sqlcipher_memory_security.py`, `tests/test_memory_sqlcipher.py` (CI) |
 | MM-2 | Persist, retrieve, correct, delete | ✅ | — | — | T-04 scenario; memory governance tests |
-| MM-3 | No credential or private-data leaks to models or logs | 🟡 | P0 | M | A canary test: plant a fake key, password and card number in a connector, memory and a file; run a turn, a task and a support export; grep every log, event, model request (via a recording provider) and export for the canaries |
-| MM-4 | Backup, migration, corruption recovery | 🟡 | P0 | M | A corruption drill: truncate the database, flip bytes in a page, delete the key file, and fill the disk mid-write. Assert recovery offers the newest verified backup and never silently starts empty |
-| MM-5 | No unexpected cloud transmission | 🟡 | P0 | M | An egress audit run: Local execution profile, local model, all features used for 30 minutes behind a recording proxy; the only allowed destinations are those the owner configured. Recorded as evidence |
+| MM-3 | No credential or private-data leaks to models or logs | 🟡 | P0 | M | `Data safety drills` now provides required automated transport/key/recovery regressions. Still required: plant distinct fake key, password and card canaries in a connector, memory and file; exercise a turn, task and support export; attach redacted searches of every model request, log, event and export. See [data-safety evidence](DATA_SAFETY_EVIDENCE.md). |
+| MM-4 | Backup, migration, corruption recovery | 🟡 | P0 | M | Automated backup and lock-screen recovery checks are required in `Data safety drills`. Still required: on a disposable candidate truncate the database, flip page bytes, remove the key file and exhaust disk mid-write; record that recovery offers the newest verified backup and never silently starts empty. |
+| MM-5 | No unexpected cloud transmission | 🟡 | P0 | M | `scripts/verify_egress_audit.py` rejects a capture shorter than 30 minutes or with an unapproved host. Still required: owner-machine local-profile recording while all features are used, then attach its redacted verifier report and capture hash. |
 | MM-6 | Key rotation (BUG-354) | 🔴 | P2 | M | After beta; documented as a known limitation |
 
 **UI / UX.**
@@ -283,7 +283,7 @@ work runs (top bar), and so is the count of running items.
 | UX-1 | Quiet UI across retained pages | 🟡 | P0 | M | Close the open rows in TO_BE_FIXED's Quiet UI sections or move them to beta.2 with a known-issue entry; turn the QUI-G01 size budget into a failing check for Chat, Build, Models and Settings |
 | UX-2 | Composer, navigation, model selection consistent | 🟡 | P0 | S | One `ComposerParity` test per surface (Chat, Build, Design) that asserts the same controls in the same order |
 | UX-3 | Permission controls, runtime status, approvals | ✅ | — | — | QUI-P01–P09 (approvals round) |
-| UX-4 | Understandable errors and recovery actions | 🟡 | P0 | M | An **error copy audit**: every `reason_code` a route can return has a sentence and an action in the UI (a test that collects codes from `HTTPException(detail={"reason_code": ...})` and checks a label map). PR #245 does this for the llama.cpp engine |
+| UX-4 | Understandable errors and recovery actions | 🟡 | P0 | M | The connector UI now gives action-oriented copy for missing, expired/revoked, and refresh-failed credentials; PR #245 does this for the llama.cpp engine. Still required: an automated whole-route `reason_code` label audit. |
 | UX-5 | Responsive layouts, accessibility, desktop usability | 🟡 | P0 | M | axe-core run in Playwright on every page at 1440, 1280 and 390 widths with zero serious violations; keyboard-only T-14; screen-reader pass with NVDA and VoiceOver |
 
 **UI / UX deliverables for beta.**
@@ -340,9 +340,9 @@ The composer microphone has three states (*Set up voice*, *Dictate*,
 |---|---|---|---|---|---|
 | PL-1 | Install, configure, remove supported integrations | 🟡 | P0 | M | A **supported list** for beta: GitHub, email (IMAP/SMTP), calendar (CalDAV), web search, local MCP stdio. Each gets one live install → use → revoke → remove run |
 | PL-2 | Grants, revocation, audit | ✅ | — | — | Governance suite |
-| PL-3 | OAuth and credential storage | 🟡 | P0 | S | Vault encryption is tested; add expired-token and revoked-token live checks for GitHub |
+| PL-3 | OAuth and credential storage | 🟡 | P0 | S | Vault encryption and expiry checks are tested; a provider 401 marks the local credential `reauth_required` so it is not retried. Still required: expired-token and owner-revoked-token live checks for GitHub on the release candidate. Provider-specific OAuth revoke endpoints are not claimed until Raiker has registered clients. |
 | PL-4 | Plugins and MCP cannot bypass the sandbox | 🟡 | P0 | S | Covered by SB-4/SB-6; add an MCP server that tries network, a home read and a spawn outside its folder |
-| PL-5 | Supported vs experimental | 🔴 | P0 | S | A `support_level` field (`supported` / `experimental`) on every connector and MCP catalogue entry, shown as a badge; experimental ones need an extra confirmation to install |
+| PL-5 | Supported vs experimental | 🟡 | P0 | S | Every connector now has a `support_level` field and is labelled **Experimental** by default, preventing a catalogue listing from implying beta support. Still required: live evidence to promote the supported beta list, the same labels for MCP catalogue entries, and an extra installation confirmation for experimental entries. |
 
 **UI / UX.** The Extensions page has two sections, *Supported* and
 *Experimental*. An experimental card has an amber badge and the install dialog
@@ -376,13 +376,13 @@ a fresh install.
   remote-access jobs.
 - `desktop-package.yml` builds every target; `release.yml` drafts releases.
 - `llama-cpp.yml` (PR #245) adds a three-OS engine job and a weekly live job.
-- On `9c532624`, the Python shards, Windows lifecycle, Build fault, native
-  runner and desktop-package checks passed. The three llama.cpp **live** jobs
-  failed because of the release-selection defect above.
+- PR #246 (`aff48e7`) repaired the llama.cpp release selection, and the three
+  llama.cpp **live** jobs passed on Windows, macOS and Linux. The full required
+  release suite must still be green again on the exact release commit.
 
 | ID | Item | State | P | Effort | Work left |
 |---|---|---|---|---|---|
-| CI-1 | All mandatory workflows green on the release commit | 🔴 | P0 | M | Make the three llama.cpp live jobs green. The release gate must require the complete beta-critical CI and llama.cpp suite, using the latest GitHub Actions result for each check on the exact commit. |
+| CI-1 | All mandatory workflows green on the release commit | 🟡 | P0 | M | The three llama.cpp live jobs are green after PR #246, and the release gate requires the complete beta-critical CI, llama.cpp, native-runner and data-safety suites using the latest GitHub Actions result for the exact commit. Remaining: a green candidate-release run with its signed artifacts and attached evidence. |
 | CI-2 | Ruff, mypy, lint, unit, integration, security, packaging | 🟡 | P0 | S | Already wired; part of CI-1 |
 | CI-3 | Per-platform artifacts verified independently | 🟡 | P0 | S | Each target downloads its own artifact in a fresh job and runs the installed-host smoke (exists); add signature verification once IN-3 lands |
 | CI-4 | Dependency vulnerability and secret scans | ✅ | — | — | `pip-audit`/`npm audit` and `scan_secrets.py` in CI |
@@ -394,7 +394,7 @@ a fresh install.
 
 | ID | Item | State | P | Effort | Work left |
 |---|---|---|---|---|---|
-| DOC-1 | Reconcile TO_BE_FIXED, FIXED_ITEMS and architecture docs | 🟡 | P0 | M | A reconciliation pass dated on the release commit; every row in this plan marked ✅ names its FIXED item |
+| DOC-1 | Reconcile TO_BE_FIXED, FIXED_ITEMS and architecture docs | 🟡 | P0 | M | Reconciled 2026-11-02: FIXED-1283 closes the llama.cpp release-selection defect; TO_BE_FIXED and the native-sandbox architecture retain only release evidence and platform-signing gaps. Repeat this pass on the final release commit; every ✅ row must name its FIXED item. |
 | DOC-2 | Supported OS, hardware, known limitations | ✅ | — | — | [Beta guide](../guide/beta.md) (this round) with README's requirements and [KNOWN_LIMITS](../architecture/KNOWN_LIMITS.md) |
 | DOC-3 | Install, setup, troubleshooting, uninstall guides | ✅ | — | — | getting-started, troubleshooting, managing-the-host (Uninstall); engine-specific rows added in PR #245 |
 | DOC-4 | In-app bug reporting and feedback route | ✅ | — | — | Settings → General → **Beta feedback** and GitHub issue forms (this round) |
@@ -501,4 +501,7 @@ product refusing it, rather than delaying the date.
     optional redacted diagnostics) and `.github/ISSUE_TEMPLATE/`.
   - SB-4: the process-spawn inventory test.
 
-  MD-2 is implemented in PR #245 and awaits live CI evidence.
+  MD-2's source-only release-selection defect is closed in FIXED-1283 (PR
+  #246); its Windows, macOS and Linux live jobs passed. GPU-owner and
+  signed-installer evidence remain open. PR #247 adds the required data-safety
+  drill gate and its formal owner-machine evidence procedure.

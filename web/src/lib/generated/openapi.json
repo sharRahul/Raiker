@@ -33088,6 +33088,14 @@
             "title": "Operations",
             "type": "array"
           },
+          "support_level": {
+            "enum": [
+              "supported",
+              "experimental"
+            ],
+            "title": "Support Level",
+            "type": "string"
+          },
           "vault_configured": {
             "title": "Vault Configured",
             "type": "boolean"
@@ -33099,6 +33107,7 @@
           "category",
           "description",
           "auth_type",
+          "support_level",
           "host",
           "installed",
           "enabled",

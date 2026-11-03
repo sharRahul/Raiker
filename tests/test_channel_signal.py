@@ -56,7 +56,10 @@ def _pairing(**extra: Any) -> dict[str, Any]:
     return {"owner_sender_id": OWNER, "sender_allowlist_json": json.dumps([OWNER, FRIEND]), **extra}
 
 
-def _out(adapter: SignalAdapter, *, arguments: dict[str, Any] | None = None, pairing: dict[str, Any] | None = None):
+def _out(
+    adapter: SignalAdapter, *, arguments: dict[str, Any] | None = None,
+    pairing: dict[str, Any] | None = None,
+) -> OutboundRequest | AdapterRefusal:
     return adapter.outbound(
         connector_id="channel.signal", pairing=pairing if pairing is not None else _pairing(),
         arguments=arguments or {}, text="hello", delivered_at=utc_now(), delivery_id="act_1",

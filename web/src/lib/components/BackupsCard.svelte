@@ -13,6 +13,7 @@
   import { api, ApiError } from "../api";
   import type { BackupRestored, BackupsView, BackupView } from "../generated/apiContract";
   import { relativeTime } from "../format";
+  import { announceBackupsChanged } from "../backupReminder";
 
   let view = $state<BackupsView | null>(null);
   let loadError = $state<string | null>(null);
@@ -78,6 +79,7 @@
     } finally {
       busy = null;
       await load();
+      announceBackupsChanged();
     }
   }
 

@@ -7,6 +7,7 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/svelte";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import Topbar from "./Topbar.svelte";
 import { stubFetch } from "../test-helpers";
+import { announceBackupsChanged } from "../backupReminder";
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -166,5 +167,65 @@ describe("Topbar live work line (QUI-F04)", () => {
     const button = await screen.findByRole("button", { name: "2 tasks running · 1 waiting for you" });
     await fireEvent.click(button);
     expect(screen.getByRole("link", { name: /Send reply\s*waiting for you/ })).toHaveAttribute("href", "#/tasks?task=t2");
+  });
+});
+
+describe("Topbar backup reminder", () => {
+  const daysAgo = (days: number) => new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
+
+  it("warns from every page when no verified backup is newer than 14 days", async () => {
+    stubFetch({
+      "GET /api/notifications": [],
+      "GET /api/backups": {
+        key_fingerprint: "kfp",
+        backups: [
+          { backup_id: "bkp_old", created_at: daysAgo(20), state: "verified" },
+          { backup_id: "bkp_bad", created_at: daysAgo(1), state: "damaged" },
+        ],
+      },
+    });
+    render(Topbar, { title: "Chat", hint: "Ask anything" });
+
+    const reminder = await screen.findByRole("link", { name: /The last backup was 20 days ago\. Make a backup/ });
+    expect(reminder).toHaveAttribute("href", "#/settings?tab=general");
+    expect(reminder).toHaveAttribute("title", "The last backup was 20 days ago.");
+  });
+
+  it("warns when there is no backup at all", async () => {
+    stubFetch({ "GET /api/notifications": [], "GET /api/backups": { key_fingerprint: "kfp", backups: [] } });
+    render(Topbar, { title: "Chat", hint: "Ask anything" });
+
+    await screen.findByRole("link", { name: /There is no backup of this workspace yet/ });
+  });
+
+  it("stays quiet with a recent verified backup, or when backups cannot be read", async () => {
+    stubFetch({
+      "GET /api/notifications": [],
+      "GET /api/backups": { key_fingerprint: "kfp", backups: [{ backup_id: "bkp_new", created_at: daysAgo(10), state: "verified" }] },
+    });
+    const first = render(Topbar, { title: "Chat", hint: "Ask anything" });
+    await screen.findByRole("button", { name: "Notifications" });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(screen.queryByRole("link", { name: /Make a backup/ })).not.toBeInTheDocument();
+    first.unmount();
+
+    stubFetch({ "GET /api/notifications": [], "GET /api/backups": { __status: 500 } });
+    render(Topbar, { title: "Chat", hint: "Ask anything" });
+    await screen.findByRole("button", { name: "Notifications" });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(screen.queryByRole("link", { name: /Make a backup/ })).not.toBeInTheDocument();
+  });
+
+  it("re-reads when a backup is made on this page", async () => {
+    stubFetch({ "GET /api/notifications": [], "GET /api/backups": { key_fingerprint: "kfp", backups: [] } });
+    render(Topbar, { title: "Chat", hint: "Ask anything" });
+    await screen.findByRole("link", { name: /Make a backup/ });
+
+    stubFetch({
+      "GET /api/notifications": [],
+      "GET /api/backups": { key_fingerprint: "kfp", backups: [{ backup_id: "bkp_now", created_at: daysAgo(0), state: "verified" }] },
+    });
+    announceBackupsChanged();
+    await waitFor(() => expect(screen.queryByRole("link", { name: /Make a backup/ })).not.toBeInTheDocument());
   });
 });

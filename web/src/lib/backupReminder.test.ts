@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { backupReminder } from "./backupReminder";
+import { TOP_BAR_BACKUP_STALE_DAYS, backupReminder } from "./backupReminder";
 
 const now = new Date("2026-10-21T12:00:00Z");
 
@@ -26,5 +26,15 @@ describe("backupReminder", () => {
         now,
       ),
     ).toMatchObject({ text: "The last backup was 20 days ago." });
+  });
+
+  it("takes a longer threshold for the top bar", () => {
+    const tenDays = [{ created_at: "2026-10-11T12:00:00Z", state: "verified" }];
+    expect(backupReminder(tenDays, now)).not.toBeNull();
+    expect(backupReminder(tenDays, now, TOP_BAR_BACKUP_STALE_DAYS)).toBeNull();
+    const fourteenDays = [{ created_at: "2026-10-07T12:00:00Z", state: "verified" }];
+    expect(backupReminder(fourteenDays, now, TOP_BAR_BACKUP_STALE_DAYS)).toMatchObject({
+      text: "The last backup was 14 days ago.",
+    });
   });
 });

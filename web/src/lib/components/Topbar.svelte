@@ -12,6 +12,8 @@
   import { WORK_MODES } from "../nav";
   import { shortcutLabel, shortcutSpoken } from "../shortcutLabel";
   import { desktopBridge } from "../desktopShell";
+  import { BACKUPS_CHANGED, TOP_BAR_BACKUP_STALE_DAYS, backupReminder } from "../backupReminder";
+  import type { BackupView } from "../generated/apiContract";
 
   // The top bar carries the shell's own controls only. The project selector
   // moved into Build, where the execution boundary it sets is visible for the
@@ -55,6 +57,25 @@
     } catch {
       // A failed read leaves the last known count. Never a broken shell.
     }
+  }
+
+  // Beta plan, area 6 — a backup reminder from every page once no verified
+  // backup is newer than two weeks. Read on mount, re-read on a slow cadence
+  // (a backup ages by the day, not the second) and whenever a backup is made,
+  // verified or removed on this page. A failed read shows nothing: the shell
+  // never nags on a guess.
+  const BACKUPS_POLL_MS = 10 * 60 * 1000;
+  let backups = $state<BackupView[] | null>(null);
+  let backupsReadAt = $state(new Date());
+  const backupNote = $derived(backupReminder(backups, backupsReadAt, TOP_BAR_BACKUP_STALE_DAYS));
+  async function loadBackups() {
+    try {
+      const listed = await api.backups();
+      backups = Array.isArray(listed?.backups) ? listed.backups : null;
+    } catch {
+      backups = null;
+    }
+    backupsReadAt = new Date();
   }
 
   // Owner-scoped notifications, reachable from every route. Reads are
@@ -110,6 +131,7 @@
   onMount(() => {
     void loadNotifications();
     void loadApprovals();
+    void loadBackups();
     // QUI-P05 — the count was read once, on mount, so a decision made in Chat,
     // on Approvals or in another tab left it showing until a reload. It is
     // re-read when a decision is announced and on the same cadence as the
@@ -118,14 +140,21 @@
     const approvalsTimer = setInterval(() => {
       if (document.visibilityState === "visible") void loadApprovals();
     }, APPROVALS_POLL_MS);
+    const backupsTimer = setInterval(() => {
+      if (document.visibilityState === "visible") void loadBackups();
+    }, BACKUPS_POLL_MS);
+    const rereadBackups = () => void loadBackups();
+    window.addEventListener(BACKUPS_CHANGED, rereadBackups);
     // BUG-309 — the dock marks a notice read when the page shows its subject.
     // The count re-reads then, instead of disagreeing until the next poll.
     const reread = () => void loadNotifications();
     window.addEventListener(NOTICES_CHANGED, reread);
     return () => {
       window.removeEventListener(NOTICES_CHANGED, reread);
+      window.removeEventListener(BACKUPS_CHANGED, rereadBackups);
       stopResolved();
       clearInterval(approvalsTimer);
+      clearInterval(backupsTimer);
     };
   });
 
@@ -186,6 +215,18 @@
     <LiveWorkLine />
   </div>
   <div class="controls">
+    {#if backupNote !== null}
+      <!-- Beta plan, area 6 — no verified backup in two weeks. Outside the
+           status strip, which is hidden on narrow windows: this one must be
+           reachable at every width. The words say what is wrong; the link
+           goes where backups are made. -->
+      <a
+        href={backupNote.href}
+        class="btn btn-ghost backup-reminder"
+        aria-label={`${backupNote.text} ${backupNote.label}`}
+        title={backupNote.text}
+      ><Icon name="warning" size="md" /><span class="backup-reminder-label">{backupNote.label}</span></a>
+    {/if}
     <button
       type="button"
       class="btn btn-ghost palette-button"
@@ -309,6 +350,12 @@
   .approvals-link{position:relative;display:inline-grid;place-items:center;padding:.35rem .5rem}
   .approvals-link.waiting{color:var(--accent)}
   .approval-count{position:absolute;top:-2px;right:-2px;min-width:1rem;height:1rem;display:grid;place-items:center;font-size:var(--text-2xs);font-weight:700;border-radius:var(--r-pill);background:var(--accent);color:var(--text-inverse);padding:0 .2rem}
+  /* Colour because something is actually wrong, and words beside it so the
+     colour is never the only signal. The words drop on narrow bars; the name
+     and tooltip keep them. */
+  .backup-reminder{display:inline-flex;align-items:center;gap:.35rem;padding:.35rem .5rem;color:var(--warning);white-space:nowrap}
+  .backup-reminder-label{font-size:var(--text-sm);font-weight:600}
+  @media(max-width:1100px){.backup-reminder-label{display:none}}
   .bell-wrap{position:relative}
   .bell{position:relative;padding:.35rem .5rem}
   .unread-count{position:absolute;top:-2px;right:-2px;min-width:1rem;height:1rem;display:grid;place-items:center;font-size:var(--text-2xs);font-weight:700;border-radius:var(--r-pill);background:var(--danger);color:var(--text-inverse);padding:0 .2rem}

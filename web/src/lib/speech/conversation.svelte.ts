@@ -249,7 +249,7 @@ export class Conversation {
       return;
     }
     this.turn = handle;
-    let status = "failed";
+    let status: string;
     try {
       status = (await handle.done).status;
     } catch {

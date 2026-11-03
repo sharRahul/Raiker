@@ -58,6 +58,10 @@ test("an owner completes first-run setup in the installed window", async () => {
     await page.getByLabel("Your name").fill("Owner");
     await page.getByRole("button", { name: "Continue", exact: true }).click();
 
+    await expect(title).toHaveText("Should I be able to listen and answer aloud, on this computer?", { timeout: 60_000 });
+    await page.getByRole("radio", { name: "Not now" }).check();
+    await page.getByRole("button", { name: "Continue", exact: true }).click();
+
     await expect(title).toHaveText("Where should I think?", { timeout: 60_000 });
     await page.getByRole("button", { name: /^Decide later/ }).click();
 

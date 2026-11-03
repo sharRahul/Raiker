@@ -1,3 +1,4 @@
+/* global AudioWorkletProcessor, sampleRate, registerProcessor */
 // Voice spec §5.1 — microphone capture at 16 kHz mono, in 32 ms frames.
 //
 // Runs on the audio thread. Each input block is mixed to mono and resampled

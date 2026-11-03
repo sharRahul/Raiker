@@ -52,7 +52,9 @@ APPROVAL_MODES = {"manual", "auto", "skip", "dont_ask"}
 #: should recognise it by a string of its own: the whole point of the surface is
 #: that a question is never mistaken for an approval, in either direction.
 OWNER_QUESTION_TOOL = "ask_owner_question"
-VOICE_INPUT_MODES = {"typed", "dictated", "mixed"}
+# Voice spec V2 — `spoken`: a turn said aloud in the conversation panel, whose
+# answer will be spoken back. It carries no extra authority (spec §9).
+VOICE_INPUT_MODES = {"typed", "dictated", "mixed", "spoken"}
 #: Which conversation surface produced a prompt. It selects the operating
 #: protocol the turn is run under and nothing else: a surface can never widen
 #: what a turn may do, and every capability, gate and approval is unchanged by
@@ -138,6 +140,7 @@ EVENT_TYPES = {
     # (character count only).
     "background_runs_reported",
     "plan_posture_applied",
+    "spoken_style_applied",
     # B7 — a bounded, read-only subagent finished. Metadata only: its name, its
     # contract id, the steps it ran and the read-only tools it used. The
     # findings themselves reach the calling model and nothing else.

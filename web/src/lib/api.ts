@@ -22,6 +22,7 @@ import { request, requestBlob } from "./api/core";
 // (scripts/api_contract.py); streams, downloads and the few calls that shape a
 // body stay written here.
 import { contract } from "./generated/apiContract";
+import type { VoiceSettingsRequest } from "./generated/apiContract";
 import type {
   CreateStandingGrantRequest,
   SettingsView,
@@ -106,6 +107,22 @@ export const api = {
         body: clip,
       },
     ),
+
+  // ── Voice (voice spec V1) ──
+  // Status contacts nothing; install runs as a model operation; speak returns
+  // one sentence of WAV audio from the installed engine on this computer.
+  voiceStatus: () => contract.voiceStatus(),
+  saveVoiceSettings: (change: VoiceSettingsRequest) => contract.writeVoiceSettings(change),
+  installVoice: (profile?: "lite" | "balanced" | "high") =>
+    contract.installVoice(profile ? { profile } : {}),
+  removeVoice: () => contract.removeVoice(),
+  testVoice: () => contract.testVoice(),
+  speakVoice: (text: string) =>
+    requestBlob("/api/voice/speak", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text }),
+    }),
 
   vaultStatus: () => contract.getVaultStatus(),
   setVaultKey: (key: string, mfaCode?: string) =>

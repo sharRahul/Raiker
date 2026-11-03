@@ -81,14 +81,44 @@ def _clip_name(content_type: str) -> str:
     return f"dictation.{_CLIP_EXTENSIONS.get(base, 'wav')}"
 
 
+async def _managed_listening(ws: str | Path, principal_id: str) -> SpeechRuntimeSettings:
+    import asyncio
+
+    from raiker.voice.engines import VoiceEngineError
+    from raiker.voice.service import VoiceService
+
+    service = VoiceService(ws, principal_id)
+    if not service.listening_ready():
+        raise _refuse("speech_runtime_not_configured")
+    try:
+        endpoint = await asyncio.to_thread(service.listening_endpoint)
+    except VoiceEngineError as exc:
+        raise _refuse(str(exc), status.HTTP_503_SERVICE_UNAVAILABLE) from exc
+    return SpeechRuntimeSettings(endpoint=endpoint)
+
+
 @router.get("/api/speech/runtime")
 async def read_speech_runtime(request: Request) -> dict[str, Any]:
     """What the owner chose. Nothing is contacted to answer this."""
     _session, principal = AuthMiddleware(_ws(request)).authenticate(request)
     _require_local(request, _session)
     settings = load_speech_runtime(_ws(request), principal.principal_id)
-    answer: SpeechRuntime = {"runtime": settings.to_dict(), "max_audio_bytes": MAX_AUDIO_BYTES}
+    runtime = settings.to_dict()
+    if not settings.configured and _managed_listening_installed(_ws(request), principal.principal_id):
+        # Voice spec V1 — the managed Whisper engine serves dictation when no
+        # server was set up by hand. Installed is enough: it starts on first use.
+        runtime["effective"] = "local"
+    answer: SpeechRuntime = {"runtime": runtime, "max_audio_bytes": MAX_AUDIO_BYTES}
     return serialize_dto(answer)
+
+
+def _managed_listening_installed(ws: str | Path, principal_id: str) -> bool:
+    try:
+        from raiker.voice.service import VoiceService
+
+        return VoiceService(ws, principal_id).listening_ready()
+    except Exception:  # noqa: BLE001 - a voice catalogue problem must not break dictation's read
+        return False
 
 
 @router.put("/api/speech/runtime")
@@ -168,7 +198,9 @@ async def transcribe_clip(request: Request) -> dict[str, Any]:
     _require_local(request, _session)
     settings = load_speech_runtime(_ws(request), principal.principal_id)
     if not settings.configured:
-        raise _refuse("speech_runtime_not_configured")
+        # Voice spec V1 — with no hand-configured server, dictation uses the
+        # managed Whisper engine when the owner's voice profile has it.
+        settings = await _managed_listening(_ws(request), principal.principal_id)
     try:
         clip = await read_audio(request.stream())
     except SpeechRuntimeError as exc:

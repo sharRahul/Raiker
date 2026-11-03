@@ -637,7 +637,7 @@ export type PromptAttachment = PathAttachment | UploadAttachment;
 export interface PromptRequestBody {
   text: string;
   // Client-reported provenance; no audio or transcript metadata crosses this boundary.
-  input_mode?: "typed" | "dictated" | "mixed";
+  input_mode?: "typed" | "dictated" | "mixed" | "spoken";
   // Which composer sent this prompt. It selects the operating protocol the turn
   // runs under — Build adds the engineering protocol, Design adds the research
   // one, Chat adds neither — and grants nothing: gates, capabilities and

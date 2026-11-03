@@ -27355,7 +27355,8 @@
             "enum": [
               "typed",
               "dictated",
-              "mixed"
+              "mixed",
+              "spoken"
             ],
             "title": "Input Mode",
             "type": "string"
@@ -31846,6 +31847,7 @@
               "welcome",
               "account",
               "system",
+              "voice",
               "model",
               "privacy",
               "permissions",
@@ -31995,6 +31997,7 @@
               "welcome",
               "account",
               "system",
+              "voice",
               "model",
               "privacy",
               "permissions",
@@ -36577,6 +36580,786 @@
           "state"
         ],
         "title": "VaultStatus",
+        "type": "object"
+      },
+      "VoiceComponentView": {
+        "properties": {
+          "installable": {
+            "title": "Installable",
+            "type": "boolean"
+          },
+          "installed": {
+            "title": "Installed",
+            "type": "boolean"
+          },
+          "item_id": {
+            "title": "Item Id",
+            "type": "string"
+          },
+          "licence": {
+            "title": "Licence",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "pending_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pending Reason"
+          },
+          "refusal": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Refusal"
+          },
+          "role": {
+            "title": "Role",
+            "type": "string"
+          },
+          "size_bytes": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Size Bytes"
+          },
+          "source_page": {
+            "title": "Source Page",
+            "type": "string"
+          }
+        },
+        "required": [
+          "role",
+          "item_id",
+          "name",
+          "licence",
+          "size_bytes",
+          "installed",
+          "installable",
+          "refusal",
+          "pending_reason",
+          "source_page"
+        ],
+        "title": "VoiceComponentView",
+        "type": "object"
+      },
+      "VoiceConversationRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "barge_in": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Barge In"
+          },
+          "end_silence_ms": {
+            "anyOf": [
+              {
+                "maximum": 1500.0,
+                "minimum": 250.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "End Silence Ms"
+          },
+          "keep_recordings": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Keep Recordings"
+          },
+          "labs_hands_free": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Labs Hands Free"
+          },
+          "mode": {
+            "anyOf": [
+              {
+                "enum": [
+                  "push_to_talk",
+                  "hands_free"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mode"
+          },
+          "speak_tool_progress": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Speak Tool Progress"
+          }
+        },
+        "title": "VoiceConversationRequest",
+        "type": "object"
+      },
+      "VoiceConversationSettings": {
+        "properties": {
+          "barge_in": {
+            "title": "Barge In",
+            "type": "boolean"
+          },
+          "end_silence_ms": {
+            "title": "End Silence Ms",
+            "type": "integer"
+          },
+          "keep_recordings": {
+            "title": "Keep Recordings",
+            "type": "boolean"
+          },
+          "labs_hands_free": {
+            "title": "Labs Hands Free",
+            "type": "boolean"
+          },
+          "mode": {
+            "title": "Mode",
+            "type": "string"
+          },
+          "speak_tool_progress": {
+            "title": "Speak Tool Progress",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "mode",
+          "end_silence_ms",
+          "barge_in",
+          "speak_tool_progress",
+          "keep_recordings",
+          "labs_hands_free"
+        ],
+        "title": "VoiceConversationSettings",
+        "type": "object"
+      },
+      "VoiceHardwareView": {
+        "properties": {
+          "arch": {
+            "title": "Arch",
+            "type": "string"
+          },
+          "gpu": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Gpu"
+          },
+          "os": {
+            "title": "Os",
+            "type": "string"
+          },
+          "total_memory_bytes": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Total Memory Bytes"
+          }
+        },
+        "required": [
+          "os",
+          "arch",
+          "total_memory_bytes",
+          "gpu"
+        ],
+        "title": "VoiceHardwareView",
+        "type": "object"
+      },
+      "VoiceInstallRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "profile": {
+            "anyOf": [
+              {
+                "enum": [
+                  "lite",
+                  "balanced",
+                  "high"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Profile"
+          }
+        },
+        "title": "VoiceInstallRequest",
+        "type": "object"
+      },
+      "VoiceListeningView": {
+        "properties": {
+          "components": {
+            "items": {
+              "$ref": "#/components/schemas/VoiceComponentView"
+            },
+            "title": "Components",
+            "type": "array"
+          },
+          "device": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Device"
+          },
+          "state": {
+            "title": "State",
+            "type": "string"
+          }
+        },
+        "required": [
+          "state",
+          "components",
+          "device"
+        ],
+        "title": "VoiceListeningView",
+        "type": "object"
+      },
+      "VoicePlacementView": {
+        "properties": {
+          "device": {
+            "title": "Device",
+            "type": "string"
+          },
+          "engine": {
+            "title": "Engine",
+            "type": "string"
+          },
+          "gpu_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Gpu Name"
+          },
+          "ram_bytes": {
+            "title": "Ram Bytes",
+            "type": "integer"
+          },
+          "reason": {
+            "title": "Reason",
+            "type": "string"
+          },
+          "threads": {
+            "title": "Threads",
+            "type": "integer"
+          },
+          "vram_bytes": {
+            "title": "Vram Bytes",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "engine",
+          "device",
+          "gpu_name",
+          "threads",
+          "ram_bytes",
+          "vram_bytes",
+          "reason"
+        ],
+        "title": "VoicePlacementView",
+        "type": "object"
+      },
+      "VoicePlanView": {
+        "properties": {
+          "fits": {
+            "title": "Fits",
+            "type": "boolean"
+          },
+          "placements": {
+            "items": {
+              "$ref": "#/components/schemas/VoicePlacementView"
+            },
+            "title": "Placements",
+            "type": "array"
+          },
+          "sentence": {
+            "title": "Sentence",
+            "type": "string"
+          },
+          "smaller_profile": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Smaller Profile"
+          }
+        },
+        "required": [
+          "fits",
+          "sentence",
+          "smaller_profile",
+          "placements"
+        ],
+        "title": "VoicePlanView",
+        "type": "object"
+      },
+      "VoiceProfileView": {
+        "properties": {
+          "audience": {
+            "title": "Audience",
+            "type": "string"
+          },
+          "download_bytes": {
+            "title": "Download Bytes",
+            "type": "integer"
+          },
+          "listening_available": {
+            "title": "Listening Available",
+            "type": "boolean"
+          },
+          "memory_bytes": {
+            "title": "Memory Bytes",
+            "type": "integer"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "profile_id": {
+            "title": "Profile Id",
+            "type": "string"
+          },
+          "recommended": {
+            "title": "Recommended",
+            "type": "boolean"
+          },
+          "speaking": {
+            "title": "Speaking",
+            "type": "string"
+          },
+          "speaking_available": {
+            "title": "Speaking Available",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "profile_id",
+          "name",
+          "audience",
+          "speaking",
+          "download_bytes",
+          "memory_bytes",
+          "listening_available",
+          "speaking_available",
+          "recommended"
+        ],
+        "title": "VoiceProfileView",
+        "type": "object"
+      },
+      "VoiceRemoved": {
+        "properties": {
+          "freed_bytes": {
+            "title": "Freed Bytes",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "freed_bytes"
+        ],
+        "title": "VoiceRemoved",
+        "type": "object"
+      },
+      "VoiceSettingsRequest": {
+        "additionalProperties": false,
+        "description": "Voice spec §6.2 — every field optional; what is sent is changed.",
+        "properties": {
+          "conversation": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/VoiceConversationRequest"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "english_only": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "English Only"
+          },
+          "idle_unload_minutes": {
+            "anyOf": [
+              {
+                "maximum": 120.0,
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Idle Unload Minutes"
+          },
+          "profile": {
+            "anyOf": [
+              {
+                "enum": [
+                  "off",
+                  "lite",
+                  "balanced",
+                  "high"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Profile"
+          },
+          "run_on": {
+            "anyOf": [
+              {
+                "enum": [
+                  "auto",
+                  "cpu",
+                  "gpu"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Run On"
+          },
+          "speed": {
+            "anyOf": [
+              {
+                "maximum": 2.0,
+                "minimum": 0.5,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Speed"
+          },
+          "voice": {
+            "anyOf": [
+              {
+                "maxLength": 40,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Voice"
+          },
+          "whisper_model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Whisper Model"
+          }
+        },
+        "title": "VoiceSettingsRequest",
+        "type": "object"
+      },
+      "VoiceSettingsView": {
+        "properties": {
+          "conversation": {
+            "$ref": "#/components/schemas/VoiceConversationSettings"
+          },
+          "english_only": {
+            "title": "English Only",
+            "type": "boolean"
+          },
+          "idle_unload_minutes": {
+            "title": "Idle Unload Minutes",
+            "type": "integer"
+          },
+          "profile": {
+            "title": "Profile",
+            "type": "string"
+          },
+          "run_on": {
+            "title": "Run On",
+            "type": "string"
+          },
+          "speed": {
+            "title": "Speed",
+            "type": "number"
+          },
+          "voice": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Voice"
+          },
+          "whisper_model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Whisper Model"
+          }
+        },
+        "required": [
+          "profile",
+          "english_only",
+          "whisper_model",
+          "voice",
+          "speed",
+          "idle_unload_minutes",
+          "run_on",
+          "conversation"
+        ],
+        "title": "VoiceSettingsView",
+        "type": "object"
+      },
+      "VoiceSpeakRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "text": {
+            "maxLength": 2000,
+            "minLength": 1,
+            "title": "Text",
+            "type": "string"
+          }
+        },
+        "required": [
+          "text"
+        ],
+        "title": "VoiceSpeakRequest",
+        "type": "object"
+      },
+      "VoiceSpeakingView": {
+        "properties": {
+          "components": {
+            "items": {
+              "$ref": "#/components/schemas/VoiceComponentView"
+            },
+            "title": "Components",
+            "type": "array"
+          },
+          "engine": {
+            "title": "Engine",
+            "type": "string"
+          },
+          "state": {
+            "title": "State",
+            "type": "string"
+          },
+          "voices": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Voices",
+            "type": "array"
+          }
+        },
+        "required": [
+          "state",
+          "engine",
+          "components",
+          "voices"
+        ],
+        "title": "VoiceSpeakingView",
+        "type": "object"
+      },
+      "VoiceStatus": {
+        "properties": {
+          "disk_bytes": {
+            "title": "Disk Bytes",
+            "type": "integer"
+          },
+          "hardware": {
+            "$ref": "#/components/schemas/VoiceHardwareView"
+          },
+          "listening": {
+            "$ref": "#/components/schemas/VoiceListeningView"
+          },
+          "plan": {
+            "$ref": "#/components/schemas/VoicePlanView"
+          },
+          "profiles": {
+            "items": {
+              "$ref": "#/components/schemas/VoiceProfileView"
+            },
+            "title": "Profiles",
+            "type": "array"
+          },
+          "recommendation": {
+            "title": "Recommendation",
+            "type": "string"
+          },
+          "recommended_profile": {
+            "title": "Recommended Profile",
+            "type": "string"
+          },
+          "settings": {
+            "$ref": "#/components/schemas/VoiceSettingsView"
+          },
+          "speaking": {
+            "$ref": "#/components/schemas/VoiceSpeakingView"
+          }
+        },
+        "required": [
+          "settings",
+          "recommended_profile",
+          "recommendation",
+          "profiles",
+          "listening",
+          "speaking",
+          "plan",
+          "disk_bytes",
+          "hardware"
+        ],
+        "title": "VoiceStatus",
+        "type": "object"
+      },
+      "VoiceTestResult": {
+        "properties": {
+          "heard": {
+            "title": "Heard",
+            "type": "boolean"
+          },
+          "reason_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason Code"
+          },
+          "seconds": {
+            "title": "Seconds",
+            "type": "number"
+          },
+          "spoke": {
+            "title": "Spoke",
+            "type": "boolean"
+          },
+          "transcript": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Transcript"
+          },
+          "word_error_rate": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Word Error Rate"
+          }
+        },
+        "required": [
+          "spoke",
+          "heard",
+          "transcript",
+          "word_error_rate",
+          "seconds",
+          "reason_code"
+        ],
+        "title": "VoiceTestResult",
         "type": "object"
       },
       "WebBlocklist": {
@@ -56402,6 +57185,177 @@
           }
         },
         "summary": "Get Vault Status"
+      }
+    },
+    "/api/voice": {
+      "delete": {
+        "description": "Stop every voice engine and remove every voice file, freeing the disk.",
+        "operationId": "remove_voice_api_voice_delete",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VoiceRemoved"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Remove Voice"
+      }
+    },
+    "/api/voice/install": {
+      "post": {
+        "description": "Download and verify the chosen profile's components in the background.",
+        "operationId": "install_voice_api_voice_install_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VoiceInstallRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelOperationView"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Install Voice"
+      }
+    },
+    "/api/voice/settings": {
+      "put": {
+        "operationId": "write_voice_settings_api_voice_settings_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VoiceSettingsRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VoiceStatus"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Write Voice Settings"
+      }
+    },
+    "/api/voice/speak": {
+      "post": {
+        "description": "One sentence as WAV audio from the installed speaking engine.",
+        "operationId": "speak_api_voice_speak_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VoiceSpeakRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Speak"
+      }
+    },
+    "/api/voice/status": {
+      "get": {
+        "description": "What is chosen, what is installed, where it would run. Starts nothing.",
+        "operationId": "voice_status_api_voice_status_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VoiceStatus"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Voice Status"
+      }
+    },
+    "/api/voice/test": {
+      "post": {
+        "description": "Spec §6.2 — play a phrase, transcribe it back, and show the accuracy.",
+        "operationId": "test_voice_api_voice_test_post",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VoiceTestResult"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Test Voice"
       }
     },
     "/api/web-access/blocklist": {

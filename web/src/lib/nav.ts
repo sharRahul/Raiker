@@ -232,6 +232,7 @@ export const HUB_TABS: Record<string, string[]> = {
     "general",
     "personalisation",
     "notification",
+    "voice",
     "security",
     "privacy",
     "execution-profiles",

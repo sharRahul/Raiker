@@ -76,6 +76,9 @@
   import ComposerMenu, { type MenuItem } from "../components/ComposerMenu.svelte";
   import MessageActions from "../components/MessageActions.svelte";
   import VoiceDictationControl, { type VoiceDictationHandle } from "../components/VoiceDictationControl.svelte";
+  import ConversationPanel from "../components/ConversationPanel.svelte";
+  import { browserConversationPorts } from "../speech/browserPorts";
+  import type { TurnHandle } from "../speech/conversation.svelte";
   import ReadAloudButton from "../components/ReadAloudButton.svelte";
   import { requestSchedule } from "../scheduleHandoff";
   import ShortcutSheet from "../components/ShortcutSheet.svelte";
@@ -209,6 +212,20 @@
   // defaulted to the browser, so a composer that cannot reach the host still
   // offers dictation rather than nothing.
   let speechRuntime = $state<"unavailable" | "local">("unavailable");
+  /** Voice spec V2 — whether Talk is offered, and how the conversation is set up. */
+  let voiceTalk = $state<{ handsFree: boolean; bargeIn: boolean; endSilenceMs: number; engines: string } | null>(null);
+  let talking = $state(false);
+  /**
+   * A spoken turn: the same governed path as a typed one, marked `spoken`, with
+   * the answer handed to the conversation as it streams.
+   */
+  function sendSpoken(text: string, onText: (answerSoFar: string) => void): TurnHandle {
+    return {
+      done: submit(null, { text, onText }).then((status) => ({ status })),
+      cancel: () => void stopRunningTurn(),
+    };
+  }
+  const conversationPorts = $derived(browserConversationPorts(sendSpoken, speechLanguage));
   let voiceControl = $state<VoiceDictationHandle | undefined>();
   let voiceDictated = $state(false);
   let voiceTypedBefore = $state(false);
@@ -364,6 +381,11 @@
   // QUI-C04 — where the next message is processed, for the model that will run it.
   const dataLocation = $derived(
     activeProfile === null ? null : inferenceLocation(activeProfile, model !== "" ? model : activeProfile.model),
+  );
+  // Voice spec §8.2 — the privacy line says where the words go.
+  const voicePrivacyLine = $derived(
+    `On this device · ${voiceTalk?.engines || "local engines"}` +
+      (dataLocation?.kind === "remote" ? ` · Your words are sent as text to ${dataLocation.destination}.` : ""),
   );
   // BUG-238 — a stale observation never blocks: the server re-checks it
   // before admitting the turn, so the only thing that stops a send is a
@@ -918,6 +940,21 @@
     void api.speechRuntime().then((view) => {
       speechRuntime = view.runtime.effective;
     }).catch(() => {});
+    // Voice spec V2 — Talk appears once listening and speaking are installed.
+    void api.voiceStatus().then((view) => {
+      const installed = (state: string) => state === "installed" || state === "ready" || state === "paused";
+      voiceTalk = installed(view.listening.state) && installed(view.speaking.state)
+        ? {
+            handsFree: view.settings.conversation.labs_hands_free,
+            bargeIn: view.settings.conversation.barge_in,
+            endSilenceMs: view.settings.conversation.end_silence_ms,
+            engines: [
+              view.listening.components.find((c) => c.role === "whisper_model")?.name,
+              view.speaking.components.find((c) => c.role !== "kokoro_voices")?.name,
+            ].filter(Boolean).join(" · "),
+          }
+        : null;
+    }).catch(() => {});
     void api.settings().then((view) => {
       // RR-IDENTITY-01 — the name the owner chose, not their sign-in handle.
       // Chat greeted them by the handle however many times they set a display
@@ -1141,23 +1178,26 @@
     });
   });
 
-  async function submit(retryOf: string | null = null) {
-    if (voiceControl?.active()) {
+  async function submit(
+    retryOf: string | null = null,
+    spoken: { text: string; onText: (answerSoFar: string) => void } | null = null,
+  ): Promise<string> {
+    if (spoken === null && voiceControl?.active()) {
       voiceControl.done();
       promptEl?.focus();
-      return;
+      return "not_sent";
     }
-    const sentDraft = draft;
+    const sentDraft = spoken === null ? draft : { text: spoken.text };
     const text = sentDraft.text.trim();
-    if (text === "" || streaming || attachStore.uploading) return;
+    if (text === "" || streaming || attachStore.uploading) return "not_sent";
     // QUI-Q04 — Send is never a dead button. With no usable model the press
     // opens the dialog that fixes it, and the draft stays where it is.
     if (modelBlocked) {
       // QUI-C05 — and the message is sent once a model is ready, unless the
       // owner changes it or cancels. The line under the composer says so.
-      sendWhenReady = text;
+      if (spoken === null) sendWhenReady = text;
       openModelSetup(null, modelReadiness);
-      return;
+      return "not_sent";
     }
     sendWhenReady = null;
     const voiceState = {
@@ -1165,7 +1205,8 @@
       typedBefore: voiceTypedBefore,
       editedAfter: voiceEditedAfter,
     };
-    const inputMode = inputModeForDraft(voiceState);
+    // Voice spec V2 — a turn said aloud in the conversation panel.
+    const inputMode = spoken !== null ? "spoken" : inputModeForDraft(voiceState);
     audioSessionCoordinator.stopAll("submit");
     // Careful's capabilities are normally read already; only a send that
     // races the read waits for it.
@@ -1173,9 +1214,10 @@
     if (sentModes === null) {
       exportNotice =
         "Raiker could not read your permissions, so Careful could not be applied. Nothing was sent; your message is still here.";
-      return;
+      return "not_sent";
     }
-    const sentAttachments = attachStore.take();
+    // A spoken turn carries only what was said; attachments stay in the composer.
+    const sentAttachments = spoken === null ? attachStore.take() : [];
     turns = [
       ...turns,
       {
@@ -1192,14 +1234,16 @@
     // Mutate the $state-proxied instance, not the raw literal: raw-object writes
     // bypass Svelte 5's signals and the transcript would never re-render.
     const turn = turns[turns.length - 1];
-    draft.text = "";
-    resetVoiceProvenance();
+    if (spoken === null) {
+      draft.text = "";
+      resetVoiceProvenance();
+    }
     // B19 — a box that grew to hold a long prompt has to shrink back when the
     // prompt leaves it, or the composer keeps the height of the longest thing
     // ever typed into it.
     menuKind = "none";
     queueMicrotask(() => autoGrow(promptEl ?? null));
-    attachStore.clear();
+    if (spoken === null) attachStore.clear();
     streaming = true;
     stopping = false;
     void scrollToEnd(true);
@@ -1251,12 +1295,14 @@
           if (sessionId === null && typeof event.session_id === "string" && event.session_id !== "") {
             sessionId = event.session_id;
           }
+          spoken?.onText(answerText(turn));
           void scrollToEnd();
         },
       );
     } catch (e) {
       if (e instanceof ApiError && e.reasonCode === "model_not_ready") {
         turns = turns.filter((candidate) => candidate !== turn);
+        if (spoken !== null) return "not_sent";
         if (sentDraft.text === "") sentDraft.text = text;
         voiceDictated = voiceState.dictated;
         voiceTypedBefore = voiceState.typedBefore;
@@ -1264,7 +1310,7 @@
         attachStore.set(sentAttachments);
         await refreshModels();
         openModelSetup(activeProfile);
-        return;
+        return "not_sent";
       }
       // BUG-285 — the refusal the runtime named, not the status number it came
       // with, and no blanket reachability claim about a turn that had already
@@ -1282,6 +1328,7 @@
       if (turn.response?.status === "needs_approval") resumeWatcher?.checkNow();
       void scrollToEnd();
     }
+    return turn.response?.status ?? (turn.error ? "failed" : "completed");
   }
 
   /**
@@ -2686,6 +2733,18 @@
     </div>
   {/if}
 
+  {#if talking && voiceTalk !== null}
+    <!-- Voice spec V2 (Preview) — a spoken conversation over this chat. -->
+    <ConversationPanel
+      ports={conversationPorts}
+      handsFree={voiceTalk.handsFree}
+      bargeIn={voiceTalk.bargeIn}
+      endSilenceMs={voiceTalk.endSilenceMs}
+      privacyLine={voicePrivacyLine}
+      onClose={() => (talking = false)}
+    />
+  {/if}
+
   <Composer
     cardClass="chat-composer"
     ariaLabel="Message composer"
@@ -2842,6 +2901,16 @@
     {/snippet}
 
     {#snippet right()}
+          {#if voiceTalk !== null && !talking}
+            <button
+              type="button"
+              class="btn btn-ghost talk-button"
+              aria-label="Talk to Raiker (Preview)"
+              title="Talk to Raiker (Preview)"
+              disabled={streaming}
+              onclick={() => (talking = true)}
+            ><Icon name="volume" size="sm" /><span class="talk-label">Talk</span></button>
+          {/if}
           <VoiceDictationControl
             bind:this={voiceControl}
             showPrivacy={false}

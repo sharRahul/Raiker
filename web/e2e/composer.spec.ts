@@ -626,6 +626,7 @@ test("Settings presents one section rail rather than a wall of fields", async ({
     "General",
     "Personalisation",
     "Notifications",
+    "Voice",
     "Security",
     "Privacy",
     "Execution profiles",

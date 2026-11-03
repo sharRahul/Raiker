@@ -12,7 +12,7 @@ operation answers with, and whether OpenAPI describes it (OPT-01/OPT-02 —
 * **deferred** — the body has no declared type; a test fails while any is.
 * **special** — a stream, a file or another non-JSON transport; hand-written.
 
-**514 operations: 500 verified, 0 eligible, 0 deferred, 14 special.**
+**520 operations: 505 verified, 0 eligible, 0 deferred, 15 special.**
 
 | Method | Path | Request | Response | Status | Why |
 |---|---|---|---|---|---|
@@ -521,6 +521,12 @@ operation answers with, and whether OpenAPI describes it (OPT-01/OPT-02 —
 | DELETE | `/api/vault/key` |  | VaultStatus | verified | _status |
 | PUT | `/api/vault/key` | VaultKeyRequest | VaultStatus | verified | _status |
 | GET | `/api/vault/status` |  | VaultStatus | verified | _status |
+| DELETE | `/api/voice` |  | VoiceRemoved | verified | declared VoiceRemoved |
+| POST | `/api/voice/install` | VoiceInstallRequest | ModelOperationView | verified | declared ModelOperationView |
+| PUT | `/api/voice/settings` | VoiceSettingsRequest | VoiceStatus | verified | declared by cast |
+| POST | `/api/voice/speak` | VoiceSpeakRequest |  | special | special |
+| GET | `/api/voice/status` |  | VoiceStatus | verified | declared by cast |
+| POST | `/api/voice/test` |  | VoiceTestResult | verified | declared VoiceTestResult |
 | GET | `/api/web-access/blocklist` |  | WebBlocklist | verified | declared WebBlocklist |
 | POST | `/api/web-access/blocklist` | BlocklistRuleRequest | BlocklistRuleAdded | verified | declared BlocklistRuleAdded |
 | POST | `/api/web-access/blocklist/test` | BlocklistTestRequest | BlocklistProbe | verified | declared BlocklistProbe |

@@ -474,6 +474,12 @@ def main(argv: list[str] | None = None) -> int:
         from raiker.storage.sqlcipher_probe_worker import run_files
 
         return run_files(Path(raw_args[1]), Path(raw_args[2]))
+    if raw_args[:1] == ["--voice-tts-worker"]:
+        # A frozen host has no `python -m`; the speaking worker is reached
+        # through the launcher instead (raiker/voice/tts_worker.py).
+        from raiker.voice.tts_worker import main as tts_worker_main
+
+        return tts_worker_main(raw_args[1:])
     if raw_args[:1] == ["--update-handoff"]:
         # A frozen host has no `python -m`; the signed-update helper is reached
         # through the launcher instead (raiker/app/update_handoff.py).

@@ -5244,7 +5244,7 @@ export type PromoteTaskWorkspaceRequest = {
 
 export type PromptRequest = {
   text: string;
-  input_mode?: "typed" | "dictated" | "mixed";
+  input_mode?: "typed" | "dictated" | "mixed" | "spoken";
   surface?: "chat" | "build" | "design";
   project_id?: string | null;
   session_id?: string | null;
@@ -6133,7 +6133,7 @@ export type SetupLocations = {
 export type SetupState = {
   owner_principal_id: string;
   status: "required" | "in_progress" | "skipped" | "complete";
-  stage: "welcome" | "account" | "system" | "model" | "privacy" | "permissions" | "verify" | "backup" | "finish";
+  stage: "welcome" | "account" | "system" | "voice" | "model" | "privacy" | "permissions" | "verify" | "backup" | "finish";
   selected_profile_id: string | null;
   selected_model: string | null;
   model_deferred: boolean;
@@ -6157,7 +6157,7 @@ export type SetupSystemReadiness = {
 
 export type SetupUpdateRequest = {
   status: "required" | "in_progress" | "skipped" | "complete";
-  stage: "welcome" | "account" | "system" | "model" | "privacy" | "permissions" | "verify" | "backup" | "finish";
+  stage: "welcome" | "account" | "system" | "voice" | "model" | "privacy" | "permissions" | "verify" | "backup" | "finish";
   selected_profile_id?: string | null;
   selected_model?: string | null;
   model_deferred?: boolean;
@@ -7015,6 +7015,142 @@ export type VaultKeyRequest = {
 /** Whether the connector vault has a usable key; never the key. */
 export type VaultStatus = {
   state: "configured_valid" | "missing" | "invalid";
+};
+
+export type VoiceComponentView = {
+  role: string;
+  item_id: string;
+  name: string;
+  licence: string;
+  size_bytes: number | null;
+  installed: boolean;
+  installable: boolean;
+  refusal: string | null;
+  pending_reason: string | null;
+  source_page: string;
+};
+
+export type VoiceConversationRequest = {
+  mode?: "push_to_talk" | "hands_free" | null;
+  end_silence_ms?: number | null;
+  barge_in?: boolean | null;
+  speak_tool_progress?: boolean | null;
+  keep_recordings?: boolean | null;
+  labs_hands_free?: boolean | null;
+};
+
+export type VoiceConversationSettings = {
+  mode: string;
+  end_silence_ms: number;
+  barge_in: boolean;
+  speak_tool_progress: boolean;
+  keep_recordings: boolean;
+  labs_hands_free: boolean;
+};
+
+export type VoiceHardwareView = {
+  os: string;
+  arch: string;
+  total_memory_bytes: number | null;
+  gpu: string | null;
+};
+
+export type VoiceInstallRequest = {
+  profile?: "lite" | "balanced" | "high" | null;
+};
+
+export type VoiceListeningView = {
+  state: string;
+  components: VoiceComponentView[];
+  device: string | null;
+};
+
+export type VoicePlacementView = {
+  engine: string;
+  device: string;
+  gpu_name: string | null;
+  threads: number;
+  ram_bytes: number;
+  vram_bytes: number;
+  reason: string;
+};
+
+export type VoicePlanView = {
+  fits: boolean;
+  sentence: string;
+  smaller_profile: string | null;
+  placements: VoicePlacementView[];
+};
+
+export type VoiceProfileView = {
+  profile_id: string;
+  name: string;
+  audience: string;
+  speaking: string;
+  download_bytes: number;
+  memory_bytes: number;
+  listening_available: boolean;
+  speaking_available: boolean;
+  recommended: boolean;
+};
+
+export type VoiceRemoved = {
+  freed_bytes: number;
+};
+
+/** Voice spec §6.2 — every field optional; what is sent is changed. */
+export type VoiceSettingsRequest = {
+  profile?: "off" | "lite" | "balanced" | "high" | null;
+  english_only?: boolean | null;
+  whisper_model?: string | null;
+  voice?: string | null;
+  speed?: number | null;
+  idle_unload_minutes?: number | null;
+  run_on?: "auto" | "cpu" | "gpu" | null;
+  conversation?: VoiceConversationRequest | null;
+};
+
+export type VoiceSettingsView = {
+  profile: string;
+  english_only: boolean;
+  whisper_model: string | null;
+  voice: string | null;
+  speed: number;
+  idle_unload_minutes: number;
+  run_on: string;
+  conversation: VoiceConversationSettings;
+};
+
+export type VoiceSpeakRequest = {
+  text: string;
+};
+
+export type VoiceSpeakingView = {
+  state: string;
+  engine: string;
+  components: VoiceComponentView[];
+  voices: string[];
+};
+
+export type VoiceStatus = {
+  settings: VoiceSettingsView;
+  recommended_profile: string;
+  recommendation: string;
+  profiles: VoiceProfileView[];
+  listening: VoiceListeningView;
+  speaking: VoiceSpeakingView;
+  plan: VoicePlanView;
+  disk_bytes: number;
+  hardware: VoiceHardwareView;
+};
+
+export type VoiceTestResult = {
+  spoke: boolean;
+  heard: boolean;
+  transcript: string | null;
+  word_error_rate: number | null;
+  seconds: number;
+  reason_code: string | null;
 };
 
 /** The rules in force, by source, so the page knows which it may delete. */
@@ -8087,6 +8223,16 @@ export const contract = {
     call<VaultStatus>("PUT", "/api/vault/key", { body }),
   getVaultStatus: () =>
     request<VaultStatus>("/api/vault/status"),
+  removeVoice: () =>
+    call<VoiceRemoved>("DELETE", "/api/voice"),
+  installVoice: (body: VoiceInstallRequest) =>
+    call<ModelOperationView>("POST", "/api/voice/install", { body }),
+  writeVoiceSettings: (body: VoiceSettingsRequest) =>
+    call<VoiceStatus>("PUT", "/api/voice/settings", { body }),
+  voiceStatus: () =>
+    request<VoiceStatus>("/api/voice/status"),
+  testVoice: () =>
+    call<VoiceTestResult>("POST", "/api/voice/test"),
   getBlocklist: () =>
     request<WebBlocklist>("/api/web-access/blocklist"),
   addBlocklistRule: (body: BlocklistRuleRequest) =>

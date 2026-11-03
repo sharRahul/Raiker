@@ -364,6 +364,16 @@ LOCAL_ANSWER_PROVIDERS = frozenset(
 #: denies every write), so what it owes the owner is a plan worth approving.
 #: The second paragraph is Muse Code's `/grill`: a plan that has been questioned
 #: by its author before the owner sees it fails less often after approval.
+#: Voice spec §5.4 — a turn said aloud is answered to be heard. The owner's own
+#: instructions still apply; this only shapes length and form.
+SPOKEN_STYLE_PROMPT = (
+    "This message was spoken aloud and your answer will be read aloud to the owner. "
+    "Answer in short, natural spoken sentences: no tables, code blocks, bullet lists or "
+    "Markdown, and no long lists of items. If the full answer needs detail that is better "
+    "read, give the short spoken version and offer to show the detail on screen. "
+    "Approvals are never given by voice: if an action needs one, say that it is waiting on screen."
+)
+
 PLAN_POSTURE_PROMPT = (
     "This is a Plan turn: research with read-only tools and propose a plan; change nothing. "
     "Write the plan as steps with update_plan, each step one change you can check.\n\n"
@@ -2674,6 +2684,9 @@ class RuntimeOrchestrator:
                 "skills_indexed",
                 {"active_skills": len(skill_names), "names": skill_names},
             )
+        if envelope.prompt.metadata.get("input_mode") == "spoken":
+            messages.append(ModelMessage(role="system", content=SPOKEN_STYLE_PROMPT))
+            self._event(envelope, "spoken_style_applied", {"hint_chars": len(SPOKEN_STYLE_PROMPT)})
         hook_context = envelope.prompt.metadata.get("_hook_context")
         if isinstance(hook_context, list):
             advisory = [str(item) for item in hook_context if isinstance(item, str) and item]

@@ -63,6 +63,7 @@ from raiker.api.routes_speech import router as speech_router
 from raiker.api.routes_tray import router as tray_router
 from raiker.api.routes_updates import router as updates_router
 from raiker.api.routes_vault import router as vault_router
+from raiker.api.routes_voice import router as voice_router
 from raiker.api.security import (
     MaxBodySizeMiddleware,
     RateLimitMiddleware,
@@ -677,6 +678,7 @@ def create_app(
     app.include_router(vault_router)
     app.include_router(settings_router)
     app.include_router(speech_router)
+    app.include_router(voice_router)
     app.include_router(control_router)
     app.include_router(host_router)
     app.include_router(updates_router)

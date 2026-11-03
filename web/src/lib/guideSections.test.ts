@@ -89,6 +89,8 @@ describe("every page the product navigates to can reach the guide", () => {
       "managing-the-host",
       "releasing",
       "security-and-privacy",
+      // Voice spans Chat (Talk), Settings › Voice and first-run setup.
+      "voice",
     ]);
     const linked = new Set(mappedRoutes().map((route) => guideSectionFor(route)!.slug));
     const unreachable = [...slugs].filter((slug) => !GENERAL.has(slug) && !linked.has(slug));

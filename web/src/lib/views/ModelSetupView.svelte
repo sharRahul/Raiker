@@ -23,6 +23,7 @@
     SetupSystemReadiness,
     SetupVerification,
   } from "../apiTypes";
+  import type { VoiceStatus } from "../generated/apiContract";
   import { modelName } from "../modelPresentation";
   import { inferenceLocation, inferenceSentence, type InferenceLocation } from "../inferenceLocation";
   import { setModels } from "../models.svelte";
@@ -45,6 +46,7 @@
     HELLO_LINE,
     MODEL_QUESTION,
     PROFILE_LINE,
+    VOICE_QUESTION,
     saveOwnerName,
   } from "../setupConversation";
   import { handOffToChat } from "../chatHandoff";
@@ -326,11 +328,14 @@
   const stageOf = (state: SetupState | null) => (state === null ? null : state.stage);
   const stage = $derived(visibleStage(stageOf(setup), stages));
   const after = (current: typeof stage) => nextStage(stages, current);
+  /** Voice spec §6.1 — what was chosen at the voice step, for the conversation above it. */
+  let voiceAnswer = $state<string | null>(null);
   /** QUI-W02 – W04 — what has been asked and answered, above the current step. */
   const exchanges = $derived(
     answeredExchanges(stages.slice(0, Math.max(stages.indexOf(stage), 0)), {
       name: ownerName || nameDraft,
       model: picked,
+      voice: voiceAnswer,
     }),
   );
   const before = (current: typeof stage) => previousStage(stages, current);
@@ -431,9 +436,44 @@
   }
   const mandatoryFailed = $derived(verification !== null && verification.failed.length > 0);
 
+  // Voice spec §6.1 — *Talk to Raiker*, optional. The choice is stored and the
+  // download starts in the background as a model operation; nothing is
+  // downloaded for "Not now". The thinking model is never part of it.
+  let voice = $state<VoiceStatus | null>(null);
+  let voiceChoice = $state<string>("off");
+  let voiceError = $state("");
+  async function loadVoice() {
+    try {
+      voice = await api.voiceStatus();
+      voiceChoice = voice.settings.profile;
+      if (voiceChoice !== "off") voiceAnswer = voice.profiles.find((p) => p.profile_id === voiceChoice)?.name ?? null;
+    } catch {
+      voiceError = "Voice options could not be read. You can set voice up later in Settings › Voice.";
+    }
+  }
+  async function answerVoice() {
+    busy = true;
+    try {
+      if (voiceChoice !== "off") {
+        await api.saveVoiceSettings({ profile: voiceChoice as "lite" | "balanced" | "high" });
+        const chosen = voice?.profiles.find((p) => p.profile_id === voiceChoice);
+        if (chosen && (chosen.listening_available || chosen.speaking_available)) await api.installVoice();
+        voiceAnswer = chosen?.name ?? voiceChoice;
+      } else {
+        voiceAnswer = null;
+      }
+    } catch {
+      // The choice is not lost: Settings › Voice shows it and can install.
+    } finally {
+      busy = false;
+    }
+    await save({ status: "in_progress", stage: after("voice") });
+  }
+
   $effect(() => {
     if ((stage === "system" || stage === "model") && system === null && systemError === "") void loadSystem();
     if (stage === "verify" && verification === null && !verifying && verifyError === "") void runVerification();
+    if (stage === "voice" && voice === null && voiceError === "") void loadVoice();
   });
 
   const stateLabel = (check: SetupCheck) => CHECK_STATE_LABELS[check.state];
@@ -528,6 +568,38 @@
         <button class="quiet" onclick={() => save({ stage: before("system") })}>Back</button>
         <button class="primary" disabled={busy} onclick={() => save({ status: "in_progress", stage: after("system") })}>Continue</button>
       </div>
+    {:else if stage === "voice"}
+      <h2 id="setup-title" class="raiker-line">{VOICE_QUESTION}</h2>
+      <form class="card" onsubmit={(event) => { event.preventDefault(); void answerVoice(); }}>
+        <p class="note">Optional. Raiker listens and answers aloud entirely on this computer. You can change this any time in Settings › Voice.</p>
+        {#if voiceError}
+          <p class="note" role="alert">{voiceError}</p>
+        {:else if voice === null}
+          <p class="note" role="status" aria-live="polite">Checking what this computer can run…</p>
+        {:else}
+          <fieldset class="voice-choices">
+            <legend class="sr-only">Talk to Raiker</legend>
+            <label class="voice-choice"><input type="radio" name="setup-voice" value="off" bind:group={voiceChoice} /> <span><strong>Not now</strong></span></label>
+            {#each voice.profiles as profile (profile.profile_id)}
+              <label class="voice-choice">
+                <input type="radio" name="setup-voice" value={profile.profile_id} bind:group={voiceChoice}
+                  disabled={!profile.listening_available && !profile.speaking_available} />
+                <span>
+                  <strong>{profile.name} — {(profile.download_bytes / 1e9).toFixed(1)} GB</strong>
+                  {#if profile.recommended}<em> · Recommended for this computer</em>{/if}
+                  {#if !profile.listening_available && !profile.speaking_available}<em> · not available yet</em>
+                  {:else if !profile.listening_available}<em> · speaking only for now</em>{/if}
+                </span>
+              </label>
+            {/each}
+          </fieldset>
+          <p class="note">{voice.recommendation} Downloads run in the background after you continue.</p>
+        {/if}
+        <div class="actions">
+          <button type="button" class="quiet" onclick={() => save({ stage: before("voice") })}>Back</button>
+          <button type="submit" class="primary" disabled={busy}>Continue</button>
+        </div>
+      </form>
     {:else if stage === "model"}
       <header>
         <h2 id="setup-title" class="raiker-line">{MODEL_QUESTION}</h2>
@@ -757,6 +829,9 @@
   .said.raiker { justify-self: start; color: var(--text-2); background: var(--surface); border: 1px solid var(--border); }
   .said.owner { justify-self: end; color: var(--text-1); background: var(--sunken); }
   .raiker-line { font-size: clamp(1.35rem, 3vw, 1.9rem); line-height: 1.3; max-width: 40rem; }
+  .voice-choices { border: 0; padding: 0; margin: 0; display: grid; gap: var(--space-2); }
+  .voice-choice { display: flex; gap: var(--space-2); align-items: baseline; }
+  .voice-choice em { color: var(--text-3); font-style: normal; font-size: var(--text-sm); }
   .card { display: grid; gap: var(--space-3); padding: var(--space-4); border: 1px solid var(--neutral-border); border-radius: var(--r-lg); background: var(--surface); max-width: 40rem; }
   .card p { margin: 0; color: var(--text-2); line-height: 1.55; }
   .card .card-foot { color: var(--text-3); font-size: var(--text-sm); }

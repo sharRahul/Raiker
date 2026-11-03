@@ -52,6 +52,11 @@ _SECURITY_HEADERS: tuple[tuple[bytes, bytes], ...] = (
 #:   fetched with the owner's bearer token and handed to the element as an
 #:   object URL, precisely so the bytes never travel as a URL anything else
 #:   could follow.
+#: * ``'wasm-unsafe-eval'`` in ``script-src`` (voice spec V2) lets the page
+#:   compile WebAssembly — the Silero VAD runtime the conversation panel loads,
+#:   served from this origin. It permits ``WebAssembly.compile`` only: string
+#:   ``eval`` and ``new Function`` stay blocked, and no script from anywhere
+#:   else is admitted.
 #: * ``frame-ancestors 'none'`` says what ``X-Frame-Options: DENY`` says, to the
 #:   browsers that read only this one.
 #: * ``base-uri`` and ``form-action`` are ``'none'`` because Raiker has no
@@ -60,7 +65,7 @@ _SECURITY_HEADERS: tuple[tuple[bytes, bytes], ...] = (
 _CONTENT_SECURITY_POLICY = b"; ".join(
     (
         b"default-src 'self'",
-        b"script-src 'self'",
+        b"script-src 'self' 'wasm-unsafe-eval'",
         b"style-src 'self'",
         b"img-src 'self' data: blob:",
         b"font-src 'self' data:",

@@ -25,7 +25,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
-import random
+import secrets
 from collections.abc import Awaitable, Callable
 from contextlib import suppress
 from dataclasses import dataclass, field
@@ -51,6 +51,8 @@ RETRY_MAX_SECONDS = 60.0
 #: The longest single SSE line accepted. An envelope is a few kilobytes; a
 #: daemon sending more than this on one line is not one Raiker should parse.
 MAX_LINE_BYTES = 256 * 1024
+#: Use the operating system's secure random source for reconnect jitter.
+_JITTER = secrets.SystemRandom()
 
 
 @dataclass
@@ -190,7 +192,7 @@ async def run(
             if stop.is_set():
                 break
             status.set("unreachable", type(exc).__name__ if not str(exc) else str(exc)[:60])
-            await wait(backoff + backoff * 0.2 * random.random())
+            await wait(backoff + backoff * 0.2 * _JITTER.random())
             backoff = min(backoff * 2, RETRY_MAX_SECONDS)
     status.set("off")
 

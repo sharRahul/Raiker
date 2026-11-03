@@ -13,7 +13,11 @@ from __future__ import annotations
 import os
 from typing import TYPE_CHECKING, Any, Literal, cast
 
-from raiker.channels.adapters import channel_capabilities
+from raiker.channels.adapters import (
+    OWNER_CHAT_CHANNEL_TYPES,
+    channel_capabilities,
+    signal_http_url,
+)
 from raiker.channels.revision import pairing_revision
 from raiker.control.dtos import ControlResult
 from raiker.control.views.extensions import (
@@ -832,6 +836,19 @@ def _channel_destination(
                 fnmatch.fnmatch("api.telegram.org", pattern) for pattern in allowlist
             ),
         }
+    if channel_type == "signal":
+        # Delivered to the owner's own chat through the signal-cli daemon on
+        # this machine; the allowlist must name that daemon's address.
+        bridge = signal_http_url()
+        netloc = urlsplit(bridge).netloc if bridge else ""
+        return {
+            "kind": "owner_chat",
+            "configured": bool(pairing and pairing.get("owner_sender_id")),
+            "host": urlsplit(bridge).hostname if bridge else None,
+            "allowlisted": (
+                any(fnmatch.fnmatch(netloc, pattern) for pattern in allowlist) if bridge else False
+            ),
+        }
     if channel_type != "webhooks":
         return {"kind": "none", "configured": False, "host": None, "allowlisted": None}
     url = str((pairing or {}).get("delivery_url") or "")
@@ -879,7 +896,7 @@ def _channel_route_scope(channel_type: str, pairing: dict[str, Any] | None) -> C
         starts = "any_allowed_sender"
     else:
         starts = "owner_only"
-    telegram = channel_type == "telegram"
+    telegram = channel_type in OWNER_CHAT_CHANNEL_TYPES
     reply: Literal["returned_to_caller", "sent_to_owner_chat", "kept_in_raiker", "none"]
     if mode in {"record_only", "interrupt"}:
         reply = "none"

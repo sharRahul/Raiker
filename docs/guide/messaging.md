@@ -241,6 +241,69 @@ never appears in a reason code: the token sits in the URL *path*, so `post_url`
 reports only scheme and host when a URL is rejected, and the delivery record
 carries byte counts and a status rather than the target.
 
+## Signal
+
+Signal has no bot API and no server that could call Raiker. Raiker therefore
+works the way Hermes Agent does: **you run
+[signal-cli](https://github.com/AsamK/signal-cli) on this machine, linked to
+your phone as a device**, and Raiker talks to its HTTP daemon on loopback. It
+sends a reply as one JSON-RPC `send` to `/api/v1/rpc`, and reads your messages
+from the daemon's event stream at `/api/v1/events`. Raiker never holds your
+Signal keys: the linked device and its keys belong to signal-cli.
+
+1. Install signal-cli. It needs Java 17 or newer. On macOS use
+   `brew install signal-cli`; on Linux and Windows, unpack a release from its
+   GitHub page.
+2. Link it as a device: run `signal-cli link -n "Raiker"`. Then, in Signal on
+   your phone, go to **Settings → Linked devices → Link new device** and scan
+   the code it prints.
+3. Start the daemon and keep it running:
+   `signal-cli --account +15551234567 daemon --http 127.0.0.1:8080`. Check it
+   with `curl http://127.0.0.1:8080/api/v1/check`.
+4. Set the environment Raiker reads, then restart Raiker:
+
+| Variable | What it is |
+|---|---|
+| `RAIKER_SIGNAL_ACCOUNT` | The number signal-cli is linked as, in E.164 form (`+15551234567`). |
+| `RAIKER_CHANNEL_EGRESS_ALLOWLIST` | Must contain the daemon's address, `127.0.0.1:8080` by default, or no reply leaves Raiker. |
+| `RAIKER_SIGNAL_HTTP_URL` | Optional. Where the daemon listens. Defaults to `http://127.0.0.1:8080`. |
+
+5. In **Messaging**, link Signal. Add yourself to the sender allowlist by your
+   number (`+15551234567`) or your Signal UUID, choose yourself as the owner
+   sender, choose a route, send a test, and turn the channel on.
+
+**Only a daemon on this machine is used.** signal-cli's HTTP interface has no
+sign-in, so anyone who can reach it can send as you. Raiker refuses an
+`RAIKER_SIGNAL_HTTP_URL` that is not `http://` on `127.0.0.1`, `localhost` or
+`::1`. Keep the daemon bound to loopback as well.
+
+**Listening runs only while the channel is on.** The host connects to the
+event stream while a Signal pairing is enabled and `RAIKER_SIGNAL_ACCOUNT` is
+set. It reconnects with backoff if the daemon stops. Each message then takes
+the same path as Telegram and the webhook: the sender allowlist, the
+per-sender budget, duplicate suppression, the loop guard, redaction, the audit
+event and your stored route. Several kinds of envelope are never routed:
+read and delivery receipts, typing notices, stories, empty messages, and
+anything sent from the linked account itself (your own phone's messages, or
+Raiker's reply coming back). An edited message is read as its new text.
+
+**Your own message is answered over Signal**, exactly as on Telegram. The
+answer goes back to your chat as its own governed delivery with its own
+receipt, and an answer carrying sensitive information is held on
+**Deliveries to review** until you send it. A reply is plain text up to Signal's
+8,000-character limit; a longer one is refused with that limit rather than cut
+short.
+
+signal-cli answers HTTP `200` even when a send failed. Raiker reads its answer,
+so an unregistered recipient, a refused send or Signal rate-limiting the
+account is recorded as a failed delivery (`signal_recipient_failed`,
+`signal_send_failed`, `signal_rate_limited`) rather than as delivered. A group
+can be the recipient as `group:<groupId>`, and only when that id is on the
+sender allowlist.
+
+Attachments, reactions, typing indicators and reply quotes are not carried
+yet. Raiker's channels are a governed text relay (see below).
+
 
 ## Adding another platform
 

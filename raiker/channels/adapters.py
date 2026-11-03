@@ -27,6 +27,7 @@ it, which is why adding one is a small, reviewable thing.
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 from dataclasses import dataclass
@@ -345,8 +346,218 @@ class WebhookAdapter:
         return InboundMessage(sender_id=sender_id, text=text)
 
 
+# ── Signal ────────────────────────────────────────────────────────────────────
+#
+# Signal has no bot API. Like Hermes Agent, Raiker talks to an owner-run
+# ``signal-cli`` linked as a secondary device on the owner's phone and started
+# in HTTP daemon mode (``signal-cli --account +1… daemon --http 127.0.0.1:8080``):
+# a reply is one JSON-RPC ``send`` to ``/api/v1/rpc``, and messages arrive on
+# the daemon's Server-Sent Events stream at ``/api/v1/events``
+# (:mod:`raiker.channels.signal_bridge`). Raiker never holds Signal keys: the
+# linked device and its keys are signal-cli's.
+
+#: The daemon Raiker talks to when ``RAIKER_SIGNAL_HTTP_URL`` is unset, and the
+#: default ``signal-cli daemon --http`` address.
+SIGNAL_DEFAULT_HTTP_URL = "http://127.0.0.1:8080"
+
+#: Signal's own limit on one message body.
+SIGNAL_MAX_TEXT_CHARS = 8000
+
+#: How a group chat is written as a recipient, so one id names either kind.
+SIGNAL_GROUP_PREFIX = "group:"
+
+
+def signal_account() -> str:
+    """The Signal number signal-cli is linked as (E.164), or empty when unset."""
+    return os.environ.get("RAIKER_SIGNAL_ACCOUNT", "").strip()
+
+
+def signal_http_url() -> str | None:
+    """The signal-cli daemon's base URL, or ``None`` when it is not on this machine.
+
+    The daemon's HTTP interface has no authentication: anyone who can reach it
+    can send as the owner. So Raiker only talks to one on loopback, and an
+    address elsewhere is refused rather than trusted.
+    """
+    from urllib.parse import urlsplit
+
+    raw = (os.environ.get("RAIKER_SIGNAL_HTTP_URL", "").strip() or SIGNAL_DEFAULT_HTTP_URL).rstrip("/")
+    parts = urlsplit(raw)
+    if (
+        parts.scheme != "http"
+        or parts.hostname not in {"127.0.0.1", "localhost", "::1"}
+        or parts.username is not None
+        or parts.password is not None
+        or parts.path not in {"", "/"}
+    ):
+        return None
+    return raw
+
+
+class SignalAdapter:
+    """One owner-run signal-cli daemon, reached over loopback JSON-RPC."""
+
+    channel_type = "signal"
+    capabilities: ChannelCapabilities = {
+        "direct_messages": True,
+        "group_chats": True,
+        "threads": False,
+        "streaming": False,
+        "media": False,
+        "reactions": False,
+        "edits_and_deletes": False,
+        "buttons": False,
+        "typing_indicator": False,
+        "max_text_chars": SIGNAL_MAX_TEXT_CHARS,
+        "authentication": "signal-cli linked to your phone as a device, on this machine only",
+    }
+
+    def outbound(
+        self, *, connector_id: str, pairing: dict[str, Any], arguments: dict[str, Any],
+        text: str, delivered_at: str, delivery_id: str,
+    ) -> OutboundRequest | AdapterRefusal:
+        account = signal_account()
+        if not account:
+            return AdapterRefusal(
+                "signal_account_missing",
+                "Signal delivery refused: RAIKER_SIGNAL_ACCOUNT is unset in the host environment.",
+            )
+        base = signal_http_url()
+        if base is None:
+            return AdapterRefusal(
+                "signal_bridge_not_local",
+                "Signal delivery refused: RAIKER_SIGNAL_HTTP_URL must be an http:// address on "
+                "this machine, because signal-cli's HTTP daemon has no authentication.",
+            )
+        # The recipient is the pairing's owner unless the action names one, and
+        # one named by an action is still checked against the sender allowlist:
+        # a model can propose a recipient, but only one the owner allowed.
+        recipient = str(arguments.get("chat_id") or pairing.get("owner_sender_id") or "").strip()
+        if not recipient:
+            return AdapterRefusal(
+                "signal_recipient_missing",
+                "Signal delivery refused: no recipient given and the pairing has no bound owner sender.",
+            )
+        if arguments.get("chat_id") and recipient != str(pairing.get("owner_sender_id") or ""):
+            try:
+                allowed = set(json.loads(pairing.get("sender_allowlist_json") or "[]"))
+            except (ValueError, TypeError):
+                allowed = set()
+            if recipient not in allowed:
+                return AdapterRefusal(
+                    "signal_recipient_not_allowlisted",
+                    "Signal delivery refused: the recipient is not on this channel's sender allowlist.",
+                )
+        params: dict[str, Any] = {"account": account, "message": text}
+        if recipient.startswith(SIGNAL_GROUP_PREFIX):
+            params["groupId"] = recipient[len(SIGNAL_GROUP_PREFIX):]
+        else:
+            params["recipient"] = [recipient]
+        body = json.dumps(
+            {"jsonrpc": "2.0", "method": "send", "params": params, "id": delivery_id},
+            sort_keys=True,
+        ).encode("utf-8")
+        return OutboundRequest(
+            url=f"{base}/api/v1/rpc",
+            body=body,
+            headers={"Content-Type": "application/json", "X-Raiker-Delivered-At": delivered_at},
+            # signal-cli is reached on loopback and holds the owner's keys; the
+            # Signal protocol end to end is what protects the message, not a
+            # body signature Raiker could add.
+            signed=False,
+        )
+
+    def provider_message_id(self, response_body: bytes) -> str | None:
+        """``{"result": {"timestamp": 1730…}}`` → the sent message's timestamp.
+
+        Signal names a message by its sender and timestamp; a reply quoting it
+        carries the same number back.
+        """
+        result = _json_object(response_body).get("result")
+        return _clean_provider_id(result.get("timestamp")) if isinstance(result, dict) else None
+
+    def delivery_error(self, response_body: bytes) -> str | None:
+        """A JSON-RPC answer is HTTP 200 even when nothing was sent; read what it says.
+
+        Returns a reason code when the daemon reported an error or any recipient
+        was not delivered to, else ``None``.
+        """
+        parsed = _json_object(response_body)
+        if "error" in parsed:
+            error = parsed.get("error")
+            message = str(error.get("message", "")) if isinstance(error, dict) else str(error)
+            return "signal_rate_limited" if "rate" in message.lower() else "signal_send_failed"
+        result = parsed.get("result")
+        results = result.get("results") if isinstance(result, dict) else None
+        for item in results if isinstance(results, list) else ():
+            if not isinstance(item, dict):
+                continue
+            kind = str(item.get("type") or "")
+            if kind == "RATE_LIMIT_FAILURE":
+                return "signal_rate_limited"
+            if (kind and kind != "SUCCESS") or ("success" in item and not item.get("success")):
+                return "signal_recipient_failed"
+        if not isinstance(result, dict):
+            return "signal_send_failed"
+        return None
+
+    def parse_inbound(self, payload: dict[str, Any]) -> InboundMessage | None:
+        """One signal-cli envelope, as the SSE stream or ``receive`` carries it.
+
+        Only a text message from someone else becomes a message. Receipts,
+        typing notices, stories, reactions and the owner's own sent messages
+        synced from their phone are not; an edit is read as its new text.
+        """
+        envelope = payload.get("envelope", payload)
+        if not isinstance(envelope, dict):
+            return None
+        sender = str(
+            envelope.get("sourceNumber") or envelope.get("sourceUuid") or envelope.get("source") or ""
+        ).strip()
+        account = signal_account()
+        if not sender or (account and sender == account):
+            # A message from the linked account itself is the owner's own phone
+            # talking, or Raiker's reply echoing back: never a message to route.
+            return None
+        data = envelope.get("dataMessage")
+        if not isinstance(data, dict):
+            edit = envelope.get("editMessage")
+            data = edit.get("dataMessage") if isinstance(edit, dict) else None
+        if not isinstance(data, dict):
+            return None
+        text = data.get("message")
+        if not isinstance(text, str) or not text.strip():
+            return None
+        group = data.get("groupInfo")
+        group_id = str(group.get("groupId") or "") if isinstance(group, dict) else ""
+        timestamp = envelope.get("timestamp")
+        # Signal names a message by its sender and timestamp. The key is a
+        # digest of both, so a phone number is not kept as an event id.
+        event_id = (
+            "signal:" + hashlib.sha256(f"{sender}:{timestamp}".encode()).hexdigest()[:40]
+            if isinstance(timestamp, int) and not isinstance(timestamp, bool)
+            else None
+        )
+        name = envelope.get("sourceName")
+        return InboundMessage(
+            sender_id=sender,
+            text=text,
+            conversation_scope="group" if group_id else "direct",
+            # signal-cli does not mark automated accounts; the loop guard and
+            # the owner's sender allowlist are what stop two bots talking.
+            from_bot=False,
+            event_id=event_id,
+            sender_label=name.strip()[:80] if isinstance(name, str) and name.strip() else None,
+        )
+
+
+#: Channel types whose replies go to a person's own chat (the pairing's owner
+#: sender) rather than to a URL the owner binds.
+OWNER_CHAT_CHANNEL_TYPES = frozenset({"telegram", "signal"})
+
+
 _ADAPTERS: dict[str, ChannelAdapter] = {
-    a.channel_type: a for a in (TelegramAdapter(), WebhookAdapter())
+    a.channel_type: a for a in (TelegramAdapter(), WebhookAdapter(), SignalAdapter())
 }
 
 

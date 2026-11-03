@@ -47,6 +47,13 @@ export function testReason(code: string | null | undefined): string {
   if (value === "channel_paused") return "the channel is paused — resume it to deliver";
   if (value === "telegram_bot_token_missing") return "RAIKER_TELEGRAM_BOT_TOKEN is not set";
   if (value === "telegram_chat_id_missing") return "no owner sender is chosen to deliver to";
+  if (value === "signal_account_missing") return "RAIKER_SIGNAL_ACCOUNT is not set";
+  if (value === "signal_bridge_not_local") return "RAIKER_SIGNAL_HTTP_URL is not an address on this machine";
+  if (value === "signal_recipient_missing") return "no owner sender is chosen to deliver to";
+  if (value === "signal_recipient_not_allowlisted") return "the recipient is not on the allowlist";
+  if (value === "signal_rate_limited") return "Signal is rate-limiting this account; try again later";
+  if (value === "signal_recipient_failed") return "signal-cli could not deliver to that recipient";
+  if (value === "signal_send_failed") return "signal-cli refused the send — check that it is linked and running";
   if (value.startsWith("egress_denied")) return "the host is not on the channel egress allowlist";
   if (value.startsWith("http_error")) return `the destination answered ${value.split(":")[1] ?? "an error"}`;
   if (value.startsWith("fetch_failed")) return "the destination could not be reached";

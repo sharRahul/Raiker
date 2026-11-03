@@ -70,6 +70,14 @@
       "Telegram delivery needs RAIKER_TELEGRAM_BOT_TOKEN in the host environment. Raiker takes the variable name, never the token itself.",
     telegram_chat_id_missing:
       "Choose which allowed sender is you before delivering to Telegram: a test goes to your chat.",
+    signal_account_missing:
+      "Signal needs RAIKER_SIGNAL_ACCOUNT — the number signal-cli is linked as — in the host environment.",
+    signal_bridge_not_local:
+      "RAIKER_SIGNAL_HTTP_URL must be an http:// address on this machine: signal-cli's HTTP daemon has no sign-in, so Raiker never talks to one elsewhere.",
+    signal_recipient_missing:
+      "Choose which allowed sender is you before delivering to Signal: a test goes to your chat.",
+    signal_send_failed:
+      "signal-cli refused the send. Check that `signal-cli daemon --http` is running and the device is still linked.",
     channel_destination_missing: "Set where this channel delivers before sending a test.",
     channel_destination_invalid:
       "Use an https:// address, or http:// only to this machine or your own network, with no username or password in it.",
@@ -375,7 +383,7 @@
           </div>
       {/snippet}
       {#snippet empty()}
-        <p class="note">No channel is linked. Add one to reach Raiker from Telegram, a webhook or another app.</p>
+        <p class="note">No channel is linked. Add one to reach Raiker from Signal, Telegram, a webhook or another app.</p>
       {/snippet}
       {#snippet detail(profile)}
         <div class="channel-detail">

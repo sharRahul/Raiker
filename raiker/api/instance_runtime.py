@@ -275,6 +275,14 @@ class InstanceRuntime:
         watcher = AttachedRootWatcher(self.workspace_root)
         self.app.state.attached_root_watcher = watcher
         self._tasks.append(asyncio.create_task(watcher.run(self._stop)))
+        # Signal has no server that can push to Raiker: messages arrive at the
+        # owner's signal-cli daemon, and the host reads its event stream. Idle
+        # unless a Signal pairing is enabled.
+        from raiker.channels import signal_bridge
+
+        self._tasks.append(asyncio.create_task(signal_bridge.run(
+            self.workspace_root, signal_bridge.inbound_handler(self.app), self._stop
+        )))
         # The llama.cpp servers the owner deployed come back, and stay watched:
         # a crash is restarted with backoff, an unanswered health check is
         # noticed. Restoring runs on its own thread — loading a model can take

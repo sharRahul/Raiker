@@ -365,16 +365,36 @@
       "auth_method": "device_pairing",
       "supports_inbound_messages": true,
       "supports_replies": true,
-      "supports_attachments": true,
+      "supports_attachments": false,
       "supports_approvals": true,
       "supports_side_questions": true,
-      "supports_interrupts": true,
+      "supports_interrupts": false,
       "interface_status": "equal_primary_when_enabled",
       "requires_pairing": true,
       "requires_sender_allowlist": true,
       "requires_network": true,
       "setup_ui": "channel_link_wizard",
-      "capability_policy_template": "channel.signal.default.json"
+      "capability_policy_template": "channel.signal.default.json",
+      "requires_env": [
+        {
+          "name": "RAIKER_SIGNAL_ACCOUNT",
+          "description": "The Signal number signal-cli is linked as (E.164, e.g. +15551234567). Run signal-cli link on this machine and scan the code from Signal on your phone.",
+          "url": "https://github.com/AsamK/signal-cli",
+          "secret": false
+        },
+        {
+          "name": "RAIKER_CHANNEL_EGRESS_ALLOWLIST",
+          "description": "Must contain the signal-cli daemon's address (127.0.0.1:8080 by default), or no reply leaves Raiker.",
+          "secret": false
+        }
+      ],
+      "optional_env": [
+        {
+          "name": "RAIKER_SIGNAL_HTTP_URL",
+          "description": "Where signal-cli daemon --http listens. Defaults to http://127.0.0.1:8080; only an address on this machine is used.",
+          "secret": false
+        }
+      ]
     },
     {
       "connector_id": "channel.voice",

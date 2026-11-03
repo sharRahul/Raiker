@@ -182,9 +182,23 @@ class ExternalChannelExecutor:
                 reason_code=str(exc),
                 summary="Channel delivery blocked (egress/transport).",
             ))
+        response_body = result.pop("body", b"")
+        # A bridge that answers HTTP 200 for a send it did not make (Signal's
+        # JSON-RPC daemon) says so in the body. Reading it is the adapter's job;
+        # the receipt records the failure instead of a delivery that never was.
+        delivery_error = getattr(adapter, "delivery_error", None)
+        failed = delivery_error(response_body) if callable(delivery_error) else None
+        if failed:
+            return receipt.settle(ExecutionResult(
+                ok=False, capability=self.capability, action_id=action.action_id,
+                reason_code=failed,
+                summary=f"Channel delivery failed at '{connector_id}': {failed.replace('_', ' ')}.",
+                artifacts={"connector_id": connector_id, "channel_type": channel_type,
+                           "status": result["status"]},
+            ))
         # DEC-14 step 7 — the platform's id for what it accepted, and nothing
         # else of its answer: the response body is dropped here.
-        provider_id = adapter.provider_message_id(result.pop("body", b""))
+        provider_id = adapter.provider_message_id(response_body)
         return receipt.settle(ExecutionResult(
             ok=True, capability=self.capability, action_id=action.action_id,
             summary=(

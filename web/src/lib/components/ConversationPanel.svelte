@@ -1,4 +1,5 @@
 <script lang="ts">
+  /* eslint-disable no-useless-assignment -- $bindable assignment propagates the session to the parent. */
   /**
    * Voice spec §8.2 — the conversation panel (Preview).
    *

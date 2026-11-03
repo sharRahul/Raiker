@@ -99,8 +99,9 @@ describe("first-run setup", () => {
 
     expect(await screen.findByRole("heading", { name: /^Hi, I'm Raiker\./ })).toBeInTheDocument();
     const rail = screen.getByRole("list", { name: "Setup progress" });
-    await waitFor(() => expect(within(rail).getAllByRole("listitem")).toHaveLength(4));
-    for (const stage of ["Name", "Model", "Privacy", "Start"]) {
+    // Voice spec §6.1 — the optional voice step sits between Name and Model.
+    await waitFor(() => expect(within(rail).getAllByRole("listitem")).toHaveLength(5));
+    for (const stage of ["Name", "Voice", "Model", "Privacy", "Start"]) {
       expect(within(rail).getByText(stage)).toBeInTheDocument();
     }
     for (const gone of ["Welcome", "Permissions", "Account", "Backup", "Ready"]) {
@@ -694,7 +695,7 @@ const check = (id: string, state: string, extra: Record<string, unknown> = {}) =
 describe("DIST-05 — a desktop installation was checked while it installed", () => {
   const desktopUpdate = { installation: { distribution: "desktop", version: "1.0.0" } };
 
-  it("asks only name, model, privacy and start, with no device or installation stage", async () => {
+  it("asks only name, voice, model, privacy and start, with no device or installation stage", async () => {
     const fetchMock = stubFetch({
       "GET /api/setup": { ...required, stage: "model" },
       "GET /api/models": { profiles: [], chat_profiles: [] },
@@ -707,21 +708,22 @@ describe("DIST-05 — a desktop installation was checked while it installed", ()
     const rail = screen.getByRole("list", { name: "Setup progress" });
     await waitFor(() => expect(within(rail).queryByText("This device")).toBeNull());
     expect(within(rail).queryByText("Check")).toBeNull();
-    expect(within(rail).getAllByRole("listitem")).toHaveLength(4);
+    expect(within(rail).getAllByRole("listitem")).toHaveLength(5);
 
     await fireEvent.click(screen.getByRole("button", { name: /Decide later/ }));
     const put = fetchMock.mock.calls.find(([url, init]) => String(url).includes("/api/setup") && init?.method === "PUT");
     expect(JSON.parse(String(put?.[1]?.body)).stage).toBe("privacy");
   });
 
-  it("opens a stored device stage on Model rather than a check that already ran", async () => {
+  it("opens a stored device stage on the step after it rather than a check that already ran", async () => {
     stubFetch({
       "GET /api/setup": { ...required, status: "in_progress", stage: "system" },
       "GET /api/models": { profiles: [], chat_profiles: [] },
       "GET /api/host/update": desktopUpdate,
     });
     render(ModelSetupView);
-    expect(await screen.findByRole("heading", { name: "Where should I think?" })).toBeInTheDocument();
+    // Voice spec §6.1 — the stage after This device is now the optional voice step.
+    expect(await screen.findByRole("heading", { name: /listen and answer aloud/ })).toBeInTheDocument();
   });
 });
 

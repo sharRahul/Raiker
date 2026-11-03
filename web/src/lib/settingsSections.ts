@@ -38,6 +38,8 @@ export const SETTINGS_SECTIONS: readonly SettingsSection[] = [
   { id: "general", label: "General", icon: "settings", group: "Experience" },
   { id: "personalisation", label: "Personalisation", icon: "spark", group: "Experience" },
   { id: "notification", label: "Notifications", icon: "bell", group: "Experience" },
+  // Voice spec §6.2 — listening and speaking on this computer.
+  { id: "voice", label: "Voice", icon: "mic", group: "Experience" },
   { id: "security", label: "Security", icon: "lock", group: "Security & data" },
   { id: "privacy", label: "Privacy", icon: "shield", group: "Security & data" },
   // PA-D02 — where a goal's work may run and what may leave with it. Settings

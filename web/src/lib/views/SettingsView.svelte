@@ -17,6 +17,7 @@
   import ExecutionProfiles from "./settings/ExecutionProfiles.svelte";
   import MemoryEngine from "./settings/MemoryEngine.svelte";
   import Updates from "./settings/Updates.svelte";
+  import Voice from "./settings/Voice.svelte";
   import Icon from "../components/Icon.svelte";
   import ModelsView from "./ModelsView.svelte";
   import ProviderUsagePanel from "./models/ProviderUsagePanel.svelte";
@@ -411,6 +412,8 @@
       <ExecutionProfiles />
     {:else if active === "web-access"}
       <WebAccess />
+    {:else if active === "voice"}
+      <Voice />
     {:else if active === "updates"}
       <Updates />
     {:else if active === "advanced"}

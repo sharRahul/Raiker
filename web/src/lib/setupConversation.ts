@@ -10,6 +10,8 @@ import { api } from "./api";
 
 export const HELLO_LINE = "Hi, I'm Raiker. Let's set up three things, then do something useful. What should I call you?";
 export const MODEL_QUESTION = "Where should I think?";
+/** Voice spec §6.1 — optional; nothing is downloaded until the owner picks a profile. */
+export const VOICE_QUESTION = "Should I be able to listen and answer aloud, on this computer?";
 export const ASK_LINE = "Here is how I'll work for you.";
 export const PROFILE_LINE = "I'll research and prepare on my own. I'll ask before I send, delete, pay or share anything.";
 export const FIRST_TASK_READY = "You're set. What should we do first?";
@@ -29,11 +31,14 @@ export interface SetupExchange {
  */
 export function answeredExchanges(
   passed: readonly string[],
-  answers: { name: string; model: string | null },
+  answers: { name: string; model: string | null; voice?: string | null },
 ): SetupExchange[] {
   const exchanges: SetupExchange[] = [];
   if (passed.includes("welcome")) {
     exchanges.push({ id: "welcome", asked: HELLO_LINE, answered: answers.name.trim() || "Skipped" });
+  }
+  if (passed.includes("voice")) {
+    exchanges.push({ id: "voice", asked: VOICE_QUESTION, answered: answers.voice ?? "Not now" });
   }
   if (passed.includes("model")) {
     exchanges.push({ id: "model", asked: MODEL_QUESTION, answered: answers.model ?? "Decide later" });

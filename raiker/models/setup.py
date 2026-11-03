@@ -8,12 +8,13 @@ from raiker.contracts.views import View
 SetupStatus = Literal["required", "in_progress", "skipped", "complete"]
 ModelSetupStep = Literal["choose_path", "provider", "model", "review", "ready"]
 ModelSetupPath = Literal["provider", "ollama", "lm_studio", "local_gguf", "hugging_face"]
+#: Voice spec §6.1 adds `voice` (the optional *Talk to Raiker* choice).
 #: DIST-05/06 add `system` (what this machine can do), `permissions` (the
 #: governance posture, read-only) and `verify` (the installation check). No
 #: column constraint names the stages, so an older build reading one of these
 #: lands on its welcome stage rather than failing.
 SetupStage = Literal[
-    "welcome", "account", "system", "model", "privacy", "permissions", "verify", "backup", "finish"
+    "welcome", "account", "system", "voice", "model", "privacy", "permissions", "verify", "backup", "finish"
 ]
 #: BUG-345 — `local_first` (*Local only*) was removed; migration RAIKER-2111
 #: rewrites stored rows, so `balanced` is the one value a row can hold.

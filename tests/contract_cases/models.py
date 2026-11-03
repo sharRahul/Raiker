@@ -316,6 +316,10 @@ def _image_lineage(ws: Path, client: TestClient, h: dict[str, str]) -> Call:
     return "/api/images/img_contract_edit/revert", {"to": "img_contract"}
 
 
+def _no_voice_download(monkeypatch: Any) -> None:
+    monkeypatch.setattr("raiker.api.routes_voice.run_voice_install", lambda *_args: None)
+
+
 CASES: Cases = {
     ("POST", "/api/images/{generation_id}/revert"): _image_lineage,
     ("GET", "/api/model-readiness"): plain("/api/model-readiness"),
@@ -432,6 +436,14 @@ CASES: Cases = {
     ("POST", "/api/speech/runtime/probe"): plain(
         "/api/speech/runtime/probe", {"endpoint": "http://127.0.0.1:9", "model": "whisper"}
     ),
+    # Voice spec V1 — nothing is downloaded: the install worker is replaced.
+    ("GET", "/api/voice/status"): plain("/api/voice/status"),
+    ("PUT", "/api/voice/settings"): plain("/api/voice/settings", {"profile": "balanced"}),
+    ("POST", "/api/voice/install"): patched(
+        plain("/api/voice/install", {"profile": "balanced"}), _no_voice_download
+    ),
+    ("DELETE", "/api/voice"): plain("/api/voice"),
+    ("POST", "/api/voice/test"): plain("/api/voice/test"),
     ("GET", "/api/images"): plain("/api/images"),
     ("POST", "/api/images"): patched(_image, _fake_image_provider),
     ("DELETE", "/api/images/{generation_id}"): _stored_image(deleted=False),

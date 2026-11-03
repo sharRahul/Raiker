@@ -42,7 +42,7 @@ const profile = (over: Partial<ModelProfile>): ModelProfile =>
 
 describe("the stages first launch shows", () => {
   it("opens on the product and never asks for an account twice", () => {
-    expect([...SETUP_STAGES]).toEqual(["welcome", "system", "model", "privacy", "permissions", "verify", "finish"]);
+    expect([...SETUP_STAGES]).toEqual(["welcome", "system", "voice", "model", "privacy", "permissions", "verify", "finish"]);
     expect(SETUP_STAGES).not.toContain("account");
   });
 
@@ -63,21 +63,22 @@ describe("the stages first launch shows", () => {
 
   it("does not repeat the checks a desktop installer already ran (DIST-05)", () => {
     const desktop = stagesFor("desktop");
-    expect([...desktop]).toEqual(["welcome", "model", "privacy", "finish"]);
+    expect([...desktop]).toEqual(["welcome", "voice", "model", "privacy", "finish"]);
     // A source checkout or server install had no installer step: it keeps the
     // device and installation checks.
     const source = stagesFor("payload");
-    expect([...source]).toEqual(["welcome", "system", "model", "privacy", "verify", "finish"]);
+    expect([...source]).toEqual(["welcome", "system", "voice", "model", "privacy", "verify", "finish"]);
     expect(stagesFor(null)).toEqual(source);
     // A row stored on a stage this rail skips opens on the stage after it.
-    expect(visibleStage("system", desktop)).toBe("model");
+    expect(visibleStage("system", desktop)).toBe("voice");
     expect(visibleStage("verify", desktop)).toBe("finish");
     expect(nextStage(desktop, "model")).toBe("privacy");
     expect(nextStage(desktop, "privacy")).toBe("finish");
     expect(previousStage(desktop, "finish")).toBe("privacy");
     expect(nextStage(source, "privacy")).toBe("verify");
     expect(previousStage(source, "finish")).toBe("verify");
-    expect(previousStage(desktop, "model")).toBe("welcome");
+    expect(previousStage(desktop, "model")).toBe("voice");
+    expect(previousStage(desktop, "voice")).toBe("welcome");
   });
 
   it("opens on the Hello step and no longer shows Permissions (QUI-W02)", () => {
@@ -92,7 +93,7 @@ describe("the stages first launch shows", () => {
     expect(visibleStage("welcome", stagesFor("desktop"))).toBe("welcome");
     expect(visibleStage("permissions", stagesFor("desktop"))).toBe("finish");
     expect(visibleStage(null, stagesFor("desktop"))).toBe("welcome");
-    expect(stagesFor("desktop").map((stage) => SETUP_STAGE_LABELS[stage])).toEqual(["Name", "Model", "Privacy", "Start"]);
+    expect(stagesFor("desktop").map((stage) => SETUP_STAGE_LABELS[stage])).toEqual(["Name", "Voice", "Model", "Privacy", "Start"]);
   });
 });
 

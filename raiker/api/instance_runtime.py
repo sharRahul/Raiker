@@ -132,8 +132,22 @@ class InstanceRuntime:
             # storage, with its event, rather than waiting for somebody to try
             # to decide it.
             await self._contained("approval_expiry", asyncio.to_thread(self._expire_approvals))
+            # Voice spec §7 — speech engines stop after the owner's idle
+            # timeout, and first of all when memory runs short.
+            await self._contained("voice_idle_unload", asyncio.to_thread(self._unload_idle_voice))
             with suppress(TimeoutError):
                 await asyncio.wait_for(self._stop.wait(), timeout=TICK_SECONDS)
+
+    def _unload_idle_voice(self) -> None:
+        from raiker.models.llama_cpp.hardware import available_memory_bytes
+        from raiker.voice.engines import engines_for
+        from raiker.voice.planner import SYSTEM_RESERVE
+
+        engines = engines_for(self.workspace_root)
+        if not any(engines.status()[name]["running"] for name in ("whisper", "speaker")):
+            return
+        free = available_memory_bytes()
+        engines.tick(engines.idle_seconds, memory_short=free is not None and free < SYSTEM_RESERVE)
 
     def _start_due_work(self, scheduler: TaskScheduler) -> None:
         """Start the scheduled-work pass beside the tick, never inside it (DEC-24 step 1).
@@ -262,6 +276,10 @@ class InstanceRuntime:
             return
         self._started = True
         self._recover_abandoned_operations()
+        with suppress(Exception):
+            from raiker.voice.engines import engines_for
+
+            engines_for(self.workspace_root).reap_orphans()
         self._tasks = [
             asyncio.create_task(self._tick()),
             asyncio.create_task(self._continuations()),
@@ -290,6 +308,10 @@ class InstanceRuntime:
     async def aclose(self) -> None:
         """Stop the background work and release everything this workspace holds."""
         self._stop.set()
+        with suppress(Exception):
+            from raiker.voice.engines import engines_for
+
+            engines_for(self.workspace_root).stop_all(reason="host_stopped")
         with suppress(Exception):
             self.app.state.scheduler_wakeup.request()
         if self._due_work is not None:

@@ -507,6 +507,13 @@ def _dispatch_operation(
         else:
             background.add_task(_run_local_deployment, *arguments, **extra)
         return
+    if operation.kind == "install" and payload.get("framework") == "voice":
+        from raiker.api.routes_voice import run_voice_install
+
+        background.add_task(
+            run_voice_install, workspace, owner, operation_id, str(payload.get("profile_id") or "")
+        )
+        return
     if operation.kind == "install":
         from raiker.api.routes_local_runtime import run_llama_cpp_install
 

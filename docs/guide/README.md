@@ -44,6 +44,7 @@ If this is your first time using Raiker, read these pages in order:
 | Run work now, later, repeatedly, or in the background | [Tasks and projects](tasks-and-projects.md) |
 | Connect services, or add MCP servers, skills, hooks, or plugins | [Extensions and MCP](extensions-and-mcp.md) |
 | Reach Raiker from Telegram or another channel | [Messaging](messaging.md) |
+| Talk to Raiker and hear it answer, on this computer | [Voice](voice.md) |
 | Generate images, import your own, and compose editable designs to export or hand to Build | [Design](design.md) |
 | Use Raiker's desktop window, its menu and shortcuts, Quick Entry and the tray | [The desktop window](managing-the-host.md#the-desktop-window) |
 | Answer a question Raiker asks mid-task, and read a turn's receipt | [When Raiker asks you a question](working-in-chat.md#when-raiker-asks-you-a-question) and [Reading a reply](working-in-chat.md#reading-a-reply) |

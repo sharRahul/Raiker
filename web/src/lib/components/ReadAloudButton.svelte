@@ -3,18 +3,20 @@
   import {
     audioSessionCoordinator,
     speechText,
-    voicePlayback,
     type AudioSessionCoordinator,
     type SpeechLanguage,
     type VoicePlayback,
   } from "../voice";
   import Icon from "./Icon.svelte";
+  // Voice spec V1 — the installed speaking engine when there is one, the
+  // on-device system voice otherwise.
+  import { managedPlayback } from "../speech/managedPlayback";
 
   let {
     responseId,
     text,
     language = "auto",
-    playback = voicePlayback,
+    playback = managedPlayback,
     coordinator = audioSessionCoordinator,
   }: {
     responseId: string;

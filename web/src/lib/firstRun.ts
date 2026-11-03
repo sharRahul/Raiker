@@ -35,7 +35,8 @@ import { isReachableProfile } from "./modelReadiness.svelte";
  * component, verified from inside the running host, plus one real request to
  * the chosen model when there is one).
  */
-export const SETUP_STAGES = ["welcome", "system", "model", "privacy", "permissions", "verify", "finish"] as const;
+/** Voice spec §6.1 — *Talk to Raiker* is optional, after the device and before the model. */
+export const SETUP_STAGES = ["welcome", "system", "voice", "model", "privacy", "permissions", "verify", "finish"] as const;
 
 export type SetupStage = (typeof SETUP_STAGES)[number];
 
@@ -44,6 +45,7 @@ export const SETUP_STAGE_LABELS: Record<SetupStage, string> = {
   // I call you?". The progress line reads Name · Model · Privacy · Start.
   welcome: "Name",
   system: "This device",
+  voice: "Voice",
   model: "Model",
   privacy: "Privacy",
   permissions: "Permissions",

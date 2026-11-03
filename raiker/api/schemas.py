@@ -307,6 +307,36 @@ class ComposerApprovalModeRequest(StrictRequest):
     approval_mode: str
 
 
+class VoiceConversationRequest(StrictModelRequest):
+    mode: Literal["push_to_talk", "hands_free"] | None = None
+    end_silence_ms: int | None = Field(default=None, ge=250, le=1500)
+    barge_in: bool | None = None
+    speak_tool_progress: bool | None = None
+    keep_recordings: bool | None = None
+    labs_hands_free: bool | None = None
+
+
+class VoiceSettingsRequest(StrictModelRequest):
+    """Voice spec §6.2 — every field optional; what is sent is changed."""
+
+    profile: Literal["off", "lite", "balanced", "high"] | None = None
+    english_only: bool | None = None
+    whisper_model: str | None = None
+    voice: str | None = Field(default=None, max_length=40)
+    speed: float | None = Field(default=None, ge=0.5, le=2.0)
+    idle_unload_minutes: int | None = Field(default=None, ge=1, le=120)
+    run_on: Literal["auto", "cpu", "gpu"] | None = None
+    conversation: VoiceConversationRequest | None = None
+
+
+class VoiceInstallRequest(StrictModelRequest):
+    profile: Literal["lite", "balanced", "high"] | None = None
+
+
+class VoiceSpeakRequest(StrictModelRequest):
+    text: str = Field(min_length=1, max_length=2000)
+
+
 class SpeechRuntimeRequest(StrictModelRequest):
     """The local transcription runtime dictation should use, if any (BUG-256).
 
@@ -404,7 +434,7 @@ class SetupUpdateRequest(StrictModelRequest):
     # accepted because an instance part-way through the previous wizard has one
     # of them stored, and a stored row must still round-trip.
     stage: Literal[
-        "welcome", "account", "system", "model", "privacy", "permissions", "verify", "backup", "finish"
+        "welcome", "account", "system", "voice", "model", "privacy", "permissions", "verify", "backup", "finish"
     ]
     selected_profile_id: str | None = None
     selected_model: str | None = None

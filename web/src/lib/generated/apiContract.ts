@@ -5244,7 +5244,7 @@ export type PromoteTaskWorkspaceRequest = {
 
 export type PromptRequest = {
   text: string;
-  input_mode?: "typed" | "dictated" | "mixed";
+  input_mode?: "typed" | "dictated" | "mixed" | "spoken";
   surface?: "chat" | "build" | "design";
   project_id?: string | null;
   session_id?: string | null;

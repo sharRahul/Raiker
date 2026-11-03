@@ -913,7 +913,7 @@ class PromptRequest:
     text: str
     # Client-reported input provenance only. The server can constrain this
     # label but cannot prove how a REST or web client produced the text.
-    input_mode: Literal["typed", "dictated", "mixed"] = "typed"
+    input_mode: Literal["typed", "dictated", "mixed", "spoken"] = "typed"
     # Which composer sent this prompt. It selects the operating protocol the
     # turn runs under — Build gets the engineering protocol, Design the research
     # one, Chat neither — and grants nothing: capabilities, gates and approvals

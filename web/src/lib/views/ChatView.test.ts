@@ -1629,3 +1629,25 @@ describe("ChatView long transcripts (QUI-G04)", () => {
     expect(document.querySelector(".turn.search-hit")?.getAttribute("data-turn-index")).toBe("3");
   }, 20_000);
 });
+
+describe("ChatView voice conversation (voice spec V2)", () => {
+  const voiceStatus = (listening: string, speaking: string) => ({
+    settings: { profile: "balanced", conversation: { labs_hands_free: false, barge_in: true, end_silence_ms: 500 } },
+    listening: { state: listening, components: [{ role: "whisper_model", name: "Whisper small (q5_1)" }] },
+    speaking: { state: speaking, components: [{ role: "kokoro_model", name: "Kokoro-82M (int8)" }] },
+  });
+
+  it("offers Talk only when listening and speaking are installed", async () => {
+    stubFetch({ ...MODELS_ROUTE, "GET /api/voice/status": voiceStatus("installed", "ready") });
+    render(ChatView);
+    expect(await screen.findByRole("button", { name: "Talk to Raiker (Preview)" })).toBeInTheDocument();
+  });
+
+  it("does not offer Talk while speech recognition is not available", async () => {
+    stubFetch({ ...MODELS_ROUTE, "GET /api/voice/status": voiceStatus("unavailable", "ready") });
+    render(ChatView);
+    await screen.findByRole("textbox", { name: /prompt/i });
+    await new Promise((r) => setTimeout(r, 0));
+    expect(screen.queryByRole("button", { name: "Talk to Raiker (Preview)" })).toBeNull();
+  });
+});

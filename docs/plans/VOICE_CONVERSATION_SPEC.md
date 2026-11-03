@@ -1,6 +1,6 @@
 # Native voice conversation
 
-**Status:** specification, opened 2026-11-02. Tracked in
+**Status:** V1 implemented, V2 implemented as Preview (see §12a); opened 2026-11-02. Tracked in
 [BETA_RELEASE_PLAN.md](BETA_RELEASE_PLAN.md) as VD-1 (beta, **P0**) and VD-5
 (conversation, **Preview** in beta). Supersedes nothing: today's dictation and
 read-aloud (BUG-256, *Local voice delivery — release blockers* in
@@ -442,6 +442,48 @@ catalogue.
 | **V2** | Conversation panel: push-to-talk first, then hands-free with Silero VAD, streaming TTS and barge-in; spoken-style hint; approvals by click | **Preview** in beta.1, Ship in beta.2 |
 | **V3** | *Look* (camera → Moondream or a vision model); the Lite profile validated on ARM64 Linux (Raspberry Pi 5, 8 GB) as in the reference concept | after beta |
 | **V4** | Opt-in local wake word; voice on messaging channels | later |
+
+## 12a. Implementation status (2026-11-03)
+
+**V1 — implemented.** Code: `raiker/voice/`, `raiker/models/engines/`,
+`raiker/api/routes_voice.py`, `web/src/lib/views/settings/Voice.svelte`, the
+*Voice* setup stage. Kokoro speaking was installed from the catalogue,
+verified and run for real (`tests/test_voice_live.py`). What remains before the
+§14 acceptance:
+
+- Whisper models and Piper voices are listed with `pending_reason` until
+  `scripts/pin_voice_catalogue.py` pins them from Hugging Face. Piper voices
+  also need their dataset licences reviewed.
+- Upstream publishes `whisper-server` for Windows only. The Linux and macOS
+  builds are pending in Raiker's release workflow (§5.2).
+- `kokoro-onnx` pulls in espeak-ng (GPL-3.0, §11 ⚠). It is not bundled until
+  that is signed off, and a build without it reports
+  `voice_kokoro_runtime_missing`.
+- The installer step starts downloads when the step is answered. Pausing on a
+  metered network is not implemented.
+
+**V2 — Preview implemented.** Code: `web/src/lib/speech/`,
+`web/src/lib/components/ConversationPanel.svelte`, the *Talk* button in Chat,
+and `input_mode: spoken` with `SPOKEN_STYLE_PROMPT`. Two deliberate
+departures from §10:
+
+- **No WebSocket session.** The panel posts each utterance to the existing
+  dictation route (which uses the managed Whisper engine), sends the
+  transcript through the ordinary Chat stream path, and speaks the streamed
+  answer with `/api/voice/speak`. A spoken turn is therefore the same governed
+  turn as a typed one by construction, with no second turn path to keep in
+  step.
+- **VAD on the page's main thread**, with onnxruntime-web on one thread rather
+  than in a Web Worker. One 32 ms frame costs well under a millisecond, and
+  this avoids the cross-origin isolation a threaded WebAssembly worker would
+  need. Running WebAssembly requires `'wasm-unsafe-eval'` in `script-src`,
+  which permits compiling WebAssembly only (verified in Chromium against the
+  real policy).
+
+Not done yet: the §14 V2 latency acceptance on the reference laptop, the
+Playwright fake-microphone end-to-end run (§13), `Ctrl/⌘+Shift+Space` and the
+tray *Talk to Raiker* entry, ducking under a screen reader, and spoken tool
+progress (the setting is stored; nothing speaks it yet).
 
 ## 13. Testing
 

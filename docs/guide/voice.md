@@ -68,5 +68,30 @@ for each start, so other programs on the computer cannot use it.
   browser or cloud voice.
 - **Test.** Speaks a phrase, transcribes it back when listening is installed,
   and shows how many words matched.
-- **Conversation.** See the conversation panel (*Preview*). Hands-free
-  listening is behind **Settings › Voice › Hands-free conversation**.
+## Talking to Raiker (Preview)
+
+When listening and speaking are both installed, Chat shows **Talk**. It opens
+a conversation panel over the chat:
+
+- **Hold to talk** (or hold Space), and release when you have finished.
+  With **Hands-free conversation** turned on in Settings › Voice, Raiker
+  listens for the end of your sentence itself, using the Silero voice-activity
+  model that runs in the page.
+- Raiker answers aloud sentence by sentence as the answer is written, so it
+  starts speaking before the whole answer is ready. Captions show what you
+  said and what it says, and both stay in the chat as ordinary messages.
+- **Interrupt** by speaking over it, or press any key or **Stop talking**.
+  Speech stops at once and the turn is cancelled.
+- **Approvals are never given by voice.** A step that needs your OK stops
+  speech, says *"I need your OK on screen"*, and shows the normal approval
+  card. After you decide, press **Continue**.
+- The status shows one of five states, each with its own shape and words:
+  *Listening*, *Hearing you*, *Thinking*, *Speaking* and *Paused*.
+- The privacy line under the controls says where your words go. With a
+  hosted model it names the provider that receives your words as text; audio
+  never leaves the computer.
+- Pressing Escape or **End**, or hiding the window, releases the microphone.
+
+A spoken message is an ordinary turn. The same permissions, tools, approvals,
+budgets and receipts apply, and the model receives exactly the transcript you
+see. It is also asked for a short, spoken-style answer.

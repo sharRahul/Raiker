@@ -278,8 +278,10 @@ def test_every_page_carries_a_content_security_policy(workspace: Path) -> None:
         part.strip().split(" ", 1)[0]: part.strip() for part in policy.split(";") if part.strip()
     }
     assert directives["default-src"] == "default-src 'self'"
-    # Nothing Raiker's page runs comes from anywhere else.
-    assert directives["script-src"] == "script-src 'self'"
+    # Nothing Raiker's page runs comes from anywhere else. `'wasm-unsafe-eval'`
+    # admits compiling this origin's own WebAssembly (the voice VAD), not eval.
+    assert directives["script-src"] == "script-src 'self' 'wasm-unsafe-eval'"
+    assert "'unsafe-eval'" not in directives["script-src"].replace("'wasm-unsafe-eval'", "")
     assert directives["connect-src"] == "connect-src 'self'"
     # BUG-307 — no inline style allowance either: Svelte styles through the
     # CSSOM, so the only inline style this would admit is one Raiker did not ship.

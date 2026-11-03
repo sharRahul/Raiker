@@ -27355,7 +27355,8 @@
             "enum": [
               "typed",
               "dictated",
-              "mixed"
+              "mixed",
+              "spoken"
             ],
             "title": "Input Mode",
             "type": "string"

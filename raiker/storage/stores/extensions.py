@@ -822,15 +822,15 @@ class ExtensionStore:
         """Replace the inbound route as one atomic owner decision."""
         with self.connect() as connection:
             cursor = connection.execute(
-                # DEC-14 step 3 — Telegram delivers to the owner sender's chat,
+                # DEC-14 step 3 — Telegram and Signal deliver to the owner sender's chat,
                 # so choosing another owner forgets the test of the old one,
                 # as binding a new webhook URL already does.
                 """UPDATE channel_pairings
-                   SET last_test_at = CASE WHEN channel_type = 'telegram'
+                   SET last_test_at = CASE WHEN channel_type IN ('telegram', 'signal')
                          AND owner_sender_id IS NOT ? THEN NULL ELSE last_test_at END,
-                       last_test_ok = CASE WHEN channel_type = 'telegram'
+                       last_test_ok = CASE WHEN channel_type IN ('telegram', 'signal')
                          AND owner_sender_id IS NOT ? THEN NULL ELSE last_test_ok END,
-                       last_test_reason = CASE WHEN channel_type = 'telegram'
+                       last_test_reason = CASE WHEN channel_type IN ('telegram', 'signal')
                          AND owner_sender_id IS NOT ? THEN NULL ELSE last_test_reason END,
                        routing_mode = ?, target_session_id = ?, owner_sender_id = ?,
                        approval_relay_enabled = ?

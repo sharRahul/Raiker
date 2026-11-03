@@ -756,23 +756,26 @@ def test_a_channel_type_with_no_wire_format_fails_closed(
 def test_the_adapter_table_owns_the_wire_format_and_nothing_else() -> None:
     from raiker.channels.adapters import adapter_channel_types, adapter_for
 
-    assert set(adapter_channel_types()) == {"telegram", "webhooks"}
+    assert set(adapter_channel_types()) == {"signal", "telegram", "webhooks"}
     # An adapter answers two questions and has no way to widen a boundary: no
     # gate, no allowlist, no pairing, no audit surface on it.
-    adapter = adapter_for("telegram")
-    assert adapter is not None
-    assert {"outbound", "parse_inbound", "channel_type", "capabilities"} <= set(dir(adapter))
-    # DEC-14 step 1 — `capabilities` is a declaration the page reads and the
-    # executor bounds a reply by; it widens nothing. DEC-14 step 7 —
-    # `provider_message_id` reads one id out of the platform's answer.
-    assert not [
-        name
-        for name in dir(adapter)
-        if not name.startswith("_")
-        and name not in {
-            "outbound", "parse_inbound", "channel_type", "capabilities", "provider_message_id",
-        }
-    ]
+    for channel_type in adapter_channel_types():
+        adapter = adapter_for(channel_type)
+        assert adapter is not None
+        assert {"outbound", "parse_inbound", "channel_type", "capabilities"} <= set(dir(adapter))
+        # DEC-14 step 1 — `capabilities` is a declaration the page reads and the
+        # executor bounds a reply by; it widens nothing. DEC-14 step 7 —
+        # `provider_message_id` reads one id out of the platform's answer, and
+        # `delivery_error` reads whether a bridge that answered 200 sent anything.
+        assert not [
+            name
+            for name in dir(adapter)
+            if not name.startswith("_")
+            and name not in {
+                "outbound", "parse_inbound", "channel_type", "capabilities",
+                "provider_message_id", "delivery_error",
+            }
+        ]
 
 
 def test_a_connector_declares_the_environment_it_needs(

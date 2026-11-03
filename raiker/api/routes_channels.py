@@ -45,7 +45,7 @@ from raiker.api.wire.channels import (
     ChannelUpdateIgnored,
     InboundRoute,
 )
-from raiker.channels.adapters import adapter_for
+from raiker.channels.adapters import OWNER_CHAT_CHANNEL_TYPES, adapter_for
 from raiker.channels.revision import CHANNEL_CONFLICT
 from raiker.context.redaction import redact_text
 from raiker.contracts.ids import new_id, utc_now
@@ -929,7 +929,7 @@ async def _handle_inbound(
     _settle_receipt(store, channel_message_id, routed, channel_type=channel_type)
     _remember_reply(connector_id, str(routed.get("reply") or ""))
     if (
-        channel_type == "telegram"
+        channel_type in OWNER_CHAT_CHANNEL_TYPES
         and is_owner
         and routed.get("routed")
         and routed.get("reply")

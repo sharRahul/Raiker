@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import urlparse
 
+from raiker.channels.adapters import OWNER_CHAT_CHANNEL_TYPES
 from raiker.channels.revision import CHANNEL_CONFLICT, pairing_revision
 from raiker.channels.revision import is_stale as channel_is_stale
 from raiker.cli.principal_resolver import (
@@ -2177,7 +2178,7 @@ def _untested_destination(pairing: Mapping[str, Any]) -> bool:
     test, so a passed test is always a test of the destination as it stands.
     """
     channel_type = str(pairing.get("channel_type") or "")
-    if channel_type == "telegram":
+    if channel_type in OWNER_CHAT_CHANNEL_TYPES:
         configured = bool(pairing.get("owner_sender_id"))
     elif channel_type == "webhooks":
         configured = bool(pairing.get("delivery_url"))

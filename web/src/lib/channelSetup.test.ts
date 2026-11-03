@@ -188,6 +188,11 @@ describe("receipts", () => {
     // DEC-14 step 8 — the budgets behind the sender's own.
     expect(testReason("channel_rate_limited")).toMatch(/channel went over its rate limit/);
     expect(testReason("inbound_rate_limited")).toMatch(/every channel/);
+    // Signal — the failures signal-cli reports inside an HTTP 200.
+    expect(testReason("signal_account_missing")).toMatch(/RAIKER_SIGNAL_ACCOUNT/);
+    expect(testReason("signal_bridge_not_local")).toMatch(/this machine/);
+    expect(testReason("signal_rate_limited")).toMatch(/rate-limiting/);
+    expect(testReason("signal_recipient_failed")).toMatch(/could not deliver/);
   });
 
   // DEC-14 step 7 — what Raiker sent is recorded as well as what it received.

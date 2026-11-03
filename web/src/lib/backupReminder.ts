@@ -10,6 +10,12 @@
 import type { BackupView } from "./generated/apiContract";
 
 export const BACKUP_STALE_DAYS = 7;
+/**
+ * Beta plan, area 6 — the top bar warns from every page once no verified
+ * backup is newer than two weeks. Home's one-line suggestion comes first, at a
+ * week; the top bar is the louder, global step, so it waits longer.
+ */
+export const TOP_BAR_BACKUP_STALE_DAYS = 14;
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 export interface BackupReminder {
@@ -20,9 +26,20 @@ export interface BackupReminder {
 
 const WHERE = "#/settings?tab=general";
 
+/**
+ * Raised on `window` when this page makes, verifies or removes a backup, so
+ * the top bar re-reads at once instead of nagging until its next poll.
+ */
+export const BACKUPS_CHANGED = "raiker:backups-changed";
+
+export function announceBackupsChanged(): void {
+  if (typeof window !== "undefined") window.dispatchEvent(new Event(BACKUPS_CHANGED));
+}
+
 export function backupReminder(
   backups: readonly Pick<BackupView, "created_at" | "state">[] | null,
   now: Date,
+  staleDays: number = BACKUP_STALE_DAYS,
 ): BackupReminder | null {
   if (backups === null) return null;
   const times = backups
@@ -35,6 +52,6 @@ export function backupReminder(
     return { text: "There is no backup of this workspace yet.", href: WHERE, label: "Make a backup" };
   }
   const days = Math.floor((now.getTime() - Math.max(...times)) / DAY_MS);
-  if (days < BACKUP_STALE_DAYS) return null;
+  if (days < staleDays) return null;
   return { text: `The last backup was ${days} days ago.`, href: WHERE, label: "Make a backup" };
 }

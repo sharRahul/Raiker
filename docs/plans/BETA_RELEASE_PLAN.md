@@ -265,8 +265,14 @@ work runs (top bar), and so is the count of running items.
 - Settings → **Privacy** gains a *"What leaves this computer"* panel, listing
   each configured destination and what may be sent there (model prompts,
   connector calls, update checks).
-- Backup reminders appear in the top bar when no verified backup is newer than
-  14 days.
+- ✅ Backup reminders appear in the top bar when no verified backup is newer than
+  14 days. Evidence: `web/src/lib/components/Topbar.svelte` shows a *Make a
+  backup* link to Settings → General from every page (reachable at every width;
+  the label collapses to the warning icon below 1100px); it re-reads every ten
+  minutes and at once when a backup is made, verified or removed, and a failed
+  read shows nothing. The rule is shared with Home's seven-day note
+  (`web/src/lib/backupReminder.ts`, `TOP_BAR_BACKUP_STALE_DAYS`); tests in
+  `Topbar.test.ts` and `backupReminder.test.ts`.
 
 ---
 

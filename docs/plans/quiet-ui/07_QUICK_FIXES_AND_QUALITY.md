@@ -102,3 +102,33 @@ Evidence and limitations are recorded in
 [WEB_APP_LIVE_TEST.md](../../architecture/WEB_APP_LIVE_TEST.md).
 QUI-G06 remains partial: other views still need their error audit. QUI-G01,
 QUI-G04 and QUI-G07 also remain open, so this document is retained.
+
+## 2026-11-06 — QUI-G06 Model recovery
+
+The next 15-item implementation slice applies the same error-recovery decision
+to local model management and Hugging Face discovery:
+
+1. [x] Local-library read: name the stale list and offer reopening the panel.
+2. [x] Add folder: check the approval list before repeating the write.
+3. [x] Scan folders: name the stale model list and offer **Scan now**.
+4. [x] Remove folder: catch the failure and check approval before retrying.
+5. [x] Activity read: offer **Retry status**.
+6. [x] Cancel job: catch the failure without claiming cancellation succeeded.
+7. [x] Retry job: preserve the action error across successful status polling.
+8. [x] Inspect partial files: show the error outside an unopened confirmation.
+9. [x] Delete partial files: retain the review and check what remains; do not
+   describe every network/server failure as an unsafe-path refusal.
+10. [x] Clear job record: catch the failure and retain the row.
+11. [x] Save context limit: preserve entries and advise checking the saved limit.
+12. [x] Check local server: explain unconfirmed tool support and the next check.
+13. [x] Hugging Face search: name the failed search and connection recovery.
+14. [x] Inspect repository: name the missing file/folder information and access check.
+15. [x] Estimate download: explain unconfirmed size/placement and destination check.
+
+The shared error helper retains HTTP/refusal evidence. Mutation messages avoid
+claiming a failed response proves that nothing changed on the server. Activity
+now keeps read errors and action errors separately so polling does not hide
+the failed owner action. Evidence:
+[Live Test docs](../../architecture/WEB_APP_LIVE_TEST.md#result--2026-11-06-qui-g06-model-recovery)
+and [FIXED-1287](../FIXED_ITEMS.md#fixed-1287--model-management-errors-were-hidden-misleading-or-had-no-recovery-step-qui-g06).
+The remaining quality foundations above keep this plan open.

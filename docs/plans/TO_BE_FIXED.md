@@ -1351,3 +1351,14 @@ The other thirteen still need individual live fault-injection evidence.
 The broader error-copy audit, optimistic-action rollback, page-size gates and
 five-person usability study remain open in that plan. No beta acceptance
 gate is closed by this limited error-message slice.
+
+### QUI-G06 model-management slice — remaining evidence
+
+The 15 model-management recovery implementations are recorded in
+[07 Quick fixes and quality](quiet-ui/07_QUICK_FIXES_AND_QUALITY.md#2026-11-06--qui-g06-model-recovery)
+and [FIXED-1287](FIXED_ITEMS.md#fixed-1287--model-management-errors-were-hidden-misleading-or-had-no-recovery-step-qui-g06).
+Browser fault-injection cases cover library read/scan and Activity retry,
+cancel, inspection and record cleanup. The other nine paths still need
+individual running-host fault-injection evidence. Synthetic Activity rows in
+these checks do not close real download, installer or provider acceptance.
+The remaining cross-app error audit and QUI-G01/G04/G07 stay open.

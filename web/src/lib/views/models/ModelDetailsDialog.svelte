@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { failure } from "../../errorCopy";
   /**
    * UX-MODEL-01 — Model details, out of the Models page.
    *
@@ -9,7 +10,7 @@
    * its own beyond what it is handed.
    */
   import ProviderLogo from "../../components/ProviderLogo.svelte";
-  import { api, ApiError } from "../../api";
+  import { api } from "../../api";
   import type { ModelCapacitiesView, ModelProfile } from "../../apiTypes";
   import { profileLabel, providerName } from "../../format";
   import { modelName } from "../../modelPresentation";
@@ -58,7 +59,7 @@
       capacityReason = "";
       await onchanged();
     } catch (e) {
-      capacityNote = e instanceof ApiError ? `Could not save (${e.reasonCode ?? e.status})` : "Could not save.";
+      capacityNote = failure("Could not save the model context limit", "The saved override could not be confirmed.", "Copy your entries, then reopen Details to check the limit before saving again.", e);
     } finally {
       capacityBusy = false;
     }
@@ -84,7 +85,7 @@
     try {
       check = await api.checkModelServer(profile.profile_id, profile.model);
     } catch (e) {
-      checkError = e instanceof ApiError ? `Could not check (${e.reasonCode ?? e.status})` : "Could not check.";
+      checkError = failure("Could not check the model server", "Tool-call support could not be confirmed.", "Check that the local server is running, then run the check again.", e);
     } finally {
       checking = false;
     }

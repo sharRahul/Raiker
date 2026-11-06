@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { failure } from "../../errorCopy";
   import { askConfirm } from "../../confirm.svelte";
   import { onDestroy } from "svelte";
   import { api, ApiError } from "../../api";
@@ -83,10 +84,7 @@
       results = (await api.searchHuggingFace(query.trim())).items;
       showingTrending = false;
     } catch (e) {
-      error =
-        e instanceof ApiError
-          ? (e.reasonCode ?? `Search unavailable (${e.status})`)
-          : "Search unavailable";
+      error = failure("Could not search Hugging Face", "Search results could not be refreshed.", "Check your connection to Hugging Face, then search again.", e);
     } finally {
       searching = false;
     }
@@ -101,10 +99,7 @@
       library = await api.modelLibrary();
       destination = library.roots[0]?.path ?? "";
     } catch (e) {
-      error =
-        e instanceof ApiError
-          ? (e.reasonCode ?? "Could not inspect this repository")
-          : "Could not inspect this repository";
+      error = failure("Could not inspect the Hugging Face repository", "Its files and download folder could not be loaded.", "Check access to the repository, then select it again.", e);
     }
   }
   async function chooseVariant(variant: HuggingFaceVariant) {
@@ -118,10 +113,7 @@
     try {
       preview = await api.previewHuggingFaceDownload(variant, destination);
     } catch (e) {
-      error =
-        e instanceof ApiError
-          ? (e.reasonCode ?? "Could not estimate download")
-          : "Could not estimate download";
+      error = failure("Could not estimate the model download", "Download size and placement could not be confirmed.", "Check the approved destination folder, then select the file again.", e);
     }
   }
   // GCR-22 — the download is a durable background operation, never held inside

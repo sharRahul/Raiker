@@ -1591,6 +1591,7 @@ file you can open. The two capture sets that remain — `screenshots/pages/` and
 | [FIXED-1284](#fixed-1284--beta-feedback-and-runtime-state-were-not-clear-from-every-page) | Low | Beta feedback and runtime state were not clear from every page | Fixed |
 | [FIXED-1285](#fixed-1285--memory-action-failures-gave-no-recovery-step-qui-g06) | Low | Memory action failures gave no recovery step (QUI-G06) | Fixed |
 | [FIXED-1286](#fixed-1286--fixed-items-history-was-truncated-and-broke-ci-documentation-links) | Low | Fixed-items history was truncated and broke CI documentation links | Fixed |
+| [FIXED-1287](#fixed-1287--model-management-errors-were-hidden-misleading-or-had-no-recovery-step-qui-g06) | Medium | Models / error recovery | Fixed |
 
 ---
 
@@ -38767,3 +38768,26 @@ instead of reloading the trust store on every tick; the recovery assertion allow
 
 **Evidence.** tests/test_docs_consistency.py; Svelte check, production build
 and the mocked responsive composer suite.
+
+## FIXED-1287 — Model management errors were hidden, misleading or had no recovery step (QUI-G06)
+
+**Severity: Medium. Area: Models / error recovery. Status: Fixed 2026-11-06.**
+
+**Observed.** Fifteen model-management failures lacked recovery guidance.
+Folder removal, cancellation and record clearing could reject without a visible
+error. Partial-file inspection errors appeared only inside a confirmation that
+had not opened. Successful status polling could erase a failed retry message.
+Deletion failures always claimed an unsafe path even for unrelated server errors.
+
+**Fixed.** Applied QUI-G06 to four local-library actions, six Activity actions,
+two model-detail actions and three Hugging Face discovery actions. The UI keeps
+action failures separate from list-read errors, exposes inspection failures
+outside the confirmation, and reports unconfirmed writes honestly. Existing
+HTTP status and refusal evidence remains available through the shared helper.
+Failed library reads stop announcing loading; failed Activity reads no longer
+claim that there is no activity.
+
+**Evidence.** ModelRecovery.test.ts exercises action failures, retained rows,
+deletion review and polling. Existing focused panel suites cover successful
+behavior. Running-host browser cases RT-MODEL-RECOVERY-01–06 and screenshots:
+[WEB_APP_LIVE_TEST.md](../architecture/WEB_APP_LIVE_TEST.md#result--2026-11-06-qui-g06-model-recovery).

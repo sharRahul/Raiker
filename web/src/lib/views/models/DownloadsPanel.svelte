@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { failure } from "../../errorCopy";
   import { onMount } from "svelte";
   import { api } from "../../api";
   import type { ModelOperation, PartialFiles } from "../../apiTypes";
@@ -6,6 +7,7 @@
   import RowOverflow from "../../components/RowOverflow.svelte";
   let items = $state<ModelOperation[]>([]);
   let error = $state<string | null>(null);
+  let actionError = $state<string | null>(null);
   // BUG-75 — deleting bytes from disk is its own decision, so it takes its own
   // confirmation and names the exact approved path and size first. `Clear
   // record` stays metadata-only and is deliberately not merged into it.
@@ -41,31 +43,36 @@
       items = Array.isArray(body?.items) ? body.items : [];
       error = null;
       readFailed = false;
-    } catch {
-      error = "Could not load model activity.";
+    } catch (e) {
+      error = failure("Could not load model activity", "Job status could not be refreshed.", "Choose Retry status to check again.", e);
       readFailed = true;
     }
   }
   async function cancel(id: string) {
-    await api.cancelModelOperation(id);
-    await load();
+    actionError = null;
+    try {
+      await api.cancelModelOperation(id);
+      await load();
+    } catch (e) {
+      actionError = failure("Could not cancel the model job", "Cancellation could not be confirmed.", "Check the job’s status before cancelling again.", e);
+    }
   }
   async function retry(id: string) {
+    actionError = null;
     try {
       await api.retryModelOperation(id);
-      error = null;
-    } catch {
-      error = "That job could not be started again. Its original parameters were not recorded.";
+      await load();
+    } catch (e) {
+      actionError = failure("Could not retry the model job", "A new attempt could not be confirmed.", "Check the job’s status before retrying again.", e);
     }
-    await load();
   }
 
   async function askDeletePartial(id: string) {
     deleteError = null;
     try {
       deleting = { operationId: id, summary: await api.partialFiles(id) };
-    } catch {
-      deleteError = "Could not read what this job left behind.";
+    } catch (e) {
+      deleteError = failure("Could not inspect the model job’s partial files", "The file list is unavailable.", "Choose Delete partial files again to review it before deleting anything.", e);
     }
   }
 
@@ -75,14 +82,19 @@
       await api.deletePartialFiles(deleting.operationId);
       deleting = null;
       deleteError = null;
-    } catch {
-      deleteError = "That path is not inside your approved model library, so nothing was deleted.";
+    } catch (e) {
+      deleteError = failure("Could not delete the model job’s partial files", "Deletion could not be confirmed.", "Close this review and choose Delete partial files again to check what remains.", e);
     }
     await load();
   }
   async function cleanup(id: string) {
-    await api.cleanupModelOperation(id);
-    await load();
+    actionError = null;
+    try {
+      await api.cleanupModelOperation(id);
+      await load();
+    } catch (e) {
+      actionError = failure("Could not clear the model job record", "Record removal could not be confirmed.", "Check the job list before choosing Clear record again.", e);
+    }
   }
   // A once-a-second poll is what a running download needs and what an idle
   // panel wastes: on its own it spends half the API's per-minute rate budget,
@@ -137,6 +149,8 @@
     {/if}
   </header>
   {#if error}<p class="error" role="alert">{error}</p>{/if}
+  {#if actionError}<p class="error" role="alert">{actionError}</p>{/if}
+  {#if deleteError && deleting === null}<p class="error" role="alert">{deleteError}</p>{/if}
   {#if deleting !== null}
     <div class="confirm" role="alertdialog" aria-labelledby="delete-partial-title">
       <h3 id="delete-partial-title">Delete the files this job left behind?</h3>
@@ -173,13 +187,13 @@
       </div>
     </div>
   {/if}
-  {#if items.length === 0}<div class="empty">
+  {#if items.length === 0 && !readFailed}<div class="empty">
       <strong>No model activity yet</strong><span
         >Downloads, conversions, model server installs, pulls, and deployments appear
         here.</span
       >
     </div>
-  {:else}<div class="timeline">
+  {:else if items.length > 0}<div class="timeline">
       {#each ordered as item (item.operation_id)}<article>
           <div
             class="rail"

@@ -1,6 +1,7 @@
 <script lang="ts">
+  import { failure } from "../../errorCopy";
   import { onMount } from "svelte";
-  import { api, ApiError } from "../../api";
+  import { api } from "../../api";
   import type { ModelLibraryView } from "../../apiTypes";
   import Icon from "../../components/Icon.svelte";
   import PathPicker from "../../components/PathPicker.svelte";
@@ -37,10 +38,7 @@
       };
       error = null;
     } catch (e) {
-      error =
-        e instanceof ApiError
-          ? `Library unavailable (${e.status})`
-          : "Library unavailable";
+      error = failure("Could not load the local model library", "The folder and model list could not be refreshed.", "Reopen this panel to try again.", e);
     }
   }
 
@@ -53,10 +51,7 @@
       root = "";
       await scan();
     } catch (e) {
-      error =
-        e instanceof ApiError
-          ? (e.reasonCode ?? `Could not add folder (${e.status})`)
-          : "Could not add folder";
+      error = failure("Could not add the model folder", "Its approval could not be confirmed.", "Reopen this panel to check the folder list before adding it again.", e);
     } finally {
       busy = false;
     }
@@ -69,16 +64,21 @@
       const result = await api.rescanModelLibrary();
       await load();
       notice = `Found ${result.models.length} local model${result.models.length === 1 ? "" : "s"}.`;
-    } catch {
-      error = "Could not scan the approved folders.";
+    } catch (e) {
+      error = failure("Could not scan the approved model folders", "The model list may be out of date.", "Choose Scan now to try again.", e);
     } finally {
       busy = false;
     }
   }
 
   async function removeRoot(path: string) {
-    await api.removeModelLibraryRoot(path);
-    await load();
+    error = null;
+    try {
+      await api.removeModelLibraryRoot(path);
+      await load();
+    } catch (e) {
+      error = failure("Could not remove the model folder", "Its approval could not be confirmed.", "Reopen this panel to check the folder list before removing it again.", e);
+    }
   }
   onMount(load);
 </script>
@@ -164,7 +164,7 @@
     </div>
     {#if error}<p class="error" role="alert">{error}</p>{/if}
     {#if notice}<p class="notice" role="status">{notice}</p>{/if}
-    {#if library === null}<p class="empty-copy">Loading your model library…</p>
+    {#if library === null}{#if !error}<p class="empty-copy">Loading your model library…</p>{/if}
     {:else if ggufModels.length === 0}<div class="empty-models">
         <strong>No GGUF models indexed</strong><span
           >Add a folder above, or download one from Discover.</span

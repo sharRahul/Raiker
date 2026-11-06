@@ -1,0 +1,74 @@
+{
+  "activity-cancel.png": {
+    "commit": "f0ea17703fa875221a0320f94368331b75c08b12",
+    "working_tree_changed": true,
+    "viewport": {
+      "width": 1440,
+      "height": 1000
+    },
+    "theme": "light",
+    "route": "#/settings?tab=advanced&kind=models",
+    "test": "model-error-recovery-live.spec.ts › RT-MODEL-RECOVERY-04: cancel failure is visible",
+    "captured_at": "2026-11-06T11:13:41.877Z"
+  },
+  "activity-clear.png": {
+    "commit": "f0ea17703fa875221a0320f94368331b75c08b12",
+    "working_tree_changed": true,
+    "viewport": {
+      "width": 1440,
+      "height": 1000
+    },
+    "theme": "light",
+    "route": "#/settings?tab=advanced&kind=models",
+    "test": "model-error-recovery-live.spec.ts › RT-MODEL-RECOVERY-06: clear failure is visible",
+    "captured_at": "2026-11-06T11:14:30.576Z"
+  },
+  "activity-inspect.png": {
+    "commit": "f0ea17703fa875221a0320f94368331b75c08b12",
+    "working_tree_changed": true,
+    "viewport": {
+      "width": 1440,
+      "height": 1000
+    },
+    "theme": "light",
+    "route": "#/settings?tab=advanced&kind=models",
+    "test": "model-error-recovery-live.spec.ts › RT-MODEL-RECOVERY-05: inspect failure is visible",
+    "captured_at": "2026-11-06T11:14:06.181Z"
+  },
+  "activity-retry.png": {
+    "commit": "f0ea17703fa875221a0320f94368331b75c08b12",
+    "working_tree_changed": true,
+    "viewport": {
+      "width": 1440,
+      "height": 1000
+    },
+    "theme": "light",
+    "route": "#/settings?tab=advanced&kind=models",
+    "test": "model-error-recovery-live.spec.ts › RT-MODEL-RECOVERY-03: retry failure is visible",
+    "captured_at": "2026-11-06T11:13:16.814Z"
+  },
+  "library-read-phone.png": {
+    "commit": "f0ea17703fa875221a0320f94368331b75c08b12",
+    "working_tree_changed": true,
+    "viewport": {
+      "width": 390,
+      "height": 844
+    },
+    "theme": "light",
+    "route": "#/settings?tab=advanced&kind=models",
+    "test": "model-error-recovery-live.spec.ts › RT-MODEL-RECOVERY-01: library read failure offers recovery on a phone",
+    "captured_at": "2026-11-06T11:12:28.246Z"
+  },
+  "library-scan.png": {
+    "commit": "f0ea17703fa875221a0320f94368331b75c08b12",
+    "working_tree_changed": true,
+    "viewport": {
+      "width": 1440,
+      "height": 1000
+    },
+    "theme": "light",
+    "route": "#/settings?tab=advanced&kind=models",
+    "test": "model-error-recovery-live.spec.ts › RT-MODEL-RECOVERY-02: scan failure retains its recovery step",
+    "captured_at": "2026-11-06T11:12:52.256Z"
+  }
+}

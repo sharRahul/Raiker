@@ -1262,3 +1262,42 @@ The adjacent manifest records source revision, dirty-tree state and viewport.
 The shared live sign-in helper was updated to answer the new Voice setup
 stage with **Not now**, then **Continue**. The other thirteen error messages
 were reviewed in source; they were not individually fault-injected live.
+
+## Result — 2026-11-06 (QUI-G06 model recovery)
+
+Spec: `web/e2e/model-error-recovery-live.spec.ts`: **6/6 passed**, with
+screenshots visually reviewed. A fresh disposable
+Linux source host serves the built SPA. Owner creation/unlock uses the UI.
+The repeated UI run uses `--rate-limit-per-minute 10000` to avoid unrelated
+background reads exhausting the default request budget.
+No provider key or inference is needed for these local controls. Failed
+responses are deliberately injected as HTTP 503 with `injected_failure`.
+Activity checks additionally supply one synthetic job, avoiding an actual
+download or install merely to exercise an error. They do not prove real
+provider, download or installer acceptance.
+
+| Case | Check |
+|---|---|
+| RT-MODEL-RECOVERY-01 | At 390×844, a failed library read names the affected list, offers recovery, and stops announcing loading |
+| RT-MODEL-RECOVERY-02 | A failed scan offers **Scan now** without claiming success |
+| RT-MODEL-RECOVERY-03 | Retry failure remains visible with a readable job row |
+| RT-MODEL-RECOVERY-04 | Cancel failure does not claim the running job stopped |
+| RT-MODEL-RECOVERY-05 | Partial-file inspection failure is visible without a confirmation dialog |
+| RT-MODEL-RECOVERY-06 | Clear-record failure retains the job and offers a state check |
+
+Panel screenshots:
+[library read on phone](../screenshots/2026-11-06-model-recovery/library-read-phone.png),
+[scan](../screenshots/2026-11-06-model-recovery/library-scan.png),
+[retry](../screenshots/2026-11-06-model-recovery/activity-retry.png),
+[cancel](../screenshots/2026-11-06-model-recovery/activity-cancel.png),
+[inspection](../screenshots/2026-11-06-model-recovery/activity-inspect.png),
+[clear record](../screenshots/2026-11-06-model-recovery/activity-clear.png).
+The adjacent manifest records source revision, dirty-tree state and viewport.
+
+All **29 focused component tests** passed (eight recovery regressions and
+21 existing panel tests). Component regressions in `ModelRecovery.test.ts` additionally verify that a
+successful status poll does not erase a failed retry, failed deletion keeps its
+review, failed folder removal keeps the folder visible, and failed reads do
+not masquerade as loading or empty success. The other nine paths in this
+15-item implementation slice have source review and focused component-suite
+coverage, but do not have individual live fault-injection evidence.

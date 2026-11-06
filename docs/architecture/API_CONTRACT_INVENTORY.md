@@ -291,8 +291,8 @@ operation answers with, and whether OpenAPI describes it (OPT-01/OPT-02 —
 | PUT | `/api/mcp/servers/{server_id}` | RenameMcpServerRequest | McpServerRenamed | verified | declared by cast |
 | POST | `/api/mcp/servers/{server_id}/connect` |  | McpServerConnected | verified | declared by cast |
 | GET | `/api/mcp/servers/{server_id}/findings` |  | SecurityFindingView[] | verified | DashboardService.list_mcp_findings |
-| POST | `/api/mcp/servers/{server_id}/kill` | Union | McpContainment | verified | declared by cast |
-| POST | `/api/mcp/servers/{server_id}/pause` | Union | McpContainment | verified | declared by cast |
+| POST | `/api/mcp/servers/{server_id}/kill` |  | McpContainment | verified | declared by cast |
+| POST | `/api/mcp/servers/{server_id}/pause` |  | McpContainment | verified | declared by cast |
 | POST | `/api/mcp/servers/{server_id}/resume` |  | McpResumed | verified | declared by cast |
 | GET | `/api/mcp/servers/{server_id}/secrets` |  | McpServerSecrets | verified | declared by cast |
 | DELETE | `/api/mcp/servers/{server_id}/secrets/{name}` |  | McpServerSecrets | verified | declared by cast |
@@ -353,8 +353,8 @@ operation answers with, and whether OpenAPI describes it (OPT-01/OPT-02 —
 | POST | `/api/model-library/rescan` |  | LibraryRescanned | verified | declared LibraryRescanned |
 | DELETE | `/api/model-library/roots` | ModelLibraryRootRequest | OperationCleared | verified | declared OperationCleared |
 | POST | `/api/model-library/roots` | ModelLibraryRootRequest | LibraryRootAdded | verified | declared LibraryRootAdded |
-| POST | `/api/model-library/{model_id:path}/deploy` | Union | ModelOperationView | verified | declared ModelOperationView |
-| POST | `/api/model-library/{model_id:path}/deploy-mlx` | Union | ModelOperationView | verified | declared ModelOperationView |
+| POST | `/api/model-library/{model_id:path}/deploy` |  | ModelOperationView | verified | declared ModelOperationView |
+| POST | `/api/model-library/{model_id:path}/deploy-mlx` |  | ModelOperationView | verified | declared ModelOperationView |
 | GET | `/api/model-operations` |  | ModelOperations | verified | declared ModelOperations |
 | POST | `/api/model-operations` | ModelOperationRequestBody | ModelOperationView | verified | ModelOperationService.start |
 | POST | `/api/model-operations/preview` | ModelOperationRequestBody | InstallPlan \| OperationReview | verified | RuntimeInstallerRegistry.preview \| declared OperationReview |
@@ -494,7 +494,7 @@ operation answers with, and whether OpenAPI describes it (OPT-01/OPT-02 —
 | GET | `/api/skills/{skill_id}/download` |  |  | special | special |
 | GET | `/api/speech/runtime` |  | SpeechRuntime | verified | declared SpeechRuntime |
 | PUT | `/api/speech/runtime` | SpeechRuntimeRequest | SpeechRuntime | verified | declared SpeechRuntime |
-| POST | `/api/speech/runtime/probe` | Union | SpeechProbe | verified | declared SpeechProbe |
+| POST | `/api/speech/runtime/probe` |  | SpeechProbe | verified | declared SpeechProbe |
 | POST | `/api/speech/transcribe` |  |  | special | special |
 | GET | `/api/standing-grants` |  | StandingGrantList | verified | declared StandingGrantList |
 | POST | `/api/standing-grants` | CreateStandingGrantRequest | StandingGrantCreated | verified | declared StandingGrantCreated |

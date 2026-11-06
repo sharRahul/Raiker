@@ -1600,7 +1600,7 @@ file you can open. The two capture sets that remain — `screenshots/pages/` and
 | [FIXED-1293](#fixed-1293--shared-ui-primitives-drifted-across-pages-and-subpages) | Medium | Shared UI / cross-page consistency | Fixed |
 | [FIXED-1294](#fixed-1294--tabs-pointed-at-missing-panels-and-the-visual-sweep-skipped-nested-pages) | Medium | Keyboard navigation / UI coverage | Fixed |
 | [FIXED-1295](#fixed-1295--icons-and-option-controls-were-small-and-inconsistent-across-pages) | Medium | Shared UI / visual scale | Fixed 2026-11-06 |
-| [FIXED-1296](#fixed-1296--api-contract-inventory-omitted-union-request-types) | Low | API contract documentation | Fixed 2026-11-06 |
+| [FIXED-1296](#fixed-1296--api-contract-inventory-was-generated-with-a-different-python-runtime) | Low | API contract documentation | Fixed 2026-11-06 |
 
 ---
 
@@ -38907,16 +38907,20 @@ destinations in both themes with no horizontal bleed. Final composer, switch
 and slider captures plus live cases RT-UI-SCALE-01/02 are in
 [WEB_APP_LIVE_TEST.md](../architecture/WEB_APP_LIVE_TEST.md#result--2026-11-06-icon-scale-and-owner-approved-composer-shape).
 
-## FIXED-1296 — API contract inventory omitted union request types
+## FIXED-1296 — API contract inventory was generated with a different Python runtime
 
 **Severity: Low. Area: API contract documentation. Status: Fixed 2026-11-06.**
 
-**Observed.** Regenerating the API contract inventory showed five endpoints
-whose optional/combined request schema was rendered as empty: MCP kill/pause,
-model-library deploy/deploy-mlx, and speech-runtime probe.
+**Observed.** The contract inventory had been generated with Python 3.14 and
+Pydantic 2.14, while CI validates it with the repository's supported Python
+3.11 setup and Pydantic 2.13. The generated request-schema names for five
+endpoints differed between those dependency versions, so CI reported the
+inventory as stale.
 
-**Fixed.** Regenerated `docs/architecture/API_CONTRACT_INVENTORY.md`; all five
-rows now name the request type as `Union`. No API behavior changed.
+**Fixed.** Regenerated `docs/architecture/API_CONTRACT_INVENTORY.md` with the
+Python 3.11 development environment used by CI. The inventory now matches the
+supported generation environment. No API behavior changed.
 
-**Evidence.** `python -m scripts.api_contract` completed successfully and
-updated the tracked OpenAPI bindings and inventory deterministically.
+**Evidence.** `.venv/bin/python -m scripts.api_contract --check` completed
+successfully after regeneration. The OpenAPI JSON and TypeScript bindings were
+unchanged; only the inventory's five version-dependent request labels changed.

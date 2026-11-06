@@ -9,6 +9,7 @@
    */
   import Icon from "./Icon.svelte";
   import { ApiError } from "../api";
+  import { connectionFailure } from "../connectionRecovery";
   import { contract } from "../generated/apiContract";
   import type { StoreConnector } from "../generated/apiContract";
   import { askConfirm } from "../confirm.svelte";
@@ -56,7 +57,9 @@
       return true;
     } catch (e) {
       const code = e instanceof ApiError ? (e.reasonCode ?? "") : "";
-      error = ERRORS[code] ?? "That did not work. Nothing was changed.";
+      error = connectionFailure(`Could not update the account for ${connector.display_name}`,
+        "The saved account and sign-in are unconfirmed; your entry is kept here.",
+        `${ERRORS[code] ? `${ERRORS[code]} ` : ""}Refresh connections and check this account before repeating the action.`, e);
       return false;
     } finally {
       busy = false;

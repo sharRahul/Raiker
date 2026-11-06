@@ -5,6 +5,7 @@
   import GuideLink from "../components/GuideLink.svelte";
   import Icon from "../components/Icon.svelte";
   import { api, ApiError } from "../api";
+  import { connectionFailure } from "../connectionRecovery";
   import { runtimeBlock } from "../capabilityModel";
   import { endpointRefusal, networkClassLabel } from "../mcpEndpoint";
   import { purposeLine, recentUse, riskLabel, scopeLines, sourceLabel } from "../mcpScope";
@@ -55,6 +56,8 @@
   let offers = $state<McpOffer[]>([]);
   let gates = $state<CapabilityGate[]>([]);
   let error = $state<string | null>(null);
+  let loadError = $state<string | null>(null);
+  let loading = false;
   let notice = $state<string | null>(null);
   let busy = $state<string | null>(null); // server_id (or "create") currently mutating
 
@@ -160,21 +163,10 @@
     return words[key] ?? (code ? `its test failed (${code})` : "its test failed");
   }
 
-  function reason(e: unknown): string {
-    if (e instanceof ApiError) {
-      if (e.reasonCode === "disabled_by_capability_gate")
-        return "The MCP capability is disabled. Enable it in Permissions to continue.";
-      // RR-MCP-02 — a refused endpoint is explained in words an owner can act
-      // on, not shown as its reason code.
-      return (
-        endpointRefusal(e.reasonCode) ?? e.reasonCode ?? `Request failed (${e.status})`
-      );
-    }
-    return "Request failed";
-  }
-
   async function load() {
-    error = null;
+    if (loading) return;
+    loading = true;
+    loadError = null;
     try {
       const [list, gateList, access, offered] = await Promise.all([
         api.mcpServers(),
@@ -203,7 +195,9 @@
         findings = {};
       }
     } catch (e) {
-      error = reason(e);
+      loadError = connectionFailure("Could not refresh Advanced servers", "Server status and recent activity could not be verified.", "Choose Refresh servers before relying on the list.", e);
+    } finally {
+      loading = false;
     }
   }
 
@@ -225,7 +219,7 @@
       newName = "";
       await load();
     } catch (e) {
-      error = reason(e);
+      error = connectionFailure(`Could not create “${newName.trim()}”`, "The saved server profile is unconfirmed; your name is kept here.", "Choose Refresh servers and check for an existing profile before creating it again.", e);
     } finally {
       busy = null;
     }
@@ -248,7 +242,7 @@
       notice = `Added “${offer.name}”. Nothing is connected yet — test the connection below.`;
       await load();
     } catch (e) {
-      error = reason(e);
+      error = connectionFailure(`Could not add “${offer.name}”`, "The offered server profile is unconfirmed.", "Choose Refresh servers and check whether it was added before adding it again.", e);
     } finally {
       busy = null;
     }
@@ -267,7 +261,7 @@
           : ".");
       await load();
     } catch (e) {
-      error = `${server.name}: ${reason(e)}`;
+      error = connectionFailure(`Could not test “${server.name}”`, "Its connection and available tools are unconfirmed.", "Choose Refresh servers, then Test to check the connection again.", e);
     } finally {
       busy = null;
     }
@@ -298,14 +292,14 @@
       await load();
     } catch (e) {
       if (e instanceof ApiError && e.reasonCode === "mcp_tool_changed") {
-        // Re-read first: `load` clears the page's error, and this one must stay.
+        // Re-read the changed declarations before asking the owner again.
         await load();
         error =
           `${server.name} changed how it describes ${tools.length === 1 ? "that tool" : "one of those tools"} ` +
           "since this page showed it, so nothing was accepted. Read what it says now before accepting.";
         return;
       }
-      error = `${server.name}: ${reason(e)}`;
+      error = connectionFailure(`Could not accept tools for “${server.name}”`, "Acceptance of the displayed declarations is unconfirmed.", "Choose Refresh servers and review which tools are still held before accepting again.", e);
     } finally {
       busy = null;
     }
@@ -335,10 +329,10 @@
       if (e instanceof ApiError && e.reasonCode === "mcp_server_conflict") {
         renamingId = null;
         await load();
-        error = `“${server.name}” was renamed somewhere else since this page loaded, so nothing was changed.`;
+        error = `“${server.name}” was renamed somewhere else since this page loaded, so nothing was changed. Review its current name before renaming again.`;
         return;
       }
-      error = reason(e);
+      error = connectionFailure(`Could not rename “${server.name}”`, "The saved name is unconfirmed; your draft is kept here.", "Choose Refresh servers and check its name before saving again.", e);
     } finally {
       busy = null;
     }
@@ -360,7 +354,7 @@
         error = `“${server.name}” was renamed somewhere else since this page loaded, so it was not deleted. Check which server it is now.`;
         return;
       }
-      error = reason(e);
+      error = connectionFailure(`Could not delete “${server.name}”`, "Profile deletion is unconfirmed.", "Choose Refresh servers and check whether it still exists before deleting again.", e);
     } finally {
       busy = null;
     }
@@ -392,10 +386,10 @@
       const code = e instanceof ApiError ? e.reasonCode : null;
       error =
         code === "mcp_secret_name_invalid"
-          ? "A variable name is capital letters, digits and underscores, starting with a letter."
+          ? "A variable name is capital letters, digits and underscores, starting with a letter. Correct the name, then choose Give to this server."
           : code === "mcp_secret_name_reserved"
-            ? `${name} is set by Raiker for every server, so it cannot be a secret.`
-            : reason(e);
+            ? `${name} is set by Raiker for every server, so it cannot be a secret. Choose a different variable name.`
+            : connectionFailure(`Could not save the secret for “${server.name}”`, "The saved secret is unconfirmed; your entry is kept here.", "Choose Refresh servers and check its secret names before saving again.", e);
     } finally {
       busy = null;
     }
@@ -411,7 +405,7 @@
       notice = `${name} was removed from ${server.name}.`;
       await load();
     } catch (e) {
-      error = reason(e);
+      error = connectionFailure(`Could not remove the secret from “${server.name}”`, "Secret removal is unconfirmed.", "Choose Refresh servers and check its secret names before removing again.", e);
     } finally {
       busy = null;
     }
@@ -435,7 +429,8 @@
           failed =
             `${server.name} did not pass its connection test, so it stays ` +
             `${result.monitor_state === "killed" ? "stopped" : "paused"}: ` +
-            `${endpointRefusal(result.check_reason) ?? checkFailure(result.check_reason)}.`;
+            `${endpointRefusal(result.check_reason) ?? checkFailure(result.check_reason)}. ` +
+            "Check its settings and Permissions, then choose Resume to test it again.";
         } else if (result.pending.length > 0) {
           notice =
             `${server.name}: resumed after a passing connection test. ` +
@@ -445,13 +440,19 @@
         }
       }
       await load();
-      // After the reload, which clears the page's error line on its way in.
+      // Keep the failed connection check visible after refreshing the list.
       if (failed) error = failed;
     } catch (e) {
-      error = `${server.name}: ${reason(e)}`;
+      error = connectionFailure(`Could not ${server.monitor_state === "active" ? "stop" : "resume"} “${server.name}”`, "Its current state is unconfirmed.", "Choose Refresh servers and check its state before using it or repeating the action.", e);
     } finally {
       busy = null;
     }
+  }
+
+  async function refresh() {
+    error = null;
+    notice = null;
+    await load();
   }
 
   function statusLabel(s: McpServer): string {
@@ -464,7 +465,7 @@
 
   onMount(() => {
     void load();
-    const timer = window.setInterval(load, 10_000);
+    const timer = window.setInterval(() => { if (busy === null) void load(); }, 10_000);
     return () => window.clearInterval(timer);
   });
 </script>
@@ -475,7 +476,7 @@
      this page opens with its own state. -->
 <div class="header">
   <GuideLink section="extensions-and-mcp" label="How MCP servers work" />
-  <button class="icon" aria-label="Refresh servers" onclick={load}><Icon name="refresh" size="md" /></button>
+  <button class="icon" aria-label="Refresh servers" title="Refresh servers" onclick={refresh}><Icon name="refresh" size="md" /></button>
 </div>
 
 {#each blocks as block (block.reason)}
@@ -511,6 +512,7 @@
   </div>
 {/if}
 
+{#if loadError}<div class="notice notice-danger" role="alert">{loadError}</div>{/if}
 {#if error}<div class="notice notice-danger" role="alert">{error}</div>{/if}
 {#if notice}<div class="notice notice-ok"><Icon name="check" size="sm" /> {notice}</div>{/if}
 
@@ -571,7 +573,7 @@
 {/if}
 
 {#if !servers}
-  <p class="loading">Loading MCP servers…</p>
+  {#if !loadError}<p class="loading">Loading MCP servers…</p>{/if}
 {:else if servers.length === 0}
   <!-- An empty state that ignores an offer sitting directly above it reads as a
        contradiction. When a plugin has offered one, that is the shortest route. -->
@@ -871,11 +873,11 @@
   .field { display: flex; flex-direction: column; gap: 0.35rem; }
   .field-label { font-size: var(--text-xs); font-weight: 600; color: var(--text-2); }
   .input { min-width: 16rem; }
-  .rename { min-width: 12rem; }
+  .rename { min-width: min(12rem, 100%); max-width: 100%; }
   .list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-3); }
   .card { border: 1px solid var(--border); border-radius: var(--r-sm); background: var(--surface); padding: var(--space-4); }
   .top { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); flex-wrap: wrap; }
-  .name-block { display: flex; align-items: center; gap: 0.7rem; }
+  .name-block { display: flex; align-items: center; gap: 0.7rem; flex-wrap: wrap; min-width: 0; max-width: 100%; }
   .name { font-weight: 700; font-size: var(--text-base); }
   .status { display: flex; align-items: center; gap: 0.4rem; color: var(--text-3); font-size: var(--text-xs); font-weight: 600; }
   .status i { width: 7px; height: 7px; border-radius: 50%; background: currentColor; }

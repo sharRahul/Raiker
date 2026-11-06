@@ -748,3 +748,127 @@ describe("McpView — tools held for review", () => {
     expect(screen.queryByText(/waiting for your review/)).toBeNull();
   });
 });
+
+describe("Advanced server recovery (QUI-G06)", () => {
+  const failed = { __status: 503, detail: { reason_code: "injected_failure" } };
+  const base = () => ({
+    "GET /api/mcp/servers": [server({ vault_env: ["GEO_KEY"], pending_tools: [
+      { name: "purge", change: "new", description: "Delete notes", fingerprint: "fp" },
+    ] })],
+    "GET /api/capability-gates": ENABLED_GATES,
+    "GET /api/mcp/offers": [],
+    ...monitorRoutes(),
+  });
+  afterEach(() => vi.restoreAllMocks());
+
+  it("ends false loading on a read failure and recovers with Refresh servers", async () => {
+    stubFetch({ ...base(), "GET /api/mcp/servers": failed });
+    render(McpView);
+    expect(await screen.findByRole("alert")).toHaveTextContent("Could not refresh Advanced servers");
+    expect(screen.queryByText("Loading MCP servers…")).not.toBeInTheDocument();
+    stubFetch(base());
+    await fireEvent.click(screen.getByRole("button", { name: "Refresh servers" }));
+    expect(await screen.findByText("echo-server")).toBeInTheDocument();
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
+
+  for (const [label, path, message] of [
+    ["Test", "POST /api/mcp/servers/mcp_1/connect", "Could not test"],
+    ["Stop", "POST /api/mcp/servers/mcp_1/pause", "Could not stop"],
+    ["Accept purge", "POST /api/mcp/servers/mcp_1/tools/approve", "Could not accept tools"],
+    ["Delete", "DELETE /api/mcp/servers/mcp_1", "Could not delete"],
+    ["Remove GEO_KEY from echo-server", "DELETE /api/mcp/servers/mcp_1/secrets/GEO_KEY", "Could not remove the secret"],
+  ]) {
+    it(`keeps the row and recovery message after ${label} fails`, async () => {
+      vi.stubGlobal("confirm", () => true);
+      stubFetch({ ...base(), [path]: failed });
+      render(McpView);
+      await fireEvent.click(await screen.findByRole("button", { name: label }));
+      expect(await screen.findByRole("alert")).toHaveTextContent(message);
+      expect(screen.getByRole("alert")).toHaveTextContent("Refresh servers");
+      expect(screen.getByText("echo-server")).toBeInTheDocument();
+      expect(screen.getByRole("alert")).toHaveTextContent("HTTP 503");
+    });
+  }
+
+  it("retains a rename draft after failure", async () => {
+    stubFetch({ ...base(), "PUT /api/mcp/servers/mcp_1": failed });
+    render(McpView);
+    await fireEvent.click(await screen.findByRole("button", { name: "Rename" }));
+    await fireEvent.input(screen.getByLabelText("New server name"), { target: { value: "my-draft" } });
+    await fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("Could not rename");
+    expect(screen.getByLabelText("New server name")).toHaveValue("my-draft");
+  });
+
+  it("preserves a secret entry without echoing it in the failure", async () => {
+    stubFetch({ ...base(), "PUT /api/mcp/servers/mcp_1/secrets/NEW_KEY": failed });
+    render(McpView);
+    await fireEvent.input(await screen.findByLabelText("Variable name"), { target: { value: "NEW_KEY" } });
+    await fireEvent.input(screen.getByLabelText("Value"), { target: { value: "private-test-entry" } });
+    await fireEvent.click(screen.getByRole("button", { name: "Give to this server" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("Could not save the secret");
+    expect(screen.getByLabelText("Value")).toHaveValue("private-test-entry");
+    expect(screen.getByRole("alert")).not.toHaveTextContent("private-test-entry");
+  });
+
+  it("keeps action errors through a successful background poll", async () => {
+    let poll: (() => void) | undefined;
+    const originalInterval = window.setInterval.bind(window);
+    vi.spyOn(window, "setInterval").mockImplementation(((callback: () => void, delay: number) => {
+      if (delay === 10_000) { poll = callback; return 123; }
+      return originalInterval(callback, delay);
+    }) as typeof window.setInterval);
+    const mock = stubFetch({ ...base(), "POST /api/mcp/servers/mcp_1/connect": failed });
+    render(McpView);
+    await fireEvent.click(await screen.findByRole("button", { name: "Test" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("Could not test");
+    const reads = () => mock.mock.calls.filter(([url]) => url === "/api/mcp/servers").length;
+    const before = reads();
+    poll!();
+    await waitFor(() => expect(reads()).toBeGreaterThan(before));
+    expect(screen.getByRole("alert")).toHaveTextContent("Could not test");
+    await fireEvent.click(screen.getByRole("button", { name: "Refresh servers" }));
+    await waitFor(() => expect(screen.queryByRole("alert")).not.toBeInTheDocument());
+  });
+});
+
+describe("server creation and resume recovery", () => {
+  const failed = { __status: 503, detail: { reason_code: "injected_failure" } };
+  it("retains a server name after failed creation", async () => {
+    stubFetch({
+      "GET /api/mcp/servers": [], "GET /api/capability-gates": ENABLED_GATES,
+      "POST /api/mcp/servers": failed, ...monitorRoutes(),
+    });
+    render(McpView);
+    await fireEvent.click(await screen.findByText("Developer example — generate a local sample server"));
+    await fireEvent.input(screen.getByLabelText("Server name"), { target: { value: "my-sample" } });
+    await fireEvent.click(screen.getByRole("button", { name: "Generate example server" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("check for an existing profile");
+    expect(screen.getByLabelText("Server name")).toHaveValue("my-sample");
+  });
+
+  it("does not claim a plugin offer failed to create a profile", async () => {
+    stubFetch({
+      "GET /api/mcp/servers": [], "GET /api/capability-gates": ENABLED_GATES,
+      "GET /api/mcp/offers": [{ plugin_id: "demo", name: "Offered", description: "Test offer", transport: "stdio", template: "python-stdio-echo", already_added: false }],
+      "POST /api/mcp/servers": failed, ...monitorRoutes(),
+    });
+    render(McpView);
+    await fireEvent.click(await screen.findByRole("button", { name: "Add server" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("check whether it was added");
+  });
+
+  it("leaves a paused server visible when Resume is unconfirmed", async () => {
+    stubFetch({
+      "GET /api/mcp/servers": [server({ monitor_state: "paused" })],
+      "GET /api/capability-gates": ENABLED_GATES,
+      "POST /api/mcp/servers/mcp_1/resume": failed, ...monitorRoutes(),
+    });
+    render(McpView);
+    await fireEvent.click(await screen.findByRole("button", { name: "Resume" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("Could not resume");
+    expect(screen.getByRole("alert")).toHaveTextContent("current state is unconfirmed");
+    expect(screen.getByRole("button", { name: "Resume" })).toBeEnabled();
+  });
+});

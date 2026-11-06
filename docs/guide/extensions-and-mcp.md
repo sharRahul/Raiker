@@ -29,10 +29,10 @@ call anything:
 Each row carries all four, marked `✓` when the condition is met and `○` when it
 is not, so a row can be read at a glance and in greyscale.
 
-A connector appearing in the catalogue means nothing on its own. The readiness
-counters at the top read `0 usable` on a fresh workspace, which is correct — and
-every row underneath them will show four `○`, which is the same fact said per
-connector.
+A connector appearing in **Add connection** is not yet installed or usable.
+The Services list shows installed connections; select one to review its
+readiness and account sign-in. Adding a service keeps its dialog open for
+sign-in and **Done**.
 
 Reference connectors with real, governed read paths: **GitHub**, **Gmail**,
 **Google Calendar**, **Slack**. Each needs, at minimum:
@@ -60,6 +60,20 @@ not create is refused rather than sent from the default. Every approval for a
 write names the account it uses.
 
 **Import manifest** adds a manifest-driven connector.
+
+### Recovering a failed connection change
+
+An error names the failed action and the next check. If Raiker did not answer,
+the change may already have been saved. Use **Refresh connections** and check
+the service's sign-in or session access before repeating the action. An Add
+dialog with an error also offers **Refresh connections**, and keeps your entry.
+Failed manifest imports keep the JSON so it can be corrected or checked again.
+
+For Advanced servers, use **Refresh servers** to check the current name,
+state, held tools or secret names before repeating a change. Background refresh
+keeps a failed action's message visible. A failed Stop or Resume response does
+not confirm the server's state; read it again before relying on it. A Resume
+whose connection test failed stays paused or stopped and names the next check.
 
 ## MCP servers
 

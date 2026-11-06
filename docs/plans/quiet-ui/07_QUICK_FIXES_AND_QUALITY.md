@@ -132,3 +132,39 @@ the failed owner action. Evidence:
 [Live Test docs](../../architecture/WEB_APP_LIVE_TEST.md#result--2026-11-06-qui-g06-model-recovery)
 and [FIXED-1287](../FIXED_ITEMS.md#fixed-1287--model-management-errors-were-hidden-misleading-or-had-no-recovery-step-qui-g06).
 The remaining quality foundations above keep this plan open.
+
+## 2026-11-06 — QUI-G06 Connection recovery
+
+This run applies the existing QUI-G06 decision to Connections and its Advanced
+servers. Each item names the failed action and affected object, preserves the
+owner's input and provides a safe recovery step. Writes with an ambiguous
+response require checking saved state before retrying.
+
+1. [x] Read connections: distinguish an unavailable list from an empty one.
+2. [x] Add a service: check whether it was added before repeating the request.
+3. [x] Save credentials: retain the entry and check sign-in before retrying.
+4. [x] Change session access: verify the saved state before using the service.
+5. [x] Disconnect: do not claim that credentials were removed on failure.
+6. [x] Read Advanced servers: retain rows, expose retry and stop false loading.
+7. [x] Create a server: retain the name and check for an existing profile.
+8. [x] Add a plugin's offered server: check the list before adding it again.
+9. [x] Test a server: explain unconfirmed connectivity and how to retest.
+10. [x] Accept tools: verify accepted declarations before retrying.
+11. [x] Rename a server: retain the draft and resolve stale-name conflicts.
+12. [x] Delete a server: retain the row and verify whether it still exists.
+13. [x] Give a server a secret: retain the entry without echoing its value.
+14. [x] Remove a server secret: verify its name before claiming removal.
+15. [x] Stop or resume a server: report unconfirmed state and failed checks.
+
+Validation covers failed reads and mutations, periodic refresh retaining
+an action error, recovery after refresh, and running-host Playwright captures
+in both themes at supported laptop sizes. The round also fixes Add losing its
+sign-in step after installation, the account editor's false rollback claim and
+manifest error feedback, and the clipped Cancel button found during zoom
+review. Evidence:
+[Live Test docs](../../architecture/WEB_APP_LIVE_TEST.md#result--2026-11-06-qui-g06-connection-recovery),
+[FIXED-1288](../FIXED_ITEMS.md#fixed-1288--connection-failures-claimed-rollback-or-lost-their-recovery-message-qui-g06)
+[FIXED-1289](../FIXED_ITEMS.md#fixed-1289--adding-a-service-lost-its-sign-in-step-after-installation)
+and [FIXED-1290](../FIXED_ITEMS.md#fixed-1290--the-server-rename-row-clipped-cancel-at-200-percent-zoom).
+Other quality foundations remain open; this document is retained until those
+requirements are met.

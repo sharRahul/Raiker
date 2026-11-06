@@ -1284,3 +1284,72 @@ review, failed folder removal keeps the folder visible, and failed reads do
 not masquerade as loading or empty success. The other nine paths in this
 15-item implementation slice have source review and focused component-suite
 coverage, but do not have individual live fault-injection evidence.
+
+## Result — 2026-11-06 QUI-G06 connection recovery
+
+**Candidate and run.** `0872081a` plus the uncommitted connection-recovery
+changes, Linux Codespace, Node 24, Python 3.14, managed Playwright Chromium;
+run `2026-11-06-connection-recovery`. A disposable workspace at
+`/tmp/raiker-connection-recovery` is served by `raiker-web --port 8765
+--no-browser` with the test request budget set to 10,000/minute. The owner is
+created and signed in through the normal UI; setup is completed without a
+model. No provider keys, real credentials, inference or external effects are
+used. Cost: no provider charges. The owner turns on MCP builder and connector
+permissions through Permissions for these declared test actions only.
+
+**Scope.** This is running-host UI fault-injection evidence, not a T-06/T-07
+provider or transport acceptance run. Advanced-server rows and the plugin offer
+are explicit fixtures; their targeted mutations return HTTP 503 with
+`injected_failure`. Service-installation and list reads use the real host except
+where a case declares a fault or a read-model override. Session-access and
+uninstall cases expose a connected Gmail row through a declared read fixture;
+no real credential is stored. The credential case really installs Gmail in the
+disposable workspace, then intercepts its credential write. No store, database
+or artifact is repaired to make a case pass.
+
+**Reproduce.** Build with `npm --prefix web run build`, start a fresh host, then
+from `web/` run `./node_modules/.bin/playwright test --project=live
+ e2e/connection-error-recovery-live.spec.ts --workers=1`.
+
+| Case | Owner action and fault | Required result |
+|---|---|---|
+| RT-CONNECTION-RECOVERY-01 | Read Services with a failed catalogue endpoint, then remove the fault and refresh | Names the failed read, stops Loading, then shows the real list |
+| RT-CONNECTION-RECOVERY-02 | Add Gmail with an install failure | One alert inside Add connection; an accessible Refresh connections action; no false rollback claim |
+| RT-CONNECTION-RECOVERY-03 | Read Advanced servers with a failed list at 1280×800 in dark theme, then refresh | Read error replaces Loading; recovery clears the error |
+| RT-CONNECTION-RECOVERY-04 | Turn on MCP builder and connector in Permissions | Ordinary owner confirmation flows complete; no test bypass grants authority |
+| RT-CONNECTION-RECOVERY-05 | Test the declared server with a failed connection endpoint; wait through the normal ten-second poll | The action error survives a successful list poll; the row stays |
+| RT-CONNECTION-RECOVERY-06 | Stop the server with a failed response | State is unconfirmed, with a refresh/check step |
+| RT-CONNECTION-RECOVERY-07 | Accept a held tool with a failed response | Names unconfirmed acceptance and asks to review tools before accepting again |
+| RT-CONNECTION-RECOVERY-08 | Confirm Delete with a failed response | Row stays; deletion remains unconfirmed |
+| RT-CONNECTION-RECOVERY-09 | Confirm removal of a server secret with a failed response | Name stays; removal remains unconfirmed |
+| RT-CONNECTION-RECOVERY-10 | Rename with a failed response, then inspect at 1280×800 with CSS zoom 2 | Draft stays; error and recovery remain readable; Cancel fits inside its card |
+| RT-CONNECTION-RECOVERY-11 | Generate an example with a failed creation response | Name stays; check for a saved profile before creating another |
+| RT-CONNECTION-RECOVERY-12 | Add the declared plugin offer with a failed response | Check whether it was added before repeating |
+| RT-CONNECTION-RECOVERY-13 | Give a server a disposable secret with a failed response | Password entry stays; the alert never echoes its value |
+| RT-CONNECTION-RECOVERY-14 | Actually install Gmail, then fail its credential write | Sign-in step survives installation; the password entry stays after failure |
+| RT-CONNECTION-RECOVERY-15 | Turn on session access with a failed response | Access is unconfirmed; service remains listed |
+| RT-CONNECTION-RECOVERY-16 | Disconnect with a failed response | Credential removal is unconfirmed; service remains listed |
+
+**Outcome: passed, 16/16 retained cases.** Cases 01–07 passed in the first
+validation batch; 08–16 passed after correcting the confirmation selector to
+the app's native dialog role. The strengthened zoom case was rebuilt and
+rerun separately: **1/1 passed**, with Cancel scrolled into view and checked
+against the card bounds. Preliminary interrupted/selector runs are not counted
+as passes. Local validation: **91/91 focused tests**, **25/25 documentation and
+governance tests**, Svelte **0 errors / 0 warnings**, ESLint, production build,
+Ruff and mypy (**1,251 source files**) passed. Screenshot review found and fixed
+[FIXED-1290](../plans/FIXED_ITEMS.md#fixed-1290--the-server-rename-row-clipped-cancel-at-200-percent-zoom).
+
+**Evidence.** Each visual case writes a screenshot and provenance in
+`output/playwright/2026-11-06-connection-recovery/manifest.json`; captures are
+local ignored artifacts, not committed images. They include light 1440×900,
+dark 1280×800 and the CSS-zoom case. Component regressions additionally cover
+Resume failures, existing stale-name/tool conflicts, private per-account
+credential retention and refusal/transport evidence. The Impeccable detector
+reported no findings on the three changed UI components.
+
+**Limits.** CSS zoom is a layout stress check, not native browser zoom or a
+screen-reader evaluation. No five-person study, real server process lifecycle,
+provider-side timeout-after-commit drill, Windows/macOS browser round or beta
+journey is claimed. The broader audit remains in
+[TO_BE_FIXED.md](../plans/TO_BE_FIXED.md#qui-g06-connection-slice--remaining-acceptance-evidence).

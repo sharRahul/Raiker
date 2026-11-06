@@ -279,3 +279,65 @@ describe("Connections › Services (QUI-L07)", () => {
     );
   });
 });
+
+// QUI-G06: a missing response does not prove a write was rolled back.
+describe("Connections recovery", () => {
+  const failed = { __status: 503, detail: { reason_code: "injected_failure" } };
+
+  it("stops loading after a failed read and recovers using Refresh connections", async () => {
+    const data = routes([]);
+    const mock = stubFetch({ ...data, "GET /api/connector-store": failed });
+    render(ConnectionsView);
+    expect(await screen.findByRole("alert")).toHaveTextContent("Could not load connections");
+    expect(screen.queryByText("Loading connections…")).not.toBeInTheDocument();
+    stubFetch(data);
+    await fireEvent.click(screen.getByRole("button", { name: "Refresh connections" }));
+    expect(await screen.findByText(/Nothing is connected yet/)).toBeInTheDocument();
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    expect(mock).toHaveBeenCalled();
+  });
+
+  it("keeps the Add dialog and gives a read-back step after a failed install", async () => {
+    stubFetch(routes([connector()], [], { "POST /api/connector-store/gmail/install": failed }));
+    render(ConnectionsView);
+    await fireEvent.click(await screen.findByRole("button", { name: "Add connection" }));
+    await fireEvent.click(screen.getByRole("button", { name: /Gmail/ }));
+    await fireEvent.click(screen.getByRole("button", { name: "Add Gmail" }));
+    const dialog = screen.getByRole("dialog");
+    expect(await within(dialog).findByRole("alert")).toHaveTextContent("check whether it was added");
+    expect(screen.getAllByRole("alert")).toHaveLength(1);
+    expect(within(dialog).getByRole("button", { name: "Refresh connections" })).toBeEnabled();
+  });
+
+  it("retains a failed credential entry as a password without claiming it was not saved", async () => {
+    stubFetch(routes([connector()]));
+    render(ConnectionsView);
+    await fireEvent.click(await screen.findByRole("button", { name: "Add connection" }));
+    await fireEvent.click(screen.getByRole("button", { name: /Gmail/ }));
+    stubFetch(routes([connector({ installed: true })], [], {
+      "POST /api/connector-store/gmail/install": { ok: true },
+      "PUT /api/connector-store/gmail/credentials": failed,
+    }));
+    await fireEvent.click(screen.getByRole("button", { name: "Add Gmail" }));
+    const input = await screen.findByLabelText("OAuth access token");
+    await fireEvent.input(input, { target: { value: "private-test-entry" } });
+    await fireEvent.click(screen.getByRole("button", { name: "Connect" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("saved sign-in is unconfirmed");
+    expect(input).toHaveValue("private-test-entry");
+    expect(input).toHaveAttribute("type", "password");
+    expect(screen.getByRole("alert")).not.toHaveTextContent("private-test-entry");
+  });
+
+  for (const action of ["toggle", "uninstall"] as const) {
+    it(`keeps the service after a failed ${action} and asks for read-back`, async () => {
+      stubFetch(routes([connector({ installed: true, auth_status: "connected" })], [], {
+        [`${action === "toggle" ? "PUT /api/connector-store/gmail/enabled" : "DELETE /api/connector-store/gmail"}`]: failed,
+      }));
+      render(ConnectionsView);
+      await fireEvent.click(await screen.findByRole("option", { name: /Gmail/ }));
+      await fireEvent.click(screen.getByRole("button", { name: action === "toggle" ? "Turn on for this session" : "Disconnect and remove its credential" }));
+      expect(await screen.findByRole("alert")).toHaveTextContent(/unconfirmed/);
+      expect(screen.getByRole("option", { name: /Gmail/ })).toBeInTheDocument();
+    });
+  }
+});

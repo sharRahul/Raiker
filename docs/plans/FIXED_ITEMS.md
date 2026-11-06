@@ -1592,6 +1592,9 @@ file you can open. The two capture sets that remain — `screenshots/pages/` and
 | [FIXED-1285](#fixed-1285--memory-action-failures-gave-no-recovery-step-qui-g06) | Low | Memory action failures gave no recovery step (QUI-G06) | Fixed |
 | [FIXED-1286](#fixed-1286--fixed-items-history-was-truncated-and-broke-ci-documentation-links) | Low | Fixed-items history was truncated and broke CI documentation links | Fixed |
 | [FIXED-1287](#fixed-1287--model-management-errors-were-hidden-misleading-or-had-no-recovery-step-qui-g06) | Medium | Models / error recovery | Fixed |
+| [FIXED-1288](#fixed-1288--connection-failures-claimed-rollback-or-lost-their-recovery-message-qui-g06) | Medium | Connections / error recovery | Fixed |
+| [FIXED-1289](#fixed-1289--adding-a-service-lost-its-sign-in-step-after-installation) | Medium | Connections / Add dialog | Fixed |
+| [FIXED-1290](#fixed-1290--the-server-rename-row-clipped-cancel-at-200-percent-zoom) | Low | Connections / zoom layout | Fixed |
 
 ---
 
@@ -38709,3 +38712,65 @@ claim that there is no activity.
 deletion review and polling. Existing focused panel suites cover successful
 behavior. Running-host browser cases RT-MODEL-RECOVERY-01–06 and screenshots:
 [WEB_APP_LIVE_TEST.md](../architecture/WEB_APP_LIVE_TEST.md#result--2026-11-06-qui-g06-model-recovery).
+
+## FIXED-1288 — Connection failures claimed rollback or lost their recovery message (QUI-G06)
+
+**Severity: Medium. Area: Connections / error recovery. Status: Fixed 2026-11-06.**
+
+**Observed.** Fifteen Connections and Advanced-server actions either exposed a
+bare reason code, offered no recovery or claimed nothing changed after a lost
+response. Server polling cleared action errors. Failed server-list reads kept
+showing loading, and manifest failures had no alert semantics or submit guard.
+The per-account editor also claimed rollback without confirming it.
+
+**Fixed.** Implemented the 15-item connection slice in
+[07 Quick fixes and quality](quiet-ui/07_QUICK_FIXES_AND_QUALITY.md#2026-11-06--qui-g06-connection-recovery).
+Each error names the action and affected object, retains HTTP/refusal evidence
+and gives a safe next check. Transport failures preserve read-back guidance.
+Connections offers **Refresh connections**, including inside a failed Add
+flow. Advanced servers separates read errors from action errors, retains the
+latter across background polling, stops false loading and keeps rows and drafts.
+Account edits and manifest import now report unconfirmed writes honestly;
+manifest submission prevents duplicate clicks and announces failures.
+
+**Evidence.** ConnectionsView, McpView, ConnectorAccountsRecovery and
+connectionRecovery component/helper regressions cover failed actions, retained
+inputs, recovery after refresh and polling. Running-host scenarios and visual
+checks are recorded in
+[WEB_APP_LIVE_TEST.md](../architecture/WEB_APP_LIVE_TEST.md#result--2026-11-06-qui-g06-connection-recovery).
+These fault-injection checks do not qualify a real provider or server transport.
+
+## FIXED-1289 — Adding a service lost its sign-in step after installation
+
+**Severity: Medium. Area: Connections / Add dialog. Status: Fixed 2026-11-06.**
+
+**Observed.** The new credential-retention regression installed a service and
+could not find its credential field. Installation removed the selected service
+from the Add catalogue before its sign-in and Done steps could render. GitHub
+sign-in had the same selected-option lifetime problem.
+
+**Fixed.** Keep the chosen service or GitHub sign-in option in the catalogue
+while its Add flow is open. The page still lists installed services, and closing
+the dialog returns the catalogue to services not yet installed.
+
+**Evidence.** ConnectionsView's install → credential failure test proves the
+sign-in field stays mounted, preserves its password entry and shows exactly one
+error inside the dialog. RT-CONNECTION-RECOVERY-14 exercises this transition
+against the running host; see the
+[Live Test run record](../architecture/WEB_APP_LIVE_TEST.md#result--2026-11-06-qui-g06-connection-recovery).
+
+## FIXED-1290 — The server rename row clipped Cancel at 200 percent zoom
+
+**Severity: Low. Area: Connections / zoom layout. Status: Fixed 2026-11-06.**
+
+**Observed.** Visual review of RT-CONNECTION-RECOVERY-10 found Cancel clipped
+outside its server card at 1280×800 with CSS zoom 2. The rename input's minimum
+width and the single-line name group pushed the buttons past the card edge.
+
+**Fixed.** The name group wraps, may shrink within the card, and bounds the
+rename input to its available width. Save and Cancel remain reachable without
+losing the draft or error message.
+
+**Evidence.** RT-CONNECTION-RECOVERY-10 now asserts that Cancel is in the
+viewport and fully inside its card before recording the zoom screenshot; see
+[Live Test docs](../architecture/WEB_APP_LIVE_TEST.md#result--2026-11-06-qui-g06-connection-recovery).

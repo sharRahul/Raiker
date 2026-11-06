@@ -22,8 +22,9 @@
   import ConnectorAccounts from "../components/ConnectorAccounts.svelte";
   import GuideLink from "../components/GuideLink.svelte";
   import GitHubConnection from "./settings/GitHubConnection.svelte";
-  import { api, ApiError } from "../api";
-  import { endpointRefusal, networkClassLabel } from "../mcpEndpoint";
+  import { api } from "../api";
+  import { connectionFailure } from "../connectionRecovery";
+  import { networkClassLabel } from "../mcpEndpoint";
   import { humanize, relativeTime } from "../format";
   import { operationEffect } from "../connectionEffects";
   import { addFromHash, itemFromHash } from "../listDetail";
@@ -67,6 +68,7 @@
   let manifestConnectorId = $state("");
   let manifestText = $state("");
   let manifestResult = $state<string | null>(null);
+  let manifestFailed = $state(false);
   let mcpOpen = $state(false);
   let mcpTransport = $state<"local" | "remote">("local");
   let mcpName = $state("");
@@ -90,7 +92,7 @@
   ]);
 
   const catalogue = $derived<AddOption[]>([
-    ...(githubConnected
+    ...(githubConnected && !(adding && chosen === GITHUB_ID)
       ? []
       : [
           {
@@ -101,7 +103,9 @@
           },
         ]),
     ...(view?.connectors ?? [])
-      .filter((connector) => !connector.installed)
+      // Installing is the first step of Add, not its end. Keep the selected
+      // service here until its sign-in and Done steps have finished.
+      .filter((connector) => !connector.installed || (adding && chosen === connector.connector_id))
       .map((connector) => ({
         id: connector.connector_id,
         name: connector.display_name,
@@ -123,26 +127,12 @@
     return approvals.filter((approval) => approval.capability === extension.capability).length;
   }
 
-  function reason(e: unknown): string {
-    if (!(e instanceof ApiError)) return "The request did not reach Raiker. Nothing was changed. Try again.";
-    // RR-MCP-02 — a refused endpoint is explained in words an owner can act on,
-    // not shown as its reason code.
-    const connectorErrors: Record<string, string> = {
-      connector_auth_required: "Connect this account before turning it on. Nothing was sent.",
-      connector_reauth_required: "This sign-in expired or was revoked. Connect the account again before trying it.",
-      connector_oauth_refresh_failed: "Raiker could not refresh this sign-in. Connect the account again before trying it.",
-      connector_oauth_refresh_invalid: "The provider returned an invalid refreshed sign-in. Connect the account again.",
-      connector_not_enabled: "Turn this connection on for this session before using it.",
-    };
-    return endpointRefusal(e.reasonCode) ?? (e.reasonCode ? connectorErrors[e.reasonCode] ?? e.reasonCode : `The request was refused (HTTP ${e.status}). Nothing was changed.`);
-  }
-
   async function load() {
     error = null;
     try {
       view = await api.connectorStore();
     } catch (e) {
-      error = reason(e);
+      error = connectionFailure("Could not load connections", "The service list could not be verified.", "Choose Refresh connections to read it again.", e);
     }
     try {
       extensions = (await api.extensions()).extensions;
@@ -178,7 +168,7 @@
     }
   }
 
-  async function act(action: () => Promise<unknown>) {
+  async function act(action: () => Promise<unknown>, what: string, affected: string, next: string) {
     busy = true;
     error = null;
     try {
@@ -186,7 +176,7 @@
       await load();
       return true;
     } catch (e) {
-      error = reason(e);
+      error = connectionFailure(what, affected, next, e);
       return false;
     } finally {
       busy = false;
@@ -194,7 +184,9 @@
   }
 
   async function install(connector: StoreConnector) {
-    await act(() => api.installConnector(connector.connector_id));
+    await act(() => api.installConnector(connector.connector_id),
+      `Could not add ${connector.display_name}`, "The saved connection is unconfirmed.",
+      "Refresh connections and check whether it was added before adding it again.");
   }
 
   async function authenticate(connector: StoreConnector) {
@@ -203,6 +195,8 @@
         connector.connector_id,
         connector.auth_type === "oauth2" ? { access_token: secret } : { api_key: secret },
       ),
+      `Could not save the sign-in for ${connector.display_name}`, "Your entry is kept here; the saved sign-in is unconfirmed.",
+      "Refresh connections and check its sign-in before connecting again.",
     );
     if (done) secret = "";
   }
@@ -214,11 +208,15 @@
   }
 
   async function toggle(connector: StoreConnector) {
-    await act(() => api.setConnectorEnabled(connector.connector_id, !connector.enabled));
+    await act(() => api.setConnectorEnabled(connector.connector_id, !connector.enabled),
+      `Could not ${connector.enabled ? "turn off" : "turn on"} ${connector.display_name} for this session`,
+      "Session access is unconfirmed.", "Refresh connections and check session access before using this service.");
   }
 
   async function uninstall(connector: StoreConnector) {
-    if (await act(() => api.uninstallConnector(connector.connector_id))) selectedId = null;
+    if (await act(() => api.uninstallConnector(connector.connector_id),
+      `Could not disconnect ${connector.display_name}`, "Credential removal is unconfirmed.",
+      "Refresh connections and check whether the service is still listed before disconnecting again.")) selectedId = null;
   }
 
   function openMcp(connector: StoreConnector) {
@@ -244,20 +242,26 @@
       const connected = await api.connectMcpServer(created.server_id);
       mcpResult = `${mcpName.trim()}: connected · ${connected.tools.length} tool(s). It is listed under Advanced › MCP servers.`;
     } catch (e) {
-      error = reason(e);
+      error = connectionFailure(`Could not connect ${mcpName.trim()}`, "The server may have been created without passing its connection test.", "Check Advanced › MCP servers and test any saved profile before creating another.", e);
     } finally {
       busy = false;
     }
   }
 
   async function registerManifest() {
+    if (busy) return;
+    busy = true;
+    manifestFailed = false;
     manifestResult = null;
     try {
       const manifest = JSON.parse(manifestText) as Record<string, unknown>;
       const result = await api.registerConnectorManifest(manifestConnectorId, manifest);
       manifestResult = `${result.operations?.length ?? 0} operations registered`;
     } catch (e) {
-      manifestResult = e instanceof SyntaxError ? "That is not valid JSON. Nothing was registered." : reason(e);
+      manifestFailed = true;
+      manifestResult = e instanceof SyntaxError ? "That is not valid JSON. Nothing was registered. Correct the JSON, then choose Check and register." : connectionFailure("Could not register the connection manifest", "Registration is unconfirmed; your JSON is kept here.", "Close this dialog and refresh connections to check its activities before registering again.", e);
+    } finally {
+      busy = false;
     }
   }
 
@@ -275,6 +279,9 @@
 <div class="services-head">
   <GuideLink route="connections" />
   <div class="head-actions">
+    <button type="button" class="btn btn-ghost btn-sm" onclick={load} disabled={busy}>
+      <Icon name="refresh" size="sm" /> Refresh connections
+    </button>
     {#if services.length > 0}
       <button type="button" class="btn btn-ghost btn-sm" onclick={() => (showManifest = true)}>
         <Icon name="file" size="sm" /> Import manifest
@@ -290,7 +297,7 @@
   </div>
 </div>
 
-{#if error}<div class="notice notice-danger" role="alert">{error}</div>{/if}
+{#if error && !adding}<div class="notice notice-danger" role="alert">{error}</div>{/if}
 {#if view && !view.vault_configured}
   <!-- The one readiness fact that stops a connection, shown only when true. -->
   <div class="attention-row" role="status">
@@ -450,6 +457,7 @@
               : "Not yet beta-supported; verify it for your account before relying on it."}</p>
           <p class="note">Talks to <span class="mono">{connector.host}</span>. Connecting stores a credential and grants nothing until Permissions allows it.</p>
           {#if error}<div class="notice notice-danger" role="alert">{error}</div>{/if}
+          {#if error}<button class="btn btn-sm" onclick={load} disabled={busy}>Refresh connections</button>{/if}
           {#if !connector.installed}
             <div class="step-actions">
               <button class="btn btn-primary" onclick={() => install(connector)} disabled={busy}>
@@ -523,9 +531,9 @@
       </select>
       <label class="field-label" for="manifest-json">Manifest JSON</label>
       <textarea id="manifest-json" class="textarea manifest" bind:value={manifestText}></textarea>
-      {#if manifestResult}<div class="notice">{manifestResult}</div>{/if}
+      {#if manifestResult}<div class="notice" class:notice-danger={manifestFailed} role={manifestFailed ? "alert" : "status"}>{manifestResult}</div>{/if}
       <div class="step-actions">
-        <button class="btn btn-primary" onclick={registerManifest} disabled={!manifestConnectorId || !manifestText}>
+        <button class="btn btn-primary" onclick={registerManifest} disabled={busy || !manifestConnectorId || !manifestText}>
           Check and register
         </button>
       </div>

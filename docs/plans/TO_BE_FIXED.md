@@ -1362,3 +1362,15 @@ cancel, inspection and record cleanup. The other nine paths still need
 individual running-host fault-injection evidence. Synthetic Activity rows in
 these checks do not close real download, installer or provider acceptance.
 The remaining cross-app error audit and QUI-G01/G04/G07 stay open.
+
+### QUI-G06 connection slice — remaining acceptance evidence
+
+The 15 connection-recovery implementations are recorded in
+[07 Quick fixes and quality](quiet-ui/07_QUICK_FIXES_AND_QUALITY.md#2026-11-06--qui-g06-connection-recovery)
+and [FIXED-1288](FIXED_ITEMS.md#fixed-1288--connection-failures-claimed-rollback-or-lost-their-recovery-message-qui-g06).
+The browser run uses explicit endpoint failures and declared Advanced-server
+fixtures. It does not prove real credential-provider recovery, a live server's
+stop/resume lifecycle, or a write whose provider committed before its response
+was lost. Those require owner-authorized provider/server acceptance fixtures.
+The broader error audit, optimistic rollback, size gates and five-person study
+remain open; no beta acceptance gate is closed by this slice.

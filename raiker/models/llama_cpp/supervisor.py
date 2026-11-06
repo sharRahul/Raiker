@@ -77,7 +77,9 @@ def probe_health(port: int, alias: str, *, timeout: float = 2.0) -> str:
     """``ready``, ``loading`` (503 while weights load) or ``down``."""
     origin = f"http://127.0.0.1:{port}"
     try:
-        with httpx.Client(timeout=timeout, trust_env=False) as client:
+        # This origin is fixed to plain HTTP on loopback. Avoid loading the
+        # platform TLS trust store on every monitor tick (costly on macOS).
+        with httpx.Client(timeout=timeout, trust_env=False, verify=False) as client:
             health = client.get(f"{origin}/health")
             if health.status_code == 503:
                 return "loading"

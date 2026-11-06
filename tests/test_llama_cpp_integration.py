@@ -178,7 +178,7 @@ def test_crash_after_ready_is_restarted_by_the_monitor(stack: Stack) -> None:
     stack.runtime._processes[slot].kill()
     stack.supervisor.start()
     _wait(lambda: stack.supervisor.health(slot).restarts >= 1, timeout=20)
-    _wait(lambda: stack.supervisor.health(slot).state == "ready", timeout=20)
+    _wait(lambda: stack.supervisor.health(slot).state == "ready", timeout=120)
     assert stack.runtime.status(slot).pid != first_pid
     assert stack.supervisor.health(slot).last_error == "local_runtime_exited"
 

@@ -1602,6 +1602,7 @@ file you can open. The two capture sets that remain — `screenshots/pages/` and
 | [FIXED-1295](#fixed-1295--icons-and-option-controls-were-small-and-inconsistent-across-pages) | Medium | Shared UI / visual scale | Fixed 2026-11-06 |
 | [FIXED-1296](#fixed-1296--api-contract-inventory-was-generated-with-a-different-python-runtime) | Low | API contract documentation | Fixed 2026-11-06 |
 | [FIXED-1297](#fixed-1297--settings-errors-hid-uncertainty-and-offered-no-recovery-qui-g06) | Medium | Settings / recovery | Fixed 2026-11-06 |
+| [FIXED-1298](#fixed-1298--windows-account-cases-raced-over-the-shared-account-pool) | Medium | Native runner tests | Fixed 2026-11-06 |
 
 ---
 
@@ -38950,3 +38951,18 @@ dialog after a connected Models inventory was restored. It now opens the source
 through Add model when needed; the three-provider saved-connection recheck
 passed. Provider evidence uses individual card screenshots to avoid the
 Chromium crash observed while resizing for the full Models page capture.
+
+## FIXED-1298 — Windows account cases raced over the shared account pool
+
+**Severity: Medium. Area: Native runner tests. Status: Fixed 2026-11-06.**
+
+**Observed.** CI job 128070542407 failed the stale-grant test: its planted
+`RaikerSandbox` grant remained, although the attempted write was blocked. Other
+tests ran concurrently against the same machine-wide pool, so the run could
+select a different account whose grant was correctly isolated. The assertion
+assumed the primary account was available.
+
+**Fixed.** Serialized cases within `windows_account.rs` with a shared mutex.
+The explicit overlap case still launches concurrent runs and checks isolation;
+the stale-grant assertion and every boundary test remain intact. Production
+sandbox behavior is unchanged. GitHub's Windows job provides the host evidence.

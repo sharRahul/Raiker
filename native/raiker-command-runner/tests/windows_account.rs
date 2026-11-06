@@ -6,6 +6,10 @@
 use std::path::PathBuf;
 use std::process::Command;
 
+// These cases mutate one machine-wide account pool and inspect its grants.
+// Keep cases apart; the overlap case still launches concurrent runs itself.
+static ACCOUNT_TEST: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
 fn runner() -> &'static str {
     env!("CARGO_BIN_EXE_raiker-command-runner")
 }
@@ -61,6 +65,7 @@ fn run(copy: &Copy, argv: &[&str]) -> std::process::Output {
 
 #[test]
 fn the_account_probe_measures_every_filesystem_and_process_control_enforced() {
+    let _account_test = ACCOUNT_TEST.lock().unwrap();
     let Some(_) = configured() else { return };
     let output = Command::new(runner())
         .args(["--probe", "--workspace"])
@@ -84,6 +89,7 @@ fn the_account_probe_measures_every_filesystem_and_process_control_enforced() {
 
 #[test]
 fn ordinary_toolchains_start_as_the_account_inside_the_copy() {
+    let _account_test = ACCOUNT_TEST.lock().unwrap();
     let Some(base) = configured() else { return };
     let copy = copy_under(&base, "toolchains");
     let cmd = std::env::var("ComSpec").unwrap_or_else(|_| r"C:\Windows\System32\cmd.exe".into());
@@ -109,6 +115,7 @@ fn ordinary_toolchains_start_as_the_account_inside_the_copy() {
 
 #[test]
 fn the_account_cannot_write_the_owners_profile_or_a_copy_outside_its_base() {
+    let _account_test = ACCOUNT_TEST.lock().unwrap();
     let Some(base) = configured() else { return };
     let copy = copy_under(&base, "escape");
     let profile =
@@ -150,6 +157,7 @@ fn the_account_cannot_write_the_owners_profile_or_a_copy_outside_its_base() {
 
 #[test]
 fn a_run_cannot_touch_another_sessions_copy() {
+    let _account_test = ACCOUNT_TEST.lock().unwrap();
     let Some(base) = configured() else { return };
     let mine = copy_under(&base, "mine");
     let theirs = copy_under(&base, "theirs");
@@ -180,6 +188,7 @@ fn a_run_cannot_touch_another_sessions_copy() {
 
 #[test]
 fn a_grant_left_on_another_copy_is_revoked_before_a_run_starts() {
+    let _account_test = ACCOUNT_TEST.lock().unwrap();
     let Some(base) = configured() else { return };
     let mine = copy_under(&base, "fresh");
     let stale = copy_under(&base, "stale");
@@ -236,6 +245,7 @@ fn spawn(copy: &Copy, label: &str, deadline: u64, argv: &[&str]) -> std::process
 
 #[test]
 fn runs_in_two_copies_overlap_on_different_accounts_and_stay_apart() {
+    let _account_test = ACCOUNT_TEST.lock().unwrap();
     let Some(base) = configured() else { return };
     let ping = r"C:\Windows\System32\PING.EXE";
     let cmd = r"C:\Windows\System32\cmd.exe";
@@ -315,6 +325,7 @@ fn run_limited(copy: &Copy, limits: serde_json::Value, argv: &[&str]) -> std::pr
 
 #[test]
 fn the_job_memory_limit_stops_an_allocation_past_it_and_not_one_inside_it() {
+    let _account_test = ACCOUNT_TEST.lock().unwrap();
     let Some(base) = configured() else { return };
     let copy = copy_under(&base, "memory");
     let powershell = r"C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe";
@@ -349,6 +360,7 @@ fn the_job_memory_limit_stops_an_allocation_past_it_and_not_one_inside_it() {
 
 #[test]
 fn the_job_process_limit_stops_a_child_past_it_and_not_one_inside_it() {
+    let _account_test = ACCOUNT_TEST.lock().unwrap();
     let Some(base) = configured() else { return };
     let copy = copy_under(&base, "processes");
     let cmd = r"C:\Windows\System32\cmd.exe";
@@ -380,6 +392,7 @@ fn freshly_set_up() -> Option<PathBuf> {
 
 #[test]
 fn the_account_reaches_its_own_listeners_and_no_other_local_service() {
+    let _account_test = ACCOUNT_TEST.lock().unwrap();
     let Some(_) = freshly_set_up() else { return };
     let output = Command::new(runner())
         .args(["--probe", "--workspace"])
@@ -422,6 +435,7 @@ fn free_port_in(ports: std::ops::RangeInclusive<u16>) -> std::net::TcpListener {
 
 #[test]
 fn the_account_reaches_the_proxy_and_port_zero_servers_but_no_fixed_port_service() {
+    let _account_test = ACCOUNT_TEST.lock().unwrap();
     let Some(base) = freshly_set_up() else { return };
     let copy = copy_under(&base, "loopback");
     // Owner listeners: the proxy range, a fixed port where services such as

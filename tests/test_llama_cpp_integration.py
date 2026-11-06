@@ -171,8 +171,11 @@ def test_slow_load_is_waited_for(stack: Stack) -> None:
 
 
 def test_crash_after_ready_is_restarted_by_the_monitor(stack: Stack) -> None:
-    slot = stack.launch("crash.gguf")
+    # Trigger one crash after readiness instead of making every replacement
+    # crash after two seconds: a loaded runner may miss that short ready window.
+    slot = stack.launch("recover.gguf")
     first_pid = stack.runtime.status(slot).pid
+    stack.runtime._processes[slot].kill()
     stack.supervisor.start()
     _wait(lambda: stack.supervisor.health(slot).restarts >= 1, timeout=20)
     _wait(lambda: stack.supervisor.health(slot).state == "ready", timeout=20)

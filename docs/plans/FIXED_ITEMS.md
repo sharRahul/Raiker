@@ -38759,6 +38759,9 @@ The shared live sign-in helper now handles the Voice setup stage explicitly.
 The compact top bar uses tighter gaps so the Beta badge fits with the existing
 controls on small phones. GitHub rejected the retired macos-14-arm64 runner
 configuration; llama.cpp jobs and the matching release gate now use macos-15.
+The crash-recovery integration test now kills one ready process explicitly,
+rather than making every replacement crash again after two seconds; recovery
+is still required and its PID and failure receipt are checked.
 
 **Evidence.** tests/test_docs_consistency.py; Svelte check, production build
 and the mocked responsive composer suite.

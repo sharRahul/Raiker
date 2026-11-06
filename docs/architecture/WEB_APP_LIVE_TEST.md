@@ -1685,3 +1685,71 @@ RT-PROJECT-RECOVERY-03/04/06 passed again **3/3** in 1.5 minutes against the fin
 production build. Their dark content, context/export and move-dialog captures
 replace the earlier versions. The 69 focused Projects/Limits/quiet-copy tests
 and final Svelte check (zero errors/warnings) passed on the completed source.
+
+## Result — 2026-11-06 QUI-G06 Approvals, Library and Sessions recovery
+
+**Scope.** The fifteen paths in
+[07 Quick fixes and quality](../plans/quiet-ui/07_QUICK_FIXES_AND_QUALITY.md#2026-11-06--qui-g06-approvals-library-and-sessions-recovery)
+and the open-queue fix found in this round. Built SPA served by real FastAPI
+from `/tmp/raiker-approvals-recovery` on port 8765, Linux Chromium, 1280×800.
+The owner signs in through the UI. Anthropic was connected through Models with
+the owner-supplied key and workspace ID entered in the password and Advanced
+fields (`models-provider-validation-live.spec.ts`, Anthropic leg: passed,
+Haiku 4.5 answered `42`). Each approval is raised by a real Haiku 4.5 turn asked
+to write `approval-recovery.md`. Failures are explicit HTTP 503 answers injected
+in the browser, so no failed decision, unpin or delete reaches the host. Library
+pin rows are a declared fixture.
+
+| Case | Check |
+|---|---|
+| RT-APPROVAL-RECOVERY-01 | Approvals is opened while the real turn is still working; the decision it raises appears in the open queue without Refresh (FIXED-1303) |
+| RT-APPROVAL-RECOVERY-02 | A failed queue refresh keeps the rows, says the list may be out of date, and Retry approvals recovers |
+| RT-APPROVAL-RECOVERY-03 | A failed detail read says nothing was decided; Open it again loads the real proposal |
+| RT-APPROVAL-RECOVERY-04 | A lost Allow once says it may have been recorded and to check History; after Refresh the approval is still waiting and a real decision is recorded by the host |
+| RT-APPROVAL-RECOVERY-05 | A failed History read in the dark theme keeps the list and recovers |
+| RT-LIBRARY-RECOVERY-01 | A failed Library read says nothing was removed and recovers; a failed unpin keeps the row with a check-first step |
+| RT-SESSIONS-RECOVERY-01 | A failed refresh keeps rows; a failed detail read reopens; a failed bulk delete keeps the selection and says to check what is listed |
+
+**Outcome: 7/7 passed (2.9 minutes)** on the final production build. Earlier
+attempts are not passing evidence: the first waited on text that matched its
+own prompt; one count-based assertion misread a surviving approval; one attempt
+received no new proposal from the model within three minutes; and the Sessions
+list route pattern missed its URL. The run also found that an unknown code on a
+503 (`injected_failure`) produced *The runtime reported: injected_failure.* in
+place of the unconfirmed-decision step. A 4xx is now treated as a refusal and a
+5xx as unconfirmed (FIXED-1302). Execution relay was off in this workspace, so
+the real decision was recorded, not executed; that is the product's stated
+behaviour.
+
+**Procedure and evidence.**
+`web/e2e/approvals-library-sessions-recovery-live.spec.ts`, run with
+`npx playwright test --project=live e2e/approvals-library-sessions-recovery-live.spec.ts --workers=1 --trace off`
+from `web/`, after connecting Anthropic through the provider spec with
+`RAIKER_LIVE_CREDENTIALS_FILE` pointing at a private mode-0600 file. Captures
+and manifest are under
+`output/playwright/2026-11-06-approvals-library-sessions-recovery/` (ignored by
+Git). The decision, History (dark), unpin and Sessions delete captures were
+reviewed for readable wrapping, visible recovery buttons and status words
+alongside colour. The credential file was deleted and the host stopped after
+the run; no key is in source, captures or this record.
+
+**Local checks.** On the final source: 2,765 web component tests (289 files),
+Svelte check (0 errors, 0 warnings), ESLint, Ruff, the documentation
+consistency, comment-policy and truthfulness validators passed. The comment
+policy caught a discovery narrative in a production comment, which was reworded.
+
+**Visual direction.** Recovery uses the existing Quiet UI tokens, notices and
+button scale, informed by the requested [Apple design reference](https://github.com/dickwu/apple-design-skill),
+[Impeccable](https://github.com/pbakaus/impeccable), its
+[anti-slop guidance](https://impeccable.style/#slop) and the
+[macOS](https://github.com/ceorkm/macos-design-skill) /
+[macOS skill catalogue](https://skill-repo.io/extensions/skill/davepoon/macos-design)
+references: inline, specific messages, one plain recovery button, no new colour
+or chrome.
+
+**Limits.** Injected failures do not show a write that committed before its
+answer was lost. Question answers, edits, continuation, critical step-up,
+held-send undo, download and pin move have component evidence only. Native
+Windows/macOS, screen readers and the five-person study remain open; see
+[TO_BE_FIXED.md](../plans/TO_BE_FIXED.md#qui-g06-approvals-library-and-sessions-recovery--remaining-evidence).
+The five GitHub workflows remain current; none was stale enough to remove.

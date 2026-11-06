@@ -18,6 +18,7 @@
     alreadyResumedElsewhere,
     publishApprovalResolved,
     subscribeApprovalResolved,
+    subscribePendingApprovalCount,
   } from "../approvalResume";
   import type { ApprovalDetailView, ApprovalView, OwnerQuestion } from "../apiTypes";
   import { ownerQuestions, previewFor } from "../clarify";
@@ -26,6 +27,17 @@
   import { capabilityLabel } from "../capabilityModel";
   import { formatTimestamp, humanize, relativeTime } from "../format";
   import { explainReasonCode } from "../reasonCodes";
+
+  /**
+   * QUI-G06 — a 4xx answer is a refusal: the server read the request and said
+   * no, so nothing was recorded and its reason is the explanation. A 5xx or no
+   * answer at all is not a refusal, whatever code rides along, and a decision
+   * sent then may have been recorded.
+   */
+  function refusalOf(e: unknown): ReturnType<typeof explainReasonCode> {
+    return e instanceof ApiError && e.status < 500 ? explainReasonCode(e.reasonCode) : null;
+  }
+  import { failure } from "../errorCopy";
 
   let { sessionId = null }: { sessionId?: string | null } = $props();
 
@@ -214,8 +226,14 @@
         approvals = [...byId.values()];
       }
     } catch (e) {
-      approvals = null;
-      loadError = e instanceof ApiError ? `Unavailable (${e.status})` : "Unavailable";
+      // QUI-G06 — keep the rows already read: a failed refresh does not mean
+      // the decisions on screen went away, only that they are unconfirmed.
+      loadError = failure(
+        view === "pending" ? "Approvals could not be read" : "Approval history could not be read",
+        approvals === null ? "Which decisions are waiting is unknown." : "The list below may be out of date.",
+        "Choose Retry approvals to read them again.",
+        e,
+      );
     }
   }
 
@@ -232,7 +250,12 @@
       selected = await api.approval(id);
     } catch (e) {
       selected = null;
-      detailError = e instanceof ApiError ? `Could not load approval (${e.status}).` : "Could not load approval.";
+      detailError = failure(
+        "This approval could not be opened",
+        "Its proposal and evidence are unavailable, and nothing was decided.",
+        "Choose Open it again.",
+        e,
+      );
     }
   }
 
@@ -319,10 +342,17 @@
       selected = null;
       await load();
     } catch (e) {
-      const explained = e instanceof ApiError ? explainReasonCode(e.reasonCode) : null;
+      const explained = refusalOf(e);
       notice = {
         kind: "error",
-        text: explained ? `${explained.plain} ${explained.remediation ?? ""}` : "That answer was not accepted.",
+        text: explained
+          ? `${explained.plain} ${explained.remediation ?? ""}`
+          : failure(
+              "The answer was not confirmed",
+              "It may have reached the turn; your choices are still selected.",
+              "Choose Refresh and check whether the question is still waiting before answering again.",
+              e,
+            ),
       };
     } finally {
       busy = false;
@@ -368,8 +398,19 @@
     } catch (e) {
       editError =
         e instanceof ApiError
-          ? EDIT_REFUSALS[e.reasonCode ?? ""] ?? `That version was not accepted (${e.status}).`
-          : "That version was not accepted.";
+          ? EDIT_REFUSALS[e.reasonCode ?? ""] ??
+            failure(
+              "Your version was not confirmed",
+              "Your edit is still here; a replacement may already be waiting.",
+              "Choose Refresh and look for it before proposing again.",
+              e,
+            )
+          : failure(
+              "Your version was not confirmed",
+              "Your edit is still here; a replacement may already be waiting.",
+              "Choose Refresh and look for it before proposing again.",
+              e,
+            );
     } finally {
       busy = false;
     }
@@ -379,12 +420,23 @@
   let holdLeft = $state<number | null>(null);
   let holdApproval = $state<string | null>(null);
 
+  /** QUI-G06 — an undo that failed for another reason than a closed window. */
+  let undoError = $state<string | null>(null);
+
   async function undoSend() {
     if (holdApproval === null) return;
+    undoError = null;
     try {
       await contract.undoHeldSend(holdApproval);
-    } catch {
+    } catch (e) {
       // The window closed and it was sent; the decision's own answer says so.
+      if (e instanceof ApiError && e.reasonCode === "send_not_held") return;
+      undoError = failure(
+        "Undo was not confirmed",
+        "The send may still go out when its window closes.",
+        "Choose Undo again while the countdown runs, then check History for Sent or Undone.",
+        e,
+      );
     }
   }
 
@@ -392,6 +444,7 @@
     if (selected === null || busy) return;
     busy = true;
     notice = null;
+    undoError = null;
     let ticker: ReturnType<typeof setInterval> | null = null;
     if (approve && holdsBeforeSending(selected.approval.tool_name)) {
       holdApproval = selected.approval.approval_id;
@@ -410,6 +463,8 @@
         // approval for no reason.
         ...(approve && hunkSelection !== undefined ? { accepted_hunks: hunkSelection } : {}),
       });
+      // The decision's own answer is authoritative about whether it was sent.
+      undoError = null;
       const receipt = result.execution?.receipt;
       const checkpoint = result.execution?.checkpoint_capture;
       if (result.status === "undone") {
@@ -452,10 +507,17 @@
       selected = null;
       await load();
     } catch (e) {
-      const explained = e instanceof ApiError ? explainReasonCode(e.reasonCode) : null;
+      const explained = refusalOf(e);
       notice = {
         kind: "error",
-        text: explained ? `${explained.plain} ${explained.remediation ?? ""}` : "The decision was rejected.",
+        text: explained
+          ? `${explained.plain} ${explained.remediation ?? ""}`
+          : failure(
+              approve ? "Allowing this was not confirmed" : "Declining this was not confirmed",
+              "The decision may have been recorded and, if allowed, the action may have run.",
+              "Choose Refresh and check History for this approval before deciding again.",
+              e,
+            ),
       };
     } finally {
       if (ticker !== null) clearInterval(ticker);
@@ -496,12 +558,17 @@
         await load();
         return;
       }
-      const explained = e instanceof ApiError ? explainReasonCode(e.reasonCode) : null;
+      const explained = refusalOf(e);
       notice = {
         kind: "error",
         text: explained
           ? `${explained.plain} ${explained.remediation ?? ""}`
-          : "The turn could not be continued.",
+          : failure(
+              "Continuing the turn was not confirmed",
+              "It may already be running.",
+              "Open the conversation and check its latest turn before continuing again.",
+              e,
+            ),
       };
     } finally {
       resumeBusy = false;
@@ -522,12 +589,15 @@
     criticalBusy = true;
     criticalError = null;
     const controlToken = getToken();
+    // QUI-G06 — a refused step-up decided nothing; a lost answer after it may have.
+    let elevated = false;
     try {
       const { token: elevatedToken } = await auth.elevate(
         criticalPassword.trim() || undefined,
         criticalMfaCode.trim() || undefined,
       );
       setToken(elevatedToken);
+      elevated = true;
       const result = await api.resolveCriticalApproval(selected.approval.approval_id, {
         approve: criticalDecision === "approve",
         reason: criticalReason.trim(),
@@ -544,10 +614,22 @@
       criticalDecision = null;
       await load();
     } catch (e) {
-      const explained = e instanceof ApiError ? explainReasonCode(e.reasonCode) : null;
+      const explained = refusalOf(e);
       criticalError = explained
         ? `${explained.plain} ${explained.remediation ?? ""}`
-        : "Step-up verification was rejected.";
+        : elevated
+          ? failure(
+              "The critical decision was not confirmed",
+              "Verification succeeded, so the decision may have been recorded.",
+              "Cancel, choose Refresh and check History before deciding again.",
+              e,
+            )
+          : failure(
+              "Step-up verification was not completed",
+              "Nothing was decided.",
+              "Check your password or code and try again.",
+              e,
+            );
     } finally {
       setToken(controlToken);
       criticalBusy = false;
@@ -564,6 +646,13 @@
   // A decision made in Chat, the floating card or another tab leaves this
   // queue as soon as it is announced.
   onMount(() => subscribeApprovalResolved(() => void load()));
+  // A decision raised while the queue is open arrives here as the top bar's
+  // count changing; the queue re-reads rather than waiting for a Refresh.
+  onMount(() =>
+    subscribePendingApprovalCount((count) => {
+      if (view === "pending" && count !== pendingCount) void load();
+    }),
+  );
   onMount(load);
 </script>
 
@@ -582,6 +671,9 @@
       <a href={notice.link.href}>{notice.link.label}</a>
     {/if}
   </p>
+{/if}
+{#if undoError && holdLeft === null}
+  <p class="notice notice-danger" role="alert">{undoError}</p>
 {/if}
 {#if editedFrom}
   {#key editedFrom}
@@ -648,10 +740,14 @@
 </div>
 
 {#if loadError}
-  <PageState state="error" title="Couldn't load approvals" detail={loadError} />
-{:else if approvals === null}
+  <div class="read-recovery">
+    <PageState state="error" title="Couldn't load approvals" detail={loadError} />
+    <button type="button" class="btn btn-sm" onclick={() => void load()}>Retry approvals</button>
+  </div>
+{/if}
+{#if approvals === null && !loadError}
   <PageState state="loading" title="Loading approvals…" />
-{:else}
+{:else if approvals !== null}
   <!-- QUI-P07 — layout B: the queue, the selected decision with its actions,
        and its evidence beside it on a wide screen (closed below 1,600 px). -->
   <ListDetail
@@ -704,7 +800,10 @@
     {/snippet}
     {#snippet detail(item: ApprovalView)}
       {#if detailError}
-        <p class="error" role="alert">{detailError}</p>
+        <div class="read-recovery">
+          <p class="error" role="alert">{detailError}</p>
+          <button type="button" class="btn btn-sm" onclick={() => void openDetail(item.approval_id)}>Open it again</button>
+        </div>
       {:else if selected === null || selected.approval.approval_id !== item.approval_id}
         <p class="loading-detail">Loading the decision…</p>
       {:else}
@@ -952,6 +1051,7 @@
           {#if holdLeft !== null}
             <span class="held" role="status" aria-live="polite">Sending in {holdLeft} s</span>
             <button type="button" class="btn btn-primary" onclick={() => void undoSend()}>Undo</button>
+            {#if undoError}<p class="error" role="alert">{undoError}</p>{/if}
           {:else}
           <button type="button" class="btn btn-primary" onclick={() => resolve(true)} disabled={busy}>
             {busy
@@ -1349,4 +1449,10 @@
   .edit-block .textarea { font-family: var(--font-mono, ui-monospace, monospace); }
   .recommended{margin-left:var(--space-2);padding:0 .35rem;border:1px solid var(--accent);border-radius:var(--r-sm);font-size:var(--text-xs);font-weight:600;color:var(--accent)}
   .preview{margin:var(--space-2) 0 0;padding:var(--space-2);max-height:14rem;overflow:auto;border:1px solid var(--border);border-radius:var(--r-sm);background:var(--surface);font-family:var(--font-mono);font-size:var(--text-xs);white-space:pre-wrap}
+  .read-recovery {
+    display: grid;
+    gap: var(--space-2);
+    margin-bottom: var(--space-3);
+  }
+  .read-recovery .btn { justify-self: start; }
 </style>

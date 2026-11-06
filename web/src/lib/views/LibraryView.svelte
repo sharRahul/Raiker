@@ -18,6 +18,7 @@
   import PageState from "../components/PageState.svelte";
   import ShowMore from "../components/ShowMore.svelte";
   import { api, ApiError } from "../api";
+  import { failure } from "../errorCopy";
   import { contract } from "../generated/apiContract";
   import type { ContentPart, LibraryItem, ProjectView } from "../generated/apiContract";
   import type { IconName } from "../icons";
@@ -65,6 +66,8 @@
   let shown = $state(PAGE_SIZE);
   let openBlock = $state<string | null>(null);
   let notice = $state("");
+  /** QUI-G06 — a failed action stays until the next one; it is not a 3-second toast. */
+  let actionError = $state<string | null>(null);
 
   const scoped = $derived(
     (items ?? []).filter(
@@ -82,7 +85,12 @@
       const answer = await contract.getLibrary(projectId ? { project_id: projectId } : {});
       items = answer.items.filter((item) => !exclude.includes(item.kind));
     } catch (error) {
-      loadError = error instanceof ApiError ? error.message : "The Library could not be read.";
+      loadError = failure(
+        "The Library could not be read",
+        items === null ? "What Raiker has made is unknown, and nothing was removed." : "The items below may be out of date.",
+        "Choose Retry Library to read it again.",
+        error,
+      );
     }
   }
 
@@ -116,26 +124,47 @@
   async function download(item: LibraryItem) {
     if (!item.download_url) return;
     const name = item.kind === "image" ? `${item.item_id.split(":")[1]}.png` : item.title;
+    actionError = null;
     try {
       await api.downloadLibraryItem(item.download_url, name);
-    } catch {
-      say(`Could not download ${item.title}: it may have been deleted where it was made.`);
+    } catch (error) {
+      actionError =
+        error instanceof ApiError && error.status === 404
+          ? failure(
+              `${item.title} could not be downloaded`,
+              "It may have been deleted where it was made.",
+              "Choose Retry Library to see whether it is still here.",
+              error,
+            )
+          : failure(
+              `${item.title} could not be downloaded`,
+              "No file was saved.",
+              "Check browser downloads and download permissions, then try again.",
+              error,
+            );
     }
   }
 
   async function unpin(item: LibraryItem) {
     if (!item.pin_id) return;
+    actionError = null;
     try {
       await contract.unpinBlock(item.pin_id);
       items = (items ?? []).filter((row) => row.item_id !== item.item_id);
       say("Unpinned. The answer it came from is unchanged.");
-    } catch {
-      say("Could not unpin: try again.");
+    } catch (error) {
+      actionError = failure(
+        `Unpinning ${item.title} was not confirmed`,
+        "It may already be unpinned; the answer it came from is unchanged.",
+        "Choose Retry Library and check whether it is still pinned before unpinning again.",
+        error,
+      );
     }
   }
 
-  async function move(item: LibraryItem, target: string) {
+  async function move(item: LibraryItem, target: string, control?: HTMLSelectElement) {
     if (!item.pin_id) return;
+    actionError = null;
     try {
       const moved = await contract.movePin(item.pin_id, { project_id: target || null });
       items = (items ?? []).map((row) =>
@@ -144,16 +173,34 @@
           : row,
       );
       say(moved.project_name ? `Moved to ${moved.project_name}` : "Moved out of its project");
-    } catch {
-      say("Could not move it: try again.");
+    } catch (error) {
+      // The picker shows the saved project, not the one that was not confirmed.
+      if (control) control.value = item.project_id ?? "";
+      actionError = failure(
+        `Moving ${item.title} was not confirmed`,
+        "Its saved project may have changed.",
+        "Choose Retry Library and check its project before moving it again.",
+        error,
+      );
     }
   }
 </script>
 
 <section class="library" class:compact aria-label={projectId ? "Project library" : "Library"}>
   {#if loadError}
-    <PageState state="error" title="The Library could not be read" detail={loadError} />
-    <p><button type="button" class="btn btn-soft btn-sm" onclick={() => void load()}>Try again</button></p>
+    <div class="read-recovery">
+      <PageState state="error" title="The Library could not be read" detail={loadError} />
+      <button type="button" class="btn btn-soft btn-sm" onclick={() => void load()}>Retry Library</button>
+    </div>
+  {/if}
+  {#if actionError}
+    <div class="read-recovery">
+      <p class="error" role="alert">{actionError}</p>
+      <button type="button" class="btn btn-soft btn-sm" onclick={() => { actionError = null; void load(); }}>Retry Library</button>
+    </div>
+  {/if}
+  {#if items === null && loadError}
+    <!-- Nothing known yet: the error above is the whole page. -->
   {:else if items === null}
     <PageState state="loading" title="Reading the Library…" lines={3} />
   {:else if items.length === 0 && compact}
@@ -234,7 +281,7 @@
                       class="move"
                       value={item.project_id ?? ""}
                       aria-label={`Project for ${item.title}`}
-                      onchange={(event) => void move(item, (event.currentTarget as HTMLSelectElement).value)}
+                      onchange={(event) => void move(item, (event.currentTarget as HTMLSelectElement).value, event.currentTarget as HTMLSelectElement)}
                     >
                       <option value="">No project</option>
                       {#each projects as project (project.project_id)}
@@ -381,4 +428,11 @@
   .block {
     grid-column: 2 / -1;
   }
+  .read-recovery {
+    display: grid;
+    gap: var(--space-2);
+    margin-bottom: var(--space-3);
+  }
+  .read-recovery .btn { justify-self: start; }
+  .error { margin: 0; }
 </style>

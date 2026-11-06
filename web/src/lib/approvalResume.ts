@@ -275,3 +275,26 @@ export function classifyResumeFailure(reasonCode: string | null | undefined): Re
   if (reasonCode === "build_authority_changed") return "authority-changed";
   return "failed";
 }
+
+/**
+ * The pending count, as the top bar last read it (FIXED-1303). The top bar
+ * re-reads it on a cadence and announces a change here, so an open Approvals
+ * queue re-reads its list when a decision is raised after it loaded, without
+ * a second poll of the same list.
+ */
+const PENDING_COUNT_HERE = "raiker:approvals-pending-count";
+
+export function publishPendingApprovalCount(count: number): void {
+  if (typeof window === "undefined") return;
+  window.dispatchEvent(new CustomEvent<number>(PENDING_COUNT_HERE, { detail: count }));
+}
+
+export function subscribePendingApprovalCount(onCount: (count: number) => void): () => void {
+  if (typeof window === "undefined") return () => {};
+  const here = (event: Event) => {
+    const count = (event as CustomEvent<number>).detail;
+    if (typeof count === "number") onCount(count);
+  };
+  window.addEventListener(PENDING_COUNT_HERE, here);
+  return () => window.removeEventListener(PENDING_COUNT_HERE, here);
+}

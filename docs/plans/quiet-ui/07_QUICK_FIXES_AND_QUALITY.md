@@ -27,7 +27,7 @@ redesign and can ship on its own.
 | QUI-G03 | **Done** ([FIXED-1097](../FIXED_ITEMS.md#fixed-1097--there-was-no-single-place-to-see-every-shared-state-qui-g03)), at `#/state-gallery` in development builds. |
 | QUI-G04 | **Partly done** ([FIXED-1100](../FIXED_ITEMS.md#fixed-1100--a-long-conversation-rendered-every-turn-qui-g04)): long transcripts. Open: actions that paint first and roll back visibly. |
 | QUI-G05 | **Done** ([FIXED-1098](../FIXED_ITEMS.md#fixed-1098--keyboard-use-and-zoom-were-not-checked-qui-g05)). |
-| QUI-G06 | **Partly done** ([FIXED-1099](../FIXED_ITEMS.md#fixed-1099--stop-steer-and-continue-errors-blamed-the-local-runtime-qui-g06)): the helper and the Chat, Build and Tasks errors, followed by the Memory, Models, Connections, Settings and Projects slices below. Other views still need their audit. |
+| QUI-G06 | **Partly done** ([FIXED-1099](../FIXED_ITEMS.md#fixed-1099--stop-steer-and-continue-errors-blamed-the-local-runtime-qui-g06)): the helper and the Chat, Build and Tasks errors, followed by the Memory, Models, Connections, Settings, Projects, and Approvals, Library and Sessions slices below. Other views still need their audit. |
 | QUI-G07 | Open: needs five people, not code. |
 
 ### QUI-G01 — Size budgets in CI
@@ -229,3 +229,37 @@ Implementation and evidence: [FIXED-1299](../FIXED_ITEMS.md#fixed-1299--projects
 and [Live Test docs](../../architecture/WEB_APP_LIVE_TEST.md#result--2026-11-06-qui-g06-projects-recovery).
 The related live setup helper repair is
 [FIXED-1301](../FIXED_ITEMS.md#fixed-1301--live-setup-preparation-consumed-the-helpers-navigation-budget).
+
+## 2026-11-06 — QUI-G06 Approvals, Library and Sessions recovery
+
+This run applies QUI-G06 to Approvals, the Library and Sessions. A decision,
+unpin, move or delete whose answer is lost may still have been recorded, so
+each such error asks the owner to check saved state before repeating it.
+Governed refusals keep their explained reason; reads keep the rows already on
+screen. The 15-item checklist:
+
+1. [x] Read the queue or History: keep known rows and offer Retry approvals.
+2. [x] Open an approval: say nothing was decided and offer Open it again.
+3. [x] Allow or decline: say it may have been recorded and to check History first.
+4. [x] Answer a question: keep the choices and check whether it is still waiting.
+5. [x] Propose your own version: keep the edit and look for a waiting replacement.
+6. [x] Continue the turn: open the conversation and check its latest turn first.
+7. [x] Critical decision: tell a refused step-up (nothing decided) from a lost answer after it.
+8. [x] Undo a held send: report a failure that is not a closed window, outside the countdown too.
+9. [x] Read the Library: keep known items and offer Retry Library.
+10. [x] Download: a missing file may have been deleted; any other failure says no file was saved.
+11. [x] Unpin: keep the row and check whether it is still pinned; errors no longer vanish after 3 s.
+12. [x] Move a pin: put the picker back to the saved project and check before moving again.
+13. [x] Read Sessions: keep known rows and offer Retry sessions.
+14. [x] Open a session or turn: name what is unavailable and offer to open it again.
+15. [x] Delete one or many: keep the selection and check what is still listed first.
+
+Found during the live round and fixed: an open Approvals queue did not show a
+decision raised after it loaded, while the top bar's count already did. The
+queue now re-reads when that count changes
+([FIXED-1303](../FIXED_ITEMS.md#fixed-1303--an-open-approvals-queue-missed-a-decision-raised-after-it-loaded)).
+
+Implementation and evidence: [FIXED-1302](../FIXED_ITEMS.md#fixed-1302--approvals-library-and-sessions-errors-hid-uncertain-writes-qui-g06)
+and [Live Test docs](../../architecture/WEB_APP_LIVE_TEST.md#result--2026-11-06-qui-g06-approvals-library-and-sessions-recovery).
+QUI-G01, QUI-G04, QUI-G07 and the remaining QUI-G06 views stay open, so this
+document is retained.

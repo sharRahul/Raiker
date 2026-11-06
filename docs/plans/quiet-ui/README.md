@@ -37,6 +37,8 @@ and the cross-page shared UI pass in
 [08](08_BRAND_AND_VISUAL_SYSTEM.md#2026-11-06--shared-ui-refinement-across-pages-and-subpages).
 Projects error recovery is tracked in
 [07](07_QUICK_FIXES_AND_QUALITY.md#2026-11-06--qui-g06-projects-recovery).
+Approvals, Library and Sessions recovery is tracked in
+[07](07_QUICK_FIXES_AND_QUALITY.md#2026-11-06--qui-g06-approvals-library-and-sessions-recovery).
 Their implemented slices have live evidence; the unrelated open items and
 release acceptance gates retain their status.
 

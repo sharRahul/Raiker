@@ -7,7 +7,8 @@
   import Icon from "../components/Icon.svelte";
   import PageState from "../components/PageState.svelte";
   import SessionMenu from "../components/SessionMenu.svelte";
-  import { api, ApiError } from "../api";
+  import { api } from "../api";
+  import { failure } from "../errorCopy";
   import type { SessionDetail, SessionSummary, TurnDetail } from "../apiTypes";
   import { responseBadge } from "../statusMaps";
   import { taskBetaStatus, withBetaStatus } from "../betaStatus";
@@ -112,8 +113,12 @@
       selected = new Set([...selected].filter((x) => x !== id));
       await load();
     } catch (e) {
-      actionError =
-        e instanceof ApiError ? `Could not delete (${e.status}).` : "Could not delete.";
+      actionError = failure(
+        "Deleting this conversation was not confirmed",
+        "It may already be deleted.",
+        "Choose Retry sessions and check whether it is still listed before deleting again.",
+        e,
+      );
     } finally {
       deleting = false;
     }
@@ -138,7 +143,13 @@
       selected = new Set();
       await load();
     } catch (e) {
-      actionError = e instanceof ApiError ? `Could not delete (${e.status}).` : "Could not delete.";
+      // The selection is kept, so the same set can be checked and deleted again.
+      actionError = failure(
+        "Deleting the selected conversations was not confirmed",
+        "Some or all of them may already be deleted.",
+        "Choose Retry sessions and check which are still listed before deleting again.",
+        e,
+      );
     } finally {
       deleting = false;
     }
@@ -152,12 +163,22 @@
       const ids = new Set((sessions ?? []).map((s) => s.session_id));
       selected = new Set([...selected].filter((id) => ids.has(id)));
     } catch (e) {
-      sessions = null;
-      loadError = e instanceof ApiError ? `Unavailable (${e.status})` : "Unavailable";
+      // QUI-G06 — keep the rows already read; a failed refresh does not delete them.
+      loadError = failure(
+        "Sessions could not be read",
+        sessions === null ? "Which conversations exist is unknown." : "The list below may be out of date.",
+        "Choose Retry sessions to read them again.",
+        e,
+      );
     }
   }
 
+  /** What Open it again reopens after a failed read. */
+  let lastSessionId = $state<string | null>(null);
+  let lastTurnId = $state<string | null>(null);
+
   async function openSession(id: string) {
+    lastSessionId = id;
     detailError = null;
     turnDetail = null;
     turnError = null;
@@ -165,17 +186,28 @@
       detail = await api.session(id);
     } catch (e) {
       detail = null;
-      detailError = e instanceof ApiError ? `Could not load session (${e.status}).` : "Could not load session.";
+      detailError = failure(
+        "This session could not be opened",
+        "Its turns and events are unavailable; nothing was changed.",
+        "Choose Open it again.",
+        e,
+      );
     }
   }
 
   async function openTurn(id: string) {
+    lastTurnId = id;
     turnError = null;
     try {
       turnDetail = await api.turn(id);
     } catch (e) {
       turnDetail = null;
-      turnError = e instanceof ApiError ? `Could not load turn (${e.status}).` : "Could not load turn.";
+      turnError = failure(
+        "This turn could not be opened",
+        "Its tool calls and evidence are unavailable; nothing was changed.",
+        "Choose Open the turn again.",
+        e,
+      );
     }
   }
 
@@ -216,7 +248,13 @@
 </div>
 
 {#if loadError}
-  <PageState state="error" title="Couldn't load sessions" detail={loadError} />
+  <div class="read-recovery">
+    <PageState state="error" title="Couldn't load sessions" detail={loadError} />
+    <button type="button" class="btn btn-sm" onclick={() => void load()}>Retry sessions</button>
+  </div>
+{/if}
+{#if sessions === null && loadError}
+  <!-- Nothing known yet: the error above is the whole page. -->
 {:else if sessions === null}
   <PageState state="loading" title="Loading sessions…" />
 {:else if sessions.length === 0}
@@ -250,7 +288,12 @@
       </button>
     </div>
   {/if}
-  {#if actionError}<p class="error" role="alert">{actionError}</p>{/if}
+  {#if actionError}
+    <div class="read-recovery">
+      <p class="error" role="alert">{actionError}</p>
+      <button type="button" class="btn btn-sm" onclick={() => { actionError = null; void load(); }}>Retry sessions</button>
+    </div>
+  {/if}
 
   <div class="layout">
     <div class="card list-card">
@@ -329,7 +372,12 @@
 
     <div class="detail-col">
       {#if detailError}
-        <p class="error" role="alert">{detailError}</p>
+        <div class="read-recovery">
+          <p class="error" role="alert">{detailError}</p>
+          {#if lastSessionId}
+            <button type="button" class="btn btn-sm" onclick={() => lastSessionId && void openSession(lastSessionId)}>Open it again</button>
+          {/if}
+        </div>
       {:else if detail !== null}
         <section class="card" aria-labelledby="session-detail-h">
           <h2 id="session-detail-h">{detail.session.title ?? shortId(detail.session.session_id)}</h2>
@@ -364,7 +412,12 @@
       {/if}
 
       {#if turnError}
-        <p class="error" role="alert">{turnError}</p>
+        <div class="read-recovery">
+          <p class="error" role="alert">{turnError}</p>
+          {#if lastTurnId}
+            <button type="button" class="btn btn-sm" onclick={() => lastTurnId && void openTurn(lastTurnId)}>Open the turn again</button>
+          {/if}
+        </div>
       {:else if turnDetail !== null}
         <section class="card" aria-labelledby="turn-detail-h">
           <div class="turn-head">
@@ -656,4 +709,10 @@
     font-size: var(--text-xs);
     white-space: nowrap;
   }
+  .read-recovery {
+    display: grid;
+    gap: var(--space-2);
+    margin-bottom: var(--space-3);
+  }
+  .read-recovery .btn { justify-self: start; }
 </style>

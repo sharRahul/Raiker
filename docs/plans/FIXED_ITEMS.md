@@ -1606,6 +1606,8 @@ file you can open. The two capture sets that remain — `screenshots/pages/` and
 | [FIXED-1299](#fixed-1299--projects-failures-hid-missing-content-or-offered-no-safe-recovery-qui-g06) | Medium | Projects / recovery | Fixed 2026-11-06 |
 | [FIXED-1300](#fixed-1300--project-limits-stayed-loading-after-failure-and-claimed-rollback) | Medium | Projects / limits | Fixed 2026-11-06 |
 | [FIXED-1301](#fixed-1301--live-setup-preparation-consumed-the-helpers-navigation-budget) | Low | Live test helper | Fixed 2026-11-06 |
+| [FIXED-1302](#fixed-1302--approvals-library-and-sessions-errors-hid-uncertain-writes-qui-g06) | High | Approvals / Library / Sessions / recovery | Fixed 2026-11-06 |
+| [FIXED-1303](#fixed-1303--an-open-approvals-queue-missed-a-decision-raised-after-it-loaded) | Medium | Approvals / top bar | Fixed 2026-11-06 |
 
 ---
 
@@ -39011,3 +39013,45 @@ run out of steps before setup finished. It now waits for asynchronous preparatio
 separately and bounds actual stage transitions. Unknown stages still fail
 explicitly. The running-host project round exercises the helper; provider
 acceptance uses the same helper.
+
+## FIXED-1302 — Approvals, Library and Sessions errors hid uncertain writes (QUI-G06)
+
+A lost answer to **Allow once** read *The decision was rejected.*, although the
+decision may have been recorded and the action may have run. A failed refresh
+of Approvals or Sessions replaced the rows on screen with *Unavailable (503)*.
+A refused step-up and a lost critical decision read the same. A failed undo of
+a held send was swallowed. Library errors were three-second toasts, every
+failed download blamed deletion, and a failed move left the picker showing a
+project that was never saved. A failed Sessions delete cleared nothing but
+offered no way to check.
+
+The fifteen paths in
+[07 Quick fixes and quality](quiet-ui/07_QUICK_FIXES_AND_QUALITY.md#2026-11-06--qui-g06-approvals-library-and-sessions-recovery)
+now use `errorCopy.failure`: what failed, what it affected and one safe step,
+with the HTTP status and refusal code as evidence. Unconfirmed decisions,
+answers, replacements, continuations, unpins, moves and deletes ask the owner
+to check History, the queue, the Library or the list before repeating them.
+A 4xx answer is a refusal and keeps its explained words; a 5xx or no answer
+is unconfirmed whatever code it carries. The live round found that an unknown
+code on a 503 (*The runtime reported: injected_failure.*) had hidden the
+check-History step; it no longer does. Reads keep known rows and
+offer Retry approvals, Retry Library, Retry sessions or Open it again.
+
+Coverage: `ApprovalsView.recovery.test.ts`, `LibraryView.recovery.test.ts`,
+`SessionsView.recovery.test.ts` and the running-host
+`web/e2e/approvals-library-sessions-recovery-live.spec.ts`; see the
+[Live Test docs](../architecture/WEB_APP_LIVE_TEST.md#result--2026-11-06-qui-g06-approvals-library-and-sessions-recovery).
+
+## FIXED-1303 — An open Approvals queue missed a decision raised after it loaded
+
+Found in this round's live run. A real Anthropic turn proposed a file write a
+moment after Approvals had loaded. The top bar changed to *Approvals (1 waiting
+on you)* while the queue still said *Nothing waiting on you* until Refresh. The
+top bar already re-reads the pending count; it now announces a change
+(`publishPendingApprovalCount` in `approvalResume.ts`) and an open pending
+queue re-reads when its own count differs. No second poll was added.
+
+Coverage: `ApprovalsView.recovery.test.ts` and RT-APPROVAL-RECOVERY-01, where
+the decision raised by a real model turn appears in the open queue without a
+Refresh.
+

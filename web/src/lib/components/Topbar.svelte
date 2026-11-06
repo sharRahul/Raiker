@@ -3,7 +3,7 @@
   import type { Notification as RaikerNotification } from "../apiTypes";
   import { NOTICES_CHANGED, announceNoticesChanged } from "../noticeDestination";
   import { api } from "../api";
-  import { subscribeApprovalResolved } from "../approvalResume";
+  import { publishPendingApprovalCount, subscribeApprovalResolved } from "../approvalResume";
   import { relativeTime } from "../format";
   import Icon from "./Icon.svelte";
   import HostControl from "./HostControl.svelte";
@@ -51,7 +51,9 @@
     try {
       // QUI-P06 — an approval past its time limit can no longer be decided, so
       // it is not "waiting on you": it is a turn marked not done.
-      pendingApprovals = (await api.approvals("pending")).filter((item) => !item.is_expired).length;
+      const count = (await api.approvals("pending")).filter((item) => !item.is_expired).length;
+      if (count !== pendingApprovals) publishPendingApprovalCount(count);
+      pendingApprovals = count;
       // QUI-F11 — the desktop tray shows a dot while a decision waits.
       desktopBridge()?.setAttention?.(pendingApprovals);
     } catch {

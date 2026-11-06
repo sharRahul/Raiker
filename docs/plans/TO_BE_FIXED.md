@@ -1416,3 +1416,27 @@ study remain open. The wider QUI-G06 audit, optimistic-action rollback and page
 size gates retain their existing status. See the
 [Live Test docs](../architecture/WEB_APP_LIVE_TEST.md#result--2026-11-06-qui-g06-projects-recovery)
 for this round's exact results and limitations.
+
+## QUI-G06 Approvals, Library and Sessions recovery — remaining evidence
+
+The fifteen implementations are recorded in
+[07 Quick fixes and quality](quiet-ui/07_QUICK_FIXES_AND_QUALITY.md#2026-11-06--qui-g06-approvals-library-and-sessions-recovery)
+and [FIXED-1302](FIXED_ITEMS.md#fixed-1302--approvals-library-and-sessions-errors-hid-uncertain-writes-qui-g06).
+Running-host cases cover queue, History, detail and decision failures on a real
+model-raised approval, Library read and unpin, and Sessions read, detail and
+bulk delete. Answering a question, proposing an edit, continuing a turn, the
+critical step-up, held-send undo, download and pin move have component evidence
+only. Injected failures cannot show a write that committed before its answer was
+lost. Native Windows/macOS rendering, screen readers and the five-person study
+remain open, as do the other QUI-G06 views (Goals, Messaging, Skills, Design,
+Rewind and the GitHub repository connector).
+
+## Sessions rows open only by pointer
+
+Found during the 2026-11-06 Sessions recovery round. A Sessions row opens its
+record from `onclick` on table cells (`SessionsView.svelte`); the cells are not
+focusable and have no keyboard handler, so the record cannot be opened from the
+keyboard. QUI-G05 expects every destination to be walkable by keyboard. Fix:
+make the session title a button (or link) that opens the record, and keep the
+checkbox cell for selection. Not changed in this round because it alters the
+row's control structure and its existing tests.

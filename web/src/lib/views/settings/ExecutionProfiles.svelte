@@ -8,6 +8,7 @@
    * a safe boundary until Resume rechecks them against it. Every field on this
    * page is enforced when a goal's step is filed and again when it runs.
    */
+  import { failure } from "../../errorCopy";
   import { onMount } from "svelte";
   import PageState from "../../components/PageState.svelte";
   import { ApiError, api } from "../../api";
@@ -29,7 +30,7 @@
       data = await contract.listExecutionProfiles();
       loadError = null;
     } catch (err) {
-      loadError = err instanceof Error ? err.message : "Could not load execution profiles.";
+      loadError = failure("Execution profiles could not be read", "The saved boundaries are unconfirmed.", "Reopen this page to refresh them.", err);
     }
     try {
       const list = await api.projects();
@@ -56,7 +57,7 @@
       said(made.goals_paused, `Created ${made.profile?.name ?? "a profile"}.`);
       await load();
     } catch (err) {
-      notice = goalRefusal(reason(err));
+      notice = failure("The profile creation was not confirmed", "A profile may already have been created.", "Refresh the profiles before creating another.", err) + (reason(err) ? " " + goalRefusal(reason(err)) : "");
     } finally {
       busy = false;
     }
@@ -95,7 +96,7 @@
       said(changed.goals_paused, `Saved version ${changed.profile?.version ?? ""}.`);
       await load();
     } catch (err) {
-      notice = goalRefusal(reason(err));
+      notice = failure("The profile save was not confirmed", "Your draft is retained; the saved version is unconfirmed.", "Check the current version before saving again.", err) + (reason(err) ? " " + goalRefusal(reason(err)) : "");
       if (reason(err) === "execution_profile_version_stale") await load();
     } finally {
       busy = false;
@@ -110,7 +111,7 @@
       said(changed.goals_paused, `${changed.profile?.name ?? "The profile"} is now active for new goals.`);
       await load();
     } catch (err) {
-      notice = goalRefusal(reason(err));
+      notice = failure("The active profile change was not confirmed", "The boundary for new goals is unconfirmed.", "Refresh the active profile before starting work.", err) + (reason(err) ? " " + goalRefusal(reason(err)) : "");
     } finally {
       busy = false;
     }
@@ -124,7 +125,7 @@
       said(changed.goals_paused, profileId ? "Bound to the project." : "The project uses the active profile again.");
       await load();
     } catch (err) {
-      notice = goalRefusal(reason(err));
+      notice = failure("The project binding was not confirmed", "The project’s execution boundary is unconfirmed.", "Refresh its binding before starting work.", err) + (reason(err) ? " " + goalRefusal(reason(err)) : "");
     } finally {
       busy = false;
     }

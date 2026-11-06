@@ -274,8 +274,14 @@ export async function openHostedProviders(
   const wizard = page.locator("#setup-title");
   for (let attempt = 0; attempt < 3; attempt += 1) {
     await page.goto(`${base}/#/models?tab=add&source=${source}`);
-    await expect(hosted.or(wizard).first()).toBeVisible({ timeout: 30_000 });
+    await expect(hosted.or(wizard).or(page.getByRole("button", { name: "Add model", exact: true })).first()).toBeVisible({ timeout: 30_000 });
     if (!(await dismissFirstRunModelSetup(page))) break;
+  }
+  // A restored Models inventory can supersede the legacy add deep link.
+  // Open the same source through the visible Add flow in that case.
+  if (!(await hosted.isVisible())) {
+    await page.getByRole("button", { name: "Add model", exact: true }).click();
+    await page.getByRole("button", { name: source === "account" ? /An account I have/ : /Custom endpoint/ }).click();
   }
   await expect(hosted).toBeVisible({ timeout: 30_000 });
 }

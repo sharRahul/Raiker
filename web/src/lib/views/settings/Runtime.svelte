@@ -10,6 +10,7 @@
    * is binary and stays here in the danger zone: whether the runtime accepts
    * new executions at all.
    */
+  import { failure } from "../../errorCopy";
   import { onMount } from "svelte";
   import Icon from "../../components/Icon.svelte";
   import CommandDownloads from "./CommandDownloads.svelte";
@@ -71,7 +72,7 @@
       } catch { environments = null; }
     } catch (e) {
       mode = null;
-      loadError = e instanceof ApiError ? `Unavailable (${e.status})` : "Unavailable";
+      loadError = failure("Execution status could not be read", "Whether the agent accepts new work is unconfirmed.", "Refresh this page before starting work.", e);
     }
   }
   async function saveEnvironment() {
@@ -84,7 +85,7 @@
       notice = { kind: "ok", text: `${environmentKind === "ssh" ? "SSH" : "Daytona"} environment saved. Credential values remain in the named environment variable.` };
       environmentName = ""; host = ""; remoteUser = ""; hostPublicKey = ""; hostKeySha256 = ""; sandboxId = "";
       await load();
-    } catch { notice = { kind: "error", text: "The execution profile could not be saved." }; }
+    } catch (error) { notice = { kind: "error", text: failure("The environment save was not confirmed", "Your entries are retained; the saved configuration is unconfirmed.", "Refresh the environment list before saving again.", error) }; }
     finally { busy = false; }
   }
   // BUG-194 — what a boundary actually does between commands, stated on the
@@ -135,7 +136,7 @@
         kind: "error",
         text: reason === "execution_environment_reset_unavailable"
           ? "This session has no environment standing, so there is nothing to reset."
-          : "The environment could not be reset.",
+          : failure("The environment reset was not confirmed", "Its current session and cache state are unconfirmed.", "Check the environment before discarding it again.", e),
       };
     } finally { resetting = null; }
   }
@@ -148,8 +149,8 @@
       await api.probeExecutionEnvironment(profileId);
       await load();
       notice = { kind: "ok", text: "The execution boundary was checked." };
-    } catch {
-      notice = { kind: "error", text: "The boundary could not be measured on this host." };
+    } catch (error) {
+      notice = { kind: "error", text: failure("The boundary check did not finish", "Its readiness is unconfirmed.", "Check the environment connection, then measure it again.", error) };
     } finally {
       probing = null;
     }
@@ -175,8 +176,8 @@
             ? `${name} is off. ${result.stopped_runs} running command${result.stopped_runs === 1 ? " was" : "s were"} stopped.`
             : `${name} is off. Nothing was running there.`,
       };
-    } catch {
-      notice = { kind: "error", text: `${name} could not be turned ${enabled ? "on" : "off"}.` };
+    } catch (error) {
+      notice = { kind: "error", text: failure(`${name} could not be confirmed ${enabled ? "on" : "off"}`, "Its saved state and running commands are unconfirmed.", "Refresh the environment and check its commands before retrying.", error) };
     } finally {
       switching = null;
     }
@@ -224,7 +225,7 @@
         kind: "error",
         text: reason === "execution_environment_in_use"
           ? `${name} still has commands running. Turn it off first — that stops them — then remove it.`
-          : `${name} could not be removed.`,
+          : failure(`${name} removal was not confirmed`, "The environment may still be configured.", "Refresh the list before removing it again.", e),
       };
       await load();
     } finally {
@@ -234,7 +235,7 @@
 
   async function selectEnvironment(profileId: string) {
     try { await api.selectExecutionEnvironment(profileId); await load(); }
-    catch { notice = { kind: "error", text: "That environment is not ready. Complete its configuration and credential reference first." }; }
+    catch (error) { notice = { kind: "error", text: failure("The execution target change was not confirmed", "The default environment is unconfirmed.", "Refresh the selected target and check its readiness before starting work.", error) }; }
   }
 
   async function confirm(values: StepUpValues) {

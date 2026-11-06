@@ -168,3 +168,33 @@ review. Evidence:
 and [FIXED-1290](../FIXED_ITEMS.md#fixed-1290--the-server-rename-row-clipped-cancel-at-200-percent-zoom).
 Other quality foundations remain open; this document is retained until those
 requirements are met.
+
+## 2026-11-06 — QUI-G06 Settings recovery
+
+This 15-item slice applies the existing QUI-G06 decision to Settings. Errors
+identify the failed action, the affected state and a safe recovery step. An
+unconfirmed response to a write does not prove that the server rejected it.
+
+1. [x] Read execution profiles: explain that saved boundaries are unconfirmed.
+2. [x] Create a profile: check the list before creating a duplicate.
+3. [x] Save a profile: retain the draft and check the current version.
+4. [x] Activate a profile: verify the active boundary before new work.
+5. [x] Bind a project: verify its saved boundary before starting work.
+6. [x] Read update status: stop false loading and offer Retry update status.
+7. [x] Check updates: say release availability is unknown and offer a channel check.
+8. [x] Start an update: account for a helper that may already have started.
+9. [x] Read execution status: do not claim the agent accepts work.
+10. [x] Save an environment: retain entries and check for an existing configuration.
+11. [x] Reset an environment: verify session and cache state before repeating.
+12. [x] Probe a boundary: explain unconfirmed readiness and check connectivity.
+13. [x] Toggle an environment: verify saved state and running commands.
+14. [x] Remove an environment: check the list before repeating removal.
+15. [x] Select an environment: verify the default target instead of assuming it is unready.
+
+HTTP status and refusal codes remain visible. Known version conflicts and
+in-use environment refusals keep their specific remediation. The update-status
+retry clears the error after a successful read. No composer shape changes are
+included. The remaining quality foundations keep this document open.
+
+Evidence: [Live Test docs](../../architecture/WEB_APP_LIVE_TEST.md#result--2026-11-06-qui-g06-settings-recovery)
+and [FIXED-1297](../FIXED_ITEMS.md#fixed-1297--settings-errors-hid-uncertainty-and-offered-no-recovery-qui-g06).

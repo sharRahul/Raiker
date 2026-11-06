@@ -1601,6 +1601,7 @@ file you can open. The two capture sets that remain — `screenshots/pages/` and
 | [FIXED-1294](#fixed-1294--tabs-pointed-at-missing-panels-and-the-visual-sweep-skipped-nested-pages) | Medium | Keyboard navigation / UI coverage | Fixed |
 | [FIXED-1295](#fixed-1295--icons-and-option-controls-were-small-and-inconsistent-across-pages) | Medium | Shared UI / visual scale | Fixed 2026-11-06 |
 | [FIXED-1296](#fixed-1296--api-contract-inventory-was-generated-with-a-different-python-runtime) | Low | API contract documentation | Fixed 2026-11-06 |
+| [FIXED-1297](#fixed-1297--settings-errors-hid-uncertainty-and-offered-no-recovery-qui-g06) | Medium | Settings / recovery | Fixed 2026-11-06 |
 
 ---
 
@@ -38924,3 +38925,28 @@ supported generation environment. No API behavior changed.
 **Evidence.** `.venv/bin/python -m scripts.api_contract --check` completed
 successfully after regeneration. The OpenAPI JSON and TypeScript bindings were
 unchanged; only the inventory's five version-dependent request labels changed.
+
+## FIXED-1297 — Settings errors hid uncertainty and offered no recovery (QUI-G06)
+
+**Severity: Medium. Area: Settings / recovery. Status: Fixed 2026-11-06.**
+
+**Observed.** Execution profiles, update checks and execution environments
+reported raw errors or generic failure sentences. A failed target selection
+claimed the target was unready without evidence. A failed update-status read
+left Loading on screen indefinitely.
+
+**Fixed.** Fifteen error paths now name the action, affected state and safe
+recovery step using the shared error helper. Writes ask the owner to verify
+saved state before repeating; drafts remain available. HTTP and refusal evidence
+is preserved. Update status has a retry action that clears stale error text
+when the host answers.
+
+**Evidence.** See the 15-item checklist in
+[07 Quick fixes and quality](quiet-ui/07_QUICK_FIXES_AND_QUALITY.md#2026-11-06--qui-g06-settings-recovery)
+and [running-host evidence](../architecture/WEB_APP_LIVE_TEST.md#result--2026-11-06-qui-g06-settings-recovery).
+
+**Found during live review.** The provider helper could wait for a missing Add
+dialog after a connected Models inventory was restored. It now opens the source
+through Add model when needed; the three-provider saved-connection recheck
+passed. Provider evidence uses individual card screenshots to avoid the
+Chromium crash observed while resizing for the full Models page capture.

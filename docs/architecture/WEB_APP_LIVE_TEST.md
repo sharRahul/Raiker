@@ -1544,3 +1544,50 @@ was stopped after the run.
 
 **Limits.** This is a Linux Chromium visual review. It does not qualify native
 macOS/Windows rendering, screen readers, or all populated workspace states.
+
+## Result — 2026-11-06 QUI-G06 Settings recovery
+
+**Scope.** Fifteen Settings error paths from
+[07 Quick fixes and quality](../plans/quiet-ui/07_QUICK_FIXES_AND_QUALITY.md#2026-11-06--qui-g06-settings-recovery).
+Built SPA served by real FastAPI from `/tmp/raiker-settings-recovery` on port
+8765; owner created and authenticated through the UI. Endpoint fault injection
+returns HTTP 503 to exercise failures without performing an installation or
+changing the execution boundary.
+
+| Case | Observation | Result |
+|---|---|---|
+| RT-SETTINGS-RECOVERY-01 | Failed update-status read removes false Loading, exposes Retry update status, then clears the error after a real-host retry | Passed |
+| RT-SETTINGS-RECOVERY-02 | Failed update check names unknown availability and channel recovery | Passed |
+| RT-SETTINGS-RECOVERY-03 | Failed profile read identifies unconfirmed saved boundaries and refresh | Passed |
+| RT-SETTINGS-RECOVERY-04 | Failed execution-status read makes no readiness claim; explicit dark-theme assertion and capture | Passed |
+
+**Evidence.** `web/e2e/settings-error-recovery-live.spec.ts`, four fault cases
+passed; the corrected dark case passed on a separate rerun. Screenshots reviewed
+at `output/playwright/2026-11-06-settings-recovery/01-update-read.png` and
+`04-execution-status-dark.png`, at 1280×800, with readable wrapping and visible
+recovery controls. The first dark capture used the light theme; it was replaced
+after adding an explicit theme assertion. Component/helper coverage: 29 tests
+passed across errorCopy, ExecutionProfiles, Updates and Runtime.
+
+**Limits.** These cases verify rendered recovery and one real read retry. They
+do not certify a real release installation, environment reset or hosted model
+inference. Mutation failure guidance was reviewed against the 15-item checklist;
+the live cases do not execute all fifteen mutations. Existing CI, data-safety,
+engine, packaging and release workflows remain relevant; none was removed.
+
+**Provider UI check.** RT-SETTINGS-RECOVERY-05 entered the supplied Anthropic,
+OpenRouter and OpenAI keys through their secure UI fields; all three displayed
+Connection saved before Chromium crashed during a full-page Models screenshot.
+This case is not recorded as a passing test. Replaced the full-page evidence
+capture with provider-card captures. RT-SETTINGS-RECOVERY-06 then passed against
+the saved connections on a fresh page; the three `06-*-saved.png` cards are the
+canonical provider evidence. OpenAI's card was visually reviewed. Connection
+saved confirms credential storage, not provider readiness or inference.
+No keys are embedded in the test or screenshots; the credential case reads
+explicit environment variables. The isolated workspace remains outside Git.
+
+The recheck found a stale helper assumption on restored Models inventories.
+`openHostedProviders` now falls back to the visible Add model/source flow when
+the legacy deep link does not open it. RT-SETTINGS-RECOVERY-06 verifies that
+fallback for all three providers. Final Svelte check: zero errors and warnings;
+lint, build and the 29 focused tests passed.

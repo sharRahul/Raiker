@@ -1,5 +1,6 @@
 <script lang="ts">
   import { localDateTime } from "../../format";
+  import { failure } from "../../errorCopy";
   import { onMount } from "svelte";
   import Icon from "../../components/Icon.svelte";
   import { api } from "../../api";
@@ -60,13 +61,13 @@
   );
 
   async function load() {
-    try { update = await api.hostUpdate(); }
-    catch { notice = "Update status could not be read."; }
+    try { update = await api.hostUpdate(); notice = null; }
+    catch (error) { notice = failure("Update status could not be read", "The installed release status is unconfirmed.", "Reopen Updates to refresh it.", error); }
   }
   async function check() {
     busy = "checking"; notice = null;
     try { update = await api.checkHostUpdate(); notice = update.message; }
-    catch { notice = "The update check could not be carried out."; }
+    catch (error) { notice = failure("The update check did not finish", "Whether a newer release is available is unknown.", "Check again when the release channel is reachable.", error); }
     finally { busy = null; }
   }
   async function apply() {
@@ -96,7 +97,7 @@
         confirm = true;
         notice = "An update would interrupt work in progress. Select Update and restart again to confirm.";
       } else notice = result.message;
-    } catch { notice = "The verified update could not be started."; }
+    } catch (error) { notice = failure("The update handover was not confirmed", "The helper may already have started.", "Reopen Updates and check the installed version before restarting the update.", error); }
     finally { busy = null; }
   }
   onMount(load);
@@ -106,7 +107,11 @@
 <section class="settings-card" aria-label="Raiker updates">
   <div class="card-heading"><h3>Signed updates</h3></div>
   {#if update === null}
-    <p class="description">Loading update status…</p>
+    {#if notice}
+      <button class="secondary" onclick={load}>Retry update status</button>
+    {:else}
+      <p class="description">Loading update status…</p>
+    {/if}
   {:else}
     <p class="description">{update.message}</p>
     <dl>

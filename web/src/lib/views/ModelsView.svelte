@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { MODEL_ADD_SOURCES } from "../modelNavigation";
   import { askConfirm } from "../confirm.svelte";
   import { onDestroy, onMount } from "svelte";
   import EmptyState from "../components/EmptyState.svelte";
@@ -75,32 +76,7 @@
    * Adding a model is a three-step dialog whose second step shows only the
    * source chosen in the first.
    */
-  const ADD_SOURCES = [
-    {
-      id: "local",
-      name: "On this computer",
-      category: "Source",
-      description: "A model this machine runs itself. Nothing you send leaves it.",
-    },
-    {
-      id: "account",
-      name: "An account I have",
-      category: "Source",
-      description: "Anthropic, OpenAI, Gemini or another provider, with your own key.",
-    },
-    {
-      id: "huggingface",
-      name: "Hugging Face",
-      category: "Source",
-      description: "Download an open model and run it on this computer.",
-    },
-    {
-      id: "custom",
-      name: "Custom endpoint",
-      category: "Source",
-      description: "A router such as OpenRouter, or a vLLM or home-lab server you control.",
-    },
-  ];
+  const ADD_SOURCES = MODEL_ADD_SOURCES;
   const SOURCE_SECTIONS: Record<string, readonly ("Local" | "Hosted" | "Advanced")[]> = {
     local: ["Local"],
     account: ["Hosted"],

@@ -25,7 +25,9 @@
  * reachable at all — and `HUB_TABS` is what each hub holds. A destination added
  * to either is swept from the next run, with nothing to remember.
  */
-import { HUB_TABS, NAV_ITEMS } from "../src/lib/nav";
+import { ADVANCED_SETTINGS } from "../src/lib/settingsSections";
+import { MODEL_ADD_SOURCES, MODEL_SETTINGS_PANELS } from "../src/lib/modelNavigation";
+import { ADVANCED_KINDS, HUB_TABS, NAV_ITEMS } from "../src/lib/nav";
 
 export interface Destination {
   /** The hash path, without the leading `#/`. */
@@ -47,6 +49,16 @@ export const DESTINATIONS: readonly Destination[] = NAV_ITEMS.flatMap((item) => 
   if (tabs === undefined) return [{ route: item.id, name: item.id }];
   return tabs.map((tab) => ({ route: `${item.id}?tab=${tab}`, name: `${item.id}-${tab}` }));
 });
+
+/** The visual review also enters subpages below the navigation's first tab. */
+export const VISUAL_DESTINATIONS: readonly Destination[] = [
+  ...DESTINATIONS,
+  { route: "design?view=documents", name: "design-documents" },
+  ...ADVANCED_KINDS.map(id => ({ route: `connections?tab=advanced&kind=${id}`, name: `connections-advanced-${id}` })),
+  ...ADVANCED_SETTINGS.map(item => ({ route: `settings?tab=advanced&kind=${item.id}`, name: `settings-advanced-${item.id}` })),
+  ...MODEL_SETTINGS_PANELS.map(item => ({ route: `settings?tab=advanced&kind=models&modelsPanel=${item.id}`, name: `settings-models-${item.id}` })),
+  ...MODEL_ADD_SOURCES.map(item => ({ route: `models?tab=add&source=${item.id}`, name: `models-add-${item.id}` })),
+];
 
 /**
  * The widths a responsive check walks.

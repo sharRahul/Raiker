@@ -714,7 +714,7 @@
         />
       </div>
     {/if}
-    <div class="card-grid project-grid">
+    <div class="card-grid project-grid" id={`panel-${listView}`} role="tabpanel" aria-labelledby={`tab-${listView}`}>
       {#each page(shownProjects, shownCount) as p (p.project_id)}
         <article
           class="card card-interactive project"
@@ -900,6 +900,7 @@
           </p>
         {/if}
 
+        <div id={`panel-${detailSection}`} role="tabpanel" aria-labelledby={`tab-${detailSection}`}>
         {#if detailSection === "overview"}
         <h3 class="kicker">Project context</h3>
         <p class="sub">Instructions and shared files are included only in chats already assigned to this project. Project memory follows this folder's setting or its nearest ancestor.</p>
@@ -1097,6 +1098,7 @@
           <a class="cross-link" href="#/checkpoints">Open the checkpoint timeline</a>
         {/if}
         {/if}
+        </div>
       </section>
     {/if}
 

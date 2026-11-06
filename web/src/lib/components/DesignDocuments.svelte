@@ -1374,6 +1374,7 @@
       <aside class="right" aria-label="Inspector and design work">
         <TabStrip tabs={RAIL_TABS} selected={rail} onselect={(id: string) => (rail = id as RailTab)} label="Design panels" />
 
+        <div id={`panel-${rail}`} role="tabpanel" aria-labelledby={`tab-${rail}`}>
         {#if rail === "inspect"}
           {#if selectedNodes.length > 1}
             <section class="panel" aria-label="Selected layers">
@@ -1771,6 +1772,7 @@
             {/if}
           </section>
         {/if}
+        </div>
       </aside>
     </div>
   {/if}

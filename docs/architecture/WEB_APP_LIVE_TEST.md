@@ -1450,3 +1450,66 @@ under `output/playwright/2026-11-06-models-real-providers/`.
 qualify billing accuracy, every model, failure/timeout recovery, downloads,
 managed local engines, full beta journeys or native Windows/macOS acceptance.
 Those gates remain in [TO_BE_FIXED.md](../plans/TO_BE_FIXED.md#models-simplification--remaining-release-evidence).
+
+## Result — 2026-11-06 Shared UI refinement
+
+**Candidate and scope.** `6893c3d1` plus the shared UI changes in
+[08 Brand and visual system](../plans/quiet-ui/08_BRAND_AND_VISUAL_SYSTEM.md#2026-11-06--shared-ui-refinement-across-pages-and-subpages).
+Linux Codespace, Python 3.14, Node 24 and managed Playwright Chromium against
+the same disposable owner workspace. This pass applies the requested Apple,
+macOS and Impeccable design references through shared primitives. No provider
+inference, credential entry, permission change, download, project write or
+security-setting save occurs in this review.
+
+| Case | Coverage | Required evidence |
+|---|---|---|
+| RT-SHARED-UI-light | Entire visual route catalogue at 1440×900 in light mode | Each page settles; no uncaught renderer error or sideways bleed; selected tabs control actual panels; screenshots and actual addresses retained |
+| RT-SHARED-UI-dark | Same catalogue at 1280×800 in dark mode | Explicit dark palette retained on every route, with the same containment and tab checks |
+| RT-SHARED-UI-dialog | Open Change password at 1280×320, scroll the form and close with Escape | Body really overflows and scrolls; heading/Close remain in view; entire dialog fits; focus returns to Change; no password is entered or saved |
+
+**Catalogue.** `VISUAL_DESTINATIONS` extends the nav registry with Advanced
+settings, all four Model serving sections and Add sources, Design Documents,
+and all Advanced Connections categories. Model source/section metadata is shared
+with the actual UI; settings and connection categories use their existing
+registries. Default and direct nested addresses are both checked. This is a
+read/layout catalogue; populated project/document details are additionally
+covered by their existing component regressions, not claimed as real populated
+workspace acceptance.
+
+**Visual review.** Reviewed the complete light/dark contact sheets, the dialog
+capture, and full-size captures for nested settings, model sources and dense
+pages. Empty icons, fields, controls, disclosures, tabs and reading boundaries
+use Raiker's existing tokens. Long audit/pricing lists still scroll; this does
+not close the separate page-size budgets. The initial baseline stopped at the
+missing model panel ID; that failure led to repairing Models and the other tab
+consumers found by the audit. Preliminary partial runs are excluded from final
+pass counts.
+
+**Reproduce and artifacts.** Build the web app, start the disposable host, then
+run `./web/node_modules/.bin/playwright test --config web/playwright.config.ts
+--project=live web/e2e/shared-ui-refinement-live.spec.ts --workers=1`. Set
+`RAIKER_SHARED_UI_STAGE=before` only when capturing a baseline. Local ignored
+captures, per-theme manifests, route observations and review sheets live in
+`output/playwright/2026-11-06-shared-ui/`.
+
+**Outcome: passed, 3/3 final cases (3.0 minutes).** The catalogue contains
+**54 route entries** (including default/direct addresses), checked in both
+combinations for **108 route/theme observations**, plus the short-window
+interaction. All selected-tab associations resolved, no horizontal bleed was
+observed, and no uncaught renderer error occurred. Focused regressions passed
+**190/190** across 11 files, then **88/88** across four Design/Project/Connections
+files after repairing their panel associations. ESLint, production build and
+**25/25** documentation/governance checks passed. Final Svelte/design-token
+validation passed with **0 errors / 0 warnings**. The test host was stopped.
+
+**Design audit.** The final source detector retains two reviewed findings:
+Personalisation's disclosure triangle and AuthorityMatrix's arrowhead. Both
+are geometric parts of functional indicators, not side stripes on surfaces;
+removing them to satisfy a text matcher would break the indicators. The seven
+actual thick side treatments were removed or reduced. No new raw palette
+colours or decorative glass/chrome were introduced.
+
+**Limits.** These Linux Chromium checks do not qualify native Windows/macOS
+appearance, screen readers, all populated detail states or the five-person
+study. Companion art and separate beta/download/error-recovery gates remain
+in [TO_BE_FIXED.md](../plans/TO_BE_FIXED.md#shared-ui-refinement--remaining-acceptance-evidence).

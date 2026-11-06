@@ -2329,7 +2329,11 @@ describe("focused model settings", () => {
     render(ModelsView, { view: "routing" });
     const serving = await screen.findByRole("tab", { name: "Running models" });
     await fireEvent.keyDown(serving, { key: "ArrowRight" });
-    expect(await screen.findByRole("tabpanel", { name: "Library" })).toBeInTheDocument();
+    const libraryPanel = await screen.findByRole("tabpanel", { name: "Library" });
+    expect(libraryPanel).toBeInTheDocument();
+    const libraryTab = screen.getByRole("tab", { name: "Library" });
+    expect(document.getElementById(libraryTab.getAttribute("aria-controls")!)).toBe(libraryPanel);
+    expect(libraryPanel).toHaveAttribute("aria-labelledby", libraryTab.id);
     expect(window.location.hash).toContain("modelsPanel=library");
     await fireEvent.input(screen.getByLabelText("Absolute model folder"), { target: { value: "/tmp/unsaved-model-folder" } });
     expect(screen.queryByRole("heading", { name: "Downloads and model jobs" })).not.toBeInTheDocument();

@@ -135,7 +135,7 @@
     margin-bottom: var(--space-4);
     background: var(--sunken);
     border: 1px solid var(--border);
-    border-radius: var(--r-pill);
+    border-radius: var(--r-md);
     overflow-x: auto;
     scrollbar-width: none;
   }
@@ -164,7 +164,7 @@
     gap: 0.35rem;
     white-space: nowrap;
     border: 0;
-    border-radius: var(--r-pill);
+    border-radius: var(--r-sm);
     background: transparent;
     color: var(--text-2);
     font: inherit;
@@ -174,7 +174,8 @@
     cursor: pointer;
     transition: background 120ms var(--ease), color 120ms var(--ease);
   }
-  button:hover { color: var(--text-1); }
+  button:hover { color: var(--text-1); transition-duration: 0ms; }
+  button:focus-visible { outline-offset: -2px; box-shadow: none; }
   button.active {
     background: var(--surface);
     color: var(--text-1);

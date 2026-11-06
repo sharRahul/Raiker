@@ -1122,7 +1122,7 @@
      weight rather than in a fill: a page where a section shouts is a page where
      the shout stops meaning anything. */
   .panel-attention {
-    border-inline-start: 3px solid var(--warn);
+    border-color: var(--warn-border);
   }
   .shortcuts {
     list-style: none;

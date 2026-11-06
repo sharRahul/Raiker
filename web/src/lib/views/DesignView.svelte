@@ -814,11 +814,11 @@
     />
   </div>
   {#if mode === "documents"}
-    <div class="thread">
+    <div class="thread" id="panel-documents" role="tabpanel" aria-labelledby="tab-documents">
       <DesignDocuments {projects} />
     </div>
   {:else}
-  <div class="thread" bind:this={threadEl}>
+  <div class="thread" id="panel-images" role="tabpanel" aria-labelledby="tab-images" bind:this={threadEl}>
     {#if lifecycleNotice !== null}
       <p class="notice" role="alert">{lifecycleNotice}</p>
     {/if}

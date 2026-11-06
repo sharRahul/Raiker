@@ -145,7 +145,6 @@
   }
   .recall-list li {
     padding: 0.4rem 0.55rem;
-    border-left: 2px solid var(--border);
     background: var(--sunken);
     border-radius: var(--r-sm);
   }

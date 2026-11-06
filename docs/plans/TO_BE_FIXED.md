@@ -1390,3 +1390,15 @@ Managed-engine/download, provider failure/timeout recovery, complete beta
 journeys and Windows/macOS installer acceptance still need evidence. Those gates and
 the existing usability/screen-reader qualification remain open in
 [BETA_RELEASE_PLAN.md](BETA_RELEASE_PLAN.md) and [TESTING.md](TESTING.md).
+
+
+## Shared UI refinement — remaining acceptance evidence
+
+The owner-requested shared pass applies to every page through the primitives
+listed in [08 Brand and visual system](quiet-ui/08_BRAND_AND_VISUAL_SYSTEM.md#2026-11-06--shared-ui-refinement-across-pages-and-subpages).
+The Linux Chromium catalogue covers navigation and named nested settings/Add
+pages in light and dark themes. It is a layout/read review, not qualification
+of every populated detail state, provider operation or full beta journey.
+Native Windows/macOS appearance, screen readers, the five-person study and
+QUI-V05 companion art remain open. Existing page-size budgets, provider failure
+and managed-download acceptance retain their separate evidence gates.

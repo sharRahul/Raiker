@@ -148,7 +148,7 @@
   blockquote {
     margin: 0;
     padding: 0.55rem 0.75rem;
-    border-left: 3px solid var(--border-strong);
+    border-inline-start: 1px solid var(--border-strong);
     background: var(--surface);
     border-radius: 0 var(--r-sm) var(--r-sm) 0;
     max-height: 22rem;

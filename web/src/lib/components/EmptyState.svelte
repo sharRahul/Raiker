@@ -2,17 +2,8 @@
   // BUG-37 — the empty state as the first thing a new owner sees, rather than a
   // centred sentence apologising for the absence of data.
   //
-  // Three changes, each with a reason:
-  //
-  // * **The mark has depth.** A tinted disc with a soft ring and the icon at the
-  //   display size, so the block has a focal point instead of being uniform grey.
-  // * **The title is display type by default.** Every empty state is Raiker
-  //   speaking to the owner, which is exactly what the serif face is reserved
-  //   for. `serif={false}` remains for the few places an empty state sits inside
-  //   a dense panel where display type would shout.
-  // * **It can offer the next step.** An empty state that names what is missing
-  //   and stops is a dead end; the `action` slot puts the way out in the same
-  //   block as the explanation.
+  // The icon, short title and next action carry this state. The legacy `serif`
+  // prop selects the larger title style; QUI-V02 uses Inter for both styles.
   import Icon from "./Icon.svelte";
   import type { IconName } from "../icons";
   import type { Snippet } from "svelte";
@@ -60,18 +51,12 @@
     padding: var(--space-6) var(--space-4);
     color: var(--text-2);
   }
-  /* A disc, a ring, and a very soft glow — three tokens deep, so it reads as a
-     mark rather than as a grey square, and it costs nothing but a box-shadow. */
   .empty-icon {
     display: grid;
     place-items: center;
-    width: 56px;
-    height: 56px;
-    border-radius: var(--r-pill);
-    background: var(--accent-soft);
-    border: 1px solid var(--accent-border);
-    box-shadow: 0 0 0 6px var(--accent-soft);
-    color: var(--accent);
+    width: 40px;
+    height: 40px;
+    color: var(--text-2);
     margin-bottom: var(--space-3);
   }
   .empty-title {

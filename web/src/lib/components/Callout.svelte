@@ -25,7 +25,6 @@
     align-items: flex-start;
     padding: var(--space-2) var(--space-3);
     border: 1px solid var(--accent-border);
-    border-inline-start-width: 3px;
     border-radius: var(--r-md);
     background: var(--accent-soft);
     color: var(--accent-strong);

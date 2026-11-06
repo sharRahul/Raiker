@@ -8,6 +8,7 @@
    * connections — testing, selecting, the details dialog — and hands them in,
    * so a slot row here and a provider row on Add do exactly the same thing.
    */
+  import { MODEL_SETTINGS_PANELS } from "../../modelNavigation";
   import { onMount } from "svelte";
   import TabStrip from "../../components/TabStrip.svelte";
   import type { ModelProfile, ModelsView as ModelsData } from "../../apiTypes";
@@ -49,12 +50,7 @@
     ondetails: (profile: ModelProfile) => void;
     onselect: (profile: ModelProfile) => void;
   } = $props();
-  const panels = [
-    { id: "serving", label: "Running models" },
-    { id: "library", label: "Library" },
-    { id: "activity", label: "Activity" },
-    { id: "advanced", label: "Advanced" },
-  ];
+  const panels = MODEL_SETTINGS_PANELS;
   function requestedPanel(): string {
     if (typeof window === "undefined") return "serving";
     const value = new URLSearchParams(window.location.hash.split("?", 2)[1] ?? "").get("modelsPanel");
@@ -86,7 +82,7 @@
 <TabStrip tabs={panels} selected={panel} onselect={choosePanel} label="Model settings" />
 {#each panels as item (item.id)}
 {#if visited.includes(item.id)}
-<div role="tabpanel" aria-label={item.label} hidden={panel !== item.id}>
+<div id={`panel-${item.id}`} role="tabpanel" aria-labelledby={`tab-${item.id}`} hidden={panel !== item.id}>
 {#if item.id === "serving"}
 <!-- Local serving, in the section about runtime rather than
      in the middle of the list of things you could add. The slot rows are

@@ -163,11 +163,14 @@ configured, and runner publisher pins are empty (`runner_publisher.py`).
     restore at startup and clean shutdown;
   - Models UI for all of it;
   - unit, integration, API and UI tests, plus a CI workflow on all three OSes.
-- The live test ran on 2026-11-02 but failed on Linux, macOS and Windows before
-  installation: GitHub's stable `v0.8.0` release has no runtime archives while
-  the current binary builds are `bNNNN` prereleases. Automatic selection must
-  choose the newest verified build-bearing release; the live matrix must then
-  be rerun on the release commit.
+- The initial 2026-11-02 live matrix failed before installation because the
+  stable release had no runtime archives. PR #246 repaired selection of a
+  verified build-bearing release; the three-OS live jobs passed. Owner GPU
+  hardware and fresh signed-installer evidence remain in MD-2.
+- **2026-11-06 hosted UI check:** Anthropic, OpenRouter and OpenAI passed real
+  UI credential entry, catalogue selection, readiness and exact-model Chat
+  answers ([run record](../architecture/WEB_APP_LIVE_TEST.md#result--2026-11-06-real-provider-ui-validation)).
+  MD-1 remains open for local providers and release-commit qualification.
 
 | ID | Item | State | P | Effort | Work left |
 |---|---|---|---|---|---|
@@ -178,8 +181,9 @@ configured, and runner publisher pins are empty (`runner_publisher.py`).
 | MD-5 | Failures, rate limits, timeouts, recovery | 🟡 | P0 | M | A provider fault-injection matrix (429 with Retry-After, 500, timeout mid-stream, connection reset, malformed stream, quota exhausted) run against a local fault server; assert the turn retries or falls back with a receipt and never claims an answer it did not get |
 
 **UI / UX.**
-- Models → Runtime: the engine card and the GPU/context/memory editor from
-  PR #245 (done).
+- Settings → Advanced → Model serving: Running models holds the engine;
+  Advanced holds GPU/context/memory tuning. Library and Activity have their own
+  focused sections. Models keeps the inventory and Add flow.
 - Every provider row shows one state word (*Ready*, *Needs key*, *Not running*,
   *Rate-limited until 14:32*) with one action button.
 - When a fallback answers, the turn receipt says so in the turn: *"Answered by
@@ -291,6 +295,14 @@ work runs (top bar), and so is the count of running items.
 | UX-3 | Permission controls, runtime status, approvals | ✅ | — | — | QUI-P01–P09 (approvals round) |
 | UX-4 | Understandable errors and recovery actions | 🟡 | P0 | M | The connector UI now gives action-oriented copy for missing, expired/revoked, and refresh-failed credentials; PR #245 does this for the llama.cpp engine. Still required: an automated whole-route `reason_code` label audit. |
 | UX-5 | Responsive layouts, accessibility, desktop usability | 🟡 | P0 | M | axe-core run in Playwright on every page at 1440, 1280 and 390 widths with zero serious violations; keyboard-only T-14; screen-reader pass with NVDA and VoiceOver |
+
+**2026-11-06 shared UI refinement.** The owner's settings cog, simpler Models
+and shared Apple/macOS design pass are implemented. The running-host review
+checked 54 default/nested addresses in light 1440×900 and dark 1280×800, plus
+a short-window form/focus check; see the
+[recorded results](../architecture/WEB_APP_LIVE_TEST.md#result--2026-11-06-shared-ui-refinement).
+These layout observations do not close UX-1/UX-5's size, axe, screen-reader,
+platform or usability gates.
 
 **UI / UX deliverables for beta.**
 1. **Beta badge** in the top bar, linking to *Send feedback* (area 12).
@@ -509,6 +521,10 @@ Anything not green at the start of week 4 is moved to *Not in beta* with the
 product refusing it, rather than delaying the date.
 
 ## Changelog
+
+- **2026-11-06** — Recorded the owner-requested cog/Models simplification,
+  shared cross-page refinement and three real hosted-provider UI checks.
+  Release-commit, local-provider, native-platform and usability gates remain open.
 
 - **2026-11-02** — Plan opened. Delivered in the same round:
   - DOC-2, DOC-3 and DOC-5: the [beta guide](../guide/beta.md), with

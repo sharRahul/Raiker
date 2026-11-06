@@ -684,6 +684,8 @@ p {
 a {
   color: var(--accent);
   text-decoration: none;
+  text-underline-offset: 0.18em;
+  text-decoration-thickness: 1px;
 }
 a:hover {
   text-decoration: underline;
@@ -955,6 +957,7 @@ time {
 }
 .btn:hover:not(:disabled) {
   background: var(--sunken);
+  transition-duration: 0ms;
 }
 .btn:active:not(:disabled) {
   transform: translateY(1px);
@@ -1054,6 +1057,7 @@ time {
    says nothing still gets the floor. */
 :where(button:hover:not(:disabled)) {
   background: var(--sunken);
+  transition-duration: 0ms;
 }
 :where(button:disabled) {
   opacity: 0.5;
@@ -1175,6 +1179,34 @@ time {
   resize: vertical;
   width: 100%;
 }
+/* Readonly is still readable/selectable; invalid is an explicit validation
+   result, never a red state applied to an untouched required field. */
+:where(input[readonly], textarea[readonly]),
+.input[readonly],
+.textarea[readonly] {
+  background: var(--sunken);
+  color: var(--text-1);
+}
+:where(input, textarea, select)[aria-invalid="true"] {
+  border-color: var(--danger);
+}
+:where(input, textarea, select)[aria-invalid="true"]:focus-visible {
+  outline-color: var(--danger);
+}
+
+/* Keep the native triangle and keyboard behavior. Scoped disclosure designs
+   can override this zero-specificity interaction floor. */
+:where(summary) {
+  min-height: var(--control-compact);
+  padding-block: var(--space-1);
+  border-radius: var(--r-xs);
+  cursor: pointer;
+  color: var(--text-2);
+}
+:where(summary:hover) { color: var(--text-1); }
+@media (pointer: coarse) {
+  :where(summary) { min-height: var(--control-prominent); }
+}
 .input::placeholder,
 .textarea::placeholder {
   color: var(--text-3);
@@ -1222,7 +1254,8 @@ time {
   border-bottom: 1px solid var(--border);
   vertical-align: top;
 }
-.table tbody tr:hover {
+.table tbody tr:hover,
+.table tbody tr:focus-within {
   background: var(--sunken);
 }
 /* A column of numbers is compared vertically, so its digits have to line up.
@@ -1484,6 +1517,7 @@ dialog li { font-size: var(--text-sm); line-height: 1.5; }
 }
 .chip:hover:not(:disabled) {
   color: var(--text-1);
+  transition-duration: 0ms;
 }
 .chip[aria-pressed="true"],
 .chip.chip-selected {

@@ -135,7 +135,6 @@
   .reasoning-body {
     margin: 0;
     padding: 0.5rem 0.65rem;
-    border-left: 2px solid var(--border);
     background: var(--sunken);
     border-radius: var(--r-sm);
     color: var(--text-3);

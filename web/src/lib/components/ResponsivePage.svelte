@@ -27,14 +27,15 @@
     grid-template-columns: repeat(var(--grid-columns), minmax(0, 1fr));
     column-gap: var(--grid-gap);
   }
-  .page > :global(*) { grid-column: 1 / -1; }
+  .page > :global(*) { grid-column: 1 / -1; min-width: 0; }
   .page.reading { width: min(100%, var(--page-reading)); }
   .page.reading :global(.page-lead), .page.reading > :global(p) { max-width: var(--prose-measure); }
   .page.operational { width: min(100%, var(--page-operational)); }
   .page.work-surface { width: 100%; min-height: var(--content-h); }
   .page.work-surface > :global(*) { min-height: 0; }
-  .heading { display: flex; align-items: start; justify-content: space-between; gap: var(--space-3); }
-  .actions { display: flex; gap: var(--space-2); }
+  .heading { display: flex; flex-wrap: wrap; align-items: start; justify-content: space-between; gap: var(--space-3); }
+  .heading > div:first-child { flex: 1 1 20rem; min-width: 0; overflow-wrap: anywhere; }
+  .actions { display: flex; flex-wrap: wrap; gap: var(--space-2); max-width: 100%; }
   .lead { margin: 0 0 var(--space-4); color: var(--text-2); }
   @media (max-width: 720px) { .page { width: 100%; display: block; } .heading { align-items: stretch; flex-direction: column; } }
 </style>

@@ -119,3 +119,40 @@ respects `prefers-reduced-motion`.
 Every icon has an accessible name. An icon-only control also gets a tooltip,
 except where hover would teach nothing new (Hermes's rule): menu triggers, close
 buttons, and controls whose visible label already says it.
+
+## 2026-11-06 — Shared UI refinement across pages and subpages
+
+The owner requested the macOS design references across all UI pages. Apply
+QUI-V01/V02/V07/V08 through shared primitives, then inspect the complete routed
+catalogue. The [Apple reviewer](https://github.com/dickwu/apple-design-skill),
+[macOS skill](https://github.com/ceorkm/macos-design-skill), its
+[Build with Claude version](https://github.com/davepoon/buildwithclaude/tree/main/plugins/all-skills/skills/macos-design)
+(linked by HappyCapy and SkillRepo), and Impeccable inform this refinement.
+Raiker's adopted palette, Inter, desktop target sizes, native window controls
+and truthful completion/authority rules take precedence over sample recipes.
+
+1. [x] Simplify shared empty-state decoration while keeping its title/action.
+2. [x] Keep shared form-dialog headings and Close reachable while content scrolls.
+3. [x] Bound confirmation dialogs and wrap long actions within the viewport.
+4. [x] Let shared page headings and action groups wrap without squeezing content.
+5. [x] Give native disclosures a consistent, keyboard-visible interaction floor.
+6. [x] Apply immediate hover feedback and eased return to shared controls.
+7. [x] Highlight a table row containing keyboard focus as well as pointer hover.
+8. [x] Make shared tabs compact rounded rectangles with unclipped keyboard focus.
+9. [x] Give explicitly invalid fields a consistent semantic error outline.
+10. [x] Distinguish readonly text fields from disabled controls without dimming text.
+11. [x] Replace the Permissions attention stripe with a quiet complete boundary.
+12. [x] Remove the thick answer-callout edge; retain its icon, label and tone.
+13. [x] Use fine quote rules consistently in transcript, file and source previews.
+14. [x] Remove decorative side accents from reasoning and recalled-memory content.
+15. [x] Cover nested Advanced/model settings and Add sources in the page catalogue;
+    repair tab/panel associations, capture both themes/laptop widths, reconcile
+    the visual specification, and run regressions and GitHub workflows.
+
+Implementation and screenshot evidence are recorded in
+[Live Test docs](../../architecture/WEB_APP_LIVE_TEST.md#result--2026-11-06-shared-ui-refinement)
+and [FIXED-1293/1294](../FIXED_ITEMS.md#fixed-1293--shared-ui-primitives-drifted-across-pages-and-subpages).
+
+This refinement does not supply QUI-V05 companion art or qualify native macOS,
+Windows, screen-reader or five-person usability acceptance. Keep this document
+until its remaining work is complete.

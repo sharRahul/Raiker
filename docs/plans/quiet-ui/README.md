@@ -29,6 +29,15 @@ owned by the runtime.
 app.** Phones get a separate mobile app with its own layout later. Nothing in
 these documents is designed for phone width.
 
+**2026-11-06 refinements:** connection-recovery work is recorded in
+[07](07_QUICK_FIXES_AND_QUALITY.md#2026-11-06--qui-g06-connection-recovery),
+the owner's cog/Models simplification in
+[01](01_LAYOUT_SYSTEM_AND_PAGES.md#2026-11-06--owner-requested-models-simplification),
+and the cross-page shared UI pass in
+[08](08_BRAND_AND_VISUAL_SYSTEM.md#2026-11-06--shared-ui-refinement-across-pages-and-subpages).
+Their implemented slices have live evidence; the unrelated open items and
+release acceptance gates retain their status.
+
 ## Product identity
 
 Raiker is a personal, governed AI workspace. It should feel calm and effortless

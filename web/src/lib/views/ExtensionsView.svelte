@@ -203,7 +203,7 @@
     {:else if kind === "skills"}
       <SkillsView />
     {:else if kind === "hooks"}
-  <div id="panel-hooks" role="tabpanel" aria-labelledby="tab-hooks">
+  <div role="region" aria-label="Hooks">
     <section class="card">
       <!-- The tab strip already says "Hooks", and what a hook *is* was five
            lines read once and in the way on every later visit. The one claim
@@ -429,7 +429,7 @@
     </section>
   </div>
     {:else if kind === "plugins"}
-  <div id="panel-plugins" role="tabpanel" aria-labelledby="tab-plugins">
+  <div role="region" aria-label="Plugins">
     <section class="card" data-testid="plugin-signing-posture">
       <h2>Plugin supply chain</h2>
       {#if plugins === null}

@@ -191,7 +191,7 @@
   .markdown :global(blockquote) {
     margin: 0 0 0.6rem;
     padding: 0.1rem 0 0.1rem 0.75rem;
-    border-left: 3px solid var(--border-strong);
+    border-inline-start: 1px solid var(--border-strong);
     color: var(--text-2);
   }
   .markdown :global(hr) {

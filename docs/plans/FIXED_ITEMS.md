@@ -1597,6 +1597,8 @@ file you can open. The two capture sets that remain — `screenshots/pages/` and
 | [FIXED-1290](#fixed-1290--the-server-rename-row-clipped-cancel-at-200-percent-zoom) | Low | Connections / zoom layout | Fixed |
 | [FIXED-1291](#fixed-1291--models-dialogs-were-crowded-and-model-settings-showed-every-task-at-once) | Medium | Models / owner-requested simplification | Fixed |
 | [FIXED-1292](#fixed-1292--add-dialogs-carried-scroll-and-lost-keyboard-focus-between-sources) | Low | Shared Add dialogs | Fixed |
+| [FIXED-1293](#fixed-1293--shared-ui-primitives-drifted-across-pages-and-subpages) | Medium | Shared UI / cross-page consistency | Fixed |
+| [FIXED-1294](#fixed-1294--tabs-pointed-at-missing-panels-and-the-visual-sweep-skipped-nested-pages) | Medium | Keyboard navigation / UI coverage | Fixed |
 
 ---
 
@@ -38824,3 +38826,55 @@ owning view, so a refresh of the same source does not reset an entry.
 keyboard focus in both directions. The Models browser run captures all four
 sources with their headings visible; see the
 [Live Test record](../architecture/WEB_APP_LIVE_TEST.md#result--2026-11-06-models-simplification-and-settings-cog).
+
+
+## FIXED-1293 — Shared UI primitives drifted across pages and subpages
+
+**Severity: Medium. Area: Shared UI / visual consistency. Status: Fixed 2026-11-06.**
+
+**Observed.** The owner requested the Apple/macOS design skills across all pages.
+Shared empty states carried a disc, outline and halo; attention and content
+previews used inconsistent thick side accents. Hover eased on entry despite
+QUI-V07's immediate-feedback decision. Shared form headings scrolled away,
+confirmation content was unbounded, and heading/action groups could squeeze
+each other. Field states and keyboard-focused table rows lacked shared styles.
+
+**Fixed.** Applied the fifteen-point refinement in
+[08 Brand and visual system](quiet-ui/08_BRAND_AND_VISUAL_SYSTEM.md#2026-11-06--shared-ui-refinement-across-pages-and-subpages).
+Empty states keep a plain icon, title and next action. Fine boundaries replace
+attention/callout stripes; quotation rules are one pixel, and reasoning/recall
+use neutral fill. Tabs use compact rounded rectangles with focus drawn inside
+the scroll boundary. Form dialogs keep their heading and Close fixed while
+content scrolls; confirmations fit the dynamic viewport. Page headings/actions
+wrap. Disclosures retain native keyboard behavior with a consistent target
+floor, shared hover paints immediately, table rows highlight keyboard focus,
+and explicit invalid/readonly fields have semantic, legible treatments.
+Raiker's Inter, palette, authority, consent and provider rules are unchanged.
+The visual specification's obsolete type sizes and serif policy were reconciled.
+
+**Evidence.** Shared-component, security, permission and model regressions,
+whole-product running-host captures and the short-window dialog check are
+recorded in [Live Test docs](../architecture/WEB_APP_LIVE_TEST.md#result--2026-11-06-shared-ui-refinement).
+
+## FIXED-1294 — Tabs pointed at missing panels and the visual sweep skipped nested pages
+
+**Severity: Medium. Area: Keyboard navigation / UI coverage. Status: Fixed 2026-11-06.**
+
+**Observed.** The full-page audit found Models and Design tabs whose
+`aria-controls` named no rendered panel. The same pattern existed in project
+lists/details and document inspectors; Hooks/Plugins named retired tab labels.
+The navigation-only screenshot catalogue skipped Advanced setting segments,
+model-serving sections, Add sources, Design Documents and Advanced Connections.
+
+**Fixed.** Actual model, Design, project and document-inspector panels now have
+matching IDs and accessible labels. Hooks/Plugins are labelled regions within
+the active Advanced panel. Shared model destination metadata supplies the UI
+and the visual catalogue, alongside the existing nav/Advanced registries. The
+retained live review checks the selected tab's controlled element and visits
+nested pages in both themes. No project/document or connection write is needed
+for the routed review.
+
+**Evidence.** The model keyboard regression asserts both sides of the tab/panel
+association. Design, project and document regressions and the whole-page
+browser review are recorded in
+[WEB_APP_LIVE_TEST.md](../architecture/WEB_APP_LIVE_TEST.md#result--2026-11-06-shared-ui-refinement).

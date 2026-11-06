@@ -36,15 +36,15 @@ contributor is entitled to ignore.
 
 | Token | Size | Used for |
 |---|---|---|
-| `--text-2xs` | 0.68rem | Table headers, kickers — uppercase, tracked wide |
+| `--text-2xs` | 0.68rem | Small secondary metadata |
 | `--text-xs` | 0.74rem | Field labels, timestamps, secondary metadata |
 | `--text-sm` | 0.82rem | Table body, card bodies, buttons |
 | `--text-md` | 0.9rem | Form controls, `h4` |
 | `--text-base` | 1rem | Body copy |
-| `--text-lg` | 1rem | `h3` |
-| `--text-xl` | 1.22rem | `h2` |
-| `--text-2xl` | 1.49rem | `h1` |
-| `--text-display` | 1.82rem | `.display` — serif |
+| `--text-lg` | 1.12rem | `h3` |
+| `--text-xl` | 1.32rem | `h2` |
+| `--text-2xl` | 1.6rem | `h1` |
+| `--text-display` | 2rem | `.display` — Inter, weight 500 |
 
 Headings used to sit at 1.45 / 1.08 / 0.95rem. The first interval was 14%, which
 reads as "the same size, only bolder": heading level was carried by weight alone,
@@ -52,15 +52,15 @@ and a page of headings read as one long run of bold text. Every step is now a
 visible interval, and `web/src/lib/appCss.test.ts` fails if any of them
 falls below 1.15×.
 
-**The serif is a voice, not a decoration.** `Source Serif 4` appears where Raiker
-is speaking to the owner rather than labelling a control — the Workbench
-greeting, an empty state's title, a sign-in headline — through the `.display`
-class, and nowhere else. It is set at weight 500 because a serif at 700 above
-1.5rem reads as shouting.
+**Inter carries every interface role (QUI-V02).** `.display` uses the larger
+step at weight 500 for a welcome or identity moment. Source Serif 4 remains
+deferred. Empty states use a plain neutral icon, a short title and their next
+action; no decorative disc or halo competes with that action.
 
 **Tracking.** `--tracking-tight` (−0.018em) on `h1` and `.display`: type set
 large keeps the letter spacing it was drawn with, which reads loose.
-`--tracking-wide` (0.07em) on uppercase micro-labels, which need the opposite.
+The legacy `--tracking-wide` token remains available, but shared table headings
+and metadata use sentence case and normal tracking.
 
 **Never** write a bare `rem` font size in a view. Use a step, or add one here.
 
@@ -407,3 +407,22 @@ not a new palette or heavy decoration. UX-11 applies keyboard/screen-reader,
 200% zoom, themes, responsive widths and reduced-motion checks to each slice.
 Statuses remain distinguishable by text/icon; loading/unknown/partial are not
 success colours. Visual polish cannot close an untested usability outcome.
+
+
+## 2026-11-06 shared refinement
+
+The [Quiet UI visual-system checklist](../plans/quiet-ui/08_BRAND_AND_VISUAL_SYSTEM.md#2026-11-06--shared-ui-refinement-across-pages-and-subpages)
+applies across pages through shared primitives. Buttons and chips paint hover
+immediately and ease on return. Native disclosures keep their triangle and
+keyboard behavior with a consistent target floor. Explicit `aria-invalid`
+fields use the risk outline; readonly text stays selectable and fully legible
+on a sunken fill. Table rows highlight keyboard focus as well as hover.
+
+Shared tabs use rounded rectangles; focus is drawn inside their scrolling
+boundary. Form dialogs retain a fixed heading/Close row while their content
+scrolls; confirmations stay within the dynamic viewport and wrap action labels.
+Page heading/action groups may wrap without squeezing the content. Permission
+attention and answer callouts keep text, icon and semantic tone with a fine
+boundary. Quoted text uses a one-pixel rule; reasoning and recalled content use
+neutral fill without decorative side accents. None of these treatments changes
+consent, lifecycle or provider behavior.

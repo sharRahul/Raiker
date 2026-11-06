@@ -389,7 +389,7 @@
     margin: 0;
     padding: 0.55rem 0.75rem;
     width: 100%;
-    border-left: 3px solid var(--border-strong);
+    border-inline-start: 1px solid var(--border-strong);
     background: var(--sunken);
     border-radius: 0 var(--r-sm) var(--r-sm) 0;
     white-space: pre-wrap;

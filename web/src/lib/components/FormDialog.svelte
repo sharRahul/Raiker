@@ -62,27 +62,38 @@
   .form-dialog {
     color: var(--text-1);
     width: min(560px, calc(100vw - 2rem));
-    max-height: min(85vh, 48rem);
-    overflow-y: auto;
-    padding: var(--space-5);
+    max-height: min(calc(100dvh - var(--space-6)), 48rem);
+    overflow: hidden;
+    padding: 0;
     border: 1px solid var(--border);
     border-radius: var(--r-lg);
     background: var(--surface);
     box-shadow: var(--shadow-2);
   }
+  .form-dialog[open] { display: flex; flex-direction: column; }
   header {
+    flex: none;
     display: flex;
     align-items: center;
     justify-content: space-between;
     gap: var(--space-3);
-    margin-bottom: var(--space-3);
+    padding: var(--space-4) var(--space-5);
+    border-bottom: 1px solid var(--border);
   }
   header h2 {
     margin: 0;
     font-size: var(--text-lg);
+    min-width: 0;
+    overflow-wrap: anywhere;
   }
+  header button { flex: none; }
   .form-body {
     display: grid;
     gap: var(--space-3);
+    padding: var(--space-5);
+    min-height: 0;
+    overflow: auto;
+    overscroll-behavior: contain;
   }
+  .form-body > :global(*) { min-width: 0; }
 </style>

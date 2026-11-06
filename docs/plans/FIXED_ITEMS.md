@@ -38762,8 +38762,8 @@ configuration; llama.cpp jobs and the matching release gate now use macos-15.
 The crash-recovery integration test now kills one ready process explicitly,
 rather than making every replacement crash again after two seconds; recovery
 is still required and its PID and failure receipt are checked. The fixed
-plain-HTTP loopback health probe avoids initializing an unused TLS trust store
-on every tick; the recovery assertion allows the production readiness budget.
+plain-HTTP loopback health probe caches its verified default TLS context
+instead of reloading the trust store on every tick; the recovery assertion allows the production readiness budget.
 
 **Evidence.** tests/test_docs_consistency.py; Svelte check, production build
 and the mocked responsive composer suite.

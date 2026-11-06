@@ -27,10 +27,12 @@ from __future__ import annotations
 
 import contextlib
 import logging
+import ssl
 import threading
 import time
 from collections.abc import Callable
 from dataclasses import dataclass, field, replace
+from functools import cache
 from pathlib import Path
 from typing import Any
 
@@ -73,13 +75,18 @@ def ready_budget_seconds(weights_bytes: int) -> float:
     return min(900.0, 60.0 + 20.0 * weights_bytes / hardware.GIB)
 
 
+@cache
+def _probe_tls_context() -> ssl.SSLContext:
+    # Reuse the verified default context instead of reloading platform roots
+    # for every monitor tick. HTTPX still verifies any TLS connection.
+    return ssl.create_default_context()
+
+
 def probe_health(port: int, alias: str, *, timeout: float = 2.0) -> str:
     """``ready``, ``loading`` (503 while weights load) or ``down``."""
     origin = f"http://127.0.0.1:{port}"
     try:
-        # This origin is fixed to plain HTTP on loopback. Avoid loading the
-        # platform TLS trust store on every monitor tick (costly on macOS).
-        with httpx.Client(timeout=timeout, trust_env=False, verify=False) as client:
+        with httpx.Client(timeout=timeout, trust_env=False, verify=_probe_tls_context()) as client:
             health = client.get(f"{origin}/health")
             if health.status_code == 503:
                 return "loading"

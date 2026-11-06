@@ -1,11 +1,12 @@
 <script lang="ts">
   import { failure } from "../../errorCopy";
-  import { onMount } from "svelte";
+  import { untrack } from "svelte";
   import { api } from "../../api";
   import type { ModelLibraryView } from "../../apiTypes";
   import Icon from "../../components/Icon.svelte";
   import PathPicker from "../../components/PathPicker.svelte";
 
+  let { active = true }: { active?: boolean } = $props();
   let library = $state<ModelLibraryView | null>(null);
   let root = $state("");
   let busy = $state(false);
@@ -80,24 +81,23 @@
       error = failure("Could not remove the model folder", "Its approval could not be confirmed.", "Reopen this panel to check the folder list before removing it again.", e);
     }
   }
-  onMount(load);
+  $effect(() => { if (active) untrack(() => { void load(); }); });
 </script>
 
 <div class="library-layout">
   <section class="library-intro card" id="local-library">
     <div>
-      <p class="eyebrow">Local model library</p>
       <h2>Use models already on this device</h2>
       <p>
         Raiker scans only folders you approve. It reads GGUF metadata without
         opening model code, follows no symlinks, and leaves original files where
         they are.
       </p>
-      <p class="slot-note">
-        Up to four models serve at once, each on its own local port, so Chat,
-        Build and Design can each use a different one. Which of them serves is
-        chosen in the slot rows above — this list is what is on disk.
-      </p>
+      <details class="slot-note">
+        <summary>How serving differs from storage</summary>
+        <p>Up to four models can serve at once. Choose them under Running models;
+          this library lists the files on disk.</p>
+      </details>
     </div>
     <button class="btn btn-primary" type="button" onclick={scan} disabled={busy}
       >{busy ? "Scanning…" : "Scan now"}</button
@@ -107,7 +107,6 @@
   <section class="card root-card" aria-labelledby="model-folders-title">
     <div class="section-title">
       <div>
-        <p class="eyebrow">Scope</p>
         <h3 id="model-folders-title">Approved folders</h3>
       </div>
       <span>{library?.roots.length ?? 0}</span>
@@ -157,7 +156,6 @@
   <section class="models-section" aria-labelledby="local-models-title">
     <div class="section-title">
       <div>
-        <p class="eyebrow">Inventory</p>
         <h3 id="local-models-title">Detected GGUF models</h3>
       </div>
       <span>{ggufModels.length}</span>
@@ -238,8 +236,8 @@
     align-items: center;
     justify-content: space-between;
     gap: 24px;
-    padding: 24px;
-    border: 1px solid var(--accent-border);
+    padding: 0;
+    border: 0;
   }
   .library-intro h2,
   .section-title h3 {
@@ -251,7 +249,9 @@
     color: var(--text-muted);
   }
   .root-card {
-    padding: 20px;
+    padding: var(--space-4) 0;
+    border: 0;
+    box-shadow: none;
   }
   .section-title {
     display: flex;

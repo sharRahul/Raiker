@@ -11,11 +11,12 @@ import {
   waitFor,
   within,
 } from "@testing-library/svelte";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ModelProfile, ModelsView as ModelsData } from "../apiTypes";
 import { modelProfile, modelsView, stubFetch, stubFetchPending } from "../test-helpers";
 import ModelsView from "./ModelsView.svelte";
 
+beforeEach(() => { window.location.hash = "#/models"; });
 afterEach(() => vi.unstubAllGlobals());
 
 /**
@@ -710,9 +711,9 @@ describe("ModelsView state grammar", () => {
 
     expect(await screen.findByText("On this device")).toBeInTheDocument();
     // Building a local model lives here: install a runtime, pull, and index.
-    expect(screen.getByText("Install, connect, or pull")).toBeInTheDocument();
+    expect(screen.getByText("Local server tools")).toBeInTheDocument();
     // Step 2 shows only the chosen source.
-    expect(screen.queryByText("Your hosted providers")).not.toBeInTheDocument();
+    expect(screen.queryByText("Choose a provider")).not.toBeInTheDocument();
   });
 
   it("asks for the source first, then shows only that source (QUI-L08)", async () => {
@@ -729,7 +730,7 @@ describe("ModelsView state grammar", () => {
       expect(dialog.getByRole("button", { name: new RegExp(source) })).toBeInTheDocument();
     }
     await fireEvent.click(dialog.getByRole("button", { name: /An account I have/ }));
-    expect(await dialog.findByText("Your hosted providers")).toBeInTheDocument();
+    expect(await dialog.findByText("Choose a provider")).toBeInTheDocument();
     expect(dialog.queryByText("On this device")).not.toBeInTheDocument();
     expect(dialog.getByText("2 · An account I have")).toBeInTheDocument();
   });
@@ -759,7 +760,7 @@ describe("ModelsView state grammar", () => {
     });
     render(ModelsView, { tab: "add", source: "account" });
 
-    expect(await screen.findByText("Your hosted providers")).toBeInTheDocument();
+    expect(await screen.findByText("Choose a provider")).toBeInTheDocument();
     expect(screen.queryByText(/no model pinned/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/model chosen at selection/i)).not.toBeInTheDocument();
     // The fact itself stays: a connected provider still says which model answers.
@@ -932,6 +933,7 @@ describe("ModelsView routing, selection, and provider catalogue", () => {
       }),
     });
     render(ModelsView, { props: { view: "routing" } });
+    await fireEvent.click(await screen.findByRole("tab", { name: "Advanced" }));
     await waitFor(() =>
       expect(screen.getByText("Model fallback sequence")).toBeTruthy(),
     );
@@ -1052,6 +1054,7 @@ describe("ModelsView routing, selection, and provider catalogue", () => {
   it("shows the empty state when no fallback is configured", async () => {
     stubFetch({ "GET /api/models": models({ fallback_sequence: [] }) });
     render(ModelsView, { props: { view: "routing" } });
+    await fireEvent.click(await screen.findByRole("tab", { name: "Advanced" }));
     await waitFor(() =>
       expect(screen.getByText(/No fallback configured/)).toBeTruthy(),
     );
@@ -1066,6 +1069,7 @@ describe("ModelsView routing, selection, and provider catalogue", () => {
       },
     });
     render(ModelsView, { props: { view: "routing" } });
+    await fireEvent.click(await screen.findByRole("tab", { name: "Advanced" }));
     await waitFor(() =>
       expect(screen.getByText("Model fallback sequence")).toBeTruthy(),
     );
@@ -1709,6 +1713,7 @@ describe("ModelsView routing, selection, and provider catalogue", () => {
       },
     });
     render(ModelsView, { props: { view: "routing" } });
+    await fireEvent.click(await screen.findByRole("tab", { name: "Advanced" }));
     await waitFor(() => expect(screen.getByText("Advisor model")).toBeTruthy());
 
     const select = screen.getByLabelText(
@@ -1738,6 +1743,7 @@ describe("ModelsView routing, selection, and provider catalogue", () => {
       "PUT /api/model-advisor": { ok: true, advisor_profile_id: null },
     });
     render(ModelsView, { props: { view: "routing" } });
+    await fireEvent.click(await screen.findByRole("tab", { name: "Advanced" }));
     await waitFor(() => expect(screen.getByText("Advisor model")).toBeTruthy());
 
     const select = screen.getByLabelText(
@@ -1772,6 +1778,7 @@ describe("ModelsView routing, selection, and provider catalogue", () => {
       }),
     });
     render(ModelsView, { props: { view: "routing" } });
+    await fireEvent.click(await screen.findByRole("tab", { name: "Advanced" }));
     await waitFor(() => expect(screen.getByText("Advisor model")).toBeTruthy());
     const select = screen.getByLabelText(
       "Advisor model profile",
@@ -1811,6 +1818,7 @@ describe("ModelsView routing, selection, and provider catalogue", () => {
     vi.stubGlobal("fetch", mock);
 
     render(ModelsView, { props: { view: "routing" } });
+    await fireEvent.click(await screen.findByRole("tab", { name: "Advanced" }));
     await waitFor(() =>
       expect(screen.getByText("Model fallback sequence")).toBeTruthy(),
     );
@@ -1900,7 +1908,9 @@ describe("ModelsView — one page, Add model and Settings › Advanced (QUI-L08)
     // before they need a fallback order.
     stubFetch({ "GET /api/models": models({}) });
     render(ModelsView, { props: { view: "routing" } });
+    await fireEvent.click(await screen.findByRole("tab", { name: "Advanced" }));
 
+    await fireEvent.click(await screen.findByRole("tab", { name: "Advanced" }));
     const advanced = await screen.findByText("Advanced routing");
     const disclosure = advanced.closest("details");
     expect(disclosure).not.toBeNull();
@@ -2001,6 +2011,7 @@ describe("ModelsView — one page, Add model and Settings › Advanced (QUI-L08)
   it("does not read the off-machine posture where nothing connects", async () => {
     stubFetch({ "GET /api/models": models({}) });
     render(ModelsView, { props: { view: "routing" } });
+    await fireEvent.click(await screen.findByRole("tab", { name: "Advanced" }));
     expect(screen.queryByLabelText("Off-machine provider posture")).toBeNull();
   });
 
@@ -2295,5 +2306,51 @@ describe("the profile card's readiness steps", () => {
     render(ModelsView);
     await screen.findByRole("heading", { name: "My models" });
     expect(screen.queryByTestId("model-readiness-steps")).not.toBeInTheDocument();
+  });
+});
+
+// Owner request, 2026-11-06: keep model tasks short and independently reachable.
+describe("focused model settings", () => {
+  it("does not offer comparison or repeat Add in an empty inventory", async () => {
+    stubFetch({ "GET /api/models": models({ profiles: [], chat_profiles: [] }) });
+    render(ModelsView);
+    await screen.findByRole("heading", { name: "My models" });
+    expect(screen.queryByRole("group", { name: "Show models as" })).not.toBeInTheDocument();
+    expect(screen.getAllByRole("button", { name: "Add model" })).toHaveLength(1);
+    expect(screen.queryByRole("button", { name: "Add a model" })).not.toBeInTheDocument();
+  });
+
+  it("switches settings sections by keyboard without hiding effective-model facts", async () => {
+    stubFetch({
+      "GET /api/models": models({}),
+      "GET /api/model-library": { roots: [], models: [], count: 0 },
+      "GET /api/model-operations": { items: [] },
+    });
+    render(ModelsView, { view: "routing" });
+    const serving = await screen.findByRole("tab", { name: "Running models" });
+    await fireEvent.keyDown(serving, { key: "ArrowRight" });
+    expect(await screen.findByRole("tabpanel", { name: "Library" })).toBeInTheDocument();
+    expect(window.location.hash).toContain("modelsPanel=library");
+    await fireEvent.input(screen.getByLabelText("Absolute model folder"), { target: { value: "/tmp/unsaved-model-folder" } });
+    expect(screen.queryByRole("heading", { name: "Downloads and model jobs" })).not.toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Work defaults" }).closest('[role="tabpanel"]')).toBeNull();
+    await fireEvent.keyDown(screen.getByRole("tab", { name: "Library" }), { key: "ArrowRight" });
+    expect(await screen.findByRole("tabpanel", { name: "Activity" })).toBeInTheDocument();
+    expect(await screen.findByText("No model activity yet")).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Approved folders" })).not.toBeInTheDocument();
+    await fireEvent.click(screen.getByRole("tab", { name: "Library" }));
+    expect(screen.getByLabelText("Absolute model folder")).toHaveValue("/tmp/unsaved-model-folder");
+  });
+
+  it("filters provider choices without losing source navigation", async () => {
+    stubFetch({ "GET /api/models": models({ profiles: [profile({ provider: "anthropic", profile_id: "anthropic-hosted", off_machine: true, requires_network: true }), profile({ provider: "openai", profile_id: "openai-hosted", off_machine: true, requires_network: true })] }) });
+    render(ModelsView, { tab: "add", source: "account" });
+    const search = await screen.findByRole("searchbox", { name: "Search providers" });
+    await fireEvent.input(search, { target: { value: "Anthropic" } });
+    expect(screen.getByRole("heading", { name: "Anthropic" })).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "OpenAI" })).not.toBeInTheDocument();
+    await fireEvent.input(search, { target: { value: "no-such-provider" } });
+    expect(await screen.findByRole("status")).toHaveTextContent("No providers match");
+    expect(screen.getByRole("button", { name: "Back" })).toBeInTheDocument();
   });
 });

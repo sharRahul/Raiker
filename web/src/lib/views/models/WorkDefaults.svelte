@@ -85,16 +85,14 @@
     <h2 id="work-defaults-h">Work defaults</h2>
   </div>
   <p class="sub">
-    Where each surface's model picker starts. A default is a preference, never a
-    permission: the turn still names its exact profile and model, and the
-    readiness gate judges that pair on its own evidence.
+    Starting models for Chat, Build and Design. Defaults grant no permissions.
   </p>
 
   {#if read && decisions === null}
     <PageState
       state="error"
       title="Couldn't read the work defaults"
-      detail="Nothing was changed. The fallback sequence below is still editable."
+      detail="Defaults are unavailable. Open Advanced to review the fallback settings."
     />
   {:else if !read}
     <PageState state="loading" title="Reading your defaults…" />

@@ -143,11 +143,12 @@
     z-index: var(--z-scrim);
   }
   .signin-dialog {
+    max-height: calc(100dvh - var(--space-6));
+    overflow-y: auto;
     position: relative;
     width: min(100%, 26rem);
     background: var(--surface);
     border: 1px solid var(--border-strong);
-    border-top: 4px solid var(--brand);
     border-radius: var(--r-lg);
     box-shadow: var(--shadow-2);
     padding: 1.6rem 1.5rem 1.3rem;

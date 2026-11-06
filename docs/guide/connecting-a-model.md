@@ -161,7 +161,7 @@ that.
 
 ### The llama.cpp engine Raiker manages
 
-**Models → Runtime → llama.cpp engine** is where GGUF models get the program
+**Settings → Advanced → Model serving → Running models** is where GGUF models get the program
 that runs them. You do not install llama.cpp, put it on `PATH`, or choose
 command-line flags.
 
@@ -216,7 +216,7 @@ command-line flags.
 
 ### Downloads, conversions and other long jobs
 
-**Settings → Advanced → Model serving** is where every durable model job lives:
+**Settings → Advanced → Model serving → Activity** is where every durable model job lives:
 downloads, conversions, runtime installs, Ollama pulls, and local deployments.
 They survive navigation and an interrupted app session, and none of them is ever
 silently retried.
@@ -336,9 +336,19 @@ spending limit and the rates live in **Settings → Advanced → Usage and
 spending**. The old addresses (`#/models?tab=runtime`, `#/models?tab=usage`)
 open those sections.
 
-The off-machine gate status reads in the **An account I have** step, before you
-connect anything, because "the hosted gate is off" is what you need to know
-*before* a provider refuses rather than after.
+**Model serving** has four focused sections: **Running models**, **Library**,
+**Activity** and **Advanced**. Work defaults and the model that would answer now
+remain visible above them. The Library manages approved folders; Activity follows
+downloads and other jobs; Advanced holds GPU/context settings, fallback order,
+the advisor and side-task models.
+
+In Add model, search for a provider, then use its one main action. **Permissions
+and network** holds the connection-wide policy facts; **Privacy and cost** holds
+each provider's details. On this computer keeps optional installation and pull
+tools under **Install a local server or download a model**. Hugging Face uses its
+own download steps and keeps the optional Memory embedding choice in a disclosure.
+Model details keeps telemetry and context overrides on request, and My models
+keeps **Default models** and **Usage and spending** in disclosures.
 
 That is the whole flow. Behind it:
 
@@ -598,7 +608,7 @@ or shipped price.
 
 ### Rolling seven-day usage
 
-Models → **Usage** shows one row for every connected provider and no row for
+**Settings → Advanced → Usage and spending** shows one row for every connected provider and no row for
 an unconnected one. **Raiker observed** is the rolling seven-day total from the
 local ledger: input/output/cache tokens, owner turns, all model requests,
 automatic compactions, and cost where the exact recorded models have known
@@ -686,7 +696,7 @@ catalogue is for an outage, not for an account Raiker may no longer reach.
 
 ## Fallback sequence
 
-Under **Advanced routing** in **Settings → Advanced → Model serving**, **Model fallback sequence**
+Under **Advanced routing** in **Settings → Advanced → Model serving → Advanced**, **Model fallback sequence**
 orders the backends Raiker tries when the selected one is unavailable. Listing a
 hosted provider there grants nothing on its own — each candidate is still gated
 by the same policy.
@@ -704,7 +714,7 @@ reason the earlier one gave.
 
 ## Side-task models
 
-**Settings → Advanced → Model serving → Side-task models** gives two kinds of side work their own
+**Settings → Advanced → Model serving → Advanced → Side-task models** gives two kinds of side work their own
 model, each an ordered list of up to three you have set up:
 
 - **Summarising** compacts a long conversation. A cheaper or faster model is
@@ -748,12 +758,12 @@ keeping either side of it.
 
 ## Off-machine provider posture
 
-**Models → Add model → An account I have** opens with five read-only facts about everything that
-would leave this machine: the hosted model gate, the private-network gate, how
+**Models → Add model → An account I have → Permissions and network** shows
+five read-only facts about everything that would leave this machine: the hosted model gate, the private-network gate, how
 many off-machine providers you have connected, how many off-machine profiles
 exist, and **Through your proxy** — whether hosted requests go through the
 proxy set in Raiker's environment (`HTTPS_PROXY`, `HTTP_PROXY`, `ALL_PROXY`,
-minus `NO_PROXY`), and which one. Each off-machine card's posture line ends
+minus `NO_PROXY`), and which one. Each provider's **Privacy and cost** disclosure ends
 **Direct connection** or **Through your proxy (host:port)**. It is status, not
 a control — endpoints, API keys and proxy passwords are never displayed here.
 

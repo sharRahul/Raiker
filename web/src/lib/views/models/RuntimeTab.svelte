@@ -8,6 +8,8 @@
    * connections — testing, selecting, the details dialog — and hands them in,
    * so a slot row here and a provider row on Add do exactly the same thing.
    */
+  import { onMount } from "svelte";
+  import TabStrip from "../../components/TabStrip.svelte";
   import type { ModelProfile, ModelsView as ModelsData } from "../../apiTypes";
   import AdvancedRouting from "./AdvancedRouting.svelte";
   import SideTaskModels from "./SideTaskModels.svelte";
@@ -47,8 +49,45 @@
     ondetails: (profile: ModelProfile) => void;
     onselect: (profile: ModelProfile) => void;
   } = $props();
+  const panels = [
+    { id: "serving", label: "Running models" },
+    { id: "library", label: "Library" },
+    { id: "activity", label: "Activity" },
+    { id: "advanced", label: "Advanced" },
+  ];
+  function requestedPanel(): string {
+    if (typeof window === "undefined") return "serving";
+    const value = new URLSearchParams(window.location.hash.split("?", 2)[1] ?? "").get("modelsPanel");
+    return panels.some(panel => panel.id === value) ? value! : "serving";
+  }
+  const initialPanel = requestedPanel();
+  let panel = $state(initialPanel);
+  let visited = $state([initialPanel]);
+  function rememberPanel(id: string) {
+    panel = id;
+    if (!visited.includes(id)) visited = [...visited, id];
+  }
+  function choosePanel(id: string) {
+    const [route, query] = window.location.hash.split("?", 2);
+    const params = new URLSearchParams(query);
+    params.set("modelsPanel", id);
+    rememberPanel(id);
+    window.location.hash = `${route}?${params}`;
+  }
+  onMount(() => {
+    const sync = () => { rememberPanel(requestedPanel()); };
+    window.addEventListener("hashchange", sync);
+    return () => window.removeEventListener("hashchange", sync);
+  });
 </script>
 
+<!-- Effective model/fallback facts remain visible on every settings section. -->
+<WorkDefaults {models} />
+<TabStrip tabs={panels} selected={panel} onselect={choosePanel} label="Model settings" />
+{#each panels as item (item.id)}
+{#if visited.includes(item.id)}
+<div role="tabpanel" aria-label={item.label} hidden={panel !== item.id}>
+{#if item.id === "serving"}
 <!-- Local serving, in the section about runtime rather than
      in the middle of the list of things you could add. The slot rows are
      unchanged; what moved is which question they answer. -->
@@ -56,8 +95,9 @@
   {#if gguf.length > 0}
     <!-- The engine behind the GGUF slots: installed, sized and supervised by
          Raiker, so serving a model needs no manual setup. -->
-    <LlamaEnginePanel onchanged={() => void onreload()} />
+    <LlamaEnginePanel active={panel === "serving"} onchanged={() => void onreload()} />
     <LocalFrameworkRow
+      active={panel === "serving"}
       provider="llama.cpp"
       title="GGUF"
       format="gguf"
@@ -71,10 +111,10 @@
       {selecting}
       testResult={testResults[gguf[0].profile_id] ?? null}
     />
-    <ModelRuntimeSettings />
   {/if}
   {#if mlx.length > 0}
     <LocalFrameworkRow
+      active={panel === "serving"}
       provider="mlx"
       title="MLX"
       format="mlx"
@@ -95,35 +135,21 @@
   <SpeechRuntimePanel />
 </div>
 
-<!-- The library answers "what is on disk"; the serving rows
-     above answer "what is running". They were interleaved. -->
-<LocalLibraryPanel />
-
-<!-- Two facts told apart: what each surface starts on, and what would
-     really answer right now. The fallback sequence that produces the second is edited
-     directly beneath, so cause and effect are on one screen. -->
-<WorkDefaults {models} />
-
-<!-- REM-MODEL-02 / UX-MODEL-05 — orchestration tuning, one reach down.
-     The two controls below decide what happens when the owner's model
-     *cannot* serve, and what a local model may consult. Both are real and
-     both stay editable; neither is what somebody opens this tab to find
-     out. Above them, `WorkDefaults` already answers the ordinary
-     questions — what each surface starts on, and what would really answer
-     right now — and it keeps naming a fallback that displaced a selection
-     **outside** this disclosure, because a substitution that changes
-     provider, and therefore where the owner's words go, is never
-     something to fold away. What is folded is the tuning, not the
-     disclosure. -->
-<AdvancedRouting {models} {revision} {onreload} />
-<SideTaskModels {models} {onreload} />
-
-<!-- Downloads, conversions and pulls are what the
-     runtime is *doing*, so they belong to the runtime rather than beside
-     Pricing as a sixth peer tab. -->
-<DownloadsPanel />
+{:else if item.id === "library"}
+  <LocalLibraryPanel active={panel === "library"} />
+{:else if item.id === "activity"}
+  <DownloadsPanel active={panel === "activity"} />
+{:else}
+  {#if gguf.length > 0}<ModelRuntimeSettings />{/if}
+  <AdvancedRouting {models} {revision} {onreload} />
+  <SideTaskModels {models} {onreload} />
+{/if}
+</div>
+{/if}
+{/each}
 
 <style>
+  [role="tabpanel"] { margin-top: var(--space-4); }
   .local-list {
     list-style: none;
     margin: 0;

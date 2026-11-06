@@ -109,6 +109,8 @@
   let adding = $state(false);
   let addSource = $state<string | null>(null);
   let changing = $state(false);
+  let providerQuery = $state("");
+  $effect(() => { void addSource; providerQuery = ""; });
   const visibleSections = $derived(addSource === null ? [] : (SOURCE_SECTIONS[addSource] ?? []));
 
   function openAdd(source: string | null) {
@@ -133,7 +135,10 @@
     if (requested === null) return;
     // What serves models and what they cost moved to Settings › Advanced.
     if (SERVING_TABS.includes(requested)) {
-      window.location.replace("#/settings?tab=advanced&kind=models");
+      const panel = requested === "library" ? "library"
+        : requested === "downloads" || requested === "activity" ? "activity"
+        : requested === "routing" ? "advanced" : null;
+      window.location.replace(`#/settings?tab=advanced&kind=models${panel ? `&modelsPanel=${panel}` : ""}`);
     } else if (USAGE_TABS.includes(requested)) {
       window.location.replace("#/settings?tab=advanced&kind=usage");
     } else if (requested === "add" || requested === "posture") openAdd(requestedSource());
@@ -1295,8 +1300,6 @@
         <button type="button" class="btn btn-ghost btn-sm" onclick={() => (changing = false)}>Cancel</button>
       {:else if globalChoices.length > 0}
         <button type="button" class="btn btn-sm" onclick={() => (changing = true)}>Change</button>
-      {:else if !showReadiness}
-        <button type="button" class="btn btn-primary btn-sm" onclick={() => openAdd(null)}>Add model</button>
       {/if}
     </div>
   </section>
@@ -1308,16 +1311,19 @@
     <div class="lead-row">
       <h2 id="my-models-title">My models</h2>
       <!-- UX-MODEL-04 — the same models as a comparison. -->
+      {#if ownedProfiles.length > 0}
       <div class="segmented" role="group" aria-label="Show models as">
         <button type="button" class="segment" aria-pressed={modelsLayout === "list"} onclick={() => (modelsLayout = "list")}>List</button>
         <button type="button" class="segment" aria-pressed={modelsLayout === "compare"} onclick={() => (modelsLayout = "compare")}>Compare</button>
       </div>
+      {/if}
     </div>
-    {#if modelsLayout === "compare"}
+    {#if modelsLayout === "compare" && ownedProfiles.length > 0}
       <ModelComparison profiles={models.profiles} />
     {:else}
       <MyModels
         profiles={ownedProfiles}
+        showAddAction={false}
         {decisions}
         busy={selecting}
         onuse={(profile) => void select(profile.profile_id, profile.model)}
@@ -1343,13 +1349,17 @@
     onclose={closeAdd}
   >
     {#snippet steps(option)}
+      {#if option.id !== "huggingface"}
       <p class="step-line" aria-label="Steps">
         <span>1 · Source</span><span aria-current="step">2 · {option.name}</span><span>3 · Review</span>
       </p>
+      {/if}
       {#if option.id === "huggingface"}
         <HuggingFacePanel />
       {:else if models !== null}
         {#if option.id !== "local"}
+        <details class="provider-permissions">
+          <summary>Permissions and network</summary>
         <dl class="gates" aria-label="Off-machine provider posture">
           <div>
             <dt>Hosted model gate</dt>
@@ -1383,8 +1393,14 @@
             <dd data-testid="proxy-posture">{proxyPosture}</dd>
           </div>
         </dl>
+        </details>
         {/if}
-        {#if option.id === "local"}<ProvidersPanel onCatalogueChanged={refreshProviderCatalogues} />{/if}
+        {#if option.id === "local"}
+          <details class="local-setup-tools">
+            <summary>Install a local server or download a model</summary>
+            <ProvidersPanel onCatalogueChanged={refreshProviderCatalogues} />
+          </details>
+        {/if}
       {#if models.profiles.length === 0}
         <div class="card">
           <!-- the empty-state rule/FIXED-436 — this said "Add profiles in
@@ -1405,8 +1421,17 @@
         </div>
       {:else}
 
+        {#if option.id !== "local"}
+          <label class="provider-search">
+            <span class="sr-only">Search providers</span>
+            <input class="input" type="search" bind:value={providerQuery} placeholder="Search providers" />
+          </label>
+          {#if providerQuery.trim() && !visibleSections.some(section => profilesFor(section).some(profile => `${profileLabel(profile)} ${profile.provider}`.toLowerCase().includes(providerQuery.trim().toLowerCase())))}
+            <p role="status">No providers match “{providerQuery}”. Try another name.</p>
+          {/if}
+        {/if}
         {#each visibleSections as section}
-          {@const sectionProfiles = profilesFor(section)}
+          {@const sectionProfiles = profilesFor(section).filter(profile => `${profileLabel(profile)} ${profile.provider}`.toLowerCase().includes(providerQuery.trim().toLowerCase()))}
           {#if sectionProfiles.length}
             <section
               class="provider-section"
@@ -1414,13 +1439,12 @@
             >
               <div class="section-heading">
                 <div>
-                  <p class="eyebrow">{section}</p>
                   <h2 id={`section-${section}`}>
                     {section === "Local"
                       ? "On this device"
                       : section === "Hosted"
-                        ? "Your hosted providers"
-                        : "Advanced connections"}
+                        ? "Choose a provider"
+                        : "Choose a connection"}
                   </h2>
                 </div>
                 <p>
@@ -1602,7 +1626,7 @@
                   {/each}
                 </div>
               {:else}
-                <div class="provider-grid">
+                <div class="provider-grid compact-providers">
                   {#each sectionProfiles as p (p.profile_id)}
                     {@const b = brand(p.provider)}
                     <article
@@ -1651,7 +1675,7 @@
                         {/if}
                       </p>
                       <div class="chips">
-                        {#if readinessChip(p)}<span
+                        {#if (isConnected(p) || p.selected) && readinessChip(p)}<span
                             class="chip"
                             class:chip-ok={p.ready === true}
                             class:chip-warn={!isChoosableModel(p)}
@@ -1665,7 +1689,7 @@
                            measured. Readiness is the only state on this card;
                            the posture is one quiet line. -->
                       {#if posture(p) !== ""}
-                        <p class="posture-line">{posture(p)}</p>
+                        <details class="provider-facts"><summary>Privacy and cost</summary><p class="posture-line">{posture(p)}</p></details>
                       {/if}
                       <!-- BUG-270 — a local runtime that is not on this machine
                            is the one thing the card can say without measuring
@@ -2218,6 +2242,39 @@
 {/if}
 
 <style>
+  .provider-search { display: block; margin-top: var(--space-3); }
+  .provider-search input { width: 100%; }
+  .provider-permissions, .local-setup-tools { margin-block: var(--space-3); }
+  .provider-permissions summary, .local-setup-tools summary, .provider-facts summary {
+    color: var(--text-2); font-size: var(--text-sm); cursor: pointer;
+  }
+  .provider-grid.compact-providers { grid-template-columns: minmax(0, 1fr); gap: 0; }
+  .compact-providers .provider-card {
+    display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: var(--space-1) var(--space-3);
+    box-shadow: none; border: 0; border-radius: 0;
+    border-bottom: 1px solid var(--border); padding: var(--space-3) 0;
+  }
+  .compact-providers .provider-card > :global(*) { min-width: 0; grid-column: 1 / -1; }
+  .compact-providers .provider-card .pc-head { grid-column: 1; margin-bottom: var(--space-1); }
+  .compact-providers .provider-card .pc-status,
+  .compact-providers .provider-card .pc-model,
+  .compact-providers .provider-card .chips,
+  .compact-providers .provider-card .provider-facts { grid-column: 1; }
+  .compact-providers .provider-card .pc-actions {
+    grid-column: 2; grid-row: 1 / span 3; align-self: center;
+    justify-content: flex-end; margin: 0;
+  }
+  .compact-providers .pc-status { margin-block: var(--space-1); }
+  .compact-providers .pc-actions { margin-top: var(--space-2); }
+  .compact-providers .chips { margin-block: var(--space-1); }
+  .provider-facts { margin-block: var(--space-2); }
+  .local-list { container-type: inline-size; }
+  @container (max-width: 640px) {
+    .local-list .local-row { display: grid; grid-template-columns: auto minmax(0, 1fr); }
+    .local-row .row-main { min-width: 0; }
+    .local-row .row-usage, .local-row .row-actions { grid-column: 2; }
+  }
+
   .head-actions {
     display: flex;
     align-items: center;
@@ -2267,6 +2324,7 @@
   }
   .step-line {
     display: flex;
+    flex-wrap: wrap;
     gap: var(--space-3);
     margin: 0;
     color: var(--text-3);
@@ -2325,6 +2383,7 @@
   
   .section-heading {
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
     justify-content: space-between;
     gap: var(--space-4);
@@ -2577,13 +2636,13 @@
     margin-top: 0.2rem;
   }
   .pc-connect {
-    background: var(--brand);
-    border-color: var(--brand);
-    color: var(--brand-black);
+    background: var(--accent);
+    border-color: var(--accent);
+    color: var(--text-inverse);
   }
   .pc-connect:hover:not(:disabled) {
-    background: color-mix(in srgb, var(--brand) 88%, var(--brand-black));
-    border-color: color-mix(in srgb, var(--brand) 88%, var(--brand-black));
+    background: var(--accent-strong);
+    border-color: var(--accent-strong);
   }
 
   .chips {
@@ -2634,11 +2693,12 @@
     z-index: var(--z-scrim);
   }
   .signin-dialog {
+    max-height: calc(100dvh - var(--space-6));
+    overflow-y: auto;
     position: relative;
     width: min(100%, 26rem);
     background: var(--surface);
     border: 1px solid var(--border-strong);
-    border-top: 4px solid var(--brand);
     border-radius: var(--r-lg);
     box-shadow: var(--shadow-2);
     padding: 1.6rem 1.5rem 1.3rem;

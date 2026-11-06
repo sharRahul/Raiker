@@ -660,7 +660,7 @@ test("Models names providers in plain language and offers a real model list", as
   // QUI-L08 — Add model is a dialog; a source names the step it opens on.
   await page.goto("http://127.0.0.1:8765/#/models?tab=add&source=account");
   const add = page.getByRole("dialog", { name: "Add model" });
-  await expect(add.getByRole("heading", { name: "Your hosted providers" })).toBeVisible();
+  await expect(add.getByRole("heading", { name: "Choose a provider" })).toBeVisible();
   // The internal profile id is never the thing the owner is shown.
   await expect(page.getByText("anthropic-hosted")).toHaveCount(0);
   // One visible action per provider row. Browsing a provider's

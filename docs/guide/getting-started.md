@@ -433,10 +433,9 @@ filters (*All · Chats · Tasks · Memories · Settings · Help*) to narrow it t
 one kind. On a phone More is a full-height sheet with **Back**,
 and it says which page you are on.
 
-**More was a gear**, and it opened a window that could not take you to Settings:
-its ten sections were listed, the destination itself was not. A gear promises the
-settings screen everywhere else you have used a computer, so it is named for what
-it is now, and Settings leads the window.
+The settings **cog** in the top bar opens this dropdown. **Settings** leads its
+settings group; the other groups still provide quick access to the less frequent
+pages. Search remains in the command palette.
 
 **Home** is one column. It opens with a greeting for your time of day and a
 composer: what you type there, and any file you add with **Add attachment**,

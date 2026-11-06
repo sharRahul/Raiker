@@ -17,7 +17,7 @@ test("RT-MODEL-RECOVERY-01: library read failure offers recovery on a phone", as
   await signInAsOwner(page, BASE);
   await page.setViewportSize({ width: 390, height: 844 });
   await page.route("**/api/model-library", route => route.fulfill(fail));
-  await page.goto(SETTINGS);
+  await page.goto(`${SETTINGS}&modelsPanel=library`);
   const alert = page.getByRole("alert").filter({ hasText: "Could not load the local model library" });
   await expect(alert).toContainText("Reopen this panel");
   await expect(page.getByText("Loading your model library…", { exact: true })).toHaveCount(0);
@@ -27,7 +27,7 @@ test("RT-MODEL-RECOVERY-01: library read failure offers recovery on a phone", as
 test("RT-MODEL-RECOVERY-02: scan failure retains its recovery step", async ({ page }) => {
   await signInAsOwner(page, BASE);
   await page.route("**/api/model-library/rescan", route => route.fulfill(fail));
-  await page.goto(SETTINGS);
+  await page.goto(`${SETTINGS}&modelsPanel=library`);
   await page.getByRole("button", { name: "Scan now", exact: true }).click();
   const alert = page.getByRole("alert").filter({ hasText: "Could not scan the approved model folders" });
   await expect(alert).toContainText("Choose Scan now");
@@ -46,7 +46,7 @@ for (const action of ["retry", "cancel", "inspect", "clear"] as const) {
       }] }),
     }));
     await page.route("**/api/model-operations/mop_recovery_ui**", route => route.fulfill(fail));
-    await page.goto(SETTINGS);
+    await page.goto(`${SETTINGS}&modelsPanel=activity`);
     const job = page.getByRole("article").filter({ hasText: "Recovery test job" });
     if (action === "retry" || action === "cancel") {
       await job.getByRole("button", { name: action === "retry" ? "Retry" : "Cancel", exact: true }).click();

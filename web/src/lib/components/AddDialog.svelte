@@ -58,6 +58,19 @@
   );
   const chosenOption = $derived(options.find((option) => option.id === chosen) ?? null);
 
+  // Each source is a new short task. Preserve form state, but start its view
+  // at the heading instead of inheriting another source's scroll position.
+  $effect(() => {
+    const selected = chosen;
+    const element = dialogElement;
+    if (!element) return;
+    queueMicrotask(() => {
+      element.scrollTop = 0;
+      element.querySelector<HTMLElement>(selected === null ? 'input[type="search"]' : "header button")
+        ?.focus({ preventScroll: true });
+    });
+  });
+
   onMount(() => {
     const returnFocus =
       document.activeElement instanceof HTMLElement ? document.activeElement : null;

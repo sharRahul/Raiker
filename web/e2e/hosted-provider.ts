@@ -257,7 +257,7 @@ export async function dismissFirstRunModelSetup(page: Page): Promise<boolean> {
  * provider cards on it at all. This helper still waited for a `Hosted` tab, so
  * eighteen specs timed out before their first assertion, and the failure looked
  * like a broken product rather than a stale harness. It waits for the section
- * heading now: `Your hosted providers` is what the redesign actually renders,
+ * heading now: `Choose a provider` is what the page actually renders,
  * and unlike a tab name it is the thing the cards are under.
  */
 export async function openHostedProviders(
@@ -269,7 +269,7 @@ export async function openHostedProviders(
   // router such as OpenRouter is under Custom endpoint, everything else an
   // owner signs in to under An account I have.
   const hosted = page.getByRole("heading", {
-    name: source === "account" ? "Your hosted providers" : "Advanced connections",
+    name: source === "account" ? "Choose a provider" : "Choose a connection",
   });
   const wizard = page.locator("#setup-title");
   for (let attempt = 0; attempt < 3; attempt += 1) {

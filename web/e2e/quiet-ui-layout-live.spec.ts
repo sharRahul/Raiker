@@ -156,7 +156,7 @@ test("RT-QUI-21 — Models: Add model in three steps connects Anthropic and make
   await capture(page, `${SHOTS}/21-add-model-step-1.png`);
   await dialog.getByRole("button", { name: /An account I have/ }).click();
   await expect(dialog.getByText("2 · An account I have")).toBeVisible();
-  await expect(dialog.getByRole("heading", { name: "Your hosted providers" })).toBeVisible();
+  await expect(dialog.getByRole("heading", { name: "Choose a provider" })).toBeVisible();
   await expect(dialog.getByRole("heading", { name: "On this device" })).toHaveCount(0);
   const card = dialog.locator("article.provider-card").filter({ hasText: "Anthropic" }).first();
   // A rerun on the same workspace finds Anthropic connected already.

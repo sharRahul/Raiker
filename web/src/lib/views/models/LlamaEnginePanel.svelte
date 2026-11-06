@@ -25,7 +25,7 @@
     slotTone,
   } from "../../llamaRuntime";
 
-  let { onchanged }: { onchanged?: () => void } = $props();
+  let { onchanged, active = true }: { onchanged?: () => void; active?: boolean } = $props();
 
   let overview = $state<LlamaRuntimeOverview | null>(null);
   let operations = $state<ModelOperation[]>([]);
@@ -81,7 +81,7 @@
 
   function schedule() {
     if (timer) clearTimeout(timer);
-    timer = settling ? setTimeout(() => void load(), 2000) : null;
+    timer = settling ? setTimeout(() => { if (active) void load(); else schedule(); }, 2000) : null;
   }
 
   async function install() {

@@ -1374,3 +1374,19 @@ stop/resume lifecycle, or a write whose provider committed before its response
 was lost. Those require owner-authorized provider/server acceptance fixtures.
 The broader error audit, optimistic rollback, size gates and five-person study
 remain open; no beta acceptance gate is closed by this slice.
+
+## Models simplification — remaining release evidence
+
+The owner-requested UI refinement is recorded in
+[01 Layout system and pages](quiet-ui/01_LAYOUT_SYSTEM_AND_PAGES.md#2026-11-06--owner-requested-models-simplification)
+and [FIXED-1291](FIXED_ITEMS.md#fixed-1291--models-dialogs-were-crowded-and-model-settings-showed-every-task-at-once).
+Linux running-host checks cover the layout and navigation. Declared model and
+Hugging Face read fixtures exercise details, picker and long-name layout
+without credentials, downloads or inference. A separate owner-authorized UI
+run passed key/workspace entry, catalogue selection, readiness and real Chat
+answers for Anthropic, OpenRouter and OpenAI; see the
+[provider results](../architecture/WEB_APP_LIVE_TEST.md#result--2026-11-06-real-provider-ui-validation).
+Managed-engine/download, provider failure/timeout recovery, complete beta
+journeys and Windows/macOS installer acceptance still need evidence. Those gates and
+the existing usability/screen-reader qualification remain open in
+[BETA_RELEASE_PLAN.md](BETA_RELEASE_PLAN.md) and [TESTING.md](TESTING.md).

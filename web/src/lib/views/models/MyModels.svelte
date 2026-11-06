@@ -44,6 +44,7 @@
     onstart,
     ondetails,
     onadd = () => {},
+    showAddAction = true,
     onchanged,
   }: {
     profiles: ModelProfile[];
@@ -57,6 +58,7 @@
     ondetails: (profile: ModelProfile) => void;
     /** Opens the Add model dialog. */
     onadd?: () => void;
+    showAddAction?: boolean;
     onchanged?: () => void;
   } = $props();
 
@@ -183,7 +185,7 @@
     body="Connect a provider or set up a local model server, and every model you add appears here."
   >
     {#snippet action()}
-      <button type="button" class="btn btn-primary" onclick={onadd}>Add a model</button>
+      {#if showAddAction}<button type="button" class="btn btn-primary" onclick={onadd}>Add a model</button>{/if}
     {/snippet}
   </EmptyState>
 {:else}
@@ -252,6 +254,8 @@
             onclick={() => openModelSetup(profile, readinessForProfile(profile))}
           >Configure provider</button>
         </div>
+        <details class="model-options">
+          <summary>Default models</summary>
         <div class="defaults" role="group" aria-label={`Use ${rowName(profile)} by default in`}>
           {#each WORK_SURFACES as surface (surface)}
             <button
@@ -262,13 +266,19 @@
             >Set as {SURFACE_LABEL[surface]} default</button>
           {/each}
         </div>
-        <ProviderUsagePanel provider={profile.provider} />
+        </details>
+        <details class="model-options">
+          <summary>Usage and spending</summary>
+          <ProviderUsagePanel provider={profile.provider} />
+        </details>
       </article>
     {/snippet}
   </ListDetail>
 {/if}
 
 <style>
+  .model-options summary { cursor: pointer; color: var(--text-2); font-size: var(--text-sm); }
+  .model-options[open] summary { margin-bottom: var(--space-3); }
   .model-detail {
     display: grid;
     gap: var(--space-3);

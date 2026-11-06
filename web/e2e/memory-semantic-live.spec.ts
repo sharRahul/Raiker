@@ -30,6 +30,7 @@ test("managed content exposes governed semantic indexing and curated local acqui
   // and states the size before anything is downloaded. Asserted through the
   // region's accessible name rather than a heading: it is a labelled region
   // with a strong lead line, which is what the tab actually renders.
+  await page.getByText("Embedding model for Memory", { exact: true }).click();
   const curated = page.getByRole("region", { name: "Curated local embedding model" });
   await expect(curated).toBeVisible({ timeout: 60_000 });
   await expect(curated.getByText(/Nomic Embed Text v1\.5 · GGUF · Apache-2\.0/)).toBeVisible();

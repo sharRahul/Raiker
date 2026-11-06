@@ -129,7 +129,6 @@
       aria-label="Close model details"
       onclick={() => onclose()}>×</button
     >
-    <p class="eyebrow">Model details</p>
     <div class="details-heading">
       <ProviderLogo provider={profile.provider} size={28} />
       <h2 id="model-details-title">{profileLabel(profile)}</h2>
@@ -164,6 +163,11 @@
         <dt>Context capacity</dt>
         <dd>{contextCapacity(profile)}</dd>
       </div>
+    </dl>
+    <details class="additional-details">
+      <summary>Usage and limits</summary>
+      <dl class="details-grid">
+        {#if !profile.off_machine}
       <div>
         <dt>Local refresh</dt>
         <dd>
@@ -174,6 +178,8 @@
             : "Scheduled for when this local model server is available"}
         </dd>
       </div>
+      {/if}
+
       <div>
         <dt>Current context usage</dt>
         <dd>
@@ -187,7 +193,9 @@
           weekly limits when an authorized provider API exposes them.
         </dd>
       </div>
-    </dl>
+      </dl>
+    </details>
+
     {#if profile.connection_configured}
       <div class="details-actions">
         <button
@@ -232,8 +240,9 @@
     {#if capacities?.can_override && profile.model && !profile.model.includes("<")}
       <!-- Context-length override: an exact window when the provider does
            not say, or says something wrong. Kept with a reason, in history. -->
+      <details class="additional-details">
+        <summary>Context window override</summary>
       <form class="capacity-form" onsubmit={(e) => { e.preventDefault(); void saveCapacity(false); }}>
-        <h3>Context window override</h3>
         <label>
           <span>Tokens</span>
           <input type="number" min="1024" step="1" inputmode="numeric" bind:value={capacityTokens} placeholder={profile.context_window_tokens ? String(profile.context_window_tokens) : "e.g. 65536"} />
@@ -250,6 +259,7 @@
         </div>
         {#if capacityNote}<p class="note" role="status">{capacityNote}</p>{/if}
       </form>
+      </details>
     {/if}
     {#if capacityEntry?.history.length}<details>
         <summary>Administrator override history</summary>
@@ -265,6 +275,8 @@
 </div>
 
 <style>
+  .additional-details { margin-top: var(--space-4); }
+  .additional-details summary { cursor: pointer; color: var(--text-2); font-size: var(--text-sm); }
   /* ── Details modal ── */
   .details-overlay {
     align-items: center;
@@ -277,6 +289,8 @@
     z-index: var(--z-scrim);
   }
   .details-dialog {
+    max-height: calc(100dvh - var(--space-6));
+    overflow-y: auto;
     max-width: 42rem;
     position: relative;
     width: min(100%, 42rem);
@@ -326,7 +340,7 @@
     flex-wrap: wrap;
   }
   .server-check, .capacity-form { border-top: 1px solid var(--border); margin-top: .9rem; padding-top: .8rem; display: grid; gap: .45rem; }
-  .server-check h3, .capacity-form h3 { margin: 0; font-size: var(--text-md); }
+  .server-check h3 { margin: 0; font-size: var(--text-md); }
   .hint, .note { margin: 0; color: var(--text-3); font-size: var(--text-sm); }
   .check-result { display: grid; gap: .3rem; margin: 0; }
   .check-result div { display: flex; gap: .6rem; }

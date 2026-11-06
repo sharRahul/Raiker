@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/svelte";
+import { render, screen, waitFor } from "@testing-library/svelte";
 import { fireEvent } from "@testing-library/dom";
 import { describe, expect, it, vi } from "vitest";
 import AddDialogHarness from "./AddDialogHarness.test.svelte";
@@ -57,4 +57,18 @@ describe("AddDialog (QUI-L04)", () => {
     await fireEvent.click(screen.getByRole("button", { name: "Close" }));
     expect(onclose).toHaveBeenCalledTimes(1);
   });
+});
+
+
+it("starts each chosen task at its heading and returns keyboard focus to search", async () => {
+  render(AddDialogHarness);
+  const dialog = screen.getByRole("dialog", { name: "Add connection" });
+  dialog.scrollTop = 180;
+  await fireEvent.click(screen.getByRole("button", { name: /Slack/ }));
+  await waitFor(() => expect(dialog.scrollTop).toBe(0));
+  expect(screen.getByRole("button", { name: "Back" })).toHaveFocus();
+  dialog.scrollTop = 120;
+  await fireEvent.click(screen.getByRole("button", { name: "Back" }));
+  await waitFor(() => expect(dialog.scrollTop).toBe(0));
+  expect(screen.getByRole("searchbox", { name: "Search services" })).toHaveFocus();
 });

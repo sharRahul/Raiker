@@ -321,7 +321,6 @@
   <section class="search-hero">
     <div class="hf-brand"><ProviderLogo provider="huggingface" size={40} /></div>
     <div>
-      <p class="eyebrow">Hugging Face</p>
       <h2>Find a model for this machine</h2>
       <p>
         Raiker prefers ready-to-run GGUF files. Safetensors can be downloaded
@@ -341,9 +340,10 @@
       </li>
     {/each}
   </ol>
+  <details class="embedding-choice">
+    <summary>Embedding model for Memory</summary>
   <section class="card curated-embedding" aria-label="Curated local embedding model">
     <div>
-      <p class="eyebrow">Curated for semantic recall</p>
       <strong>Nomic Embed Text v1.5 · GGUF · Apache-2.0</strong>
       <p>
         The recommended Q4_K_M variant is about 81 MiB. Raiker resolves the
@@ -356,6 +356,7 @@
       onclick={() => void chooseRepo("nomic-ai/nomic-embed-text-v1.5-GGUF")}
     >Review variants</button>
   </section>
+  </details>
   <!-- This appears when the repository in front of the owner
        actually needs it. As a permanent hero button beside the search box it
        told every owner that signing in to Hugging Face was a normal part of
@@ -452,7 +453,7 @@
           >{#if item.gated}<em>Access gated</em>{/if}</button
         >{/each}
     </section>
-    <section class="variants" aria-label="Model download options">
+    <section class="variants" class:unselected={selectedRepo === null} aria-label="Model download options">
       {#if selectedRepo === null}<div class="empty">
           <strong>No repository selected</strong><span
             >Choose a result to compare formats, quantizations, size, and
@@ -460,7 +461,6 @@
           >
         </div>
       {:else}<header>
-          <p class="eyebrow">Immutable snapshot</p>
           <h3>{selectedRepo}</h3>
         </header>
         {#if variants.length === 0}<p class="empty-copy">
@@ -494,7 +494,6 @@
 
   {#if selected}<section class="download-drawer card">
       <div>
-        <p class="eyebrow">Review download</p>
         <h3>
           {selected.format === "gguf"
             ? `Download ${selected.quantization ?? "GGUF"}`
@@ -522,7 +521,7 @@
         type="button"
         disabled={!destination || preview === null}
         onclick={() => void download()}>Confirm download</button
-      >{#if !destination}<a href="#/models"
+      >{#if !destination}<a href="#/settings?tab=advanced&kind=models&modelsPanel=library"
           >Approve a model folder first →</a
         >{/if}
     </section>{/if}
@@ -659,13 +658,16 @@
     text-decoration: underline;
   }
   .hf-shell {
+    min-width: 0;
+    container-type: inline-size;
+    grid-template-columns: minmax(0, 1fr);
     --text-muted: var(--text-2);
     display: grid;
     gap: 18px;
   }
   .search-hero {
     display: grid;
-    grid-template-columns: 56px 1fr auto;
+    grid-template-columns: 56px minmax(0, 1fr);
     align-items: start;
     gap: 16px;
     padding: 18px 4px;
@@ -722,9 +724,9 @@
   }
   .catalogue {
     display: grid;
-    grid-template-columns: minmax(270px, 0.8fr) minmax(340px, 1.2fr);
+    grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr);
     gap: 14px;
-    min-height: 340px;
+    min-height: 0;
   }
   .results,
   .variants {
@@ -906,5 +908,18 @@
       align-items: flex-start;
       flex-direction: column;
     }
+  }
+  .hf-shell > :global(*) { min-width: 0; }
+  .search-box input { min-width: 0; width: 100%; }
+  .repo, .variants h3 { overflow-wrap: anywhere; }
+  .embedding-choice summary { color: var(--text-2); cursor: pointer; font-size: var(--text-sm); }
+  .embedding-choice[open] summary { margin-bottom: var(--space-3); }
+  @container (max-width: 760px) {
+    .catalogue, .download-drawer, .conversion-card { grid-template-columns: minmax(0, 1fr); }
+    .catalogue .results { max-height: 22rem; overflow-y: auto; }
+    .catalogue .variants.unselected { display: none; }
+    .curated-embedding { align-items: flex-start; flex-direction: column; }
+    .search-box { grid-template-columns: minmax(0, 1fr) auto; }
+    .token-card { grid-template-columns: minmax(0, 1fr); }
   }
 </style>

@@ -5,6 +5,7 @@
   import type { ModelOperation, PartialFiles } from "../../apiTypes";
   import { formatBytes } from "../../composerAttachments.svelte";
   import RowOverflow from "../../components/RowOverflow.svelte";
+  let { active = true }: { active?: boolean } = $props();
   let items = $state<ModelOperation[]>([]);
   let error = $state<string | null>(null);
   let actionError = $state<string | null>(null);
@@ -108,7 +109,7 @@
   function schedule() {
     const anyRunning = items.some((item) => !terminal(item.state));
     timer = window.setTimeout(async () => {
-      if (document.visibilityState === "visible") await load();
+      if (active && document.visibilityState === "visible") await load();
       schedule();
     }, anyRunning ? ACTIVE_POLL_MS : IDLE_POLL_MS);
   }
@@ -137,7 +138,6 @@
 <section class="activity" aria-labelledby="activity-title">
   <header>
     <div>
-      <p class="eyebrow">Durable operations</p>
       <h2 id="activity-title">Downloads and model jobs</h2>
       <p>
         Jobs survive navigation and interrupted app sessions. Failed work is

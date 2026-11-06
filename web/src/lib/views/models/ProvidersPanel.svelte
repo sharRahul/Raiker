@@ -115,8 +115,7 @@
 <section class="runtime-setup" aria-labelledby="runtime-setup-title">
   <header>
     <div>
-      <p class="eyebrow">Local model setup</p>
-      <h2 id="runtime-setup-title">Install, connect, or pull</h2>
+      <h2 id="runtime-setup-title">Local server tools</h2>
     </div>
     <p>
       Installers always come from the vendor. Raiker never bundles them or
@@ -177,8 +176,8 @@
         >{busy === "lm-studio-desktop"
           ? "Opening…"
           : "Open official download"}</button
-      ><a href="#local-library"
-        >Use models LM Studio already downloaded ↓</a
+      ><a href="#/settings?tab=advanced&kind=models&modelsPanel=library"
+        >Use models LM Studio already downloaded</a
       >
     </article>
   </div>
@@ -191,6 +190,8 @@
 </section>
 
 <style>
+  .runtime-setup { container-type: inline-size; }
+
   .runtime-setup {
     --text-muted: var(--text-2);
     display: grid;
@@ -271,4 +272,9 @@
       flex-direction: column;
     }
   }
+  @container (max-width: 640px) {
+    .runtime-setup > header { display: block; }
+    .runtime-grid { grid-template-columns: minmax(0, 1fr); }
+  }
+
 </style>

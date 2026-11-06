@@ -267,3 +267,35 @@ Kept from the October decision record:
   workspace ([07, QUI-G01](07_QUICK_FIXES_AND_QUALITY.md)).
 * No destination shows a catalogue of things that could be added.
 * Every removed page's old address opens its new home.
+
+## 2026-11-06 — Owner-requested Models simplification
+
+The owner requested a cog in place of the top-bar settings dropdown's three
+dots, and simpler Models and all its subpages. This supersedes the earlier
+REM-POPUP-01 icon choice; the dropdown keeps its existing destinations.
+The following refinement applies QUI-L03/L04/L08 and the Quiet UI principles:
+short pages, one next action, technical detail on request, truthful status.
+
+1. [x] Restore the settings cog without changing the dropdown destinations.
+2. [x] Remove duplicate first-use Add actions and irrelevant comparison controls.
+3. [x] Keep model defaults and usage available without showing every edit at once.
+4. [x] Make Add's provider privacy/network details a disclosure.
+5. [x] Remove repeated source headings and decorative eyebrows.
+6. [x] Make hosted/custom provider choices compact rows.
+7. [x] Keep provider connection/readiness and consequential privacy facts visible.
+8. [x] Separate optional local installation/pull tools from choosing a local server.
+9. [x] Make local rows fit the Add dialog without squeezing text into a sliver.
+10. [x] Fit Hugging Face's catalogue to its actual panel, including search and review.
+11. [x] Reduce Hugging Face's repeated introductory content.
+12. [x] Keep model details short; put telemetry and context overrides on request.
+13. [x] Separate serving, library, activity and advanced model settings.
+14. [x] Keep Work defaults/fallback disclosures visible outside tuning controls.
+15. [x] Verify keyboard navigation, both themes and supported laptop widths;
+    update retained tests, guide, fixed-item evidence and CI.
+
+Implementation and running-host evidence are recorded in
+[Live Test docs](../../architecture/WEB_APP_LIVE_TEST.md#result--2026-11-06-models-simplification-and-settings-cog).
+
+No model/provider choice, capability, permission, fallback, credential scope or
+billing rule changes. Existing addresses remain supported. This document stays
+open for its unrelated QUI-L11 and acceptance work.

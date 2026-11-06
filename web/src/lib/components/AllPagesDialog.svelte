@@ -8,9 +8,8 @@
    * differs: deep links resolve, and `nav.ts` holds every destination in
    * `NAV_GROUPS` because `routeFromHash` resolves against it.
    *
-   * **REM-POPUP-01 — it is `More`, and it says so.** A gear means "the settings
-   * screen"; this is an overflow control and a route launcher, so it is named
-   * after what it is, and a direct link to Settings leads its Settings group.
+   * Owner decision, 2026-11-06: the top-bar trigger is a settings cog.
+   * This launcher still leads its Settings group with a direct Settings link.
    *
    * **UX-SETPOP-04 — grouped by what an owner comes to do.** Review, Connect,
    * Settings, then Diagnostics & help last, read from `PRODUCT_AREAS` on the

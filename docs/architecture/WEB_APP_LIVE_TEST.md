@@ -1353,3 +1353,100 @@ screen-reader evaluation. No five-person study, real server process lifecycle,
 provider-side timeout-after-commit drill, Windows/macOS browser round or beta
 journey is claimed. The broader audit remains in
 [TO_BE_FIXED.md](../plans/TO_BE_FIXED.md#qui-g06-connection-slice--remaining-acceptance-evidence).
+
+## Result — 2026-11-06 Models simplification and settings cog
+
+**Candidate and run.** `fc4e5479` plus the owner-requested Models changes;
+`2026-11-06-models-simplification`, Linux Codespace, Node 24, Python 3.14,
+managed Playwright Chromium. The same disposable workspace and real owner UI
+as the connection-recovery run above. No provider credential, model selection,
+default change, inference, download or external effect is performed. No provider
+charges. The earlier plan's runtime authority and billing rules are unchanged.
+
+**Scope and fixtures.** RT-MODELS-SIMPLE-01 drives the actual Models page, all
+four Add sources and every model-settings section. A declared Hugging Face
+trending response supplies a long repository name to test layout without
+relying on internet search availability. RT-MODELS-SIMPLE-02 supplies a declared
+Anthropic model read snapshot, capacity metadata and a two-model catalogue so
+the details and picker can be inspected without saving a key or choosing a
+model. These are UI/read-model fixtures, not provider acceptance evidence.
+
+| Case | Owner action | Required evidence |
+|---|---|---|
+| RT-MODELS-SIMPLE-01 | Open Models, inspect all four Add sources, filter providers, open every model-settings section, revisit Hugging Face in dark at 1280×800, close Add and open the settings cog | Empty inventory has no useless comparison switch; source headings and local descriptions fit; search filters by provider; no Add dialog overflows horizontally; optional local installation is folded; Running models, Library, Activity and Advanced each have their own address; Work defaults stays outside every panel; the cog opens the existing Settings link |
+| RT-MODELS-SIMPLE-02 | Open a declared model's details, reveal its context override, then open its provider's picker | Advanced controls remain reachable, the draft controls fit a bounded dialog, and the two catalogue choices are visible; no save, selection or credential write occurs |
+| Retained recovery cases | Open Library for failed read/scan and Activity for failed retry/cancel/inspection/record cleanup | The six existing RT-MODEL-RECOVERY cases still reach their actions after the settings split |
+
+**Reproduce.** Build the web app, start the disposable `raiker-web` host, then
+run `./web/node_modules/.bin/playwright test --config web/playwright.config.ts
+--project=live web/e2e/models-simplification-live.spec.ts --workers=1` from the
+repository root. The earlier recovery cases run with the same command and
+`web/e2e/model-error-recovery-live.spec.ts`.
+
+**Artifacts.** Before/after captures and manifests are local ignored evidence
+under `output/playwright/2026-11-06-models-simplification/`. Captures include
+1440×900 light, 1280×800 dark, every model-settings section, model details,
+picker and the settings dropdown. Dialog captures target the dialog itself;
+page captures include the shell. The before run exposed a stale test heading,
+and preliminary after runs exposed an insufficient load wait and an attempted
+menu click before closing Add. Those runs are not counted as passes. A renderer
+crash and interrupted local checks are also excluded; final checks are run
+without concurrent browser/type-check pressure.
+
+**Outcome: passed, 8/8 retained browser cases:** two layout cases and the six
+existing model-recovery cases. Local regressions passed **278/278** across
+21 files; the subsequent panel-activation/shared-dialog run passed **87/87**.
+Final Svelte/design-token checks passed with **0 errors / 0 warnings**; ESLint,
+production build and **25/25** documentation/governance checks passed. The
+Impeccable detector reported no remaining findings in the changed UI files.
+Screenshot review confirmed bounded details/picker dialogs, fitted local and
+Hugging Face content, all four settings sections and the cog dropdown.
+
+**Limits.** This layout run does not qualify provider sign-in or inference;
+the separate real-provider run below covers those. Managed downloads, native
+Windows/macOS layouts, screen readers and the five-person study remain in
+[TO_BE_FIXED.md](../plans/TO_BE_FIXED.md#models-simplification--remaining-release-evidence).
+
+
+## Result — 2026-11-06 Real provider UI validation
+
+**Candidate and authority.** The same Models working tree as the layout run,
+Linux Codespace and Playwright Chromium; explicit owner authorization supplied
+three API keys and an Anthropic workspace ID for real end-to-end testing.
+`models-provider-validation-live.spec.ts` reads a private ephemeral credential
+file and enters every key through the password field in the normal Connect or
+Reconnect dialog. Anthropic's workspace is entered through Advanced. No direct
+credential API seed, mocked provider response or permission bypass is used.
+Saved credentials remain encrypted in the disposable workspace; keys are never
+included in committed source, screenshots or this record.
+
+| Case | Exact provider/profile/model | Observed result |
+|---|---|---|
+| RT-MODELS-PROVIDER-anthropic | Anthropic / `anthropic-hosted` / `claude-haiku-4-5-20251001` | UI connection and catalogue succeeded; readiness passed; 17 + 25 returned 42 |
+| RT-MODELS-PROVIDER-openrouter | OpenRouter / `openrouter-policy-gated` / `openai/gpt-4o-mini` | UI connection and catalogue succeeded; readiness passed; 19 + 24 returned 43 |
+| RT-MODELS-PROVIDER-openai | OpenAI / `openai-hosted` / `gpt-4o-mini` | UI connection and catalogue succeeded; readiness passed; 21 + 23 returned 44 |
+
+**Outcome: passed, 3/3 final cases (3.7 minutes).** The browser selected each
+model in the composer and asserted both exact request fields before inspecting
+the actual assistant answer. Each case checked that its saved key was not
+rendered back into page markup. Catalogue, readiness and real-turn captures
+were visually reviewed. A preliminary Anthropic marker prompt received a real
+Haiku refusal because it resembled an identity claim; that assertion failure
+is excluded. The final run used ordinary arithmetic and all three passed.
+Real provider calls were made and can incur normal account charges; no total
+cost is asserted from these checks.
+
+**Reproduce and artifacts.** With a private mode-0600 JSON credential file,
+set `RAIKER_LIVE_CREDENTIALS_FILE` to its path and run the live project with
+`web/e2e/models-provider-validation-live.spec.ts`, one worker, against the
+disposable host. The file uses `anthropic`, `workspace`, `openrouter` and
+`openai` keys. The run's plaintext credential file was deleted after validation;
+the test host was stopped and a repository scan found no supplied credential.
+With no path the cases skip.
+Secret-free captures, manifest and `outcomes.json` are local ignored artifacts
+under `output/playwright/2026-11-06-models-real-providers/`.
+
+**Limits.** This proves the three observed hosted Chat paths. It does not
+qualify billing accuracy, every model, failure/timeout recovery, downloads,
+managed local engines, full beta journeys or native Windows/macOS acceptance.
+Those gates remain in [TO_BE_FIXED.md](../plans/TO_BE_FIXED.md#models-simplification--remaining-release-evidence).

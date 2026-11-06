@@ -1,11 +1,12 @@
 <script lang="ts">
-  import { onMount } from "svelte";
+  import { untrack } from "svelte";
   import { api } from "../../api";
   import type { LocalModel, ModelProfile } from "../../apiTypes";
   import ProviderLogo from "../../components/ProviderLogo.svelte";
 
   let {
     provider,
+    active = true,
     title,
     format,
     profiles,
@@ -18,6 +19,7 @@
     selecting = false,
     testResult = null,
   }: {
+    active?: boolean;
     provider: "llama.cpp" | "mlx";
     title: string;
     format: "gguf" | "mlx";
@@ -119,7 +121,7 @@
     }
   }
 
-  onMount(load);
+  $effect(() => { if (active) untrack(() => { void load(); }); });
 </script>
 
 <article class="local-row framework-row" role="group" aria-label={title} data-provider={provider}>

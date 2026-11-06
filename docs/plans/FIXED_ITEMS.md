@@ -1595,6 +1595,8 @@ file you can open. The two capture sets that remain — `screenshots/pages/` and
 | [FIXED-1288](#fixed-1288--connection-failures-claimed-rollback-or-lost-their-recovery-message-qui-g06) | Medium | Connections / error recovery | Fixed |
 | [FIXED-1289](#fixed-1289--adding-a-service-lost-its-sign-in-step-after-installation) | Medium | Connections / Add dialog | Fixed |
 | [FIXED-1290](#fixed-1290--the-server-rename-row-clipped-cancel-at-200-percent-zoom) | Low | Connections / zoom layout | Fixed |
+| [FIXED-1291](#fixed-1291--models-dialogs-were-crowded-and-model-settings-showed-every-task-at-once) | Medium | Models / owner-requested simplification | Fixed |
+| [FIXED-1292](#fixed-1292--add-dialogs-carried-scroll-and-lost-keyboard-focus-between-sources) | Low | Shared Add dialogs | Fixed |
 
 ---
 
@@ -38774,3 +38776,51 @@ losing the draft or error message.
 **Evidence.** RT-CONNECTION-RECOVERY-10 now asserts that Cancel is in the
 viewport and fully inside its card before recording the zoom screenshot; see
 [Live Test docs](../architecture/WEB_APP_LIVE_TEST.md#result--2026-11-06-qui-g06-connection-recovery).
+
+## FIXED-1291 — Models dialogs were crowded and model settings showed every task at once
+
+**Severity: Medium. Area: Models / UI. Status: Fixed 2026-11-06.**
+
+**Observed.** The owner requested simpler Models and every subpage, and a cog
+for the settings dropdown. Models repeated Add actions on an empty inventory.
+Add mixed setup guidance, policy counters and large provider cards; local rows
+squeezed their descriptions, and Hugging Face exceeded its dialog's width.
+Runtime settings mounted serving, folders, defaults, tuning and activity at once.
+
+**Fixed.** Applied the documented QUI-L03/L04/L08 refinement in
+[01 Layout system and pages](quiet-ui/01_LAYOUT_SYSTEM_AND_PAGES.md#2026-11-06--owner-requested-models-simplification).
+The dropdown now uses the shared cog icon. Provider choices are searchable,
+compact rows; permissions/network and optional installation tools are
+available in disclosures. Privacy, cost and readiness remain reviewable, and
+configured-provider readiness remains visible. Local rows and Hugging Face
+adapt to the panel's width. Details and picker dialogs have bounded scrolling;
+context overrides, telemetry, per-surface defaults and usage are on request.
+Model serving separates Running models, Library, Activity and Advanced, keeping
+Work defaults/effective-model facts visible above every section. Visited sections
+retain unsaved entries; hidden Activity/engine panels pause their background
+reads. Old library,
+activity and routing addresses forward to the appropriate section. Links to
+approve a folder now open Library directly. No provider, policy, fallback or
+billing behavior changed.
+
+**Evidence.** Focused model/panel, shared-dialog, navigation, copy and guide
+regressions; running-host browser scenarios RT-MODELS-SIMPLE-01/02, screenshots
+and declared fixture boundaries are recorded in
+[WEB_APP_LIVE_TEST.md](../architecture/WEB_APP_LIVE_TEST.md#result--2026-11-06-models-simplification-and-settings-cog).
+
+## FIXED-1292 — Add dialogs carried scroll and lost keyboard focus between sources
+
+**Severity: Low. Area: Shared Add dialogs. Status: Fixed 2026-11-06.**
+
+**Observed.** The Models screenshot review showed a newly chosen source with
+its heading clipped because it inherited the previous source's scroll position.
+The selected option also disappeared without moving focus to the new step.
+
+**Fixed.** A source change starts at its heading and focuses Back. Returning to
+the catalogue resets its scroll and focuses search. Form state stays in the
+owning view, so a refresh of the same source does not reset an entry.
+
+**Evidence.** AddDialog's task-transition regression checks scroll reset and
+keyboard focus in both directions. The Models browser run captures all four
+sources with their headings visible; see the
+[Live Test record](../architecture/WEB_APP_LIVE_TEST.md#result--2026-11-06-models-simplification-and-settings-cog).

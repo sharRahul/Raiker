@@ -66,7 +66,9 @@ describe("model details", () => {
     });
     const capacities = { can_override: true, entries: [], sync: [] } as unknown as ModelCapacitiesView;
     const onchanged = show(ollama, capacities);
-    const form = screen.getByRole("heading", { name: "Context window override" }).closest("form")!;
+    const disclosure = screen.getByText("Context window override").closest("details")!;
+    await fireEvent.click(screen.getByText("Context window override"));
+    const form = disclosure.querySelector("form")!;
     await fireEvent.input(within(form).getByLabelText("Tokens"), { target: { value: "65536" } });
     await fireEvent.input(within(form).getByLabelText("Why"), { target: { value: "Set with OLLAMA_CONTEXT_LENGTH" } });
     await fireEvent.click(within(form).getByRole("button", { name: "Save override" }));

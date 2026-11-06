@@ -124,10 +124,10 @@ jobs:
               "Build faults (host killed mid-check)",
               "Data safety drills",
               "Engine tests (ubuntu-24.04)",
-              "Engine tests (macos-14)",
+              "Engine tests (macos-15)",
               "Engine tests (windows-latest)",
               "Live install and inference (ubuntu-24.04)",
-              "Live install and inference (macos-14)",
+              "Live install and inference (macos-15)",
               "Live install and inference (windows-latest)",
               *{f"Native runner ({os_})" for os_ in
                 ("ubuntu-24.04", "windows-2025", "macos-15", "macos-15-intel")},

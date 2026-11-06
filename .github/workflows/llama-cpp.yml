@@ -49,7 +49,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-24.04, macos-14, windows-latest]
+        os: [ubuntu-24.04, macos-15, windows-latest]
     steps:
       - name: Checkout
         # actions/checkout v5.0.1 (Node 24 runtime)
@@ -80,7 +80,7 @@ jobs:
         # Apple silicon (Metal build), Linux x64 and Windows x64 (CPU or
         # Vulkan builds: hosted runners have no GPU, so the automatic choice
         # and its fall-through to a backend that works are both exercised).
-        os: [ubuntu-24.04, macos-14, windows-latest]
+        os: [ubuntu-24.04, macos-15, windows-latest]
     steps:
       - name: Checkout
         # actions/checkout v5.0.1 (Node 24 runtime)

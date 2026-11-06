@@ -205,10 +205,10 @@ def test_a_release_requires_the_complete_beta_critical_suite() -> None:
         "Build faults (host killed mid-check)",
         "Data safety drills",
         "Engine tests (ubuntu-24.04)",
-        "Engine tests (macos-14)",
+        "Engine tests (macos-15)",
         "Engine tests (windows-latest)",
         "Live install and inference (ubuntu-24.04)",
-        "Live install and inference (macos-14)",
+        "Live install and inference (macos-15)",
         "Live install and inference (windows-latest)",
     ):
         assert f'"{required}"' in gate, f"missing beta-critical check: {required}"

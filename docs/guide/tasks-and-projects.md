@@ -434,8 +434,6 @@ A task belonging to another account has no address here: its id answers *"That
 task is not on this account's board"*, which is the same visibility rule the
 board itself applies.
 
-![A task's attempt history, with each run's outcome and the conversation it
-produced](../screenshots/2026-09-15-task-history/task-attempt-history.png)
 
 ## Where to watch work run
 

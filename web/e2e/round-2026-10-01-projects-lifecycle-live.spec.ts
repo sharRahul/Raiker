@@ -17,7 +17,7 @@ import {
 import { roundName } from "./naming";
 import { LIVE_BASE as BASE, ANTHROPIC_KEY, sendTurn, useAnthropic } from "./live";
 
-const SHOTS = "../../docs/screenshots/2026-10-01-projects-lifecycle";
+const SHOTS = "../../output/playwright/2026-10-01-projects-lifecycle";
 
 const PARENT = roundName("Lifecycle parent");
 const CHILD = roundName("Lifecycle child");

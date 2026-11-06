@@ -24,7 +24,7 @@ import { ANTHROPIC_KEY as KEY, ANTHROPIC_MODEL as MODEL, LIVE_BASE as BASE, send
 test.describe.configure({ mode: "serial" });
 
 const WORKSPACE_ID = process.env.RAIKER_LIVE_ANTHROPIC_WORKSPACE_ID ?? "";
-const SHOTS = process.env.RAIKER_LIVE_SHOTS ?? "../../docs/screenshots/2026-10-20-goals-execution-profiles";
+const SHOTS = process.env.RAIKER_LIVE_SHOTS ?? "../../output/playwright/2026-10-20-goals-execution-profiles";
 const GOAL = "Pack for a day hike";
 
 async function openGoals(page: Page): Promise<void> {

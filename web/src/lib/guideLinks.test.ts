@@ -46,7 +46,7 @@ describe("resolveGuideLinks", () => {
   });
 
   it("leaves a link to something that is not Markdown alone", () => {
-    const source = "[a picture](../screenshots/chat.png)";
+    const source = "[a picture](../images/chat.png)";
     expect(resolveGuideLinks(source, CHAPTERS)).toBe(source);
   });
 

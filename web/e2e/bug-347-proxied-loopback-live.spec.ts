@@ -21,7 +21,7 @@ import { LIVE_BASE as BASE } from "./live";
 import { totp } from "./totp";
 
 const PROXY = process.env.RAIKER_LIVE_PROXY_BASE ?? "http://127.0.0.1:8766";
-const SHOTS = process.env.RAIKER_LIVE_SHOTS ?? "../../docs/screenshots/2026-10-26-bug-347";
+const SHOTS = process.env.RAIKER_LIVE_SHOTS ?? "../../output/playwright/2026-10-26-bug-347";
 const HTTPS = { "X-Forwarded-Proto": "https" };
 
 function code(): string {

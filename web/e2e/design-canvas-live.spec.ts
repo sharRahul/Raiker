@@ -20,7 +20,7 @@ import { capture } from "./capture";
 import { signInAsOwner } from "./hosted-provider";
 
 const BASE = process.env.RAIKER_LIVE_BASE ?? "http://127.0.0.1:8768";
-const SHOTS = "../../docs/screenshots/2026-09-12-design-canvas";
+const SHOTS = "../../output/playwright/2026-09-12-design-canvas";
 
 test.describe.configure({ mode: "serial" });
 

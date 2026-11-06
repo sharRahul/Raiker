@@ -12,7 +12,7 @@ import { settled } from "./destinations";
 import { signInAsOwner } from "./hosted-provider";
 import { LIVE_BASE } from "./live";
 
-const SHOTS = join(import.meta.dirname, "..", "..", "docs", "screenshots", "2026-10-10-revisions-round");
+const SHOTS = join(import.meta.dirname, "..", "..", "output", "playwright", "2026-10-10-revisions-round");
 const WORKSPACE = process.env.RAIKER_LIVE_WORKSPACE ?? "";
 
 test.use({ timezoneId: "UTC" });

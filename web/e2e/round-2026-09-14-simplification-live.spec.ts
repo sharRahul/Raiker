@@ -44,7 +44,7 @@ function modelMenuName(modelId: string): string {
   return match ? match[0] : modelId;
 }
 
-const SHOTS = "../../docs/screenshots/2026-09-14-simplification";
+const SHOTS = "../../output/playwright/2026-09-14-simplification";
 
 // Serial, and generous: this is a real host talking to a real provider, and
 // the default 30s is a timeout on the network rather than on the product.

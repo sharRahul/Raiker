@@ -29,7 +29,7 @@ import { ANTHROPIC_KEY as KEY, ANTHROPIC_MODEL as MODEL, LIVE_BASE as BASE } fro
 test.describe.configure({ mode: "serial" });
 
 const WORKSPACE_ID = process.env.RAIKER_LIVE_ANTHROPIC_WORKSPACE_ID ?? "";
-const SHOTS = join(import.meta.dirname, "..", "..", "docs", "screenshots", "2026-10-19-dw-design-documents");
+const SHOTS = join(import.meta.dirname, "..", "..", "output", "playwright", "2026-10-19-dw-design-documents");
 const TITLE = `Launch post ${Date.now()}`;
 
 async function openDocuments(page: Page): Promise<void> {

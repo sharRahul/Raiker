@@ -14,7 +14,7 @@ import { DESTINATIONS, settled } from "./destinations";
 import { signInAsOwner } from "./hosted-provider";
 import { LIVE_BASE as BASE } from "./live";
 
-const SHOTS = process.env.RAIKER_LIVE_SHOTS ?? "../../docs/screenshots/2026-10-21-quiet-ui-round-2";
+const SHOTS = process.env.RAIKER_LIVE_SHOTS ?? "../../output/playwright/2026-10-21-quiet-ui-round-2";
 const TABS_PER_PAGE = 25;
 
 /** Where focus is, whether it can be seen, and whether it shows that it has focus. */

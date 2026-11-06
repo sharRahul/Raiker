@@ -18,7 +18,7 @@ import { LIVE_BASE as BASE } from "./live";
  * address is one this app's router really serves: a unit test can assert the
  * href, and only a real navigation proves the chapter opens.
  */
-const SHOTS = join(import.meta.dirname, "..", "..", "docs", "screenshots", "2026-09-18-round");
+const SHOTS = join(import.meta.dirname, "..", "..", "output", "playwright", "2026-09-18-round");
 
 test("a guide chapter's cross-reference opens the chapter it names", async ({ page }) => {
   const consoleErrors: string[] = [];

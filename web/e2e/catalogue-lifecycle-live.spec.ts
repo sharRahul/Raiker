@@ -25,7 +25,7 @@ import {
 } from "./hosted-provider";
 import { LIVE_BASE as BASE, ANTHROPIC_KEY as KEY } from "./live";
 
-const SHOTS = "../../docs/screenshots/2026-09-12-catalogue-lifecycle";
+const SHOTS = "../../output/playwright/2026-09-12-catalogue-lifecycle";
 
 test.describe.configure({ mode: "serial" });
 

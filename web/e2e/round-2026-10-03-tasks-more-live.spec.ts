@@ -14,7 +14,7 @@ import { chooseModelForTurn, signInAsOwner } from "./hosted-provider";
 import { LIVE_BASE, useAnthropic } from "./live";
 
 const BASE = LIVE_BASE;
-const SHOTS = join(import.meta.dirname, "..", "..", "docs", "screenshots", "2026-10-03-tasks-more-round");
+const SHOTS = join(import.meta.dirname, "..", "..", "output", "playwright", "2026-10-03-tasks-more-round");
 
 test.describe.configure({ mode: "serial" });
 

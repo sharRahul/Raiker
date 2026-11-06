@@ -16,7 +16,7 @@ import { capture } from "./capture";
 import { OWNER_CREDENTIALS } from "./hosted-provider";
 import { LIVE_BASE as BASE } from "./live";
 
-const SHOTS = process.env.RAIKER_LIVE_SHOTS ?? "../../docs/screenshots/2026-10-21-quiet-ui-round-2";
+const SHOTS = process.env.RAIKER_LIVE_SHOTS ?? "../../output/playwright/2026-10-21-quiet-ui-round-2";
 
 /**
  * Sign in without answering the wizard.

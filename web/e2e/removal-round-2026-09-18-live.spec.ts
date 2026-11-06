@@ -32,7 +32,7 @@ import { LIVE_BASE as BASE, ANTHROPIC_KEY, ANTHROPIC_MODEL as MODEL } from "./li
  *   1. `raiker-web` on 127.0.0.1:8765
  *   2. `RAIKER_LIVE_ANTHROPIC_KEY` in the environment (entered through the UI)
  */
-const SHOTS = join(import.meta.dirname, "..", "..", "docs", "screenshots", "2026-09-18-round");
+const SHOTS = join(import.meta.dirname, "..", "..", "output", "playwright", "2026-09-18-round");
 const MODEL_LABEL = /Haiku 4\.5/;
 
 /** One real Chat turn, so there is a thread to read back. */

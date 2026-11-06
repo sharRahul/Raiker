@@ -28,7 +28,7 @@ import { capture } from "./capture";
 import { signInAsOwner } from "./hosted-provider";
 import { LIVE_BASE as BASE } from "./live";
 
-const SHOTS = "../../docs/screenshots/2026-09-14-permissions-overhaul";
+const SHOTS = "../../output/playwright/2026-09-14-permissions-overhaul";
 
 test("Permissions leads with posture and actions, and keeps the table as evidence", async ({
   page,

@@ -811,7 +811,7 @@ launches the owner's connected providers, and an unconnected one says
 ## BUG-352 — A custom endpoint saved off the machine shows no route on its card
 
 **Severity: Low. Area: Models / UI. Status: Open — found 2026-10-20 in the
-BUG-349 live round (MT-03, `docs/screenshots/2026-10-20-model-transport-guard/04`).**
+BUG-349 live round (MT-03).**
 
 **Observed.** The OpenAI-compatible card connected to
 `https://models.raiker-live.example/v1` showed no posture line — no *Needs

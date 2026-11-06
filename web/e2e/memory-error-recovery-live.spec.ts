@@ -19,7 +19,7 @@ test("RT-MEM-RECOVERY-01: memory use failure offers a safe next step", async ({ 
   });
   await toggle.click();
   await expect(page.getByRole("alert").filter({ hasText: "Could not update memory use" })).toContainText("Refresh Memory to check the current setting before trying again.");
-  await capture(page, "../../docs/screenshots/2026-11-06-memory-recovery/memory-use-error.png");
+  await capture(page, "../../output/playwright/2026-11-06-memory-recovery/memory-use-error.png");
 });
 
 test("RT-MEM-RECOVERY-02: export failure names download recovery", async ({ page }) => {
@@ -31,5 +31,5 @@ test("RT-MEM-RECOVERY-02: export failure names download recovery", async ({ page
   }));
   await page.getByRole("button", { name: "Export memories" }).click();
   await expect(page.getByRole("alert").filter({ hasText: "Could not export memories" })).toContainText("download permissions");
-  await capture(page, "../../docs/screenshots/2026-11-06-memory-recovery/export-error.png");
+  await capture(page, "../../output/playwright/2026-11-06-memory-recovery/export-error.png");
 });

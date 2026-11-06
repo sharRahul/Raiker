@@ -13,7 +13,7 @@ import { capture } from "./capture";
 import { signInAsOwner } from "./hosted-provider";
 import { LIVE_BASE as BASE } from "./live";
 
-const SHOTS = "../../docs/screenshots/2026-10-18-bug-339-issue-to-pr";
+const SHOTS = "../../output/playwright/2026-10-18-bug-339-issue-to-pr";
 
 test("the issue-to-PR routine shows its plan and schedules nothing by itself", async ({ page }) => {
   test.setTimeout(180_000);

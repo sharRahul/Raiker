@@ -15,7 +15,7 @@ import { chooseModelForTurn, signInAsOwner } from "./hosted-provider";
 import { LIVE_BASE, useAnthropic } from "./live";
 
 const BASE = LIVE_BASE;
-const SHOTS = join(import.meta.dirname, "..", "..", "docs", "screenshots", "2026-10-05-quiet-hours-round");
+const SHOTS = join(import.meta.dirname, "..", "..", "output", "playwright", "2026-10-05-quiet-hours-round");
 const PROJECT_NAME = "Quiet round build";
 
 async function api<T>(page: Page, method: string, path: string, body?: unknown): Promise<T> {

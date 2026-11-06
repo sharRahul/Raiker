@@ -26,7 +26,7 @@ import {
 import { ANTHROPIC_KEY as KEY, ANTHROPIC_MODEL as MODEL, useAnthropic } from "./live";
 
 const BASE = process.env.RAIKER_LIVE_BASE ?? "http://127.0.0.1:8768";
-const SHOTS = "../../docs/screenshots/2026-09-13-release-readiness";
+const SHOTS = "../../output/playwright/2026-09-13-release-readiness";
 const OWNER_NAME = "Rahul S";
 
 test.describe.configure({ mode: "serial" });

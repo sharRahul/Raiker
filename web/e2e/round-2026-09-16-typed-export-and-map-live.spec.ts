@@ -25,7 +25,7 @@ import { capture } from "./capture";
 import { chooseModelForTurn, signInAsOwner } from "./hosted-provider";
 import { LIVE_BASE as BASE, ANTHROPIC_KEY as KEY, useAnthropic } from "./live";
 
-const SHOTS = "../../docs/screenshots";
+const SHOTS = "../../output/playwright";
 
 test.describe.configure({ mode: "serial" });
 

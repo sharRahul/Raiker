@@ -18,7 +18,7 @@ import { capture } from "./capture";
 import { signInAsOwner } from "./hosted-provider";
 import { LIVE_BASE as BASE } from "./live";
 
-const SHOTS = "../../docs/screenshots/2026-09-13-removal-review";
+const SHOTS = "../../output/playwright/2026-09-13-removal-review";
 
 /** Read one governed endpoint as the signed-in owner. */
 async function apiGet(page: Page, path: string): Promise<unknown> {

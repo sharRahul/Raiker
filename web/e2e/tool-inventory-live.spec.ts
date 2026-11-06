@@ -33,7 +33,7 @@ test.describe.configure({ mode: "serial" });
 
 const SERVED_WORKSPACE = process.env.RAIKER_LIVE_WORKSPACE ?? "";
 const WORKSPACE_ID = process.env.RAIKER_LIVE_ANTHROPIC_WORKSPACE_ID ?? "";
-const SHOTS = process.env.RAIKER_LIVE_SHOTS ?? "../../docs/screenshots/2026-10-25-tool-inventory";
+const SHOTS = process.env.RAIKER_LIVE_SHOTS ?? "../../output/playwright/2026-10-25-tool-inventory";
 
 async function open(page: Page, hash: string): Promise<void> {
   await page.goto(`${BASE}/${hash}`);

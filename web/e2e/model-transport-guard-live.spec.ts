@@ -35,7 +35,7 @@ test.describe.configure({ mode: "serial" });
 
 const WORKSPACE_ID = process.env.RAIKER_LIVE_ANTHROPIC_WORKSPACE_ID ?? "";
 const PRIVATE_NAME = process.env.RAIKER_LIVE_PRIVATE_NAME ?? "models.raiker-live.example";
-const SHOTS = "../../docs/screenshots/2026-10-20-model-transport-guard";
+const SHOTS = "../../output/playwright/2026-10-20-model-transport-guard";
 
 /** Connect (or reconnect) the OpenAI-compatible card to *endpoint*. */
 async function pointCustomEndpoint(

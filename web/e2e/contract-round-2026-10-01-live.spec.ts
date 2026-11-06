@@ -17,7 +17,7 @@ import { OWNER_CREDENTIALS, signInAsOwner } from "./hosted-provider";
 import { LIVE_BASE, sendTurn } from "./live";
 
 const BASE = LIVE_BASE;
-const SHOTS = join(import.meta.dirname, "..", "..", "docs", "screenshots", "2026-10-01-contract-round");
+const SHOTS = join(import.meta.dirname, "..", "..", "output", "playwright", "2026-10-01-contract-round");
 const WORKSPACE = process.env.RAIKER_LIVE_WORKSPACE ?? "";
 const MODEL = /GPT oss:20B Cloud/;
 

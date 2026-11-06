@@ -19,7 +19,7 @@ import { chooseModelForTurn, OWNER_CREDENTIALS, signInAsOwner } from "./hosted-p
 import { LIVE_BASE, sendTurn, useAnthropic } from "./live";
 
 const BASE = LIVE_BASE;
-const SHOTS = join(import.meta.dirname, "..", "..", "docs", "screenshots", "2026-10-04-ollama-readiness-round");
+const SHOTS = join(import.meta.dirname, "..", "..", "output", "playwright", "2026-10-04-ollama-readiness-round");
 const REPO = join(import.meta.dirname, "..", "..");
 const PIDFILE = process.env.RAIKER_LIVE_OLLAMA_PIDFILE ?? "";
 const PYTHON = process.env.RAIKER_LIVE_PYTHON ?? "python";

@@ -33,7 +33,7 @@ import { LIVE_BASE as BASE, ANTHROPIC_KEY, ANTHROPIC_MODEL as MODEL } from "./li
  *   3. Optionally `RAIKER_LIVE_OPENAI_KEY`, `RAIKER_LIVE_OPENROUTER_KEY` —
  *      entered through the UI too, with their real readiness result asserted.
  */
-const SHOTS = join(import.meta.dirname, "..", "..", "docs", "screenshots", "2026-09-21-static-review-round");
+const SHOTS = join(import.meta.dirname, "..", "..", "output", "playwright", "2026-09-21-static-review-round");
 const OPENAI_KEY = process.env.RAIKER_LIVE_OPENAI_KEY ?? "";
 const OPENROUTER_KEY = process.env.RAIKER_LIVE_OPENROUTER_KEY ?? "";
 const MODEL_LABEL = /Haiku 4\.5/;

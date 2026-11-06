@@ -21,7 +21,7 @@ import { capture } from "./capture";
 import { signInAsOwner } from "./hosted-provider";
 import { LIVE_BASE as BASE } from "./live";
 
-const SHOTS = join(import.meta.dirname, "..", "..", "docs", "screenshots", "2026-10-17-bug-280-weather");
+const SHOTS = join(import.meta.dirname, "..", "..", "output", "playwright", "2026-10-17-bug-280-weather");
 const MODEL_TURN = new RegExp(`Model for this turn: ${process.env.RAIKER_LIVE_OLLAMA_CLOUD_LABEL ?? "GPT oss:20B Cloud"}`, "i");
 
 interface Bundle {

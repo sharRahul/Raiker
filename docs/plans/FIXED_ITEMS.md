@@ -22580,8 +22580,7 @@ that no privacy choice mentions permissions),
 `web/src/lib/views/ModelSetupView.test.ts`, `tests/test_setup_state.py` including
 that a row stored under a retired stage still round-trips, and a live round
 driven stage by stage on an empty workspace
-(`web/e2e/first-launch-live.spec.ts`, captures under
-`docs/screenshots/2026-09-12-first-launch/`).
+(`web/e2e/first-launch-live.spec.ts`).
 
 ---
 
@@ -22728,8 +22727,7 @@ the count bound, the zero fix, lineage on refusals), `tests/test_multipart_egres
 (the two sandbox paths refusing identically), `web/src/lib/designAssets.test.ts`
 (19 cases over the rail, the chain, the grid, the refusals and the button's
 word), and a live round against a running server with real rows read back through
-`GET /api/images` (`web/e2e/design-canvas-live.spec.ts`, captures under
-`docs/screenshots/2026-09-12-design-canvas/`).
+`GET /api/images` (`web/e2e/design-canvas-live.spec.ts`).
 
 ---
 
@@ -22770,8 +22768,7 @@ pictures of this project appear, and one made elsewhere, one made before the
 column and one refused all stay out — and a live round that creates the project
 through the product's own control, asserts Design's outgoing request carries that
 `project_id`, and reads the project page back
-(`web/e2e/project-images-live.spec.ts`, capture under
-`docs/screenshots/2026-09-13-project-images/`). The live generation refused with
+(`web/e2e/project-images-live.spec.ts`). The live generation refused with
 `fetch_failed:URLError` because this host cannot reach the provider, and the
 refused row landed against the project, which is the request half proven end to
 end through the runtime.
@@ -22807,8 +22804,7 @@ of scrolling to nothing, so there is no dead action.
 shortcut works against a folded group and lands focus on the row; the attention
 entry opens the same row), and a live round that folds the group, presses
 **Manage** and reads the expanded, focused row back
-(`web/e2e/release-readiness-2026-09-13-live.spec.ts`, captures under
-`docs/screenshots/2026-09-13-release-readiness/`).
+(`web/e2e/release-readiness-2026-09-13-live.spec.ts`).
 
 ---
 
@@ -23123,8 +23119,7 @@ cannot reintroduce the shape by copying its neighbour. And the one that actually
 closes it: a live round that sets the name through the Account page, connects
 Anthropic through the Models dialog, pins Haiku 4.5, and asks the owner's own
 question through the composer. The answer came back **"The owner of this
-workspace is Rahul S."** (`web/e2e/owner-identity-live.spec.ts`, capture at
-`docs/screenshots/2026-09-13-release-readiness/identity-answered-by-name.png`).
+workspace is Rahul S."** (`web/e2e/owner-identity-live.spec.ts`).
 A sweep over five ordinary pages asserts none of them renders a `principal_…`
 key as a label.
 
@@ -23279,15 +23274,13 @@ classification to the runtime's.
 Live: `web/e2e/rr-mcp-02-remote-endpoint-trust-live.spec.ts` against a running
 host adds all three allowed destinations and reads the three labels back off the
 cards, is refused by all four bad endpoints with the right reason and stores none
-of them, and watches the Add form name the endpoint as it is typed. Captures at
-`docs/screenshots/2026-09-13-mcp-endpoint-trust/`.
+of them, and watches the Add form name the endpoint as it is typed.
 
 And the round trip these changes sit on top of, because an egress change is not
 evidence of anything until a real provider call still works with it in place:
 `web/e2e/rr-mcp-02-live-provider-turn-live.spec.ts` types this round's Anthropic
 key into the product's own Connect dialog, pins Haiku 4.5, chooses it in the
-composer's own picker and sends a turn. The model answered
-(`docs/screenshots/2026-09-13-mcp-endpoint-trust/live-anthropic-turn.png`). This
+composer's own picker and sends a turn. The model answered. This
 round's key is not identity-linked, so unlike
 [FIXED-501](#fixed-501--raiker-knew-its-owners-authorisation-key-and-not-their-name)'s
 the provider answered a model list as well as a turn.
@@ -23385,8 +23378,7 @@ no diagnostics route at all, so the read 404'd and the board reported zero issue
 from it, which is the defect encoded as a test.
 
 Live: `web/e2e/removal-review-2026-09-13-live.spec.ts` watches readiness stop
-answering while the board is open and reads the stale line off the tile
-(`docs/screenshots/2026-09-13-removal-review/home-readiness-unavailable.png`).
+answering while the board is open and reads the stale line off the tile.
 Deliberately not a reload — `/api/diagnostics` is also what the boot probe calls
 to decide whether the runtime is reachable, so refusing it across a reload locks
 the workspace and proves nothing about the rail. Found by trying it.
@@ -23429,8 +23421,7 @@ one.
 **Verification.** One case in `BrainView.test.ts` drives a successful load, fails
 every read after it, and asserts the label changes, the stale line carries both
 halves, and the graph is still rendered. Live, the same sequence against a
-running host
-(`docs/screenshots/2026-09-13-removal-review/knowledge-map-stale.png`).
+running host.
 
 ---
 
@@ -23636,8 +23627,7 @@ with its count, that the filters survive typing, and that Load more appends
 rather than replaces.
 
 Live: `web/e2e/removal-review-2026-09-13-live.spec.ts` reads the index against a
-running host and watches the filters stay on screen with a query typed
-(`docs/screenshots/2026-09-13-removal-review/threads-filters-stay-while-typing.png`).
+running host and watches the filters stay on screen with a query typed.
 
 ---
 
@@ -23689,9 +23679,7 @@ the button shares its word with the row controls, which is the point.
 Live, against a running host: the matrix contains no `Denied` and no bare `Ask`,
 and a row leads with a name rather than a registry key — asserted on shape
 rather than on one capability, because which eight rows the matrix ranks depends
-on the workspace. Capture at
-`docs/screenshots/2026-09-13-removal-review/permissions-one-vocabulary.png`,
-where the whole page reads one vocabulary: `On · Ask me` in the summary, `Ask
+on the workspace. The whole page reads one vocabulary: `On · Ask me` in the summary, `Ask
 me` in the agent column, and `Ask me / Allow / Automatic / Never` on every
 control below.
 
@@ -23768,8 +23756,7 @@ Live, against a running host
 level-1 heading; the posture sentence present and the `Permission status`
 combobox absent; the authority table below the registry by measured geometry;
 a closed row stating `On|Off · mode`; an opened row asking both questions and
-answering the first in a sentence; and no sideways scroll at 390 px. Captures in
-`docs/screenshots/2026-09-14-permissions-overhaul/`. Axe finds no WCAG 2.1 AA
+answering the first in a sentence; and no sideways scroll at 390 px. Axe finds no WCAG 2.1 AA
 violation in the registry at 390 px or 1440 px (`web/e2e/composer.spec.ts`).
 
 ---
@@ -24116,9 +24103,7 @@ exists for an unfiled capability.
 
 Live, against a running host: the page reads **37**, `GIT` holds all three rows,
 no group is named `Other tools`, and the reference section carries fourteen
-entries with no mode control and no checkbox in it. Captures at
-`docs/screenshots/2026-09-14-permissions-overhaul/permissions-git-grouped.png`
-and `…/permissions-not-decided-here.png`.
+entries with no mode control and no checkbox in it.
 
 **Two live specs changed with it, and both were doing something that had stopped
 meaning anything.** `add-01-container-providers-live` pressed **Turn on** for
@@ -24230,7 +24215,7 @@ chosen nothing has nothing selected and carries the `no_model_selected` problem;
 and — the mirror-image defect this must not introduce — a stored global choice is
 still reported, with `global_default` on it. Live on a running host: the trigger
 reads `Not selected` and the menu above it carries no `Selected · unavailable`
-note, at `docs/screenshots/2026-09-14-simplification/composer-nothing-selected.png`.
+note.
 
 ---
 
@@ -24267,8 +24252,7 @@ now comes from the same helper, so the two surfaces cannot drift.
 that the local remedy survives — replacing both sentences with the network one
 would swap the defect for its mirror image — and that both still name the
 provider (BUG-47's rule). Live on a host whose proxy answers `CONNECT
-openrouter.ai` with 403, at
-`docs/screenshots/2026-09-14-simplification/openrouter-unreachable.png`.
+openrouter.ai` with 403.
 
 ---
 
@@ -24341,8 +24325,7 @@ the mobile sheet changed.
 
 **Verification.** `App.test.ts` asserts the direct link resolves to `#/settings`
 and that `Security & sign-in` still deep-links to `#/settings?tab=security`;
-`a11y.test.ts` follows the renamed trigger. Live at
-`docs/screenshots/2026-09-14-simplification/more-window.png`.
+`a11y.test.ts` follows the renamed trigger.
 
 ---
 
@@ -24370,9 +24353,7 @@ deletion impact.
 none of the three lifecycle actions is; all three are in the menu. The two
 deletion-wording cases go through the menu now, which is both of the steps the
 change introduced — a test that could still reach Delete in one click would no
-longer be testing what the row promises. Live at
-`docs/screenshots/2026-09-14-simplification/project-card.png` and
-`…/project-lifecycle-menu.png`.
+longer be testing what the row promises.
 
 ---
 
@@ -24418,9 +24399,7 @@ row's title attribute, and in the connection detail — and no longer first.
 **Verification.** `ModelsView.test.ts` asserts the disclosure exists, is closed,
 contains both controls, and that `Work defaults` is *not* inside it;
 `BrainView.test.ts` asserts exactly one open disclosure and that it is Filters,
-with every control still present. Live at
-`docs/screenshots/2026-09-14-simplification/runtime-routing-folded.png`,
-`…/runtime-routing-open.png` and `…/knowledge-map-settings.png`.
+with every control still present.
 
 ---
 
@@ -24479,8 +24458,7 @@ first run, where there is no account for it to act beside.
 
 **Verification.** `LoginView.test.ts` asserts Unlock is still `btn-primary`, the
 isolation sentence is on screen before the branch is taken, and the flow
-completes through the renamed control. Live at
-`docs/screenshots/2026-09-14-simplification/unlock.png`.
+completes through the renamed control.
 
 ---
 
@@ -24582,9 +24560,7 @@ as a disabled Send three lines later.
 
 **Verification.** The 2026-09-14 live round drives all three through a real host
 and a real Anthropic key: the catalogue is read after it has arrived, a model is
-kept offered, chosen for the turn, and answers. Captures at
-`docs/screenshots/2026-09-14-simplification/anthropic-catalogue.png` and
-`…/anthropic-turn.png`.
+kept offered, chosen for the turn, and answers.
 
 ---
 
@@ -24676,7 +24652,6 @@ recorded, and confirm Home's rows point at the same address. It asserts zero
 console errors **before** its last step, which deliberately asks for a task that
 does not exist — a budget spent by the spec's own probe stops measuring
 anything ([FIXED-527](#fixed-527--an-outage-raiker-had-already-reported-also-reported-itself-to-the-console)).
-Capture at `docs/screenshots/2026-09-15-task-history/task-attempt-history.png`.
 
 **Found while closing it.** `chooseModelForTurn` knew one composer's label
 ("Message composer") and Tasks labels its own "Plan work", so the helper looked
@@ -26479,8 +26454,7 @@ hosts are not, and the in-helper check still holds when the helper is installed
 unscoped. `web/src/lib/views/settings/GitCredential.test.ts` holds the ordering
 and the scope's provenance. Live:
 `web/e2e/rem-p2-rows-2026-09-20-live.spec.ts` measures the field's `y` against
-the scope heading's on the rendered page —
-`docs/screenshots/2026-09-20-p2-rows/03-git-credential-scope-first.png`.
+the scope heading's on the rendered page.
 
 ---
 
@@ -26509,8 +26483,7 @@ than from prose, that no setting and no approval lifts it.
 **Evidence.** `web/src/lib/views/settings/WebAccess.test.ts` — the count, both
 remedies, the disclosure closed by default, and the editable rules still in the
 open. Live, with the host started carrying one environment rule so the card has
-both sources:
-`docs/screenshots/2026-09-20-p2-rows/04-web-access-read-only-detail.png`.
+both sources.
 
 ---
 
@@ -26536,7 +26509,7 @@ key and fingerprint stay required and visible, as the row asks.
 **Evidence.** `web/src/lib/views/settings/Runtime.test.ts` — the target above
 the tuning, the disclosure closed, the window still reported to the runtime, and
 the container preview visible with the ports folded. Live, the ordering measured
-on the rendered page: `docs/screenshots/2026-09-20-p2-rows/05-runtime-advanced.png`.
+on the rendered page.
 
 ---
 
@@ -26568,9 +26541,7 @@ running, passed in rather than fetched.
 
 **Evidence.** `web/src/lib/components/TurnEvidence.test.ts` — nothing read until
 opened, read once, the action id, the deep link, the honest failure, and a
-running turn served from its phases. Live, against a real Anthropic turn:
-`docs/screenshots/2026-09-20-p2-rows/01-chat-evidence-closed.png` and
-`02-chat-evidence-open.png`, where the events are the ones this turn actually
+running turn served from its phases. Live, against a real Anthropic turn, the events are the ones this turn actually
 produced.
 
 ---
@@ -26597,9 +26568,7 @@ restored on mount and never as a drawer over a narrow window nobody asked to
 open, exactly as the explorer is not.
 
 **Evidence.** `web/src/lib/buildArtifacts.test.ts` — the default, the round
-trip, the close, the unknown tab and the blocked storage. Live, across a real
-reload: `docs/screenshots/2026-09-20-p2-rows/12-build-workbench-terminal.png`
-and `13-build-workbench-after-reload.png`.
+trip, the close, the unknown tab and the blocked storage. Verified live across a real reload.
 
 ---
 
@@ -26668,9 +26637,7 @@ shapes and five preview cases including the skipped slots.
 `tests/test_task_schedule_preview_contract.py` reads the preview's interval
 table out of the web module and holds it against
 `raiker.tasks.scheduler.RECURRING_INTERVALS`, so a cadence added or re-timed on
-one side and not the other fails in CI rather than on an owner's calendar. Live:
-`docs/screenshots/2026-09-20-p2-rows/08-tasks-two-questions.png` and
-`09-tasks-schedule-preview.png`.
+one side and not the other fails in CI rather than on an owner's calendar.
 
 ---
 
@@ -26700,8 +26667,6 @@ sections carry a line naming where it is, and the line goes when it is saved.
 
 **Evidence.** `web/src/lib/views/ProjectsView.test.ts` — the opening section,
 one section's content at a time, the unsaved-edit notice and its disappearance.
-Live: `docs/screenshots/2026-09-20-p2-rows/10-project-overview.png` and
-`11-project-unsaved-context.png`.
 
 ---
 
@@ -26756,9 +26721,7 @@ link to the page that changes it.
 **Evidence.** `web/src/lib/views/settings/MemoryEngine.test.ts` — the build, the
 confirmation's wording, the backend change reaching the runtime, and the empty
 case. `web/src/lib/views/MemoryView.test.ts` asserts the health sentence, the
-repair link and that neither control is on that page any more. Live:
-`docs/screenshots/2026-09-20-p2-rows/06-memory-recall-health.png` and
-`07-settings-memory-engine.png`.
+repair link and that neither control is on that page any more.
 
 ---
 
@@ -26971,8 +26934,7 @@ wrong way round is a data-loss bug. Both directions are asserted.
 **Evidence.** `tests/test_knowledge_sources_inventory.py` — six cases, including
 the folder that survives its own revocation and the copy that does not — and
 `web/src/lib/components/KnowledgeSources.test.ts`, where the confirmation states
-which of those two will happen before either does. Live:
-`docs/screenshots/2026-09-20-sources-and-commands/02-knowledge-sources.png`.
+which of those two will happen before either does.
 
 ---
 
@@ -27142,9 +27104,7 @@ pool is closed once at host shutdown, after every workspace has stopped using it
 **Evidence.** `tests/test_provider_client_pool.py` — one client per origin and
 timeout, none across event loops, no credential on a pooled client, a provider
 that does not close what it does not own, and a router whose five successive
-provider builds all travel over one connection. Live:
-`docs/screenshots/2026-09-21-static-review-round/02-two-turns-one-connection.png`,
-two real Anthropic turns in one conversation.
+provider builds all travel over one connection. Live: two real Anthropic turns in one conversation.
 
 ---
 
@@ -27206,8 +27166,7 @@ differ, and stays quiet when both are unreleased, because two development
 checkouts disagreeing is not news.
 
 **Evidence.** `web/src/lib/buildIdentity.test.ts`,
-`web/src/lib/views/settings/Updates.test.ts`. Live:
-`docs/screenshots/2026-09-21-static-review-round/04-build-identity.png`.
+`web/src/lib/views/settings/Updates.test.ts`.
 
 ---
 
@@ -27283,9 +27242,7 @@ deleted or archived opens the list — which is what the link used to do, and th
 right answer.
 
 **Evidence.** `web/src/lib/nav.test.ts` for the parameter,
-`web/src/lib/views/ProjectsView.test.ts` for all three landings. Live:
-`docs/screenshots/2026-09-21-static-review-round/05-build-context-names-the-project.png`
-and `06-back-in-the-project.png` — a project created, started in Build, and
+`web/src/lib/views/ProjectsView.test.ts` for all three landings. Live: a project created, started in Build, and
 reopened from Build's own context line, on its overview.
 
 ---
@@ -27398,8 +27355,7 @@ It is now stopped with the turn and reported as the turn.
 Anthropic `claude-haiku-4-5-20251001`: a streaming answer counted as *1 answer
 being written*, stopped at its safe boundary with the text it had written kept and
 *Stopped at your request* above it, and the next turn in a new conversation
-answered normally —
-[`docs/screenshots/2026-09-28-docs-round/`](../screenshots/2026-09-28-docs-round).
+answered normally —.
 
 ---
 
@@ -27909,8 +27865,7 @@ now, followed on `hashchange`.
 composer it would cover, and stays in its corner otherwise*, and *leaves the
 screen when the owner navigates to Approvals, and returns after*; and the live
 round's python turn, which now chooses its model and sends with an earlier
-approval still pending
-([`2026-09-28-review-closure-round/`](../screenshots/2026-09-28-review-closure-round)).
+approval still pending.
 
 ---
 
@@ -27951,8 +27906,7 @@ shows the others and marks that one read*, *docks nothing on the notification
 record, and marks nothing read there*, *opens an approval notice on Approvals
 rather than on the record*; and the third 2026-09-28 live round, where a real
 turn's approval notice shows on Home, opens Approvals, is gone from the dock
-there at 1440 and 390 wide, reads as read, and the bell agrees
-([`2026-09-28-docs-items-round/`](../screenshots/2026-09-28-docs-items-round)).
+there at 1440 and 390 wide, reads as read, and the bell agrees.
 
 ---
 
@@ -28553,7 +28507,7 @@ closed **Record identifiers** disclosure for diagnostics.
 
 **Evidence.** `tests/test_project_lifecycle.py` —
 *attachments resolve to files and say when they do not*; `ProjectsView.test.ts`;
-live, [shared files by name](../screenshots/2026-10-01-projects-lifecycle/03-shared-files-by-name.png).
+live, shared files by name.
 
 ---
 
@@ -28581,9 +28535,9 @@ Retention is unchanged: an archived project is kept until it is deleted.
 archive took*, *restore leaves a child archived on its own*, *restore under an
 archived parent is refused by name*, *restore is human-only*, *archiving the
 account selection clears it*, *restore route*; `projectLifecycle.test.ts`; live,
-[the archived list](../screenshots/2026-10-01-projects-lifecycle/05-archived-list.png),
-[the child kept archived](../screenshots/2026-10-01-projects-lifecycle/07-child-kept-archived.png) and
-[at 390 px](../screenshots/2026-10-01-projects-lifecycle/08-mobile-archived.png).
+the archived list,
+the child kept archived and
+at 390 px.
 
 ---
 
@@ -28607,7 +28561,7 @@ refuses a cycle when a caller skips the service.
 **Evidence.** `tests/test_project_lifecycle.py` — the five move tests and *route
 answers a cycle with 409*; `projectLifecycle.test.ts` — *blocks the project
 itself and everything inside it, and nothing else*; live,
-[the move dialog](../screenshots/2026-10-01-projects-lifecycle/04-move-refuses-own-subtree.png).
+the move dialog.
 
 ---
 
@@ -28656,7 +28610,7 @@ An attached folder is never counted or touched, and its delete needs no step-up.
 removes*, *preview never counts an attached folder*, *managed delete requires a
 step-up*, *attached delete keeps the ordinary session*;
 `projectLifecycle.test.ts`; live,
-[the counted delete with step-up](../screenshots/2026-10-01-projects-lifecycle/06-delete-counts-and-step-up.png).
+the counted delete with step-up.
 
 ---
 
@@ -28672,7 +28626,7 @@ its own last activity.
 
 **Evidence.** `tests/test_project_lifecycle.py` — *last activity is the newest
 session update*; `ProjectsView.test.ts`; live,
-[chat rows](../screenshots/2026-10-01-projects-lifecycle/02-chat-rows-resume.png).
+chat rows.
 
 ---
 
@@ -28686,7 +28640,7 @@ store, one label — shown with **Stop working in it**. *Active* and *Archived*
 name the two lists, and last activity is its own fact on each card.
 
 **Evidence.** `ProjectsView.test.ts`; live,
-[current project and last activity](../screenshots/2026-10-01-projects-lifecycle/01-current-project-and-last-activity.png).
+current project and last activity.
 
 ---
 
@@ -28785,7 +28739,7 @@ row (`.head-row`, `.header-actions`, or anything marked `data-dock-clear-top`) a
 drops below it rather than covering it.
 
 **Evidence.** `noticeDestination.test.ts`, `SessionMenu.test.ts`; live,
-[the approval shown once on Chat](../screenshots/2026-10-01-projects-lifecycle/09-approval-shown-once-on-chat.png) and
+the approval shown once on Chat and
 the 2026-09-28 round's BUG-309 test.
 
 ---
@@ -28842,8 +28796,7 @@ restyling its own offset does not wake itself.
 
 **Evidence.** `ApprovalPrompt.test.ts` — *rises above a composer that mounts
 after it, without waiting for a tick*, failing against the previous code; live,
-the round's approval check now also asserts nothing is drawn over **Send**,
-[captured](../screenshots/2026-10-01-projects-lifecycle/09-approval-shown-once-on-chat.png).
+the round's approval check now also asserts nothing is drawn over **Send**.
 
 ---
 
@@ -29907,8 +29860,8 @@ off channel is still refused, and a forged argument cannot set the stamp.
 **Evidence.** `test_channel_owner_surface.py` — *the owner's test reaches a
 paired channel that is still off*; `test_phase_4_channels.py` — *an off channel
 refuses a delivery that is not the owner's test*; `channelSetup.test.ts`,
-`MessagingView.test.ts`; live captures 02–04 in [`2026-10-03-messaging-mcp-round/`](../screenshots/2026-10-03-messaging-mcp-round) (a test delivered to a
-local receiver while the channel read *Linked, off*).
+`MessagingView.test.ts`; live: a test delivered to a
+local receiver while the channel read *Linked, off*.
 
 ---
 
@@ -31475,8 +31428,7 @@ upgrades with quiet hours off: nothing it relied on is suppressed.
 
 **Evidence.** `tests/test_notification_quiet_hours.py` (policy, both DST
 transitions, the account zone, refusals, the stored decision, the OS command
-held); `QuietHours.test.ts` (dock, approval card, Settings). Live captures 04–06
-in [`2026-10-05-quiet-hours-round/`](../screenshots/2026-10-05-quiet-hours-round):
+held); `QuietHours.test.ts` (dock, approval card, Settings). Live:
 quiet hours on and *Quiet now, until …* read from the server, a test notice
 held, an approval notice and a paused routine held from the corner while the
 bell counts them and the record lists them.
@@ -31899,8 +31851,7 @@ doctor and read back after a reload.
 folder's `manifest.json`: the commit and whether the working tree differed,
 the viewport, the theme, the route, the test that took it and when.
 
-**Evidence.** The round's last scenario checks every capture in
-`docs/screenshots/2026-10-05-backups-round/` has a manifest entry with a
+**Evidence.** The round's last scenario checks every capture has a manifest entry with a
 commit, a viewport and a theme.
 
 ---
@@ -32263,8 +32214,7 @@ this page showed it, so nothing was accepted*. Clients that send no fingerprint
 behave as before.
 
 **Evidence.** `tests/test_mcp_tool_review.py::test_acceptance_is_of_the_declaration_the_owner_read`;
-`McpView.test.ts` (2). Live: capture
-[07](../screenshots/2026-10-10-revisions-round/07-mcp-tool-changed-not-accepted.png).
+`McpView.test.ts` (2).
 
 ---
 
@@ -32280,8 +32230,7 @@ the page re-reads and says so. With this and FIXED-813, MCP's part of §13.2
 item 6 is closed.
 
 **Evidence.** `tests/test_mcp_runtime.py::test_api_rename_and_delete_carry_the_name_the_page_showed`;
-`McpView.test.ts`. Live: capture
-[08](../screenshots/2026-10-10-revisions-round/08-mcp-stale-rename-refused.png).
+`McpView.test.ts`.
 
 ---
 
@@ -32303,8 +32252,7 @@ changed* and shows the current settings.
 
 **Evidence.** `tests/test_channel_owner_surface.py` (service and route);
 `MessagingView.test.ts`. Live: two tabs — one removed `oncall`, the other's
-save of `oncall, ops` was refused and the stored list stayed `ops` (capture
-[04](../screenshots/2026-10-10-revisions-round/04-channel-stale-tab-refused.png)).
+save of `oncall, ops` was refused and the stored list stayed `ops`.
 
 ---
 
@@ -32322,9 +32270,7 @@ refusal. With FIXED-814 and FIXED-815, §13.2 item 6's MCP, channel and project
 mutations are all revision-checked.
 
 **Evidence.** `tests/test_projects.py::test_a_stale_editor_cannot_save_or_move_over_newer_state`;
-`ProjectsView.test.ts`. Live: capture
-[06](../screenshots/2026-10-10-revisions-round/06-project-stale-editor-refused.png) —
-the newer *Cite the tide tables* stayed stored.
+`ProjectsView.test.ts`. Live: the newer *Cite the tide tables* stayed stored.
 
 ---
 
@@ -32345,9 +32291,7 @@ while paused — nothing started*. `channel_paused`/`channel_resumed` are audit
 events.
 
 **Evidence.** `tests/test_channel_owner_surface.py::test_a_paused_channel_keeps_what_arrives_and_starts_and_sends_nothing`;
-`MessagingView.test.ts` (2). Live: captures
-[05](../screenshots/2026-10-10-revisions-round/05-channel-paused-kept.png) and
-[13](../screenshots/2026-10-10-revisions-round/13-messaging-390-dark.png) (390, dark).
+`MessagingView.test.ts` (2).
 
 ---
 
@@ -32367,10 +32311,7 @@ chosen, remembered on this device only when saved, restored by Discard — and
 the page says theme is kept on this device. Notification and date preferences
 still wait for Save.
 
-**Evidence.** `SettingsView.test.ts` (3), `Personalisation.test.ts`. Live:
-captures [02](../screenshots/2026-10-10-revisions-round/02-appearance-previewed.png)
-(Compact and Dark previewed, unsaved) and
-[03](../screenshots/2026-10-10-revisions-round/03-appearance-discarded.png).
+**Evidence.** `SettingsView.test.ts` (3), `Personalisation.test.ts`. Live: Compact and Dark previewed while unsaved, then discarded.
 
 ---
 
@@ -32406,8 +32347,7 @@ this workspace's data*, *would refuse … roll back only with a backup taken
 before that update*, or *not known*, and the offered-update text says the
 database is backed up before it migrates.
 
-**Evidence.** `tests/test_api_updates.py` (2); `Updates.test.ts`. Live: capture
-[10](../screenshots/2026-10-10-revisions-round/10-updates-recovery-compatibility.png).
+**Evidence.** `tests/test_api_updates.py` (2); `Updates.test.ts`.
 
 ---
 
@@ -32431,8 +32371,7 @@ says the files are copied as the workspace keeps them. Not included now: the
 audit log and attached folders.
 
 **Evidence.** `tests/test_workspace_backups.py` (3); `BackupsCard.test.ts`.
-Live: capture [09](../screenshots/2026-10-10-revisions-round/09-backup-carries-files.png)
-(*1 checkpoint file · 1 upload*).
+Live: *1 checkpoint file · 1 upload*.
 
 ---
 
@@ -32493,7 +32432,7 @@ health, in detail* shows it as *If Raiker stops in the middle*. Writing it found
 FIXED-825.
 
 **Evidence.** `tests/test_recovery_matrix.py` (23); `DiagnosticsView.test.ts`
-(2). Live: capture [12](../screenshots/2026-10-10-revisions-round/12-diagnostics-recovery-matrix.png).
+(2).
 
 ---
 
@@ -32516,8 +32455,7 @@ three-failure pause); one being cancelled is cancelled.
 
 **Evidence.** `tests/test_task_scheduler.py::test_a_run_the_host_stopped_in_the_middle_of_is_settled_not_left_running`.
 Live: a routine left `running`, the host restarted, and it read `queued` for
-2026-10-11 07:00 with the statement in its history (capture
-[14](../screenshots/2026-10-10-revisions-round/14-interrupted-run-settled.png)).
+2026-10-11 07:00 with the statement in its history.
 
 ---
 
@@ -32534,8 +32472,7 @@ so it outlives the one-command approval it was lent under, and the page says
 git command yet*.
 
 **Evidence.** `tests/test_git_credential_grant.py::test_the_status_says_when_the_credential_was_last_lent`;
-`GitCredential.test.ts` (2). Live: capture
-[11](../screenshots/2026-10-10-revisions-round/11-git-credential-last-lent.png).
+`GitCredential.test.ts` (2).
 
 ---
 
@@ -32792,10 +32729,7 @@ group chats; the webhook is plain text up to 32,000 from one caller; neither
 claims a rich feature it does not carry.
 
 **Evidence.** `tests/test_phase_4_channels.py` (capabilities declared and
-listed); `MessagingView.test.ts` (2). Live: captures
-[04](../screenshots/2026-10-10-spend-limit-round/04-messaging-channel-carries.png)
-and, at 390 wide and dark with no overflow,
-[05](../screenshots/2026-10-10-spend-limit-round/05-messaging-carries-390-dark.png).
+listed); `MessagingView.test.ts` (2). Live: at 390 wide and dark with no overflow.
 
 ---
 
@@ -32840,11 +32774,8 @@ token budgets stay advisory and say so by contrast.
 call with `turn_spend_limit_reached`; a turn started over the limit never asks
 the model; no limit stops nothing; the window counts priced usage and names
 unpriced models; bounds. `ProviderUsagePanel.test.ts` (3). Live, real OpenRouter
-GPT-4o Mini turns: $0.0014 of $0.01 (capture
-[01](../screenshots/2026-10-10-spend-limit-round/01-spend-limit-set.png)); at
-$0.0101 the next turn stopped with the limit named and the spend unchanged
-([02](../screenshots/2026-10-10-spend-limit-round/02-turn-stopped-by-spend-limit.png),
-[03](../screenshots/2026-10-10-spend-limit-round/03-spend-limit-reached.png));
+GPT-4o Mini turns: $0.0014 of $0.01; at
+$0.0101 the next turn stopped with the limit named and the spend unchanged;
 cleared, the next turn answered.
 
 ---
@@ -32971,10 +32902,8 @@ needs a test. Choosing a different Telegram owner now forgets the last test,
 as binding a new URL already did. Messaging says why in words.
 
 **Evidence.** `tests/test_channel_enable_needs_test.py` (8). Live: Telegram with
-a chosen owner refused Turn on
-([04](../screenshots/2026-10-11-channels-runtime-round/04-turn-on-needs-test.png)); the webhook refused, then a test was
-delivered to a local receiver and the same button turned it on
-([05](../screenshots/2026-10-11-channels-runtime-round/05-webhook-tested-then-on.png)).
+a chosen owner refused Turn on; the webhook refused, then a test was
+delivered to a local receiver and the same button turned it on.
 
 ---
 
@@ -33144,7 +33073,7 @@ egress, destination error). A test is a `test_delivery`; anything else a
 
 **Evidence.** `tests/test_channel_outbound_receipts.py` (4),
 `channelSetup.test.ts`. Live: the webhook's test receipt read *queued →
-delivered* ([05](../screenshots/2026-10-11-channels-runtime-round/05-webhook-tested-then-on.png)).
+delivered*.
 
 ---
 
@@ -33161,8 +33090,8 @@ revision). Messaging shows *@rahul_live (4242)* in the owner picker and the
 checklist, and says names are the sender's own and the id is what is allowed.
 
 **Evidence.** `tests/test_channel_inbound_dedup.py` (3 for this entry),
-`channelSetup.test.ts`. Live: [03](../screenshots/2026-10-11-channels-runtime-round/03-telegram-sender-named.png); at
-390 wide, dark, no overflow: [07](../screenshots/2026-10-11-channels-runtime-round/07-messaging-390-dark.png).
+`channelSetup.test.ts`. Live: at
+390 wide, dark, no overflow:.
 
 ---
 
@@ -33184,7 +33113,6 @@ on*.
 **Evidence.** `tests/test_execution_environment_off.py` (4), a contract case,
 `Runtime.test.ts` (2). Live: an SSH target added through the form and turned
 off — *Build host is off. Nothing was running there.*
-([06](../screenshots/2026-10-11-channels-runtime-round/06-runtime-target-off.png)).
 
 ---
 
@@ -33203,8 +33131,7 @@ recorded no model and made Ready say Chat had nothing to answer with.
 recommendation that asks for a model has **Choose a model**, which opens the
 providers.
 
-**Evidence.** `ModelSetupView.test.ts` (2). Live:
-[02](../screenshots/2026-10-11-channels-runtime-round/02-setup-keeps-chosen-model.png); Ready read
+**Evidence.** `ModelSetupView.test.ts` (2). Live: Ready read
 `openai/gpt-4o-mini`.
 
 ---
@@ -33222,7 +33149,7 @@ The page passed the session's principal id down as the name to show.
 *Acting as Rahul … recorded against your account*. Who acts is still decided by
 the session on the server; the name is only shown.
 
-**Evidence.** Live: [08](../screenshots/2026-10-11-channels-runtime-round/08-step-up-names-the-owner.png).
+**Evidence.** Verified live.
 
 ---
 
@@ -33296,7 +33223,7 @@ runs to parse the file — the same unreviewed code an unpinned base would be.
 
 **Fixed.** `raiker/runtime/mcp_secrets.py`. A secret is a variable name the owner gives one local server, its value in the encrypted connector vault under that server's id (`mcp_server_env:<server_id>`). `_run_session` adds it to that server's constructed environment and no other, and replaces each value in what the server writes back before anything reads it. Names that the launcher sets (`PATH`, `HOME`, …) or that configure the boundary are refused (`mcp_secret_name_reserved`); a remote server is refused (`mcp_secret_local_only`); removing the server removes its secrets. `GET/PUT/DELETE /api/mcp/servers/{id}/secrets[/{name}]` return names only, and the server list carries them as `vault_env` (a key the response redactor does not mistake for a secret). Extensions → MCP has **Secrets for this server** with a password field, and *What it can reach* names them as this server's only. Events `mcp_server_secret_set` / `_removed` carry the name, never the value.
 
-**Evidence.** `tests/test_mcp_server_secrets.py` (7 — a real local server sees its own secret and another server does not; a server that echoes its token hands back `[REDACTED_SECRET]`), three contract cases, `McpView.test.ts`. Live: `WEATHER_API_KEY` given to the generated `weather` sample through the page, Test connected with 2 tools, the value nowhere on the page ([06](../screenshots/2026-10-11-review-steps-round/06-mcp-server-secret.png)); at 390 wide, dark ([10](../screenshots/2026-10-11-review-steps-round/10-mcp-secrets-390-dark.png)).
+**Evidence.** `tests/test_mcp_server_secrets.py` (7 — a real local server sees its own secret and another server does not; a server that echoes its token hands back `[REDACTED_SECRET]`), three contract cases, `McpView.test.ts`. Live: `WEATHER_API_KEY` given to the generated `weather` sample through the page, Test connected with 2 tools, the value nowhere on the page; at 390 wide, dark.
 
 ---
 
@@ -33308,7 +33235,7 @@ runs to parse the file — the same unreviewed code an unpinned base would be.
 
 **Fixed.** `DELETE /api/execution-environments/{profile_id}`. Refused `409 execution_environment_in_use` with the count while commands run there (turning it off stops them first); refused `execution_environment_selected` when it is where work runs by default unless `move_to` names a ready replacement, which is selected before anything is removed. Only the profile row goes; command runs and cloud cost stay as evidence. Runtime has **Remove** on configured targets; for the default one the confirm names where work will run instead.
 
-**Evidence.** `tests/test_execution_environment_remove.py` (5), a contract case, `Runtime.test.ts` (3). Live: an SSH target added through the form and removed — *Build host was removed.* ([05](../screenshots/2026-10-11-review-steps-round/05-runtime-target-removed.png)).
+**Evidence.** `tests/test_execution_environment_remove.py` (5), a contract case, `Runtime.test.ts` (3). Live: an SSH target added through the form and removed — *Build host was removed.*
 
 ---
 
@@ -33320,7 +33247,7 @@ runs to parse the file — the same unreviewed code an unpinned base would be.
 
 **Fixed.** Each adapter reads one id out of the platform's answer (`provider_message_id`: Telegram's `result.message_id`, a webhook's `id` or `message_id`), short and plain or nothing; the rest of the body is dropped where it is read (`post_url(..., keep_body=True)`). The receipt keeps it (migration RAIKER-2103) and Messaging says *Delivered · the channel's id for it is …*.
 
-**Evidence.** `tests/test_channel_delivery_review.py`, `channelSetup.test.ts`. Live: a test to a local receiver read *Delivered · the channel's id for it is rcv-0001* ([03](../screenshots/2026-10-11-review-steps-round/03-delivery-id-and-review-list.png)).
+**Evidence.** `tests/test_channel_delivery_review.py`, `channelSetup.test.ts`. Live: a test to a local receiver read *Delivered · the channel's id for it is rcv-0001*.
 
 ---
 
@@ -33332,7 +33259,7 @@ runs to parse the file — the same unreviewed code an unpinned base would be.
 
 **Fixed.** Each channel lists **Deliveries to review** — outbound receipts that failed or whose outcome is unknown and are not yet reviewed — with the reason and what to do about it (fix it and resend from whatever asked, or check the channel before resending). **Mark reviewed** (`POST /api/channels/deliveries/{receipt_id}/reviewed`, event `channel_delivery_reviewed`) takes one off the list and changes nothing else; nothing is ever sent again on its own. The list is also an item on Home's attention feed (FIXED-873).
 
-**Evidence.** `tests/test_channel_delivery_review.py` (6), a contract case, `MessagingView.test.ts`. Live: a test refused by the closed capability on the list, then marked reviewed — off the list, still *failed* in the record, gone from Home ([03](../screenshots/2026-10-11-review-steps-round/03-delivery-id-and-review-list.png), [04](../screenshots/2026-10-11-review-steps-round/04-delivery-marked-reviewed.png)); at 390 wide, dark ([09](../screenshots/2026-10-11-review-steps-round/09-messaging-review-390-dark.png)).
+**Evidence.** `tests/test_channel_delivery_review.py` (6), a contract case, `MessagingView.test.ts`. Live: a test refused by the closed capability on the list, then marked reviewed — off the list, still *failed* in the record, gone from Home; at 390 wide, dark.
 
 ---
 
@@ -33344,7 +33271,7 @@ runs to parse the file — the same unreviewed code an unpinned base would be.
 
 **Fixed.** At start, beside the task-run settlement, `settle_unsettled_outbound_receipts` marks every outbound receipt still queued as `outcome_unknown_at` with `delivery_outcome_unknown`. It is put on the channel's review list as *Outcome unknown — Raiker stopped while sending it. It was not sent again.* The recovery matrix's channel row says so.
 
-**Evidence.** `tests/test_channel_delivery_review.py` (2), `test_recovery_matrix`. Live: a receipt seeded *queued* with the host down read *Outcome unknown* after the restart, and the receiver had still been sent one delivery in all ([08](../screenshots/2026-10-11-review-steps-round/08-outcome-unknown-after-restart.png)).
+**Evidence.** `tests/test_channel_delivery_review.py` (2), `test_recovery_matrix`. Live: a receipt seeded *queued* with the host down read *Outcome unknown* after the restart, and the receiver had still been sent one delivery in all.
 
 ---
 
@@ -33380,7 +33307,7 @@ runs to parse the file — the same unreviewed code an unpinned base would be.
 
 **Fixed.** Chat and Build send `retry_of_turn_id`; the server checks it is a turn of the same conversation before anything is bound or written (`422 retry_source_not_in_session`) and records the link in `turn_retries` (migration RAIKER-2104). Every read of the conversation carries it, and the retry says *Retry of an earlier turn — that turn is kept as it was*, linking back.
 
-**Evidence.** `tests/test_turn_retry_link.py` (5), `ChatView.test.ts`. Live: a Retry of a stand-in answer, still labelled after a reload ([01](../screenshots/2026-10-11-review-steps-round/01-retry-linked-to-its-source.png)).
+**Evidence.** `tests/test_turn_retry_link.py` (5), `ChatView.test.ts`. Live: a Retry of a stand-in answer, still labelled after a reload.
 
 ---
 
@@ -33404,7 +33331,7 @@ runs to parse the file — the same unreviewed code an unpinned base would be.
 
 **Fixed.** `GET /api/attention` (`raiker/control/dashboard_parts/attention.py`) reads each subsystem's own record on every call — security signals, approvals, blocked tasks, memory proposals, deliveries to review, held MCP tools — and returns items by reference (id, severity, title, reason, origin, the one action, since), containment first. An item disappears when its subsystem says it is resolved; a subsystem that cannot be read is listed in `unknown`, never counted as clear. Home renders the items its tiles do not already cover and withholds the all-clear while anything is unread.
 
-**Evidence.** `tests/test_attention_feed.py` (5), a contract case, `WorkbenchView.test.ts` (2). Live: *2 proposed memories to review* and *1 delivery on a channel needs a look* on Home, the delivery gone once marked reviewed ([02](../screenshots/2026-10-11-review-steps-round/02-home-attention-feed.png)).
+**Evidence.** `tests/test_attention_feed.py` (5), a contract case, `WorkbenchView.test.ts` (2). Live: *2 proposed memories to review* and *1 delivery on a channel needs a look* on Home, the delivery gone once marked reviewed.
 
 ---
 
@@ -33416,7 +33343,7 @@ runs to parse the file — the same unreviewed code an unpinned base would be.
 
 **Fixed.** `raiker/memory/review_priority.py` names each factor — expired or expiring, personal or unclassified sensitivity, written by Raiker and never edited, low confidence, replaced another, stale or never recalled — with a fixed weight; the priority is their sum, and a pin lowers it by one without exempting anything. Each memory carries `review_priority` and `review_reasons`. Memory → Overview leads with **Worth reviewing first** (reasons in words), the list filter **Worth reviewing** and the sort **Worth reviewing first**.
 
-**Evidence.** `tests/test_memory_review_priority.py` (6), `memoryLifecycle.test.ts`, `MemoryView.test.ts`. Live: an approved proposal listed with *Sensitivity not classified* ([07](../screenshots/2026-10-11-review-steps-round/07-memory-worth-reviewing.png)).
+**Evidence.** `tests/test_memory_review_priority.py` (6), `memoryLifecycle.test.ts`, `MemoryView.test.ts`. Live: an approved proposal listed with *Sensitivity not classified*.
 
 ---
 
@@ -33476,7 +33403,7 @@ runs to parse the file — the same unreviewed code an unpinned base would be.
 
 **Fixed.** Both go through `formatTimestamp`, the owner's date format.
 
-**Evidence.** `McpView.test.ts`, `Runtime.test.ts`; live at 390 wide ([10](../screenshots/2026-10-11-review-steps-round/10-mcp-secrets-390-dark.png)).
+**Evidence.** `McpView.test.ts`, `Runtime.test.ts`; live at 390 wide.
 
 ## FIXED-880 — The web client did not load over plain http to a LAN address
 
@@ -33653,7 +33580,7 @@ installation cases in `tests/test_api_contract_responses.py`.
 
 **Fixed.** When the owner's own Telegram message finishes its turn, the inbound route hands the answer to `RuntimeControlService.deliver_channel_reply`, which sends it through the governed `external_channel_runtime` executor as the owner — so the capability gate, a paused channel, the egress allowlist and the 4,096-character limit all still decide. An answer that the redaction pass would mask (keys, tokens, private keys, email addresses) or that the memory policy classes as credential- or secret-like is **held** instead: an outbound receipt with `held_at`, `reason_code = reply_held_sensitive`, the turn it carries and the message it answers, never the text. *Deliveries to review* offers **Read it**, **Send to chat** (`POST /api/channels/deliveries/{receipt_id}/send`, which re-reads the text from the conversation and sends it under the same receipt) and **Discard** (the existing *reviewed* mark). A held reply is not settled *outcome unknown* at start and is not trimmed with old receipts. The route now says *Sent back to your chat when you message Raiker*; another sender's message and a turn still waiting on an approval send nothing. Migration RAIKER-2110 adds `held_at`, `turn_id` and `reply_to_receipt_id`; events `channel_reply_delivered`, `channel_reply_failed`, `channel_reply_held`.
 
-**Evidence.** `tests/test_channel_telegram_reply.py` (7), a contract case for the send route, `MessagingView.test.ts`, `channelSetup.test.ts`. Live: a real Anthropic turn answered the owner's Telegram update and the send left through the governed path — Telegram refused the round's placeholder bot token, which the receipt names — and an answer carrying an email address was held with Send to chat and Discard ([05](../screenshots/2026-10-13-ledger-round/05-messaging-held-and-failed-replies.png), [06](../screenshots/2026-10-13-ledger-round/06-route-says-replies-go-back.png), [07](../screenshots/2026-10-13-ledger-round/07-messaging-review-390-dark.png)). A real bot's delivered message is not proved: this host has no Telegram account.
+**Evidence.** `tests/test_channel_telegram_reply.py` (7), a contract case for the send route, `MessagingView.test.ts`, `channelSetup.test.ts`. Live: a real Anthropic turn answered the owner's Telegram update and the send left through the governed path — Telegram refused the round's placeholder bot token, which the receipt names — and an answer carrying an email address was held with Send to chat and Discard. A real bot's delivered message is not proved: this host has no Telegram account.
 
 ---
 
@@ -33665,7 +33592,7 @@ installation cases in `tests/test_api_contract_responses.py`.
 
 **Fixed.** Words about the shape of the answer (*answer*, *reply*, *respond*, *sentence(s)*, *briefly*, *concisely*, *paragraph(s)*, *bullet(s)*) join the stopwords the strict match ignores. When the strict match still finds nothing, `search_approved_memory` asks the index again with the words OR-ed, reads a bounded candidate set in the index's own ranking, and admits a record only when it holds at least two thirds of the content words and never fewer than two; such a row carries `recall_match = "partial"`. Every eligibility condition — owner, scope, expiry, validity, supersession, sensitivity — is the same query's.
 
-**Evidence.** `tests/test_memory_retrieval_hardening.py` (3 new): the tea sentence and *Reply briefly* recall it; two of three words do, two of four and an unrelated overlap do not; another scope or owner never does. Live: a real Haiku 5.5 turn asked the original sentence, was given the memory and answered *Your favourite tea is Assam with a splash of oat milk.* ([03](../screenshots/2026-10-13-ledger-round/03-recall-despite-the-instruction.png)).
+**Evidence.** `tests/test_memory_retrieval_hardening.py` (3 new): the tea sentence and *Reply briefly* recall it; two of three words do, two of four and an unrelated overlap do not; another scope or owner never does. Live: a real Haiku 5.5 turn asked the original sentence, was given the memory and answered *Your favourite tea is Assam with a splash of oat milk.*
 
 ---
 
@@ -33677,7 +33604,7 @@ installation cases in `tests/test_api_contract_responses.py`.
 
 **Fixed.** The server's boundary view (`GET /api/build/boundary`) carries `works_in`, the folder relative paths resolve against. The composer reads **Filed in *project* · works in *workspace***, and the inspector lists *Filed in* then *Works in — reads, writes and commands start here* before repository, environment and model.
 
-**Evidence.** `tests/test_build_boundary.py`, `BuildView.test.ts` (2). Live: *Filed in Garden planner · works in live-ws* ([04](../screenshots/2026-10-13-ledger-round/04-build-filed-in-and-works-in.png)).
+**Evidence.** `tests/test_build_boundary.py`, `BuildView.test.ts` (2). Live: *Filed in Garden planner · works in live-ws*.
 
 ---
 
@@ -33725,7 +33652,7 @@ installation cases in `tests/test_api_contract_responses.py`.
 
 **Fixed.** The recommendation reads what the provider said when its models were listed (`ProviderMatrix` reports each listing upward) and the stored readiness reason; before a hosted provider is recommended as connected, setup asks it once what it serves. A key that needs its workspace is recommended as **Anthropic needs its workspace ID**, with **Add the workspace ID** opening the providers and focusing that field; another working provider is preferred over it.
 
-**Evidence.** `firstRun.test.ts` (4), `ModelSetupView.test.ts` (2). Live, with the owner's key and workspace ID typed into setup: the recommendation asked for the workspace, the field took focus, and with it Anthropic listed 14 models and Haiku 5.5 became the default ([01](../screenshots/2026-10-13-ledger-round/01-setup-asks-for-the-workspace.png), [02](../screenshots/2026-10-13-ledger-round/02-workspace-added-models-listed.png)).
+**Evidence.** `firstRun.test.ts` (4), `ModelSetupView.test.ts` (2). Live, with the owner's key and workspace ID typed into setup: the recommendation asked for the workspace, the field took focus, and with it Anthropic listed 14 models and Haiku 5.5 became the default.
 
 ---
 
@@ -34051,7 +33978,7 @@ installation cases in `tests/test_api_contract_responses.py`.
 
 **Fixed.** `raiker/models/local_service.py` records each served model's location (`device`, or the host Ollama names; a Cloud-named model with no `remote_host` is treated as remote) and `ModelProfileView.model_locations` carries it. One rule, `web/src/lib/inferenceLocation.ts`, decides the wording everywhere: setup's recommendation earns the device claim only when every served model runs here and otherwise names ollama.com; the chosen model's line says where its requests go; the privacy step names the chosen model's destination; the comparison and Models' *Cloud inference* chip use the same rule.
 
-**Evidence.** `tests/test_local_model_service.py`, `inferenceLocation.test.ts`, `firstRun.test.ts`, `modelComparison.test.ts`. Live: `web/e2e/bug-340-ollama-cloud-location-live.spec.ts` on a reset workspace against the real Ollama 0.40.5 on this host — no screen claims the device for the cloud model, and the turn was answered `RAIKER_E2E_OK` by `gpt-oss:20b-cloud` with the runtime's *model request completed* receipt (`docs/screenshots/2026-10-17-bug-340-ollama-cloud/01`–`06`). The *Local only* choice beside it is still unenforced — raised as [BUG-345](#fixed-947--local-only-was-a-setup-answer-nothing-enforced-was-bug-345).
+**Evidence.** `tests/test_local_model_service.py`, `inferenceLocation.test.ts`, `firstRun.test.ts`, `modelComparison.test.ts`. Live: `web/e2e/bug-340-ollama-cloud-location-live.spec.ts` on a reset workspace against the real Ollama 0.40.5 on this host — no screen claims the device for the cloud model, and the turn was answered `RAIKER_E2E_OK` by `gpt-oss:20b-cloud` with the runtime's *model request completed* receipt. The *Local only* choice beside it is still unenforced — raised as [BUG-345](#fixed-947--local-only-was-a-setup-answer-nothing-enforced-was-bug-345).
 
 ---
 
@@ -34079,7 +34006,7 @@ installation cases in `tests/test_api_contract_responses.py`.
 
 **Fixed.** `LoginView.svelte` draws the credentials form under `{#key registerIntent}`, so the switch from sign-in to registration replaces the form whole. The keyboard path, password visibility and the disabled-while-verifying state are unchanged. The lock screen's `<main>` also gained the `id="main"` its skip link targets.
 
-**Evidence.** `LoginView.test.ts` (19). Headed Chromium on three fresh workspaces: no `[DOM]` diagnostic (three of three reproduced before). axe on the first-run form: 0 violations (was `region`, `skip-link`). Capture: `docs/screenshots/2026-10-17-bug-341-bootstrap/01-first-run-form-no-password-diagnostic.png`.
+**Evidence.** `LoginView.test.ts` (19). Headed Chromium on three fresh workspaces: no `[DOM]` diagnostic (three of three reproduced before). axe on the first-run form: 0 violations (was `region`, `skip-link`).
 
 ---
 
@@ -34105,7 +34032,7 @@ The full Windows run for this round found two more POSIX assumptions, both faili
 
 **Observed.** The 2026-10-04 round had driven detection, choice, readiness and a turn against `scripts/live_ollama_standin.py`, because that host could not download Ollama.
 
-**Evidence.** `round-2026-10-04-ollama-and-readiness-live.spec.ts` first test, brought up to the product (setup's Check stage; a real answer instead of the stand-in's sentence, and a refusal no longer passes as one), against the Ollama desktop app 0.40.5 serving twelve models, with `raiker-web` started on a `PATH` that excludes Ollama's folder: detected as running, `gemma3:1b` chosen and Ready, remembered, and a real answer ("Hello!") in Chat (`docs/screenshots/2026-10-04-ollama-readiness-round/01`–`05`). The round found [FIXED-927](#fixed-927--a-ready-ollama-model-without-tool-support-failed-every-turn-with-http-400). The stop-and-start half still runs only with the stand-in's pidfile; stopping the owner's real Ollama was not done.
+**Evidence.** `round-2026-10-04-ollama-and-readiness-live.spec.ts` first test, brought up to the product (setup's Check stage; a real answer instead of the stand-in's sentence, and a refusal no longer passes as one), against the Ollama desktop app 0.40.5 serving twelve models, with `raiker-web` started on a `PATH` that excludes Ollama's folder: detected as running, `gemma3:1b` chosen and Ready, remembered, and a real answer ("Hello!") in Chat. The round found [FIXED-927](#fixed-927--a-ready-ollama-model-without-tool-support-failed-every-turn-with-http-400). The stop-and-start half still runs only with the stand-in's pidfile; stopping the owner's real Ollama was not done.
 
 ---
 
@@ -34113,7 +34040,7 @@ The full Windows run for this round found two more POSIX assumptions, both faili
 
 **Severity: Low. Area: Weather / live provider evidence. Status: Fixed 2026-10-18 (BUG-280 remainder; the clock half was [FIXED-539](#fixed-539--a-real-turn-now-answers-from-raikers-clock-and-the-weather-half-still-cannot-be-measured-here)).**
 
-**Evidence.** This host reaches `api.open-meteo.com`. `web/e2e/bug-280-weather-from-a-real-provider-live.spec.ts`, with `gpt-oss:20b-cloud` through the local Ollama: the zone and default place set through Settings, then *"What is today's date … what is the weather here right now?"* answered *"Today is 2026-10-18 (Sunday). The current weather in Edinburgh … Clear sky, 5.5 °C … observed at 2026-10-18T00:15. This reading comes from the Open-Meteo provider"*, with the weather source chip and *Evidence: 1 call · 1 source* (`docs/screenshots/2026-10-17-bug-280-weather/`). The round found [FIXED-928](#fixed-928--choosing-the-value-already-saved-marked-settings-unsaved-and-held-the-owner-there).
+**Evidence.** This host reaches `api.open-meteo.com`. `web/e2e/bug-280-weather-from-a-real-provider-live.spec.ts`, with `gpt-oss:20b-cloud` through the local Ollama: the zone and default place set through Settings, then *"What is today's date … what is the weather here right now?"* answered *"Today is 2026-10-18 (Sunday). The current weather in Edinburgh … Clear sky, 5.5 °C … observed at 2026-10-18T00:15. This reading comes from the Open-Meteo provider"*, with the weather source chip and *Evidence: 1 call · 1 source*. The round found [FIXED-928](#fixed-928--choosing-the-value-already-saved-marked-settings-unsaved-and-held-the-owner-there).
 
 ---
 
@@ -34191,7 +34118,7 @@ The full Windows run for this round found two more POSIX assumptions, both faili
 
 **Fixed.** DeepSeek, Groq, Mistral, xAI, Together AI, Fireworks, NVIDIA NIM and Cerebras ship as ordinary OpenAI-compatible profiles (`<provider>-hosted`), each with its own card, key source, accent colour and brand-neutral mark. They inherit every existing rule: off until the owner connects them, the key sent as a bearer token to that provider's own host only, catalogue, readiness, fallback and spend tracking as for any provider. The comparison and the remaining gaps (named custom endpoints, credential pools, per-task auxiliary models, OpenRouter routing preferences, context-length pin) are in [MODEL_PROVIDER_CONTRACT.md](../architecture/MODEL_PROVIDER_CONTRACT.md#provider-breadth-and-resilience-comparison-with-reference-personal-agent-2026-10-18).
 
-**Evidence.** `tests/test_hosted_provider_presets.py` (24); each base URL answered from this host on 2026-10-18; Models → Add model shows the cards and the DeepSeek connect dialog (`docs/screenshots/2026-10-18-hermes-providers/`).
+**Evidence.** `tests/test_hosted_provider_presets.py` (24); each base URL answered from this host on 2026-10-18; Models → Add model shows the cards and the DeepSeek connect dialog.
 
 ---
 
@@ -34225,7 +34152,7 @@ The full Windows run for this round found two more POSIX assumptions, both faili
 
 **Fixed.** Four `generic-openai-compatible` slots ship. Each saved connection carries the owner's **Name** for it (`label`, one line, at most 40 characters), stored beside the endpoint and key; naming alone keeps the key and re-pasting the key keeps the name. Models shows the first slot and any slot that is set up, with **+ Add another endpoint** for the next; card titles, the model-picker dialog and the composer's model menu use the name, and each named endpoint is its own group there. The address still decides the gate (loopback none, private network **Home-lab models**, internet **Hosted models**).
 
-**Evidence.** `tests/test_named_custom_endpoints.py` (5), `ModelsView.test.ts`. Live: two endpoints named *Local Ollama API* and *Second box* pointing at this host's Ollama `/v1`, Gemma 3:1B kept on the first, chosen in the composer under its group *Local Ollama API*, answered *Hello!* (`docs/screenshots/2026-10-18-hermes-providers/03`–`07`). The round found that **+ Add another endpoint** opened the dialog for the slot after the one it revealed, fixed before commit, and FIXED-936.
+**Evidence.** `tests/test_named_custom_endpoints.py` (5), `ModelsView.test.ts`. Live: two endpoints named *Local Ollama API* and *Second box* pointing at this host's Ollama `/v1`, Gemma 3:1B kept on the first, chosen in the composer under its group *Local Ollama API*, answered *Hello!*. The round found that **+ Add another endpoint** opened the dialog for the slot after the one it revealed, fixed before commit, and FIXED-936.
 
 ---
 
@@ -34257,7 +34184,7 @@ The full Windows run for this round found two more POSIX assumptions, both faili
 
 **Fixed.** `raiker/models/side_tasks.py` keeps, per owner, an ordered chain of up to three models for **summarise** and **vision** (`PUT /api/model-side-tasks`, gate-manager only; the models view returns `side_tasks`). Compaction tries the summarising chain and then the turn's own model, recording which model wrote the summary. When the turn's model cannot see an attached image, the vision chain describes it and the description joins the prompt as text, marked as a description and as untrusted content, with `attachment_image_described` naming the model (`attachment_image_description_failed` per failure); with no chain the image is withheld as before. A vision chain refuses a model that does not accept images. **Runtime & routing → Side-task models** edits both.
 
-**Evidence.** `tests/test_side_task_models.py` (6), `SideTaskModels.test.ts` (2). Live: `gemma3:1b` (no vision) was asked what an attached image says; the vision chain (`gemma4:31b-cloud` through Ollama) described it and `gemma3:1b` answered *BLUE 42*, the text drawn in the image (`docs/screenshots/2026-10-18-hermes-providers/08`–`09`).
+**Evidence.** `tests/test_side_task_models.py` (6), `SideTaskModels.test.ts` (2). Live: `gemma3:1b` (no vision) was asked what an attached image says; the vision chain (`gemma4:31b-cloud` through Ollama) described it and `gemma3:1b` answered *BLUE 42*, the text drawn in the image.
 
 ---
 
@@ -34291,7 +34218,7 @@ The full Windows run for this round found two more POSIX assumptions, both faili
 
 **Fixed.** `POST /api/models/{profile_id}/server-check` (Ollama, LM Studio, llama.cpp, MLX and OpenAI-compatible profiles only) sends one request with one harmless tool through the same governed provider path a turn uses, with native tool-call parsing only so a text reply is never mistaken for a call, and classifies it native, as text, refused, not called or unavailable. It reads the serving context from a loopback server's own status endpoint (Ollama `/api/ps`, llama.cpp `/props`, LM Studio `/api/v0/models`, vLLM `/v1/models`), never from an off-machine host, and names the setting that fixes each finding. **Details → Check this server** shows it.
 
-**Evidence.** `tests/test_server_check.py` (8), `ModelDetailsDialog.test.ts`. Live against this host's Ollama: `gemma3:1b` refused, `gpt-oss:20b-cloud` native, `qwen2.5-coder:7b` returned as text with 32,768 tokens serving (`docs/screenshots/2026-10-18-hermes-providers/10`).
+**Evidence.** `tests/test_server_check.py` (8), `ModelDetailsDialog.test.ts`. Live against this host's Ollama: `gemma3:1b` refused, `gpt-oss:20b-cloud` native, `qwen2.5-coder:7b` returned as text with 32,768 tokens serving.
 
 ---
 
@@ -34303,7 +34230,7 @@ The full Windows run for this round found two more POSIX assumptions, both faili
 
 **Fixed.** Details carries a **Context window override** form (tokens, reason, **Save override**, **Clear override** when one is set) on the same governed route, and reads the profile from the page's latest view. A turn's context lookup resolves a shared slot's profile id to its provider first, so an override saved for a custom endpoint is the one its turns use.
 
-**Evidence.** `ModelDetailsDialog.test.ts`. Live: 65,536 saved with a reason; the dialog then read *65,536 tokens · Administrator override* (`docs/screenshots/2026-10-18-hermes-providers/11`).
+**Evidence.** `ModelDetailsDialog.test.ts`. Live: 65,536 saved with a reason; the dialog then read *65,536 tokens · Administrator override*.
 
 ---
 
@@ -34383,8 +34310,7 @@ UI. Anthropic Haiku 4.5, OpenAI GPT-4o Mini and OpenRouter GPT-4o Mini each
 answered the same owner-name question with **Rahul S**, not an internal
 `principal_user_…` identifier. The existing live Ollama scenario asked the same
 question through `gpt-oss:20b-cloud` and also received the chosen name. Browser
-captures for all four answers were reviewed; the Ollama capture remains at
-`docs/screenshots/2026-09-13-release-readiness/identity-answered-by-name-ollama.png`.
+captures for all four answers were reviewed.
 
 **Harness evidence.** `owner-identity-live.spec.ts` keeps the real-turn contract,
 including the assertion that the response contains the chosen name and excludes
@@ -34720,11 +34646,7 @@ passed **2/2** against a `raiker-web` on a workspace reset with
 for Build** pressed, a check declared on a new project, then a Build turn whose
 accepted `write_file` wrote `notes.txt` (`hello from Build`, read back from
 disk), its row read **Write file notes.txt done**, and the outcome read **Not
-verified** with `python -m pytest -q` *not run after the last change*. Captures
-`02-set-up-for-build.png`, `03-waiting-on-you.png` and
-`04-accepted-write-not-verified.png` (under
-`docs/screenshots/2026-10-18-br-d01-build-outcome/`, not committed) were
-reviewed. No provider key was typed; the model was the existing Ollama Cloud
+verified** with `python -m pytest -q` *not run after the last change*. No provider key was typed; the model was the existing Ollama Cloud
 sign-in.
 
 **Not changed here.** A managed project's Build turn still writes the path the
@@ -34824,9 +34746,7 @@ workspace ID: the chip read `main · 6e99715 · This computer`; a real
 outcome read **Not verified** — no checks declared — *Ran in app on main from
 6e99715*; and with the folder moved away the header said so and the turn
 answered *The repository folder app is no longer in the workspace, so this Build
-turn did not start* with no file written. Captures `01-build-target-chip.png`,
-`02-real-turn-outcome-target.png` and `05-missing-target-refused.png` (under
-`docs/screenshots/2026-10-19-br-d02-d04-build-target-review/`, not committed) were reviewed.
+turn did not start* with no file written.
 
 ## FIXED-956 — A patch was shown, never reviewed, and every look was a new look (BR-D04, first slice)
 
@@ -34963,7 +34883,7 @@ carried `Raiker-Session` and `Raiker-Turn`, `svc`'s own HEAD did not move, and
 **Recent commits** read **Made in Raiker** for it and nothing for `init`;
 **Remove worktree** with an untracked file in it was refused and the file stayed,
 and once clean the worktree went and `raiker/notes` still held the commit.
-Captures under `docs/screenshots/2026-10-19-br-d02-d05-worktree-provenance/` (not committed) were reviewed. Reviewing them found the removal refusal printed under the connect form at the foot of the panel, far from the button that raised it; worktree refusals now render beside the repository list, re-checked live on a second worktree (`raiker/second`: refused while dirty, removed once clean, branch kept).
+The live review found the removal refusal printed under the connect form at the foot of the panel, far from the button that raised it; worktree refusals now render beside the repository list, re-checked live on a second worktree (`raiker/second`: refused while dirty, removed once clean, branch kept).
 
 ## FIXED-960 — A parked Build turn resumed wherever the repository had moved to (BR-07)
 
@@ -35094,7 +35014,7 @@ turn the owner reads and sends, under the same modes and approvals, and the
 review cannot loop on itself.
 
 **Evidence.** `PatchReview.test.ts` (the request text, and no request made by the
-click). Live: `br-d04-review-repair-live.spec.ts` against a fresh `raiker-web` with Anthropic connected through Models: a file broken so it no longer parses read *File does not parse* `calc.py:4` (*'(' was never closed.*); **Ask Raiker to fix** put *Fix this patch review finding in calc.py at line 4: File does not parse…* in the composer and sent nothing; sent, a real `claude-haiku-4-5` turn repaired the file after the owner's **Accept**; Changes then said the last review was of an earlier version, and reviewing again listed *File does not parse* under **Fixed since the last review**. Running it found [FIXED-968](#fixed-968--changes-kept-showing-the-tree-from-before-accept-applied-a-change) and a missing space in the resolved list, both fixed. Captures under `docs/screenshots/2026-10-19-br-d04-review-repair/` (not committed) were reviewed.
+click). Live: `br-d04-review-repair-live.spec.ts` against a fresh `raiker-web` with Anthropic connected through Models: a file broken so it no longer parses read *File does not parse* `calc.py:4` (*'(' was never closed.*); **Ask Raiker to fix** put *Fix this patch review finding in calc.py at line 4: File does not parse…* in the composer and sent nothing; sent, a real `claude-haiku-4-5` turn repaired the file after the owner's **Accept**; Changes then said the last review was of an earlier version, and reviewing again listed *File does not parse* under **Fixed since the last review**. Running it found [FIXED-968](#fixed-968--changes-kept-showing-the-tree-from-before-accept-applied-a-change) and a missing space in the resolved list, both fixed.
 
 ## FIXED-967 — Provenance, review and scheduled Build runs were invisible where the owner decides (BR-D03, BR-D05)
 
@@ -35934,8 +35854,7 @@ EGR-28), `tests/test_phase_4_hosted_model_runtime.py`,
 `providerErrors.test.ts`. Live: `web/e2e/model-connection-authorization-live.spec.ts`
 2/2 on a fresh workspace with `RAIKER_MODEL_EGRESS_ALLOWLIST` set to an
 unrelated host — one log notice, neither the variable's value nor the key in
-the log or `/api/models`
-(`docs/screenshots/2026-10-20-model-connection-authorization/`). Against a real
+the log or `/api/models`. Against a real
 provider, `model-connection-anthropic-live.spec.ts` 4/4: an identity-linked
 Anthropic key and workspace ID entered in **Connect** reached *can reach* and
 answered a Haiku 4.5 turn with no allowlist anywhere
@@ -36087,8 +36006,7 @@ After it, the posture reads *Off* and a connected card reads **Policy blocked**.
 
 **Evidence.** `test_permissions_report_hosted_models_on_by_connection_and_revocable`,
 `permissionLanguage.test.ts` (on by connection, revocable), live LC-03 in
-`model-connection-anthropic-live.spec.ts`
-(`docs/screenshots/2026-10-20-model-connection-anthropic/04a`, `04`, `05`).
+`model-connection-anthropic-live.spec.ts`.
 
 ## FIXED-1021 — A hosted model name was dialled wherever its DNS answer pointed (was BUG-349)
 

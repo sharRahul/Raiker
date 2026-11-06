@@ -33,7 +33,7 @@ test.describe.configure({ mode: "serial" });
 
 const WORKSPACE_ID = process.env.RAIKER_LIVE_ANTHROPIC_WORKSPACE_ID ?? "";
 const RESTART = process.env.RAIKER_LIVE_RESTART_COMMAND ?? "";
-const SHOTS = join(import.meta.dirname, "..", "..", "docs", "screenshots", "2026-10-20-dw-design-round-two");
+const SHOTS = join(import.meta.dirname, "..", "..", "output", "playwright", "2026-10-20-dw-design-round-two");
 const TITLE = `Round two ${Date.now()}`;
 
 /** A small solid PNG, built here so the round needs no fixture file. */

@@ -29,7 +29,7 @@ import { ANTHROPIC_KEY as KEY, ANTHROPIC_MODEL as MODEL, LIVE_BASE as BASE } fro
 test.describe.configure({ mode: "serial" });
 
 const WORKSPACE_ID = process.env.RAIKER_LIVE_ANTHROPIC_WORKSPACE_ID ?? "";
-const SHOTS = process.env.RAIKER_LIVE_SHOTS ?? "../../docs/screenshots/2026-10-22-quiet-ui-permissions";
+const SHOTS = process.env.RAIKER_LIVE_SHOTS ?? "../../output/playwright/2026-10-22-quiet-ui-permissions";
 const SERVED_WORKSPACE = process.env.RAIKER_LIVE_WORKSPACE ?? "";
 const PYTHON = process.env.RAIKER_LIVE_PYTHON ?? "";
 

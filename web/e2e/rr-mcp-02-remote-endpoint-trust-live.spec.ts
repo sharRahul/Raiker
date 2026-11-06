@@ -22,7 +22,7 @@ import { capture } from "./capture";
 import { signInAsOwner } from "./hosted-provider";
 import { LIVE_BASE as BASE } from "./live";
 
-const SHOTS = "../../docs/screenshots/2026-09-13-mcp-endpoint-trust";
+const SHOTS = "../../output/playwright/2026-09-13-mcp-endpoint-trust";
 
 /** Open Extensions → MCP servers, signed in. */
 async function mcpTab(page: Page): Promise<void> {

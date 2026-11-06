@@ -55,7 +55,7 @@ test("capture every application page from a live instance", async ({ page }) => 
     // Found 2026-09-15. This wrote the page catalogue into
     // `docs/plans/screenshots/pages/`, which `docs/plans/README.md` describes
     // as *historical* evidence that "may intentionally contain obsolete
-    // states", while `docs/screenshots/README.md` names exactly one generator
+    // states", while `output/playwright/README.md` names exactly one generator
     // for the current catalogue — `ui-sweep-responsive-live` — and one place
     // for it. So two trees each claimed to be the page catalogue, the
     // historical one was the one being kept current, and the canonical one was

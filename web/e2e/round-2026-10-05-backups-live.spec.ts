@@ -22,7 +22,7 @@ import { chooseModelForTurn, signInAsOwner } from "./hosted-provider";
 import { ANTHROPIC_MODEL, LIVE_BASE, sendTurn, useAnthropic } from "./live";
 
 const BASE = LIVE_BASE;
-const SHOTS = join(import.meta.dirname, "..", "..", "docs", "screenshots", "2026-10-05-backups-round");
+const SHOTS = join(import.meta.dirname, "..", "..", "output", "playwright", "2026-10-05-backups-round");
 const REPO = join(import.meta.dirname, "..", "..");
 const PYTHON = process.env.RAIKER_LIVE_PYTHON ?? "python";
 const WORKSPACE = process.env.RAIKER_LIVE_WORKSPACE ?? "";

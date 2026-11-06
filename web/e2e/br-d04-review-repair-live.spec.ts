@@ -29,7 +29,7 @@ test.describe.configure({ mode: "serial" });
 
 const WORKSPACE = process.env.RAIKER_LIVE_WORKSPACE ?? "";
 const WORKSPACE_ID = process.env.RAIKER_LIVE_ANTHROPIC_WORKSPACE_ID ?? "";
-const SHOTS = join(import.meta.dirname, "..", "..", "docs", "screenshots", "2026-10-19-br-d04-review-repair");
+const SHOTS = join(import.meta.dirname, "..", "..", "output", "playwright", "2026-10-19-br-d04-review-repair");
 const REPO = "calc";
 
 test.skip(WORKSPACE === "" || KEY === "", "RAIKER_LIVE_WORKSPACE or RAIKER_LIVE_ANTHROPIC_KEY is unset");

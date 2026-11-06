@@ -24,7 +24,7 @@ test.describe.configure({ mode: "serial" });
 const OLLAMA_MODEL = process.env.RAIKER_LIVE_OLLAMA_CLOUD_MODEL ?? "gpt-oss:120b-cloud";
 const OLLAMA_MODEL_LABEL = process.env.RAIKER_LIVE_OLLAMA_CLOUD_LABEL ?? "GPT oss:120B Cloud";
 
-const SHOTS = join(import.meta.dirname, "..", "..", "docs", "screenshots", "2026-10-18-br-d01-build-outcome");
+const SHOTS = join(import.meta.dirname, "..", "..", "output", "playwright", "2026-10-18-br-d01-build-outcome");
 const CHECK = "python -m pytest -q";
 
 test("the owner's checks are saved on the project and read back after a reload", async ({ page }) => {

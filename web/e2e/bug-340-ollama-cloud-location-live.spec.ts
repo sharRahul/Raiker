@@ -19,7 +19,7 @@ import { OWNER_CREDENTIALS } from "./hosted-provider";
 import { LIVE_BASE, sendTurn } from "./live";
 
 const BASE = LIVE_BASE;
-const SHOTS = join(import.meta.dirname, "..", "..", "docs", "screenshots", "2026-10-17-bug-340-ollama-cloud");
+const SHOTS = join(import.meta.dirname, "..", "..", "output", "playwright", "2026-10-17-bug-340-ollama-cloud");
 const CLOUD_LABEL = process.env.RAIKER_LIVE_OLLAMA_CLOUD_LABEL ?? "GPT oss:20B Cloud";
 const DEVICE_CLAIM = /never leave this device|runs on this device/i;
 

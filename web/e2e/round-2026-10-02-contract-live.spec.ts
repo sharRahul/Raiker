@@ -22,7 +22,7 @@ import {
 import { LIVE_BASE, sendTurn, useAnthropic } from "./live";
 
 const BASE = LIVE_BASE;
-const SHOTS = join(import.meta.dirname, "..", "..", "docs", "screenshots", "2026-10-02-contract-round");
+const SHOTS = join(import.meta.dirname, "..", "..", "output", "playwright", "2026-10-02-contract-round");
 const HAIKU = /Haiku 4\.5/i;
 
 test.describe.configure({ mode: "serial" });

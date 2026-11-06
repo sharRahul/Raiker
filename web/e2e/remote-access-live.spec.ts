@@ -36,7 +36,7 @@ const CERT = process.env.RAIKER_LIVE_TLS_CERT ?? "";
 const KEY = process.env.RAIKER_LIVE_TLS_KEY ?? "";
 const STATE = process.env.RAIKER_LIVE_REMOTE_STATE ?? "";
 const REMOTE = `https://${HOST}:${PORT}`;
-const SHOTS = process.env.RAIKER_LIVE_SHOTS ?? "../../docs/screenshots/2026-10-26-remote-access";
+const SHOTS = process.env.RAIKER_LIVE_SHOTS ?? "../../output/playwright/2026-10-26-remote-access";
 
 function secret(): string {
   return (JSON.parse(readFileSync(STATE, "utf8")) as { secret: string }).secret;

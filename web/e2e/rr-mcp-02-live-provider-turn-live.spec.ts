@@ -19,7 +19,7 @@ import { capture } from "./capture";
 import { chooseModelForTurn, signInAsOwner } from "./hosted-provider";
 import { LIVE_BASE as BASE, ANTHROPIC_KEY as KEY, useAnthropic } from "./live";
 
-const SHOTS = "../../docs/screenshots/2026-09-13-mcp-endpoint-trust";
+const SHOTS = "../../output/playwright/2026-09-13-mcp-endpoint-trust";
 
 test.skip(KEY === "", "RAIKER_LIVE_ANTHROPIC_KEY is unset");
 

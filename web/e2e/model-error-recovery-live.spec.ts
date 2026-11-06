@@ -10,7 +10,7 @@ import { captureElement } from "./capture";
 
 const SETTINGS = `${BASE}/#/settings?tab=advanced&kind=models`;
 const fail = { status: 503, contentType: "application/json", body: '{"detail":{"reason_code":"injected_failure"}}' };
-const shots = "../../docs/screenshots/2026-11-06-model-recovery";
+const shots = "../../output/playwright/2026-11-06-model-recovery";
 test.describe.configure({ mode: "serial", timeout: 120_000 });
 
 test("RT-MODEL-RECOVERY-01: library read failure offers recovery on a phone", async ({ page }) => {

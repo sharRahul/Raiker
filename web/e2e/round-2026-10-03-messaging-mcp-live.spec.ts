@@ -18,7 +18,7 @@ import { chooseModelForTurn, enableCapability, signInAsOwner } from "./hosted-pr
 import { LIVE_BASE, sendTurn, useAnthropic } from "./live";
 
 const BASE = LIVE_BASE;
-const SHOTS = join(import.meta.dirname, "..", "..", "docs", "screenshots", "2026-10-03-messaging-mcp-round");
+const SHOTS = join(import.meta.dirname, "..", "..", "output", "playwright", "2026-10-03-messaging-mcp-round");
 const SECRET = process.env.RAIKER_LIVE_CHANNEL_SECRET ?? "";
 const SINK_LOG = process.env.RAIKER_LIVE_SINK_LOG ?? "/tmp/claude-0/sink/received.jsonl";
 const SINK_URL = "http://127.0.0.1:8799/raiker-hook";

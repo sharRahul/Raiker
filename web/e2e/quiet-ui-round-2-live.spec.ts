@@ -20,7 +20,7 @@ import { ANTHROPIC_KEY as KEY, LIVE_BASE as BASE } from "./live";
 
 test.describe.configure({ mode: "serial" });
 
-const SHOTS = process.env.RAIKER_LIVE_SHOTS ?? "../../docs/screenshots/2026-10-21-quiet-ui-round-2";
+const SHOTS = process.env.RAIKER_LIVE_SHOTS ?? "../../output/playwright/2026-10-21-quiet-ui-round-2";
 
 async function openHome(page: Page): Promise<void> {
   await page.goto(`${BASE}/#/home`);

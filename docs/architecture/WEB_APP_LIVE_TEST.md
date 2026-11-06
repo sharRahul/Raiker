@@ -32,8 +32,7 @@ in three phases — `configure` **3/3**, then the harness restarts the host,
 `remote` **5/5**, then the harness saves a setting whose certificate it then
 deletes and restarts, `failclosed` **1/1** — and
 `web/e2e/bug-347-proxied-loopback-live.spec.ts` against the same workspace
-restarted with `--proxy-port 8766`: **3/3**. Screenshots:
-`docs/screenshots/2026-10-26-remote-access/`, `docs/screenshots/2026-10-26-bug-347/`.
+restarted with `--proxy-port 8766`: **3/3**.
 
 Run it with `RAIKER_LIVE_REMOTE_PHASE`, `RAIKER_LIVE_REMOTE_STATE`,
 `RAIKER_LIVE_TLS_CERT` and `RAIKER_LIVE_TLS_KEY` set (the spec header lists
@@ -68,8 +67,7 @@ a connection is classified by the listener it arrived on, not by its headers.
 A fresh workspace served by
 `RAIKER_OWNER_TOKEN=… raiker-web --port 8765 --proxy-port 8766` at 1440×900. No
 model or key is needed. Spec: `web/e2e/bug-347-proxied-loopback-live.spec.ts`
-with `RAIKER_LIVE_PROXY_BASE=http://127.0.0.1:8766`: **3/3**. Screenshots:
-`docs/screenshots/2026-10-26-bug-347/`.
+with `RAIKER_LIVE_PROXY_BASE=http://127.0.0.1:8766`: **3/3**.
 
 | Case | Check | Result |
 |---|---|---|
@@ -89,7 +87,7 @@ The owner's decision on remote access
 [FIXED-1265](../plans/FIXED_ITEMS.md#fixed-1265--uvicorn-rewrote-the-socket-peer-from-x-forwarded-for-found-fixing-bug-347)),
 checked on a fresh workspace served by `raiker-web` on `127.0.0.1` at 1440×900.
 No model or key is needed. Spec: `web/e2e/bug-347-proxied-loopback-live.spec.ts`:
-**2/2**. Screenshot: `docs/screenshots/2026-10-26-bug-347/`.
+**2/2**.
 
 | Case | Check | Result |
 |---|---|---|
@@ -109,7 +107,6 @@ through **Add model**, with the key and workspace ID typed from the run's
 environment; neither appears in a spec, command, document, screenshot or the
 server log. Spec: `web/e2e/quiet-ui-features-2-live.spec.ts`, developed against
 earlier workspaces, then run whole on a fresh one: **10/10 in 4.7 min**.
-Screenshots: `docs/screenshots/2026-10-26-quiet-ui-features-2/`.
 
 | Case | Check | Result |
 |---|---|---|
@@ -124,7 +121,7 @@ Screenshots: `docs/screenshots/2026-10-26-quiet-ui-features-2/`.
 | RT-QUI-79 | Choosing the project in the composer shows *Project limits apply* | ✅ |
 | RT-QUI-80 | Haiku proposes a change; **Edit…** rewrites it, **Propose as a new change**, and *Remember why you changed it* saves the owner's words (*Remembered.*) | ✅ after a fix found in this round ([FIXED-1260](../plans/FIXED_ITEMS.md#fixed-1260--edit-was-never-offered-on-a-proposed-patch-found-this-round)): **Edit…** was never offered on a patch |
 | Suites | Python suite in three shards; ruff, mypy, secret scan, SAST, API contract check; web unit suite, `svelte-check`, ESLint, build | ✅ |
-| Visual review | `docs/screenshots/2026-10-26-quiet-ui-features-2/` (72–80), inspected at original resolution. Still seen: docked notices cover a project's **Save** until dismissed, and the approval's account reads in monospace ([TO_BE_FIXED](../plans/TO_BE_FIXED.md#quiet-ui-features-and-improvements--open-items-document-closed-2026-10-26)). Dated folders are local evidence and not committed | ✅ |
+| Visual review | Inspected at original resolution. Still seen: docked notices cover a project's **Save** until dismissed, and the approval's account reads in monospace ([TO_BE_FIXED](../plans/TO_BE_FIXED.md#quiet-ui-features-and-improvements--open-items-document-closed-2026-10-26)). | ✅ |
 
 ## Result — 2026-10-26 (Storage upgrade: SQLCipher 4.19.0, FTS5 required, no memory-security `off`)
 
@@ -134,7 +131,6 @@ to [FIXED-1250](../plans/FIXED_ITEMS.md#fixed-1250--search-fell-back-to-fts4-and
 checked on a fresh workspace served by `raiker-web` at 1440×900 with
 `RAIKER_SQLCIPHER_MEMORY_SECURITY=off` deliberately left in its environment. No
 model or key is needed. Spec: `web/e2e/storage-upgrade-live.spec.ts`: **3/3**.
-Screenshot: `docs/screenshots/2026-10-26-storage-upgrade/`.
 
 | Case | Check | Result |
 |---|---|---|
@@ -294,7 +290,7 @@ shortcut) are proved by `desktop/e2e/shell.spec.ts` under Xvfb: **12/12**.
 | RT-QUI-55 | `#/quick-entry` at 560×120: the input has focus, *Send to* is **New task**; Enter files the task and the top bar shows *Write a three-line haiku…* | ✅ after a fix found in this round: the long title pushed the stop switch off the top bar |
 | RT-QUI-56 | In a browser, Settings › General has no *Desktop window* section | ✅ |
 | Suites | Python suite; web unit suite, `svelte-check`, ESLint, design tokens, build; desktop unit tests, lint, type-check and shell end-to-end; ruff, mypy | ✅ |
-| Visual review | `docs/screenshots/2026-10-24-quiet-ui-features/` (45–55), inspected at original resolution: the live line overflow, Memory › Controls' spacing, the lower-case provider and the doubled *Ask owner question* on the floating card were found from the images and fixed. Still seen: a question's notice stays after it is answered ([TO_BE_FIXED](../plans/TO_BE_FIXED.md#quiet-ui-features-and-improvements--open-items-document-closed-2026-10-26)). Dated folders are local evidence and not committed | ✅ |
+| Visual review | Inspected at original resolution: the live line overflow, Memory › Controls' spacing, the lower-case provider and the doubled *Ask owner question* on the floating card were found from the images and fixed. Still seen: a question's notice stays after it is answered ([TO_BE_FIXED](../plans/TO_BE_FIXED.md#quiet-ui-features-and-improvements--open-items-document-closed-2026-10-26)). | ✅ |
 
 ## Result — 2026-10-23 (Quiet UI visual answers, hosted Anthropic Haiku 4.5)
 
@@ -322,7 +318,7 @@ RT-QUI-37 and RT-QUI-43 let the model choose.
 | RT-QUI-42 | **Export conversation → Markdown** carries the comparison as a table with *18 — Best*, and no `raiker:compare` fence in Raiker's section | ✅ |
 | RT-QUI-43 | On *Mostly text*, a question with three comparable weights is answered in prose with no block | ✅ after a fix found in this round (FIXED-1145): Haiku drew a comparison until the style sentence said it overrides the general guidance |
 | Suites | Python suite (3 workers), `tests/test_visual_answers.py`; web unit suite, `svelte-check`, ESLint, design tokens, build; ruff, mypy | ✅ |
-| Visual review | `docs/screenshots/2026-10-23-quiet-ui-visual-answers/` (36–43), inspected at original resolution; FIXED-1149 was found from the images. Still seen: the Plan card covers the *Completed · N steps* line ([TO_BE_FIXED](../plans/TO_BE_FIXED.md#2026-10-23-quiet-ui-visual-answers-round--what-is-still-open)). Dated folders are local evidence and not committed | ✅ |
+| Visual review | Inspected at original resolution; FIXED-1149 was found from the images. Still seen: the Plan card covers the *Completed · N steps* line ([TO_BE_FIXED](../plans/TO_BE_FIXED.md#2026-10-23-quiet-ui-visual-answers-round--what-is-still-open)). | ✅ |
 
 ## Result — 2026-10-22 (Quiet UI permissions and approvals, hosted Anthropic Haiku 4.5)
 
@@ -350,7 +346,7 @@ waiting approval's expiry into the past through the store
 | RT-QUI-33 | **Careful** chosen on Home's composer goes with the message: the chat answers *CAREFUL HANDOFF* and its chip reads Careful | ✅ |
 | RT-QUI-34 | A connected service's detail reads **What Raiker may do with GitHub** (*No activities are registered yet* until a manifest is imported) | ✅ |
 | Suites | Web unit suite, `svelte-check`, ESLint, design tokens, build; `tests/test_approval_timeout.py`, the approval, contract and docs tests; ruff, mypy, SAST | ✅ |
-| Visual review | `docs/screenshots/2026-10-22-quiet-ui-permissions/` (26–34), inspected at original resolution; the fixes marked above were found from the images. Still seen: the tool row above an expired approval reads *waiting for your decision* ([TO_BE_FIXED](../plans/TO_BE_FIXED.md#2026-10-22-quiet-ui-approvals-round--what-is-still-open)). Dated folders are local evidence and not committed | ✅ |
+| Visual review | Inspected at original resolution; the fixes marked above were found from the images. Still seen: the tool row above an expired approval reads *waiting for your decision* ([TO_BE_FIXED](../plans/TO_BE_FIXED.md#2026-10-22-quiet-ui-approvals-round--what-is-still-open)). | ✅ |
 
 ## Result — 2026-10-21 (Quiet UI layout system and pages, hosted Anthropic Haiku 4.5)
 
@@ -378,7 +374,7 @@ second time after the readiness fix below.
 | QUI-G01 | Size report: 8 of 70 measurements over budget (29 of 94 before), all on pages this round did not rebuild (listed in [TO_BE_FIXED](../plans/TO_BE_FIXED.md#2026-10-21-quiet-ui-round-2--what-is-still-open)) | Report, as planned |
 | Re-run | RT-QUI-14 and RT-QUI-15 (keyboard walk and 200% zoom) on the new pages; `all-pages-live` | ✅ |
 | Suites | Web unit suite; mocked `composer.spec.ts` 16/16; `svelte-check`, ESLint, design tokens, build; the Python tests that read web source and the docs | ✅ |
-| Visual review | `docs/screenshots/2026-10-21-quiet-ui-layout/` (17–25), inspected at original resolution. Found from the images: a doubled focus box on search fields ([FIXED-1122](../plans/FIXED_ITEMS.md#fixed-1122--search-fields-drew-a-second-focus-box-qui-l02)) and the readiness steps sitting outside the profile card, moved inside it. Dated folders are local evidence and not committed | ✅ |
+| Visual review | Inspected at original resolution. Found from the images: a doubled focus box on search fields ([FIXED-1122](../plans/FIXED_ITEMS.md#fixed-1122--search-fields-drew-a-second-focus-box-qui-l02)) and the readiness steps sitting outside the profile card, moved inside it. | ✅ |
 
 ## Result — 2026-10-21 (Quiet UI round 2: Home, Chat, setup and quality checks, hosted Anthropic Haiku 4.5)
 
@@ -405,7 +401,7 @@ appears in a spec, command, document, screenshot or the server log. Specs:
 | QUI-G01 | Size report at 1440×900 and 1280×800: 29 of 94 measurements over budget, all on pages the layout plan rebuilds (listed in [TO_BE_FIXED](../plans/TO_BE_FIXED.md#2026-10-21-quiet-ui-round-2--what-is-still-open)) | Report, as planned |
 | Re-run | Round 1 (`quiet-ui-home-chat-live`) 9/9 again on the new Home, setup and copy | ✅ |
 | Suites | Web unit suite (2,436); mocked `composer.spec.ts` 16/16; `svelte-check`, ESLint, design tokens, build; docs consistency tests | ✅ |
-| Visual review | `docs/screenshots/2026-10-21-quiet-ui-round-2/` (10–19), inspected at original resolution; the overlay defect above was found from the 1,280 px image. Still seen: Home's *No default model is chosen.* beside a Chat answering on Haiku (BUG-357, open). Dated folders are local evidence and not committed | ✅ |
+| Visual review | Inspected at original resolution; the overlay defect above was found from the 1,280 px image. Still seen: Home's *No default model is chosen.* beside a Chat answering on Haiku (BUG-357, open). | ✅ |
 
 ## Result — 2026-10-21 (Quiet UI Home and Chat, hosted Anthropic Haiku 4.5)
 
@@ -430,7 +426,7 @@ document, screenshot or the server log. Spec: `web/e2e/quiet-ui-home-chat-live.s
 | RT-QUI-09 | **Settings → General** offers **Home** as a startup page; **Run setup again** opens setup on its model step (*Choose how Raiker should think*, now *Where should I think?*) | ✅ |
 | Suites | `quiet-ui-home-chat-live` 9/9 in one run (3.8 min); web unit suite; mocked `composer.spec.ts` 16/16 | ✅ |
 | Seen in passing | A model that chose to write a document ended its turn with *Completed · 1 step* (QUI-C03) | ✅ |
-| Visual review | `docs/screenshots/2026-10-21-quiet-ui-home-chat/` (01–09), inspected at original resolution; the three defects above were found from the images. Dated folders are local evidence and not committed | ✅ |
+| Visual review | Inspected at original resolution; the three defects above were found from the images. | ✅ |
 
 ## Result — 2026-10-20 (Goals and execution profiles, hosted Anthropic Haiku 4.5)
 
@@ -473,7 +469,7 @@ document, screenshot or the server log. Spec: `web/e2e/mem-brief-recall-mode-liv
 | RT-MEM-05 | *Off*: the same question gets no memory; the answer carries the quiet line *Memory off for this answer* and no **Remembered** strip | ✅ |
 | RT-MEM-06 | Incognito on over *Search when relevant*: the card says no mode recalls anything; the answer reads *Memory not used: Incognito is on*; the card at 390 px in dark has no horizontal overflow; Incognito turned off afterwards | ✅ |
 | Suites | `mem-brief-recall-mode-live` 6/6 (3.2 min); `tests/test_memory_brief_and_recall_mode.py`, `test_memory_history_boundary.py`, `test_memory_adapter_contract.py`, `test_memory_key_never_leaves.py`, `test_memory_recall_evaluation_v2.py` | ✅ |
-| Visual review | `docs/screenshots/2026-10-20-memory-brief-recall-mode/` (01–06), inspected at original resolution; dated folders are local evidence and not committed | ✅ |
+| Visual review | Inspected at original resolution | ✅ |
 
 ## Result — 2026-10-20 (model transport guard, hosted Anthropic Haiku 4.5)
 
@@ -498,7 +494,7 @@ in a spec, command, document, screenshot or the server log.
 | MT-05 | A cloud metadata address is never a destination | ✅ saving `http://169.254.169.254/v1`, even ticked, is refused in the Connect dialog with `model_dial_refused:metadata_address` |
 | MT-06 | The opt-in in the dialog, dark theme at 390 px | ✅ prefilled from the saved connection, no horizontal overflow; the endpoint was disconnected afterwards |
 | Suites | `model-transport-guard-live` 6/6 on a fresh workspace (7.8 min); `tests/test_model_transport_guard.py` 34/34 (NET-01 … NET-12) | ✅ |
-| Visual review | `docs/screenshots/2026-10-20-model-transport-guard/` (01–08), inspected at original resolution; dated folders are local evidence and not committed | ✅ — found [BUG-352](../plans/TO_BE_FIXED.md#bug-352--a-custom-endpoint-saved-off-the-machine-shows-no-route-on-its-card): the custom endpoint saved off the machine shows no route line |
+| Visual review | Inspected at original resolution | ✅ — found [BUG-352](../plans/TO_BE_FIXED.md#bug-352--a-custom-endpoint-saved-off-the-machine-shows-no-route-on-its-card): the custom endpoint saved off the machine shows no route line |
 
 ## Result — 2026-10-20 (model connection authorization, hosted Anthropic Haiku 4.5)
 
@@ -521,7 +517,7 @@ environment; neither appears in a spec, command, document or screenshot.
 | LC-06 | The dialog in the dark theme and at 390 px | ✅ no horizontal overflow |
 | LC-07 | The retired variable is ignored and never echoed | ✅ one log line names it; neither its value, the sentinel key nor the Anthropic key appears in the server log |
 | Suites | `model-connection-anthropic-live` 4/4 and `model-connection-authorization-live` 2/2 in one run on a fresh workspace (7.8 min); `composer.spec.ts` (mocked) 16/16 | ✅ |
-| Visual review | `docs/screenshots/2026-10-20-model-connection-anthropic/` (01–06, 04a) and `docs/screenshots/2026-10-20-model-connection-authorization/` (01–04, 06, 07), inspected at original resolution; dated folders are local evidence and not committed | ✅ |
+| Visual review | Inspected at original resolution | ✅ |
 
 ## Result — 2026-09-03 (on-device dictation, the boot session probe, a three-width sweep)
 
@@ -1255,10 +1251,6 @@ entered or used. This is error-path evidence, not hosted-provider acceptance.
 | RT-MEM-RECOVERY-01 | Failed Incognito change names memory use and asks the owner to refresh and verify the setting before retrying | Pass |
 | RT-MEM-RECOVERY-02 | Failed export names the export and offers retry/download-permission recovery | Pass |
 
-Screenshots were visually reviewed:
-[Memory use](../screenshots/2026-11-06-memory-recovery/memory-use-error.png),
-[Export](../screenshots/2026-11-06-memory-recovery/export-error.png).
-The adjacent manifest records source revision, dirty-tree state and viewport.
 The shared live sign-in helper was updated to answer the new Voice setup
 stage with **Not now**, then **Continue**. The other thirteen error messages
 were reviewed in source; they were not individually fault-injected live.
@@ -1284,15 +1276,6 @@ provider, download or installer acceptance.
 | RT-MODEL-RECOVERY-04 | Cancel failure does not claim the running job stopped |
 | RT-MODEL-RECOVERY-05 | Partial-file inspection failure is visible without a confirmation dialog |
 | RT-MODEL-RECOVERY-06 | Clear-record failure retains the job and offers a state check |
-
-Panel screenshots:
-[library read on phone](../screenshots/2026-11-06-model-recovery/library-read-phone.png),
-[scan](../screenshots/2026-11-06-model-recovery/library-scan.png),
-[retry](../screenshots/2026-11-06-model-recovery/activity-retry.png),
-[cancel](../screenshots/2026-11-06-model-recovery/activity-cancel.png),
-[inspection](../screenshots/2026-11-06-model-recovery/activity-inspect.png),
-[clear record](../screenshots/2026-11-06-model-recovery/activity-clear.png).
-The adjacent manifest records source revision, dirty-tree state and viewport.
 
 All **29 focused component tests** passed (eight recovery regressions and
 21 existing panel tests). Component regressions in `ModelRecovery.test.ts` additionally verify that a

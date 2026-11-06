@@ -21,7 +21,7 @@ import { capture } from "./capture";
 import { hostedProviderCard, openHostedProviders, signInAsOwner } from "./hosted-provider";
 import { LIVE_BASE } from "./live";
 
-const SHOTS = "../../docs/screenshots/2026-10-20-model-connection-authorization";
+const SHOTS = "../../output/playwright/2026-10-20-model-connection-authorization";
 
 test("an environment key becomes a connection with one owner decision", async ({ page }) => {
   test.setTimeout(240_000);

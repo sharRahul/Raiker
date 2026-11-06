@@ -16,7 +16,7 @@ import { chooseModelForTurn, signInAsOwner } from "./hosted-provider";
 import { LIVE_BASE, sendTurn, useAnthropic } from "./live";
 
 const BASE = LIVE_BASE;
-const SHOTS = join(import.meta.dirname, "..", "..", "docs", "screenshots", "2026-10-02-memory-round");
+const SHOTS = join(import.meta.dirname, "..", "..", "output", "playwright", "2026-10-02-memory-round");
 const HAIKU = /Haiku 4\.5/i;
 const TEA = "My favourite tea is Assam with a splash of oat milk.";
 

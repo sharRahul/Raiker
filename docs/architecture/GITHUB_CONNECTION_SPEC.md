@@ -612,7 +612,7 @@ GitHub itself — that is RR-38…RR-41.
 | Child agents never exceed the parent's delegation | Implemented | `DelegationService.narrow`; `DELEGABLE_TOOLS` read-only — GH-53 |
 | Provider receipts | Implemented — pushed ref read back; PR number and URL recorded | `read_back_ref` — GH-54 |
 | Issue-to-PR routine | **Partial** — template and authority plan; no runner | [BUG-339](../plans/TO_BE_FIXED.md#bug-339--the-issue-to-pull-request-routine-has-a-template-and-no-runner) — GH-55 |
-| Settings → Connections → GitHub, six states, recovery messages | Implemented | `web/src/lib/views/settings/GitHubConnection.svelte`; screenshots `docs/screenshots/2026-10-12-github-connection/` — GH-19 |
+| Settings → Connections → GitHub, six states, recovery messages | Implemented | `web/src/lib/views/settings/GitHubConnection.svelte` — GH-19 |
 | Approvals re-governed at execution | Implemented | the relay recomputes the payload hash and re-routes; the grant or delegation is re-checked at lend time |
 | Official App, managed cloud | **Blocked — external** | needs GH-30 operator registration and a trusted credential service |
 

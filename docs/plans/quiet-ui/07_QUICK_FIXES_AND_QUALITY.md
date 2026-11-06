@@ -75,3 +75,30 @@ and one safe next step.
 Before and after the redesign, watch five people: ask a question, compare
 options, approve an email, connect Gmail, find last week's result. Measure time
 to first useful result and where they hesitate.
+
+## 2026-11-06 — QUI-G06 Memory error recovery
+
+This run takes one document at a time. The following 15-item slice implements
+the existing QUI-G06 decision: name the failure, its affected object and one
+safe next step. Completed implementation checklist:
+
+1. [x] Memory use: refresh and verify the setting before retrying.
+2. [x] Recall mode: refresh and verify the selected mode.
+3. [x] Pin: identify the pin change and verify its saved state.
+4. [x] Edit: copy the draft before refreshing the saved text.
+5. [x] Forget: verify the current record status before retrying.
+6. [x] Archive: verify status before retrying.
+7. [x] Restore: verify status before retrying.
+8. [x] Relationship scan: check Suggestions before scanning again.
+9. [x] History: close and reopen the history panel.
+10. [x] Review and expiry dates: verify the saved dates.
+11. [x] Permanent deletion: check whether the record still exists.
+12. [x] Export: retry, then check browser download permissions.
+13. [x] Import: check imported records before selecting the file again.
+14. [x] Observation deletion: check whether the observation still exists.
+15. [x] Proposed gist discard: check whether it is still waiting.
+
+Evidence and limitations are recorded in
+[WEB_APP_LIVE_TEST.md](../../architecture/WEB_APP_LIVE_TEST.md).
+QUI-G06 remains partial: other views still need their error audit. QUI-G01,
+QUI-G04 and QUI-G07 also remain open, so this document is retained.

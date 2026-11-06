@@ -1339,3 +1339,15 @@ Personal-agent release claims require the relevant PA-S scenarios and existing
 CR evidence gates. Preserve capability defaults, quiet-hours DEC-21a, accepted
 Git OAuth scope, model choice and coding quality. New observations go to the
 proper defect/evidence ledger; do not duplicate the PAA backlog here.
+
+
+## QUI-G06 — Remaining error recovery audit
+
+**Updated 2026-11-06.** The fifteen Memory action messages are implemented in
+[07 Quick fixes and quality](quiet-ui/07_QUICK_FIXES_AND_QUALITY.md#2026-11-06--qui-g06-memory-error-recovery).
+Two error paths have running-host browser evidence in
+[WEB_APP_LIVE_TEST.md](../architecture/WEB_APP_LIVE_TEST.md#result--2026-11-06-qui-g06-memory-recovery).
+The other thirteen still need individual live fault-injection evidence.
+The broader error-copy audit, optimistic-action rollback, page-size gates and
+five-person usability study remain open in that plan. No beta acceptance
+gate is closed by this limited error-message slice.

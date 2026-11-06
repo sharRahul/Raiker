@@ -220,6 +220,9 @@ export async function dismissFirstRunModelSetup(page: Page): Promise<boolean> {
       // Balanced, because a live round connects a hosted provider and
       // local-first would leave it refused for a reason the spec is not about.
       await page.getByRole("button", { name: "Balanced" }).click();
+    } else if (heading.startsWith("Should I be able to listen and answer aloud")) {
+      await page.getByRole("radio", { name: "Not now", exact: true }).check();
+      await page.getByRole("button", { name: "Continue", exact: true }).click();
     } else if (heading.startsWith("Create your first backup")) {
       await page.getByRole("button", { name: "Set up later" }).click();
     } else if (heading.startsWith("You're set") || heading.startsWith("Setup is saved")) {

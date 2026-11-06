@@ -403,6 +403,6 @@
     .modes .mode{padding:.3rem .5rem}
     .cluster-rule{display:none}
   }
-  @media(max-width:420px){.modes{margin-left:var(--space-1)}.controls{gap:.3rem}}
+  @media(max-width:420px){.topbar{gap:0;padding:0 var(--space-2)}.navigation-reveal-zone{width:40px}.modes{margin-left:0}.controls{gap:0}}
   @media(max-width:720px){.navigation-reveal-zone{margin-left:-.5rem}}
 </style>

@@ -1241,3 +1241,24 @@ first-use accessibility and artifact opening. Record browser/client/host/model
 separately, plus all interventions and faults. A mocked API/UI pass or a screenshot
 cannot substitute for real-provider completion. Planned personal-agent/browser
 controls remain unrun until their production paths exist.
+
+## Result — 2026-11-06 (QUI-G06 Memory recovery)
+
+Fresh disposable Linux source host, built SPA, Chromium, 1440×1000.
+Spec: `web/e2e/memory-error-recovery-live.spec.ts`: **2/2 passed**.
+The owner signs in through the UI; only the operation's failed response is
+injected (503). These local controls do not call a model; no provider key was
+entered or used. This is error-path evidence, not hosted-provider acceptance.
+
+| Case | Check | Result |
+|---|---|---|
+| RT-MEM-RECOVERY-01 | Failed Incognito change names memory use and asks the owner to refresh and verify the setting before retrying | Pass |
+| RT-MEM-RECOVERY-02 | Failed export names the export and offers retry/download-permission recovery | Pass |
+
+Screenshots were visually reviewed:
+[Memory use](../screenshots/2026-11-06-memory-recovery/memory-use-error.png),
+[Export](../screenshots/2026-11-06-memory-recovery/export-error.png).
+The adjacent manifest records source revision, dirty-tree state and viewport.
+The shared live sign-in helper was updated to answer the new Voice setup
+stage with **Not now**, then **Continue**. The other thirteen error messages
+were reviewed in source; they were not individually fault-injected live.

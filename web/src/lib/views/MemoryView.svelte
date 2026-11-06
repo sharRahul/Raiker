@@ -155,7 +155,7 @@
     if (!settings || busy) return;
     busy = true; actionError = null;
     try { await api.setMemoryIncognito(!settings.incognito); await load(); }
-    catch (e) { actionError = e instanceof ApiError ? `Could not update memory use (${e.status}).` : "Could not update memory use."; }
+    catch (e) { actionError = e instanceof ApiError ? `Could not update memory use (${e.status}). Refresh Memory to check the current setting before trying again.` : "Could not update memory use. Refresh Memory to check the current setting before trying again."; }
     finally { busy = false; }
   }
   // MEM-MODE-02 — the owner's ambient-recall mode. Incognito still wins on the
@@ -164,27 +164,27 @@
     if (!settings || busy || settings.recall_mode === mode) return;
     busy = true; actionError = null;
     try { await api.setMemoryRecallMode(mode); await load(); }
-    catch (e) { actionError = e instanceof ApiError ? `Could not change the recall mode (${e.status}).` : "Could not change the recall mode."; }
+    catch (e) { actionError = e instanceof ApiError ? `Could not change the recall mode (${e.status}). Refresh Memory to check the current mode before trying again.` : "Could not change the recall mode. Refresh Memory to check the current mode before trying again."; }
     finally { busy = false; }
   }
   async function togglePin(m: MemoryControlView) {
     try { await api.setMemoryPinned(m.memory_id, !m.pinned); await load(); }
-    catch { actionError = "Could not update this memory."; }
+    catch { actionError = "Could not change whether this memory is pinned. Refresh Memory to check its pin before trying again."; }
   }
   async function saveEdit(m: MemoryControlView) {
     try { await api.editMemory(m.memory_id, editDraft); editingId = null; await load(); }
-    catch { actionError = "Could not edit this memory."; }
+    catch { actionError = "Could not save your memory edit. Copy your draft, then refresh Memory to check the saved text."; }
   }
   async function forget(m: MemoryControlView) {
     if (!(await askConfirm({ title: "Forget this memory?", body: `${LIFECYCLE_VERBS.forget.consequence} To stop recalling it and keep it, archive it instead.`, confirmLabel: "Forget", danger: true }))) return;
     try { await api.forgetMemory(m.memory_id); await load(); }
-    catch { actionError = "Could not forget this memory."; }
+    catch { actionError = "Could not forget this memory. Refresh Memory to check its status before trying again."; }
   }
   // UX-MEM-02 — archive and restore are the reversible pair; neither asks to
   // confirm, because neither loses anything.
   async function setArchived(m: MemoryControlView, archived: boolean) {
     try { await api.setMemoryArchived(m.memory_id, archived); await load(); }
-    catch { actionError = archived ? "Could not archive this memory." : "Could not restore this memory."; }
+    catch { actionError = archived ? "Could not archive this memory. Refresh Memory to check its status before trying again." : "Could not restore this memory. Refresh Memory to check its status before trying again."; }
   }
   async function decideProposal(proposal: MemoryProposal, decision: "approved" | "rejected", editedText?: string) {
     const reason = decision === "rejected" ? window.prompt("Why should this proposal be rejected?", "Not useful as durable memory") : "";
@@ -199,7 +199,7 @@
     if (busy) return;
     busy = true; actionError = null;
     try { await api.scanMemoryRelationships(); await load(); }
-    catch { actionError = "Could not scan approved memories for relationships."; }
+    catch { actionError = "Could not scan approved memories for relationships. Refresh Suggestions to check for new proposals before scanning again."; }
     finally { busy = false; }
   }
   async function decideRelationship(proposal: MemoryRelationshipProposal, decision: "approved" | "denied") {
@@ -218,13 +218,13 @@
   }
   async function viewHistory(m: MemoryControlView) {
     try { historyById = { ...historyById, [m.memory_id]: (await api.memoryHistory(m.memory_id)).events }; }
-    catch { actionError = "Could not load this memory's history."; }
+    catch { actionError = "Could not load this memory's history. Close the history panel and open it again."; }
   }
   async function reviewExpiry(m: MemoryControlView) {
     const value = window.prompt("Review/expiry date as ISO-8601, or leave blank for no expiry", m.expires_at ?? "");
     if (value === null) return;
     try { await api.setMemoryExpiry(m.memory_id, value.trim() || null); await load(); }
-    catch { actionError = "Could not update the review or expiry date."; }
+    catch { actionError = "Could not save this memory’s review or expiry date. Refresh Memory to check the dates before trying again."; }
   }
   async function purge(m: MemoryControlView) {
     try {
@@ -233,7 +233,7 @@
       if (confirmation !== m.memory_id) return;
       await api.purgeMemory(m.memory_id);
       await load();
-    } catch { actionError = "Could not permanently delete this memory."; }
+    } catch { actionError = "Could not permanently delete this memory. Refresh Memory to check whether it still exists before trying again."; }
   }
   async function exportMemories() {
     try {
@@ -241,7 +241,7 @@
       const url = URL.createObjectURL(new Blob([JSON.stringify(exported, null, 2)], { type: "application/json" }));
       const anchor = document.createElement("a"); anchor.href = url; anchor.download = "raiker-memories.json"; anchor.click();
       window.setTimeout(() => URL.revokeObjectURL(url), 0);
-    } catch { actionError = "Could not export memories."; }
+    } catch { actionError = "Could not export memories. Try Export again; if no file downloads, check your browser’s download permissions."; }
   }
   async function reviewImport(event: Event) {
     // Held before the first await: `currentTarget` is cleared once the event
@@ -311,7 +311,7 @@
       importPreview = null; importAlready = null; importFileName = ""; importExcluded = new Set();
       await load();
     }
-    catch { actionError = "Could not import memories."; }
+    catch { actionError = "Could not import memories. Refresh Memory to check for imported records before choosing the file again."; }
     finally { importBusy = false; }
   }
   // BUG-27 — opening the passage a memory was drawn from. Provenance that
@@ -380,11 +380,11 @@
   async function deleteObservation(observationId: string) {
     if (!(await askConfirm({ title: "Delete this observation?", body: "Raiker keeps no copy of the material it describes, so this removes the record that it was seen.", confirmLabel: "Delete", danger: true }))) return;
     try { await api.deleteObservations([observationId]); await load(); }
-    catch { actionError = "Could not delete this observation."; }
+    catch { actionError = "Could not delete this observation. Refresh Observations to check whether it still exists before trying again."; }
   }
   async function discardGist(gistId: string) {
     try { await api.discardGist(gistId); await load(); }
-    catch { actionError = "Could not discard this proposed gist."; }
+    catch { actionError = "Could not discard this proposed gist. Refresh Suggestions to check whether it is still waiting before trying again."; }
   }
   const observationRows = $derived(
     (observations?.observations ?? []).filter((o) =>

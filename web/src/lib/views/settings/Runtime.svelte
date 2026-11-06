@@ -523,8 +523,7 @@
   .capabilities li :global(svg) { flex:none; color:var(--text-3); }
   .reset-actions { display:flex; flex-wrap:wrap; gap:var(--space-2); margin-top:.45rem; }
   .reset-actions .danger { color:var(--danger); }
-  details { margin-top:var(--space-4); } summary { cursor:pointer; font-weight:650; } .environment-form { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:var(--space-3); margin-top:var(--space-3); } .environment-form label { display:grid; gap:.35rem; min-width:0; color:var(--text-2); font-size:var(--text-sm); } /* `minmax(0,1fr)` is only half of it: a grid item's automatic minimum is its content, and a <select> is as wide as its longest option, which overflows a narrow track at 390px (FIXED-416). */ .environment-form input,.environment-form select { min-width:0; max-width:100%; background:var(--sunken); } .environment-form small,.environment-form button, .environment-form .environment-form
-  .advanced { margin-top: var(--space-5); }
+  details { margin-top:var(--space-4); } summary { cursor:pointer; font-weight:650; } .environment-form { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:var(--space-3); margin-top:var(--space-3); } .environment-form label { display:grid; gap:.35rem; min-width:0; color:var(--text-2); font-size:var(--text-sm); } /* `minmax(0,1fr)` is only half of it: a grid item's automatic minimum is its content, and a <select> is as wide as its longest option, which overflows a narrow track at 390px (FIXED-416). */ .environment-form input,.environment-form select { min-width:0; max-width:100%; background:var(--sunken); } .environment-form small,.environment-form button, .environment-form .form-advanced { margin-top: var(--space-5); }
   .advanced summary { color: var(--text-2); }
   .advanced label { margin-top: var(--space-3); }
   .form-advanced { grid-column: 1 / -1; margin-top: 0; }

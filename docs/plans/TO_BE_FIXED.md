@@ -1402,3 +1402,17 @@ of every populated detail state, provider operation or full beta journey.
 Native Windows/macOS appearance, screen readers, the five-person study and
 QUI-V05 companion art remain open. Existing page-size budgets, provider failure
 and managed-download acceptance retain their separate evidence gates.
+
+## QUI-G06 Projects recovery — remaining acceptance evidence
+
+The fifteen Projects recovery implementations and the related Limits panel fixes
+are recorded in
+[07 Quick fixes and quality](quiet-ui/07_QUICK_FIXES_AND_QUALITY.md#2026-11-06--qui-g06-projects-recovery)
+and [FIXED-1299](FIXED_ITEMS.md#fixed-1299--projects-failures-hid-missing-content-or-offered-no-safe-recovery-qui-g06).
+Running-host browser cases inject explicit HTTP failures; they cannot establish
+what a real provider or disk write does when it commits and its response is lost.
+Native Windows/macOS visual checks, screen readers and the five-person usability
+study remain open. The wider QUI-G06 audit, optimistic-action rollback and page
+size gates retain their existing status. See the
+[Live Test docs](../architecture/WEB_APP_LIVE_TEST.md#result--2026-11-06-qui-g06-projects-recovery)
+for this round's exact results and limitations.

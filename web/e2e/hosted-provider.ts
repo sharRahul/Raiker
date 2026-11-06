@@ -180,15 +180,14 @@ export async function dismissFirstRunModelSetup(page: Page): Promise<boolean> {
     .catch(() => false);
   if (!onWizard) return false;
 
-  // Five stages, and `Back` on three of them, so a loop that could revisit one
-  // is bounded rather than trusted.
-  for (let step = 0; step < 8; step += 1) {
+  // Preparation is asynchronous and is not an owner step. Wait for it once;
+  // polling consumed the old eight-step budget on a slower first-run host.
+  // Bound actual setup transitions rather than elapsed preparation time.
+  for (let step = 0; step < 12; step += 1) {
+    if (!(await title.isVisible().catch(() => false))) return true;
+    await expect(title).not.toHaveText(/^Preparing/, { timeout: 60_000 });
     if (!(await title.isVisible().catch(() => false))) return true;
     const heading = ((await title.textContent()) ?? "").trim();
-    if (heading.startsWith("Preparing")) {
-      await page.waitForTimeout(500);
-      continue;
-    }
     if (heading.startsWith("Hi, I'm Raiker")) {
       // QUI-W02 — the Hello step. Skip keeps the name the account already has.
       await page.getByRole("button", { name: "Skip", exact: true }).click();

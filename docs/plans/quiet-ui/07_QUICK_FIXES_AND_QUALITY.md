@@ -27,7 +27,7 @@ redesign and can ship on its own.
 | QUI-G03 | **Done** ([FIXED-1097](../FIXED_ITEMS.md#fixed-1097--there-was-no-single-place-to-see-every-shared-state-qui-g03)), at `#/state-gallery` in development builds. |
 | QUI-G04 | **Partly done** ([FIXED-1100](../FIXED_ITEMS.md#fixed-1100--a-long-conversation-rendered-every-turn-qui-g04)): long transcripts. Open: actions that paint first and roll back visibly. |
 | QUI-G05 | **Done** ([FIXED-1098](../FIXED_ITEMS.md#fixed-1098--keyboard-use-and-zoom-were-not-checked-qui-g05)). |
-| QUI-G06 | **Partly done** ([FIXED-1099](../FIXED_ITEMS.md#fixed-1099--stop-steer-and-continue-errors-blamed-the-local-runtime-qui-g06)): the helper and the Chat, Build and Tasks errors. About 200 others remain. |
+| QUI-G06 | **Partly done** ([FIXED-1099](../FIXED_ITEMS.md#fixed-1099--stop-steer-and-continue-errors-blamed-the-local-runtime-qui-g06)): the helper and the Chat, Build and Tasks errors, followed by the Memory, Models, Connections, Settings and Projects slices below. Other views still need their audit. |
 | QUI-G07 | Open: needs five people, not code. |
 
 ### QUI-G01 — Size budgets in CI
@@ -198,3 +198,34 @@ included. The remaining quality foundations keep this document open.
 
 Evidence: [Live Test docs](../../architecture/WEB_APP_LIVE_TEST.md#result--2026-11-06-qui-g06-settings-recovery)
 and [FIXED-1297](../FIXED_ITEMS.md#fixed-1297--settings-errors-hid-uncertainty-and-offered-no-recovery-qui-g06).
+
+## 2026-11-06 — QUI-G06 Projects recovery
+
+This run applies QUI-G06 to Projects. The implementation plan is to preserve
+owner drafts, distinguish failed reads from empty content, provide safe recovery
+for uncertain writes, then validate with component tests and a running-host
+Playwright round in both themes. The 15-item checklist:
+
+1. [x] Read projects: retain known rows and offer Retry projects.
+2. [x] Create: retain the name and check for an existing project before retrying.
+3. [x] Attach a new folder: retain entries and check the list before retrying.
+4. [x] Attach to an existing project: check its saved root before retrying.
+5. [x] Save instructions and checks: keep the draft and compare saved state.
+6. [x] Move a chat: check its saved project before repeating the move.
+7. [x] Read project details: name the unavailable content and how to reopen it.
+8. [x] Read file history: distinguish it from the separately loaded explorer.
+9. [x] Read tasks: show unavailable instead of claiming there are no tasks.
+10. [x] Read images: show unavailable instead of claiming there are no images.
+11. [x] Export: check downloads and browser permissions before retrying.
+12. [x] Archive: check Active and Archived before repeating the write.
+13. [x] Restore: check saved status and retain specific refusal guidance.
+14. [x] Move a project: retain the destination and check the saved hierarchy.
+15. [x] Read deletion preview: explain why deletion is unavailable and offer retry.
+
+Other quality foundations above remain open, so this document is retained.
+
+Implementation and evidence: [FIXED-1299](../FIXED_ITEMS.md#fixed-1299--projects-failures-hid-missing-content-or-offered-no-safe-recovery-qui-g06),
+[FIXED-1300](../FIXED_ITEMS.md#fixed-1300--project-limits-stayed-loading-after-failure-and-claimed-rollback)
+and [Live Test docs](../../architecture/WEB_APP_LIVE_TEST.md#result--2026-11-06-qui-g06-projects-recovery).
+The related live setup helper repair is
+[FIXED-1301](../FIXED_ITEMS.md#fixed-1301--live-setup-preparation-consumed-the-helpers-navigation-budget).

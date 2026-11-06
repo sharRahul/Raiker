@@ -12,6 +12,7 @@
   import { api, ApiError } from "../api";
   import type { ProjectView } from "../apiTypes";
   import { explainReasonCode } from "../reasonCodes";
+  import { failure } from "../errorCopy";
   import { projectDestinations } from "../projectLifecycle";
 
   let {
@@ -61,9 +62,7 @@
       onmoved();
     } catch (e) {
       const explained = e instanceof ApiError ? explainReasonCode(e.reasonCode) : null;
-      error = explained
-        ? `${explained.plain} ${explained.remediation ?? ""}`.trim()
-        : "Could not move the project.";
+      error = failure("The project move was not confirmed", "Your destination is still selected; check the project hierarchy before moving it again.", explained?.remediation ? `${explained.plain} ${explained.remediation}` : "Close this dialog and refresh Projects to check its parent.", e);
     } finally {
       busy = false;
     }

@@ -1603,6 +1603,9 @@ file you can open. The two capture sets that remain — `screenshots/pages/` and
 | [FIXED-1296](#fixed-1296--api-contract-inventory-was-generated-with-a-different-python-runtime) | Low | API contract documentation | Fixed 2026-11-06 |
 | [FIXED-1297](#fixed-1297--settings-errors-hid-uncertainty-and-offered-no-recovery-qui-g06) | Medium | Settings / recovery | Fixed 2026-11-06 |
 | [FIXED-1298](#fixed-1298--windows-account-cases-raced-over-the-shared-account-pool) | Medium | Native runner tests | Fixed 2026-11-06 |
+| [FIXED-1299](#fixed-1299--projects-failures-hid-missing-content-or-offered-no-safe-recovery-qui-g06) | Medium | Projects / recovery | Fixed 2026-11-06 |
+| [FIXED-1300](#fixed-1300--project-limits-stayed-loading-after-failure-and-claimed-rollback) | Medium | Projects / limits | Fixed 2026-11-06 |
+| [FIXED-1301](#fixed-1301--live-setup-preparation-consumed-the-helpers-navigation-budget) | Low | Live test helper | Fixed 2026-11-06 |
 
 ---
 
@@ -38966,3 +38969,45 @@ assumed the primary account was available.
 The explicit overlap case still launches concurrent runs and checks isolation;
 the stale-grant assertion and every boundary test remain intact. Production
 sandbox behavior is unchanged. GitHub's Windows job provides the host evidence.
+
+## FIXED-1299 — Projects failures hid missing content or offered no safe recovery (QUI-G06)
+
+Projects used generic status-only errors, discarded known rows on a failed
+refresh and rendered failed task/image reads as empty lists and zero counts.
+The fifteen action/read paths in
+[07 Quick fixes and quality](quiet-ui/07_QUICK_FIXES_AND_QUALITY.md#2026-11-06--qui-g06-projects-recovery)
+now name the affected state and a safe next step, retain HTTP/refusal evidence
+and preserve creation, attachment, context and move drafts. Unconfirmed writes
+ask the owner to inspect saved state before repeating them. Known conflicts
+retain their specific guidance. Retry projects retains known rows while a read
+fails; Retry project content reloads supplementary content without replacing
+unsaved instructions or checks. Loading and unavailable content are distinct
+from empty content. Export recovery also applies inside the deletion dialog.
+
+Coverage: `web/src/lib/views/ProjectsView.test.ts` and the running-host
+`web/e2e/project-error-recovery-live.spec.ts`. Procedure, screenshots, results
+and limits are recorded in the
+[Live Test docs](../architecture/WEB_APP_LIVE_TEST.md#result--2026-11-06-qui-g06-projects-recovery).
+
+## FIXED-1300 — Project limits stayed loading after failure and claimed rollback
+
+Found during the Projects error audit. The Limits panel swallowed a failed read
+and kept saying Reading indefinitely. It now reports an unconfirmed saved
+boundary with Retry project limits. Failed saves retain the owner's entries
+and require checking saved limits before further work or another save, instead
+of claiming Nothing changed. Reads discard responses belonging to an older
+selection or an unmounted panel. The parent passes its safe derived project ID
+so a late response cannot dereference a closed detail panel.
+
+Covered by `web/src/lib/components/ProjectLimits.test.ts`, Projects selection
+regressions and RT-PROJECT-RECOVERY-08 in the
+[Live Test docs](../architecture/WEB_APP_LIVE_TEST.md#result--2026-11-06-qui-g06-projects-recovery).
+
+## FIXED-1301 — Live setup preparation consumed the helper's navigation budget
+
+Found on the fresh workspace used for this round. The shared live sign-in helper
+counted each half-second Preparing poll as an owner navigation step and could
+run out of steps before setup finished. It now waits for asynchronous preparation
+separately and bounds actual stage transitions. Unknown stages still fail
+explicitly. The running-host project round exercises the helper; provider
+acceptance uses the same helper.

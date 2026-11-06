@@ -34,6 +34,7 @@
   import { humanize, isRedacted, relativeTime, shortId } from "../format";
   import { projectFromHash } from "../nav";
   import { explainReasonCode } from "../reasonCodes";
+  import { failure } from "../errorCopy";
   import { fileKind, formatBytes } from "../projectLifecycle";
   import { conversationLink, workModeRoute } from "../turnAnchor";
 
@@ -190,7 +191,7 @@
       await load();
       onchanged?.();
     } catch (e) {
-      dropError = e instanceof ApiError ? `Could not move chat into ${projectId}.` : "Could not move chat.";
+      dropError = failure("The chat move was not confirmed", "Its saved project may have changed; check the chat’s project before moving it again.", "Reopen Projects to refresh the list.", e);
     }
   }
 
@@ -229,7 +230,7 @@
           "Your text is still here — reopen the project to see the newer version before saving.";
         return;
       }
-      contextError = e instanceof ApiError ? `Could not save context (${e.status}).` : "Could not save context.";
+      contextError = failure("Saving project instructions was not confirmed", "Your draft is still here; copy it before reopening the project to check the saved instructions and checks.", "Compare the saved version before saving again.", e);
     } finally {
       savingContext = false;
     }
@@ -251,9 +252,7 @@
       list = projects;
       tree = projectTree;
     } catch (e) {
-      list = null;
-      tree = [];
-      loadError = e instanceof ApiError ? `Unavailable (${e.status})` : "Unavailable";
+      loadError = failure("Projects could not be read", "The project list and hierarchy are unconfirmed.", "Choose Retry projects to refresh them.", e);
     }
   }
 
@@ -268,12 +267,8 @@
       await load();
       onchanged?.();
     } catch (e) {
-      // Say what happened, not what the wire said: a duplicate name is an
-      // ordinary refusal and should read like one.
-      createError =
-        e instanceof ApiError
-          ? explainReasonCode(e.reasonCode)?.plain ?? `Could not create (${e.status})`
-          : "Could not create";
+      const explained = e instanceof ApiError ? explainReasonCode(e.reasonCode) : null;
+      createError = failure("Project creation was not confirmed", "Your name is still here; check the project list before creating it again.", explained?.remediation ? `${explained.plain} ${explained.remediation}` : "Refresh Projects and look for that name.", e);
     } finally {
       creating = false;
     }
@@ -293,10 +288,8 @@
       await load();
       onchanged?.();
     } catch (e) {
-      attachError =
-        e instanceof ApiError
-          ? explainReasonCode(e.reasonCode)?.plain ?? `Could not attach (${e.status})`
-          : "Could not attach";
+      const explained = e instanceof ApiError ? explainReasonCode(e.reasonCode) : null;
+      attachError = failure("Attaching the folder was not confirmed", "Your entries are still here; check the project list before attaching it again.", explained?.remediation ? `${explained.plain} ${explained.remediation}` : "Refresh Projects and check the folder’s project.", e);
     } finally {
       attaching = false;
     }
@@ -313,10 +306,7 @@
       await load();
       await open(projectId);
     } catch (e) {
-      attachError =
-        e instanceof ApiError
-          ? `Could not attach (${e.status}${e.reasonCode ? `: ${e.reasonCode}` : ""})`
-          : "Could not attach";
+      attachError = failure("Changing the project folder was not confirmed", "The saved root may have changed; reopen the project and check its folder before attaching again.", "Check the folder path if its saved root is unchanged.", e);
     }
   }
 
@@ -334,6 +324,9 @@
   let filesError = $state<string | null>(null);
   let selectedFile = $state<ProjectBrowseEntry | null>(null);
   let projectTasks = $state<TaskView[]>([]);
+  let tasksError = $state<string | null>(null);
+  let imagesError = $state<string | null>(null);
+  let contextLoading = $state(false);
 
   const detailProjectId = $derived(detail?.project.project_id ?? "");
   const detailRootKind = $derived(detail?.project.root_kind ?? "managed");
@@ -375,7 +368,10 @@
   let selectionSeq = 0;
 
   async function loadProjectContext(projectId: string, seq: number) {
+    contextLoading = true;
     filesError = null;
+    tasksError = null;
+    imagesError = null;
     files = null;
     selectedFile = null;
     projectTasks = [];
@@ -386,18 +382,15 @@
       files = loaded;
     } catch (e) {
       if (seq !== selectionSeq) return;
-      filesError =
-        e instanceof ApiError ? `Files unavailable (${e.status}).` : "Files unavailable.";
+      filesError = failure("Project file history could not be read", "File counts and change history are unavailable; the file explorer loads separately.", "Choose Retry project content to read them again.", e);
     }
     try {
       const loaded = await api.tasks({ project_id: projectId });
       if (seq !== selectionSeq) return;
       projectTasks = loaded;
-    } catch {
-      // Task scoping is supplementary context; a failed read leaves the rest
-      // of the project home intact rather than blanking it.
+    } catch (e) {
       if (seq !== selectionSeq) return;
-      projectTasks = [];
+      tasksError = failure("Project tasks could not be read", "The task count and list are unavailable.", "Choose Retry project content to read them again.", e);
     }
     try {
       // The gallery read is owner-scoped and returns metadata only, so this is
@@ -413,11 +406,11 @@
             generation.has_image,
         )
         .sort((left, right) => right.created_at.localeCompare(left.created_at));
-    } catch {
-      // Same rule as tasks: supplementary context, and a workspace with no
-      // image provider connected answers this with an error rather than a list.
+    } catch (e) {
       if (seq !== selectionSeq) return;
-      projectImages = [];
+      imagesError = failure("Project images could not be read", "The image count and gallery are unavailable.", "Choose Retry project content to read them again.", e);
+    } finally {
+      if (seq === selectionSeq) contextLoading = false;
     }
   }
 
@@ -436,6 +429,8 @@
     detailError = null;
     files = null;
     filesError = null;
+    tasksError = null;
+    imagesError = null;
     selectedFile = null;
     projectTasks = [];
     projectImages = [];
@@ -450,6 +445,8 @@
     detail = null;
     files = null;
     filesError = null;
+    tasksError = null;
+    imagesError = null;
     selectedFile = null;
     projectTasks = [];
     projectImages = [];
@@ -466,8 +463,7 @@
     } catch (e) {
       if (seq !== selectionSeq) return;
       detail = null;
-      detailError =
-        e instanceof ApiError ? `Could not load project (${e.status}).` : "Could not load project.";
+      detailError = failure("Could not load project details", "Its instructions and work are unavailable.", "Open the project again from the list.", e);
     }
   }
 
@@ -478,7 +474,7 @@
     try {
       await api.exportProject(detail.project.project_id);
     } catch (e) {
-      exportError = e instanceof ApiError ? `Could not export (${e.status}).` : "Could not export.";
+      exportError = failure("The project export did not finish", "A complete download is unconfirmed.", "Check browser downloads and download permissions before exporting again.", e);
     } finally {
       exporting = false;
     }
@@ -497,7 +493,7 @@
       if (detail?.project.project_id === project.project_id) await open(project.project_id);
       onchanged?.();
     } catch (e) {
-      archiveError = e instanceof ApiError ? `Could not archive (${e.status}).` : "Could not archive.";
+      archiveError = failure("Project archiving was not confirmed", "Its saved status may have changed; check Active and Archived before repeating the action.", "Refresh Projects to check its status.", e);
     } finally {
       archiving = null;
     }
@@ -513,9 +509,7 @@
       onchanged?.();
     } catch (e) {
       const explained = e instanceof ApiError ? explainReasonCode(e.reasonCode) : null;
-      archiveError = explained
-        ? `${explained.plain} ${explained.remediation ?? ""}`.trim()
-        : "Could not restore.";
+      archiveError = failure("Project restoration was not confirmed", "Its saved status may have changed; check Active and Archived before repeating the action.", explained?.remediation ? `${explained.plain} ${explained.remediation}` : "Refresh Projects to check its status.", e);
     } finally {
       restoring = null;
     }
@@ -655,10 +649,14 @@
 {/if}
 
 {#if loadError}
-  <PageState state="error" title="Couldn't load projects" detail={loadError} />
-{:else if list === null}
+  <div class="read-recovery">
+    <PageState state="error" title="Couldn't load projects" detail={loadError} />
+    <button type="button" class="btn btn-sm" onclick={() => void load()}>Retry projects</button>
+  </div>
+{/if}
+{#if list === null && !loadError}
   <PageState state="loading" title="Loading projects…" />
-{:else if list.projects.length === 0}
+{:else if list !== null && list.projects.length === 0}
   <div class="card">
     <EmptyState
       icon="projects"
@@ -672,7 +670,7 @@
       {/snippet}
     </EmptyState>
   </div>
-{:else}
+{:else if list !== null}
   <div class="layout">
     <div class="list-head">
       <TabStrip
@@ -871,6 +869,11 @@
           </div>
         </div>
         {#if exportError}<p class="error" role="alert">{exportError}</p>{/if}
+        {#if filesError || tasksError || imagesError}
+          <button type="button" class="btn btn-sm content-retry" disabled={contextLoading} onclick={() => void loadProjectContext(detailProjectId, selectionSeq)}>
+            {contextLoading ? "Reading project content…" : "Retry project content"}
+          </button>
+        {/if}
         {#if detail.project.is_archived}
           {@const archivedProject = detail.project}
           <p class="archived-banner" role="status">
@@ -971,12 +974,12 @@
              of thing is under it, so a section is opened deliberately rather
              than to find out whether it holds anything. -->
         <!-- QUI-F21 — what work filed here may reach. -->
-        <ProjectLimits projectId={detail.project.project_id} />
+        <ProjectLimits projectId={detailProjectId} />
         <dl class="section-counts">
-          <div><dt>Files</dt><dd>{files?.files.length ?? 0}{files?.truncated ? "+" : ""}</dd></div>
+          <div><dt>Files</dt><dd>{contextLoading ? "Loading file count…" : filesError ? "Unavailable" : files?.files.length ?? 0}{files?.truncated ? "+" : ""}</dd></div>
           <div><dt>Chats</dt><dd>{detail.sessions.length}</dd></div>
-          <div><dt>Tasks</dt><dd>{projectTasks.length}</dd></div>
-          <div><dt>Images</dt><dd>{projectImages.length}</dd></div>
+          <div><dt>Tasks</dt><dd>{contextLoading ? "Loading task count…" : tasksError ? "Unavailable" : projectTasks.length}</dd></div>
+          <div><dt>Images</dt><dd>{contextLoading ? "Loading image count…" : imagesError ? "Unavailable" : projectImages.length}</dd></div>
           <div><dt>Checkpoints</dt><dd>{detail.checkpoints.length}</dd></div>
         </dl>
         {:else if detailSection === "files"}
@@ -1015,7 +1018,11 @@
           </ul>
         {/if}
         <h3 class="kicker">Work under this project</h3>
-        {#if projectTasks.length === 0}
+        {#if contextLoading}
+          <p class="sub" role="status">Loading project tasks…</p>
+        {:else if tasksError}
+          <p class="error" role="alert">{tasksError}</p>
+        {:else if projectTasks.length === 0}
           <p class="sub">
             No tasks are scoped to this project. Tasks created while it is the current project land here.
           </p>
@@ -1038,7 +1045,11 @@
              own; REM-PROJ-02 gives them the Assets section beside Files. -->
         {:else if detailSection === "assets"}
         <h3 class="kicker">Images</h3>
-        {#if projectImages.length === 0}
+        {#if contextLoading}
+          <p class="sub" role="status">Loading project images…</p>
+        {:else if imagesError}
+          <p class="error" role="alert">{imagesError}</p>
+        {:else if projectImages.length === 0}
           <p class="sub">
             No images yet — pictures generated in Design while this is the current project land here.
           </p>
@@ -1197,6 +1208,13 @@
   .path-field .input { flex: 1; min-width: 0; }
   @media (max-width: 720px) {
   }
+  .read-recovery {
+    display: grid;
+    gap: var(--space-2);
+    margin-bottom: var(--space-3);
+  }
+  .read-recovery .btn { justify-self: start; }
+  .content-retry { margin-bottom: var(--space-2); }
   .create-row {
     display: flex;
     align-items: center;

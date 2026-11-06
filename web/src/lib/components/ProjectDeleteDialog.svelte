@@ -19,6 +19,7 @@
   import { api, auth, ApiError, getToken, setToken } from "../api";
   import type { ProjectDeletionPreview, ProjectView } from "../apiTypes";
   import { explainReasonCode } from "../reasonCodes";
+  import { failure } from "../errorCopy";
   import { describeDeletion } from "../projectLifecycle";
 
   let {
@@ -68,7 +69,7 @@
       loadError =
         e instanceof ApiError && e.status === 404
           ? "This project is no longer here."
-          : "Could not read what deleting this project would remove.";
+          : failure("The deletion preview could not be read", "What this project would remove is unconfirmed, so deletion is unavailable.", "Choose Try again to read the preview.", e);
     }
   }
 
@@ -81,11 +82,12 @@
     if (exporting) return;
     exporting = true;
     notice = null;
+    error = null;
     try {
       await api.exportProject(project.project_id);
       notice = "Exported. Check your downloads before deleting.";
-    } catch {
-      error = "Could not export the project.";
+    } catch (e) {
+      error = failure("The project export did not finish", "A complete download is unconfirmed.", "Check browser downloads and download permissions before exporting again.", e);
     } finally {
       exporting = false;
     }

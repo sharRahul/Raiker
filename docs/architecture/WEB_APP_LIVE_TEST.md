@@ -1591,3 +1591,97 @@ The recheck found a stale helper assumption on restored Models inventories.
 the legacy deep link does not open it. RT-SETTINGS-RECOVERY-06 verifies that
 fallback for all three providers. Final Svelte check: zero errors and warnings;
 lint, build and the 29 focused tests passed.
+
+## Result — 2026-11-06 QUI-G06 Projects recovery
+
+**Scope.** Fifteen Projects error paths from
+[07 Quick fixes and quality](../plans/quiet-ui/07_QUICK_FIXES_AND_QUALITY.md#2026-11-06--qui-g06-projects-recovery),
+plus the Limits read/save failures found during implementation. Built SPA served
+by real FastAPI from `/tmp/raiker-project-recovery` on port 8765, Linux Chromium,
+1280×800. The owner signs in through the UI. Projects are created through the UI;
+one disposable project is archived/restored through the real host. Explicit
+HTTP 503 injection exercises failures. The chat-move case uses a declared,
+nonexistent session ID whose request is intercepted. Failed folder attachment,
+project/chat moves, exports and deletion never reach the backend.
+
+| Case | Check |
+|---|---|
+| RT-PROJECT-RECOVERY-01 | A failed refresh retains known rows, reports unconfirmed list/hierarchy and recovers with Retry projects against the host |
+| RT-PROJECT-RECOVERY-02 | Create and attach-new-folder failures retain names/path and require checking the list before repeating a write |
+| RT-PROJECT-RECOVERY-03 | Failed file-history/task/image reads show Unavailable, task/image sections report their failure, and a real content retry retains unsaved instructions; explicit dark-theme capture |
+| RT-PROJECT-RECOVERY-04 | Failed instructions save keeps the draft; attach-existing-folder names unconfirmed root; export names download recovery |
+| RT-PROJECT-RECOVERY-05 | Failed archive remains reachable; failed deletion preview offers retry without Delete; retry reads the real preview |
+| RT-PROJECT-RECOVERY-06 | Detail failure gives reopening guidance; failed chat move requires checking its project; failed hierarchy move retains the selected destination |
+| RT-PROJECT-RECOVERY-07 | Restore failure requires checking Active/Archived; a real-host restore returns the disposable fixture to Active |
+| RT-PROJECT-RECOVERY-08 | Limits read failure stops false loading and retries; save failure retains entries and makes no rollback claim |
+
+**Outcome.** All eight cases passed across split runs: cases 01–02, 03–07,
+and 08 separately. The six-case process ended with a termination signal after
+case 07, so case 08 was rerun independently and passed. Before the final runs,
+the harness's Instructions locator was corrected to its accessible name,
+Project instructions, and the legacy route alias was replaced with the canonical
+Projects URL. These initial harness failures are not passing evidence.
+
+**Procedure and evidence.**
+`web/e2e/project-error-recovery-live.spec.ts`, run with
+`npx playwright test --project=live e2e/project-error-recovery-live.spec.ts --workers=1`
+from `web/`. Captures and provenance manifest are retained under
+`output/playwright/2026-11-06-project-recovery/` (generated artifacts, ignored by
+Git). Light list/draft captures and the dark content capture are reviewed for
+readable wrapping and visible recovery controls. Component coverage includes
+failed-read recovery, retained drafts, unavailable counts, existing conflict
+handling and stale project selection. The related Limits read/save regressions
+are in `ProjectLimits.test.ts`.
+
+**Limits.** These are deliberate response failures, not evidence of a real write
+committing before its response is lost. The project/chat move failures do not
+execute a successful move, and the deletion case does not delete anything.
+Linux Chromium does not qualify native macOS/Windows rendering, screen readers
+or the five-person study. Remaining acceptance is tracked in
+[TO_BE_FIXED.md](../plans/TO_BE_FIXED.md#qui-g06-projects-recovery--remaining-acceptance-evidence).
+The five existing GitHub workflows still cover current CI, data-safety, engine,
+packaging and release requirements; none was stale enough to remove.
+
+**Real provider recheck.** `models-provider-validation-live.spec.ts` passed
+**3/3** in 7.2 minutes against this round's disposable host. The supplied keys
+were entered through password fields in Models; Anthropic's workspace ID was
+entered under Advanced. Readiness succeeded and the outgoing request named the
+exact provider/model pair. Anthropic Haiku 4.5 answered `42`, OpenRouter's
+`openai/gpt-4o-mini` answered `43`, and OpenAI's `gpt-4o-mini` answered `44`.
+The three `*-real-turn.png` captures were visually reviewed. Outcomes and
+capture provenance are in
+`output/playwright/2026-11-06-models-real-providers/`; each current outcome has
+this round's 22:13–22:18 UTC timestamp. The private credential source is outside
+Git and is removed after the run. No key is embedded in a test or capture.
+
+**Fresh setup regression.** RT-PROJECT-RECOVERY-01 also passed on a separately
+created workspace at `/tmp/raiker-project-fresh-setup`, port 8767, completing the
+setup wizard through the UI with the corrected helper. Its capture can replace
+the identical list-failure evidence from the primary host; the manifest names
+the actual host. Tests navigate to the canonical `#/work?tab=projects` route and
+wait for a loaded list before deciding whether their project fixture exists.
+
+**Local checks.** The 55 Projects/Limits component tests, 14 quiet-copy tests,
+25 documentation/governance tests, 27 mocked browser tests, Ruff, Mypy (1,251
+files), compilation, documentation validators, secret scan and reviewed static
+security scan passed. The initial broad Python run lacked the native runner;
+a Rust toolchain was installed, the runner built, and the 17 approval tests then
+passed. The initial full web run caught bare Loading count copy, corrected to
+name the file/task/image count and checked by the quiet-copy suite. The final
+GitHub workflow run validates the complete suite on the pushed source.
+
+**Visual direction.** This is a refinement of the existing Quiet UI tokens and
+components. The requested [Apple design reference](https://github.com/dickwu/apple-design-skill),
+[Impeccable](https://github.com/pbakaus/impeccable), its
+[anti-slop guidance](https://impeccable.style/#slop), and the
+[macOS](https://github.com/ceorkm/macos-design-skill) /
+[macOS skill catalogue](https://skill-repo.io/extensions/skill/davepoon/macos-design)
+references informed inline feedback, clear recovery labels and spacing, retained
+input and light/dark review. No new palette or window chrome is introduced.
+
+**Final refinement recheck.** After naming loading counts, spacing the content
+retry control and avoiding the unknown-code catalogue's duplicate jargon,
+RT-PROJECT-RECOVERY-03/04/06 passed again **3/3** in 1.5 minutes against the final
+production build. Their dark content, context/export and move-dialog captures
+replace the earlier versions. The 69 focused Projects/Limits/quiet-copy tests
+and final Svelte check (zero errors/warnings) passed on the completed source.

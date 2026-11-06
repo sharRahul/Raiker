@@ -9,6 +9,7 @@
    * under them, and the composer says so.
    */
   import FormDialog from "./FormDialog.svelte";
+  import { failure } from "../errorCopy";
   import { ApiError } from "../api";
   import { contract } from "../generated/apiContract";
   import type { ProjectLimitsView } from "../generated/apiContract";
@@ -29,18 +30,27 @@
     project_limit_connection_invalid: "Write each connection by its short name, like gmail, one per line.",
   };
 
+  let loadError = $state<string | null>(null);
+  let readSeq = 0;
+
   $effect(() => {
     const id = projectId;
     view = null;
-    void contract
-      .getProjectLimits(id)
-      .then((answer) => {
-        if (id === projectId) view = answer;
-      })
-      .catch(() => {
-        view = null;
-      });
+    void load(id);
+    return () => { readSeq += 1; };
   });
+
+  async function load(id: string) {
+    const seq = ++readSeq;
+    loadError = null;
+    try {
+      const answer = await contract.getProjectLimits(id);
+      if (seq === readSeq && id === projectId) view = answer;
+    } catch (e) {
+      if (seq !== readSeq || id !== projectId) return;
+      loadError = failure("Project limits could not be read", "The saved work boundaries are unconfirmed.", "Choose Retry project limits before changing them.", e);
+    }
+  }
 
   function lines(text: string): string[] {
     return text.split(/[\n,]/).map((line) => line.trim()).filter((line) => line !== "");
@@ -67,7 +77,7 @@
       editing = false;
     } catch (e) {
       const code = e instanceof ApiError ? (e.reasonCode ?? "") : "";
-      error = ERRORS[code] ?? "The limits were not saved. Nothing changed.";
+      error = failure("Saving project limits was not confirmed", "Your entries are still here; check the saved limits before starting work or saving again.", ERRORS[code] ?? "Copy your entries, then reopen the project to check its limits.", e);
     } finally {
       busy = false;
     }
@@ -81,7 +91,10 @@
       {view && view.summary.length > 0 ? "Change limits" : "Set limits"}
     </button>
   </div>
-  {#if view === null}
+  {#if loadError}
+    <p class="error" role="alert">{loadError}</p>
+    <button type="button" class="btn btn-sm" onclick={() => void load(projectId)}>Retry project limits</button>
+  {:else if view === null}
     <p class="sub">Reading this project's limits…</p>
   {:else if view.summary.length === 0}
     <p class="sub">No limits. Work here follows your permissions.</p>

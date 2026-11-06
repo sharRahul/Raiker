@@ -286,6 +286,16 @@ folder and that is not a neighbour for a button you press all day. In the
 desktop window the same menu has **Open in new window**. A folder tree
 shows nesting.
 
+**When a request fails.** **Retry projects** refreshes an unavailable list.
+Previously read rows remain visible when a refresh fails. Inside a project,
+failed file-history, task and image reads show **Unavailable** instead of zero
+or an empty list. **Retry project content** reads those sections again without
+replacing unsaved instructions or checks. **Retry project limits** retries an
+unavailable limits read. After an unconfirmed create, attach, move, archive,
+restore or save, check the saved state before repeating it; copy your draft
+before reopening the project. An export error asks you to check browser downloads
+and download permissions before exporting again.
+
 **Current project** is the one project new work starts in — the same one every
 composer names. Projects says which it is, with **Stop working in it** beside it.
 That is a different fact from the two lists, **Active** and **Archived**: a

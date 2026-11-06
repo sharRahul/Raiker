@@ -53,7 +53,7 @@ describe("ProjectsView", () => {
     render(ProjectsView);
     const alert = await screen.findByRole("alert");
     expect(alert).toHaveTextContent(/couldn't load projects/i);
-    expect(alert).toHaveTextContent(/unavailable \(404\)/i);
+    expect(alert).toHaveTextContent(/HTTP 404/i);
   });
 
   it("lists projects with their scope and marks the current one from the Work project", async () => {
@@ -238,7 +238,7 @@ describe("ProjectsView", () => {
     await waitFor(() => expect(screen.getByRole("button", { name: "Export project" })).toBeInTheDocument());
     await fireEvent.click(screen.getByRole("button", { name: "Export project" }));
 
-    expect(await screen.findByRole("alert")).toHaveTextContent("Could not export (403).");
+    expect(await screen.findByText(/The project export did not finish/)).toHaveTextContent("HTTP 403, forbidden");
   });
 
   it("surfaces an honest server rejection on create", async () => {
@@ -723,7 +723,7 @@ describe("ProjectsView context home", () => {
     await openDetail(withoutFiles);
     await openSection("Files");
     expect(await screen.findByRole("button", { name: "Inspect brief.md" })).toBeInTheDocument();
-    expect(await screen.findByText(/files unavailable \(404\)/i)).toBeInTheDocument();
+    expect(await screen.findByText(/Project file history could not be read \(HTTP 404/i)).toBeInTheDocument();
   });
 
   it("offers attaching a folder to a managed project", async () => {
@@ -1367,5 +1367,74 @@ describe("QUI-F13 a project in its own window", () => {
     await openLifecycleMenu();
     await fireEvent.click(screen.getByRole("menuitem", { name: "Open in new window" }));
     expect(openWindow).toHaveBeenCalledWith("#/projects?project=proj_1");
+  });
+});
+
+// QUI-G06: failed reads must not masquerade as empty content, and retry must
+// not replace an owner's unsaved instructions with the server's old version.
+describe("Projects recovery", () => {
+  const detail = {
+    project: project({}),
+    context: { instructions: "Saved instructions", attachment_ids: [], memory_enabled: false },
+    sessions: [], checkpoints: [],
+  };
+  const failed = { __status: 503, detail: { reason_code: "injected_failure" } };
+  const routes = () => ({
+    "GET /api/projects": { projects: [project({})], active_project_id: null },
+    "GET /api/projects/tree": [],
+    "GET /api/projects/proj_1": detail,
+    "GET /api/projects/proj_1/files": failed,
+    "GET /api/tasks": failed,
+    "GET /api/images": failed,
+  });
+
+  it("retries an unavailable list without treating it as an empty workspace", async () => {
+    const answers: Record<string, unknown> = { ...routes(), "GET /api/projects": failed };
+    stubFetch(answers);
+    render(ProjectsView);
+    expect(await screen.findByRole("alert")).toHaveTextContent("HTTP 503, injected_failure");
+    expect(screen.queryByText("No projects yet")).toBeNull();
+    answers["GET /api/projects"] = routes()["GET /api/projects"];
+    await fireEvent.click(screen.getByRole("button", { name: "Retry projects" }));
+    expect(await screen.findByRole("button", { name: /open project alpha/i })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Retry projects" })).toBeNull();
+  });
+
+  it("shows unavailable counts, exposes failures in their sections and retries without losing a draft", async () => {
+    const answers: Record<string, unknown> = routes();
+    stubFetch(answers);
+    render(ProjectsView);
+    await fireEvent.click(await screen.findByRole("button", { name: /open project alpha/i }));
+    await waitFor(() => expect(screen.getAllByText("Unavailable")).toHaveLength(3));
+    const instructions = screen.getByLabelText("Instructions");
+    await fireEvent.input(instructions, { target: { value: "Unsaved owner draft" } });
+    await fireEvent.click(screen.getByRole("tab", { name: "Work" }));
+    expect(await screen.findByText(/Project tasks could not be read/)).toHaveTextContent("HTTP 503");
+    expect(screen.queryByText(/No tasks yet/)).toBeNull();
+    await fireEvent.click(screen.getByRole("tab", { name: "Project library" }));
+    expect(await screen.findByText(/Project images could not be read/)).toHaveTextContent("Retry project content");
+    expect(screen.queryByText(/No images yet/)).toBeNull();
+    answers["GET /api/projects/proj_1/files"] = { files: [], provenance: {} };
+    answers["GET /api/tasks"] = [];
+    answers["GET /api/images"] = { generations: [] };
+    await fireEvent.click(screen.getByRole("button", { name: "Retry project content" }));
+    expect(await screen.findByText(/No images yet/)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Retry project content" })).toBeNull();
+    await fireEvent.click(screen.getByRole("tab", { name: /Overview/ }));
+    expect(screen.getByLabelText("Instructions")).toHaveValue("Unsaved owner draft");
+  });
+
+  it("keeps creation and context drafts when a write response is uncertain", async () => {
+    stubFetch({ ...routes(), "POST /api/projects": failed, "PUT /api/projects/proj_1/context": failed });
+    render(ProjectsView);
+    await fireEvent.input(screen.getByLabelText("New project name"), { target: { value: "New project" } });
+    await fireEvent.click(screen.getByRole("button", { name: "Create project" }));
+    expect(await screen.findByText(/Project creation was not confirmed/)).toHaveTextContent("check the project list before creating it again");
+    expect(screen.getByLabelText("New project name")).toHaveValue("New project");
+    await fireEvent.click(await screen.findByRole("button", { name: /open project alpha/i }));
+    await fireEvent.input(screen.getByLabelText("Instructions"), { target: { value: "Keep this draft" } });
+    await fireEvent.click(screen.getByRole("button", { name: "Save context" }));
+    expect(await screen.findByText(/Saving project instructions was not confirmed/)).toHaveTextContent("copy it before reopening");
+    expect(screen.getByLabelText("Instructions")).toHaveValue("Keep this draft");
   });
 });

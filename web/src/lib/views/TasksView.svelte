@@ -65,6 +65,7 @@
   import { newIdempotencyKey } from "../idempotency";
   import { AGENT_CADENCES, cadenceLabel } from "../agentCadence";
   import { ACTIVE_TASK_STATES, isActiveTask, taskBadge, taskStatusLabel } from "../statusMaps";
+  import { taskBetaStatus, withBetaStatus } from "../betaStatus";
   import { allProfiles, chatProfiles, refreshModels, modelCatalogues, modelsKnown } from "../models.svelte";
   import { catalogueChoices } from "../modelCatalogue";
   import {
@@ -333,7 +334,8 @@
    * work waiting for a time, and work about to be claimed.
    */
   function stateLabel(task: TaskView): string {
-    return task.status === "queued" ? taskPhaseLabel(taskPhase(task)) : taskStatusLabel(task.status);
+    const detail = task.status === "queued" ? taskPhaseLabel(taskPhase(task)) : taskStatusLabel(task.status);
+    return withBetaStatus(taskBetaStatus(task.status), detail);
   }
 
   // A finished or blocked run always states why. The backend refuses to record a

@@ -21,6 +21,7 @@
   import type { ExecutionEnvironmentsView, RuntimeMode } from "../../apiTypes";
   import { explainReasonCode } from "../../reasonCodes";
   import { boundaryLabel, observationRows } from "../../sandboxPosture";
+  import { runtimeBetaStatus } from "../../betaStatus";
 
   let {
     principal = "—",
@@ -271,7 +272,7 @@
   <div class="card-heading">
     <h3>
       Raiker runtime
-      {#if mode}<span class="status" class:stopped={!running}>· {running ? "Accepting work" : "Disabled"}</span>{/if}
+      {#if mode}<span class="status" class:stopped={!running}>· {runtimeBetaStatus(mode.status)}</span>{/if}
     </h3>
   </div>
   {#if loadError}

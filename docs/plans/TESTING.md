@@ -49,6 +49,7 @@ model-driven mandatory scenarios five times on fresh state; retain every run.
 | T-14 | Accessibility and recovery | Three first-time evaluators use keyboard, screen reader and supported narrow/wide layouts to start, approve, stop, find and recover work. | Core work is achievable from shipped guidance; controls are named, focus is usable, and no false success/inert control appears. |
 | T-15 | Security and resilience | Exercise hostile prompt/page/connector data, expired credential, provider outage, corrupt/locked disposable store and duplicate triggers. | No authority expansion, secret leak, duplicate consequential effect or false completion; recovery keeps durable work/evidence. |
 | T-16 | Comparative claim | Run the same declared personal-goal fixture against any named comparison product and Raiker. | Same scope, permissions, model/host disclosure, validator, interventions and receipts; blocked comparison access is recorded as blocked, not a win. |
+| RT-BETA-UX-01 | Beta shell clarity | On a fresh local host, complete first-run setup, open Home and Runtime settings. | The visible **Beta** link goes to in-app feedback; Runtime shows one of the five shared status words; screenshots retain both surfaces. |
 
 **2026-10-19 — first T-11 / T-12 run.** On a fresh `raiker-web`
 (`scripts/reset_live_workspace.py`), Linux, hosted Anthropic

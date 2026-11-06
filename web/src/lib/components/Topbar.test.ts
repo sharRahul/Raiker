@@ -47,6 +47,15 @@ describe("Topbar scope", () => {
     expect(screen.queryByLabelText("Active project")).not.toBeInTheDocument();
     expect(screen.queryByLabelText(/theme/i)).not.toBeInTheDocument();
   });
+
+  it("keeps the beta feedback route reachable from every page", async () => {
+    stubFetch({ "GET /api/notifications": [], "GET /api/approvals": [] });
+    render(Topbar, { title: "Chat", hint: "Ask anything" });
+
+    const beta = await screen.findByRole("link", { name: "Beta — send feedback" });
+    expect(beta).toHaveAttribute("href", "#/settings?tab=general#beta-feedback");
+    expect(beta).toHaveAttribute("title", "Beta — send feedback");
+  });
 });
 
 describe("Topbar tooltips", () => {

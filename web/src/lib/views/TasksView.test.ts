@@ -484,7 +484,7 @@ describe("TasksView blocked-on-approval pointer", () => {
       expect(screen.getByRole("heading", { name: "Publish the release note" })).toBeInTheDocument(),
     );
 
-    expect(screen.getByText("waiting for approval")).toBeInTheDocument();
+    expect(screen.getByText("Needs you · waiting for approval")).toBeInTheDocument();
     expect(screen.getByText(/waiting for your approval before this run can continue/i)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Stop" })).toBeInTheDocument();
   });

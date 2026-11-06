@@ -10,6 +10,7 @@
   import { api, ApiError } from "../api";
   import type { SessionDetail, SessionSummary, TurnDetail } from "../apiTypes";
   import { responseBadge } from "../statusMaps";
+  import { taskBetaStatus, withBetaStatus } from "../betaStatus";
   import { humanize, relativeTime, shortId } from "../format";
   import { conversationLink, workModeRoute } from "../turnAnchor";
 
@@ -354,7 +355,7 @@
               <li>
                 <button type="button" class="turn-btn" onclick={() => openTurn(t.turn_id)}>
                   <span class="turn-prompt">{t.prompt_text ?? t.turn_type}</span>
-                  <Badge variant={responseBadge(t.status)} label={t.status} />
+                  <Badge variant={responseBadge(t.status)} label={withBetaStatus(taskBetaStatus(t.status), t.status)} />
                 </button>
               </li>
             {/each}

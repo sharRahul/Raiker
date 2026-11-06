@@ -287,7 +287,7 @@ work runs (top bar), and so is the count of running items.
 | ID | Item | State | P | Effort | Work left |
 |---|---|---|---|---|---|
 | UX-1 | Quiet UI across retained pages | 🟡 | P0 | M | Close the open rows in TO_BE_FIXED's Quiet UI sections or move them to beta.2 with a known-issue entry; turn the QUI-G01 size budget into a failing check for Chat, Build, Models and Settings |
-| UX-2 | Composer, navigation, model selection consistent | 🟡 | P0 | S | One `ComposerParity` test per surface (Chat, Build, Design) that asserts the same controls in the same order |
+| UX-2 | Composer, navigation, model selection consistent | 🟡 | P0 | S | Existing component coverage names the Chat and Build grammars; this round adds the shared five-state vocabulary and a live `RT-BETA-UX-01` route check. Still required: one explicit parity assertion across Chat, Build and Design that compares the common controls in order. |
 | UX-3 | Permission controls, runtime status, approvals | ✅ | — | — | QUI-P01–P09 (approvals round) |
 | UX-4 | Understandable errors and recovery actions | 🟡 | P0 | M | The connector UI now gives action-oriented copy for missing, expired/revoked, and refresh-failed credentials; PR #245 does this for the llama.cpp engine. Still required: an automated whole-route `reason_code` label audit. |
 | UX-5 | Responsive layouts, accessibility, desktop usability | 🟡 | P0 | M | axe-core run in Playwright on every page at 1440, 1280 and 390 widths with zero serious violations; keyboard-only T-14; screen-reader pass with NVDA and VoiceOver |
@@ -301,6 +301,17 @@ work runs (top bar), and so is the count of running items.
 3. **One status vocabulary** across Models, Tasks and Settings: *Ready*,
    *Working*, *Needs you*, *Unavailable*, *Failed*. Each has one colour token
    and an icon, never colour alone.
+
+**2026-11-06 UX implementation slice.** The top bar now contains a keyboard-
+reachable **Beta** link to Settings → General → Beta feedback. `betaStatus.ts`
+is the single mapping for task/turn, model-readiness and runtime states; Models,
+Tasks, Sessions and Settings → Runtime show the shared status first and retain
+the measured detail after it. Unit/UI evidence is `betaStatus.test.ts`,
+`Topbar.test.ts`, `TasksView.test.ts`, `ModelsView.test.ts` and
+`SessionsView.test.ts` (147 focused tests). `RT-BETA-UX-01` captures the
+badge and Runtime state on a fresh host. It remains a required live check on
+the release candidate; it was not recorded in this development environment
+because the Playwright browser download was unavailable.
 
 ---
 

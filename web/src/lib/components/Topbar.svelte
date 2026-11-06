@@ -215,6 +215,14 @@
     <LiveWorkLine />
   </div>
   <div class="controls">
+    <!-- Beta plan UX deliverable: feedback stays a real, keyboard-reachable
+         link from every page rather than a label that only decorates the bar. -->
+    <a
+      href="#/settings?tab=general#beta-feedback"
+      class="beta-badge"
+      aria-label="Beta — send feedback"
+      title="Beta — send feedback"
+    >Beta</a>
     {#if backupNote !== null}
       <!-- Beta plan, area 6 — no verified backup in two weeks. Outside the
            status strip, which is hidden on narrow windows: this one must be
@@ -337,6 +345,7 @@
      workspace runs and how it is stopped on the other. */
   .cluster-rule{width:1px;height:1.35rem;background:var(--border);margin:0 .1rem;flex-shrink:0}
   .runtime-cluster{display:flex;align-items:center;gap:.5rem}
+  .beta-badge{display:inline-flex;align-items:center;min-height:1.75rem;padding:.08rem .45rem;border:1px solid var(--accent-border);border-radius:var(--r-pill);background:var(--accent-soft);color:var(--accent);font-size:var(--text-xs);font-weight:700;line-height:1;text-decoration:none;white-space:nowrap}.beta-badge:hover{color:var(--accent);text-decoration:underline}.beta-badge:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
   /* A segmented control, not two links: the pair reads as one choice
      with a current value. Sentence case and no tracking (the uppercase rule). */
   .modes{display:flex;gap:2px;padding:2px;margin-left:var(--space-3);border:1px solid var(--border);border-radius:var(--r-pill);background:var(--sunken)}
@@ -388,6 +397,7 @@
      it is a keyboard affordance (Ctrl/Cmd+K), there is no keyboard here, and
      everything it reaches is in the drawer and the gear's window. */
   @media(max-width:560px){.palette-button{display:none}}
+  @media(max-width:560px){.beta-badge{padding:.08rem .32rem;font-size:var(--text-2xs)}}
   @media(max-width:480px){
     .modes .mode-label{display:none}
     .modes .mode{padding:.3rem .5rem}

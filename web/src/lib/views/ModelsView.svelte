@@ -29,6 +29,7 @@
   import { inferenceLocation } from "../inferenceLocation";
   import { modelName } from "../modelPresentation";
   import { readinessLabel, UNPINNED_MODEL } from "../modelReadinessLabels";
+  import { modelBetaStatus, withBetaStatus } from "../betaStatus";
   import { isChoosableModel } from "../modelReadiness.svelte";
   import { installerRuntimeFor, openRuntimeInstaller } from "../runtimeInstall";
   import { detectionNotice, onReturnToApp } from "../returnAndDetect";
@@ -785,7 +786,7 @@
     if (state === "ready" && profile.readiness_checked_at) {
       return `${label} · confirmed ${relativeTime(profile.readiness_checked_at)}`;
     }
-    return label;
+    return withBetaStatus(modelBetaStatus(state), label);
   }
 
   async function openPicker(profileId: string) {

@@ -17,9 +17,9 @@
 //    circle as `sun`, and `projects` was the same folder as `folder`. At 16px
 //    each pair was indistinguishable while meaning entirely different things.
 
-/** The optical size scale. `sm` sits inside dense text, `md` inside a control,
- *  `lg` beside a heading or in a nav row, `xl` in an empty state. */
-export const ICON_SIZE = { sm: 14, md: 16, lg: 20, xl: 24 } as const;
+/** The optical size scale. Controls and navigation use a generous stroke size
+ *  that remains legible at a glance; `sm` still sits cleanly beside text. */
+export const ICON_SIZE = { sm: 16, md: 18, lg: 22, xl: 28 } as const;
 
 export type IconSize = keyof typeof ICON_SIZE;
 

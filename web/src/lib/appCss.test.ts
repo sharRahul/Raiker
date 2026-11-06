@@ -3,6 +3,8 @@ import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
 const stylesheet = readFileSync(resolve(process.cwd(), "src", "app.css"), "utf8");
+const modelPickerStyles = readFileSync(resolve(process.cwd(), "src", "lib", "components", "ModelPicker.svelte"), "utf8");
+const privacyStyles = readFileSync(resolve(process.cwd(), "src", "lib", "views", "settings", "Privacy.svelte"), "utf8");
 
 function themeTokens(selector: string): Record<string, string> {
   const start = stylesheet.indexOf(selector);
@@ -75,6 +77,26 @@ describe("global mobile accessibility styles", () => {
     expect(stylesheet).toMatch(
       /@media \(prefers-reduced-motion: reduce\)\s*\{\s*html\s*\{\s*scroll-behavior: auto;/s,
     );
+  });
+});
+
+describe("sliders and switch controls", () => {
+  it("gives range controls a larger track and a lozenge thumb", () => {
+    expect(stylesheet).toMatch(/input\[type="range"\]\s*\{[^}]*height: 1\.75rem;[^}]*min-width: 7rem;/s);
+    expect(stylesheet).toMatch(/input\[type="range"\]::-webkit-slider-runnable-track\s*\{[^}]*height: 6px;[^}]*border-radius: var\(--r-pill\);/s);
+    expect(stylesheet).toMatch(/input\[type="range"\]::-webkit-slider-thumb\s*\{[^}]*width: 0\.75rem;[^}]*height: 1\.25rem;[^}]*border-radius: var\(--r-pill\);/s);
+  });
+
+  it("provides a light thumb surface that stays visible in both themes", () => {
+    expect(themeTokens(":root[data-theme=\"light\"]")["--control-thumb"]).toBe("#FFFFFF");
+    expect(themeTokens(":root[data-theme=\"dark\"]")["--control-thumb"]).toBe("#F4F1EA");
+  });
+
+  it("keeps both the model and Privacy switches on the shared 48×28 scale", () => {
+    expect(modelPickerStyles).toMatch(/\.switch\s*\{[^}]*width: 3rem;[^}]*height: 1\.75rem;/s);
+    expect(modelPickerStyles).toMatch(/\.switch::after\s*\{[^}]*width: 1\.375rem;[^}]*height: 1\.375rem;/s);
+    expect(privacyStyles).toMatch(/\.switch-input\s*\{[^}]*inline-size: 3rem;[^}]*block-size: 1\.75rem;/s);
+    expect(privacyStyles).toMatch(/\.switch-input::after\s*\{[^}]*inline-size: 1\.375rem;[^}]*block-size: 1\.375rem;/s);
   });
 });
 
@@ -265,5 +287,14 @@ describe("the composer's primary action keeps its name at phone width", () => {
     expect(rule).not.toBeNull();
     expect(rule![1]).not.toMatch(/display:\s*none/);
     expect(rule![1]).toMatch(/clip: rect\(0 0 0 0\)/);
+  });
+
+  it("keeps the approved rounded-card shape and existing composer control sizes", () => {
+    expect(composer).toMatch(/\.composer-card\s*\{[^}]*border-radius: var\(--r-xl\)/s);
+    expect(composer).toContain("border-radius: 1rem");
+    expect(composer).not.toContain("class:has-draft");
+    expect(composer).not.toContain("class:turn-active");
+    expect(composer).toContain("height: 2.5rem");
+    expect(composer).toContain("width: 2.5rem");
   });
 });

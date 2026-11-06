@@ -1513,3 +1513,34 @@ colours or decorative glass/chrome were introduced.
 appearance, screen readers, all populated detail states or the five-person
 study. Companion art and separate beta/download/error-recovery gates remain
 in [TO_BE_FIXED.md](../plans/TO_BE_FIXED.md#shared-ui-refinement--remaining-acceptance-evidence).
+
+## Result — 2026-11-06 icon scale and owner-approved composer shape
+
+**Run.** Isolated workspace at `/tmp/raiker-ui-scale-live-workspace`, built SPA
+served by `python -m raiker.api.serve`, Linux Codespace and managed Playwright
+Chromium. No API keys, provider connection, inference or settings save was used.
+
+| Case | Coverage | Evidence |
+|---|---|---|
+| RT-UI-SCALE-01 | Chat, Build and Design at 1440×900 light, 1280×800 dark and 390×844 light | Existing 20 px desktop / 16 px narrow composer cards retained; existing 40 px desktop / 44 px narrow send controls; larger inline icon role; screenshots for idle and draft states |
+| RT-UI-SCALE-02 | Privacy toggle and Knowledge Map display slider in dark mode | Privacy switch measures 48×28 px; range input measures 28 px high with 112 px minimum width; screenshots retained |
+
+**Owner review.** The initial long-pill composer proposal was rejected by the
+owner after screenshot review. Its CSS and state classes were removed and the
+previous rounded-card geometry restored before this final run. Screenshots from
+the rejected proposal are exploratory and are not the accepted result.
+
+**Artifacts.** `output/playwright/2026-11-06-ui-scale/` contains 18 final
+Chat/Build/Design captures (idle and draft, three layouts), plus the Privacy
+switch and Knowledge Map slider captures. The broader shared UI route sweep
+also covered 54 destinations in both themes after the icon scale changed; its
+108 observations had no horizontal bleed or renderer errors. The final composer
+captures above supersede its composer images.
+
+**Outcome: passed, 2/2 final cases (1.0 minute).** Focused icon, composer and
+CSS regressions passed **32/32**; design-token validation, Svelte diagnostics
+(0 errors / 0 warnings), ESLint and production build passed. The temporary host
+was stopped after the run.
+
+**Limits.** This is a Linux Chromium visual review. It does not qualify native
+macOS/Windows rendering, screen readers, or all populated workspace states.

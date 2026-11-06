@@ -321,7 +321,37 @@
   .destinations dd { margin: 0; color: var(--text-2); }
   .setting-row { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--space-4); }
   .setting-row h3 { margin: 0; font-size: var(--text-base); }
-  .switch-input { flex: none; margin-top: .3rem; }
+  .switch-input {
+    -webkit-appearance: none;
+    appearance: none;
+    position: relative;
+    flex: none;
+    inline-size: 3rem;
+    block-size: 1.75rem;
+    margin: .3rem 0 0;
+    border: 1px solid var(--border-strong);
+    border-radius: var(--r-pill);
+    background: var(--neutral-border);
+    cursor: pointer;
+    transition: background var(--motion-fast) var(--ease), border-color var(--motion-fast) var(--ease);
+  }
+  .switch-input::after {
+    content: "";
+    position: absolute;
+    inset-block-start: 2px;
+    inset-inline-start: 2px;
+    inline-size: 1.375rem;
+    block-size: 1.375rem;
+    border-radius: 50%;
+    background: var(--control-thumb);
+    box-shadow: var(--shadow-1);
+    transition: transform var(--motion-fast) var(--ease);
+  }
+  .switch-input:checked { background: var(--accent); border-color: var(--accent); }
+  .switch-input:checked::after { transform: translateX(1.25rem); }
+  .switch-input:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 3px; }
+  .switch-input:disabled { cursor: not-allowed; opacity: .55; }
+  @media (prefers-reduced-motion: reduce) { .switch-input, .switch-input::after { transition: none; } }
   @media (max-width: 760px) {
     .rows li, .rows.egress li { grid-template-columns: minmax(0, 1fr) auto; }
     .row-value { grid-column: 1 / -1; white-space: normal; }

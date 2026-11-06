@@ -141,10 +141,10 @@ Errors keep `role="alert"`; loading and empty keep `role="status"`.
 
 | Name | Pixels | Used in |
 |---|---|---|
-| `sm` | 14 | Inline with dense text, inside a `.btn-sm` |
-| `md` | 16 | Inside a control, beside a label |
-| `lg` | 20 | A nav row, beside a heading |
-| `xl` | 24 | An empty state's mark |
+| `sm` | 16 | Inline actions and dense text |
+| `md` | 18 | Inside a control, beside a label |
+| `lg` | 22 | A nav row, beside a heading |
+| `xl` | 28 | An empty state's mark |
 
 Call sites previously passed 14, 15, 16, 17, 18, 20 and 22 more or less
 interchangeably. Pass a name; pass a number only where a bespoke control
@@ -426,3 +426,24 @@ attention and answer callouts keep text, icon and semantic tone with a fine
 boundary. Quoted text uses a one-pixel rule; reasoning and recalled content use
 neutral fill without decorative side accents. None of these treatments changes
 consent, lifecycle or provider behavior.
+
+## 2026-11-06 icon and option-control scale
+
+The [Quiet UI visual-system plan](../plans/quiet-ui/08_BRAND_AND_VISUAL_SYSTEM.md#2026-11-06--icon-and-option-control-scale)
+sets the following shared scale across the routed product:
+
+- Icons use the 16 / 18 / 22 / 28 px `sm` / `md` / `lg` / `xl` optical roles.
+- Range sliders have a 28 px interaction box, a 6 px track and a 12×20 px
+  lozenge thumb. This borrows Apple's recognizable linear-slider geometry while
+  retaining Raiker's accent.
+- Setting switches use a 48×28 px track and 22 px thumb. The thumb uses a
+  theme-aware control surface, so off remains visible in dark mode.
+- Chat, Build and Design keep their existing rounded-card geometry and action
+  sizes. The owner reviewed and rejected the proposed idle capsule; no composer
+  shape or size change was retained.
+
+The icon and control scale follows Apple's clear symbols, lozenge slider thumb
+and distinguishable toggle states. This does not change Raiker's palette, Inter
+typography, permission model or add glass effects. Motion follows the
+established reduced-motion rule. Live cases review each composer in both themes
+and narrow layouts, then inspect the Privacy switch and Knowledge Map sliders.

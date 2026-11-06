@@ -1599,6 +1599,8 @@ file you can open. The two capture sets that remain — `screenshots/pages/` and
 | [FIXED-1292](#fixed-1292--add-dialogs-carried-scroll-and-lost-keyboard-focus-between-sources) | Low | Shared Add dialogs | Fixed |
 | [FIXED-1293](#fixed-1293--shared-ui-primitives-drifted-across-pages-and-subpages) | Medium | Shared UI / cross-page consistency | Fixed |
 | [FIXED-1294](#fixed-1294--tabs-pointed-at-missing-panels-and-the-visual-sweep-skipped-nested-pages) | Medium | Keyboard navigation / UI coverage | Fixed |
+| [FIXED-1295](#fixed-1295--icons-and-option-controls-were-small-and-inconsistent-across-pages) | Medium | Shared UI / visual scale | Fixed 2026-11-06 |
+| [FIXED-1296](#fixed-1296--api-contract-inventory-omitted-union-request-types) | Low | API contract documentation | Fixed 2026-11-06 |
 
 ---
 
@@ -38878,3 +38880,43 @@ for the routed review.
 association. Design, project and document regressions and the whole-page
 browser review are recorded in
 [WEB_APP_LIVE_TEST.md](../architecture/WEB_APP_LIVE_TEST.md#result--2026-11-06-shared-ui-refinement).
+
+## FIXED-1295 — Icons and option controls were small and inconsistent across pages
+
+**Severity: Medium. Area: Shared UI / visual scale. Status: Fixed 2026-11-06.**
+
+**Observed.** The shared icon scale rendered at 14 / 16 / 20 / 24 px, while
+range sliders had a browser-default interaction height and a square thumb.
+Settings switches also used different sizes and contrast treatments.
+
+**Fixed.** Shared icons now use 16 / 18 / 22 / 28 px roles throughout the
+routed UI. Range sliders have a 28 px target, a 6 px track and a 12×20 px
+lozenge thumb. The Model picker Thinking switch and the Privacy switch share a
+48×28 px track, 22 px thumb, keyboard focus treatment and reduced-motion
+behavior. A theme-aware control-thumb token keeps the off state visible in dark
+mode.
+
+The owner reviewed and rejected the proposed long-pill shape for Chat, Build and
+Design. The capsule CSS and state classes were removed; the existing rounded
+cards and composer action sizes were restored and covered by the retained live
+case.
+
+**Evidence.** `icons.test.ts`, `appCss.test.ts`, `Composer.test.ts`, production
+build, Svelte diagnostics and ESLint. The route catalogue checked 54
+destinations in both themes with no horizontal bleed. Final composer, switch
+and slider captures plus live cases RT-UI-SCALE-01/02 are in
+[WEB_APP_LIVE_TEST.md](../architecture/WEB_APP_LIVE_TEST.md#result--2026-11-06-icon-scale-and-owner-approved-composer-shape).
+
+## FIXED-1296 — API contract inventory omitted union request types
+
+**Severity: Low. Area: API contract documentation. Status: Fixed 2026-11-06.**
+
+**Observed.** Regenerating the API contract inventory showed five endpoints
+whose optional/combined request schema was rendered as empty: MCP kill/pause,
+model-library deploy/deploy-mlx, and speech-runtime probe.
+
+**Fixed.** Regenerated `docs/architecture/API_CONTRACT_INVENTORY.md`; all five
+rows now name the request type as `Union`. No API behavior changed.
+
+**Evidence.** `python -m scripts.api_contract` completed successfully and
+updated the tracked OpenAPI bindings and inventory deterministically.

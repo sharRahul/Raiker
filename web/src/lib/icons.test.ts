@@ -39,6 +39,7 @@ describe("the icon set", () => {
 
   it("names one optical size per role rather than seven near-identical numbers", () => {
     expect(Object.keys(ICON_SIZE)).toEqual(["sm", "md", "lg", "xl"]);
+    expect(ICON_SIZE).toEqual({ sm: 16, md: 18, lg: 22, xl: 28 });
     const sizes = Object.values(ICON_SIZE);
     // Strictly ascending, so choosing the next role up always means a bigger icon.
     expect([...sizes].sort((a, b) => a - b)).toEqual(sizes);

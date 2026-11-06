@@ -229,6 +229,7 @@
   --surface: #FFFFFF;
   --sunken: #EFEEE9;
   --raised: #FFFFFF;
+  --control-thumb: #FFFFFF;
   --border: #E4E2DA;
   --border-strong: #CFCCC2;
   /* Light has almost no luminance to spend — a white card on a near-white
@@ -380,6 +381,7 @@
   --surface: #1B1B1B;
   --sunken: #161616;
   --raised: #222222;
+  --control-thumb: #F4F1EA;
   --border: #2A2A2A;
   --border-strong: #3B3B3B;
   /* Dark separates a card from the ground by luminance: the ground
@@ -1416,37 +1418,38 @@ time {
 input[type="range"] {
   -webkit-appearance: none;
   appearance: none;
-  height: 1.25rem;
+  height: 1.75rem;
+  min-width: 7rem;
   background: transparent;
   accent-color: var(--accent);
   cursor: pointer;
 }
 input[type="range"]:disabled { cursor: not-allowed; opacity: 0.5; }
 input[type="range"]::-webkit-slider-runnable-track {
-  height: 4px;
-  border-radius: 0;
+  height: 6px;
+  border-radius: var(--r-pill);
   background: var(--border-strong);
 }
 input[type="range"]::-moz-range-track {
-  height: 4px;
-  border-radius: 0;
+  height: 6px;
+  border-radius: var(--r-pill);
   background: var(--border-strong);
 }
 input[type="range"]::-webkit-slider-thumb {
   -webkit-appearance: none;
   appearance: none;
-  width: 0.7rem;
-  height: 1rem;
-  margin-top: -6px;
+  width: 0.75rem;
+  height: 1.25rem;
+  margin-top: -7px;
   border: 1px solid var(--accent-strong);
-  border-radius: 0;
+  border-radius: var(--r-pill);
   background: var(--accent);
 }
 input[type="range"]::-moz-range-thumb {
-  width: 0.7rem;
-  height: 1rem;
+  width: 0.75rem;
+  height: 1.25rem;
   border: 1px solid var(--accent-strong);
-  border-radius: 0;
+  border-radius: var(--r-pill);
   background: var(--accent);
 }
 input[type="range"]:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }

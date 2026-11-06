@@ -759,7 +759,8 @@
     grid-template-columns: minmax(0, 1fr) auto auto;
     align-items: center;
     gap: 0.5rem;
-    padding: 0.42rem 0.48rem;
+    min-height: 3.25rem;
+    padding: 0.55rem 0.6rem;
     font-weight: 650;
   }
   .effort-row:hover,
@@ -805,8 +806,9 @@
     font-size: var(--text-2xs);
   }
   .switch {
-    width: 1.85rem;
-    height: 1.05rem;
+    flex: none;
+    width: 3rem;
+    height: 1.75rem;
     border-radius: var(--r-pill);
     background: var(--neutral-border);
     position: relative;
@@ -815,19 +817,19 @@
   .switch::after {
     content: "";
     position: absolute;
-    top: 0.15rem;
-    left: 0.15rem;
-    width: 0.75rem;
-    height: 0.75rem;
+    top: 0.1875rem;
+    left: 0.1875rem;
+    width: 1.375rem;
+    height: 1.375rem;
     border-radius: 50%;
-    background: var(--surface);
+    background: var(--control-thumb);
     transition: transform var(--motion-fast) var(--ease);
   }
   .switch[data-on="true"] {
     background: var(--accent);
   }
   .switch[data-on="true"]::after {
-    transform: translateX(0.8rem);
+    transform: translateX(1.25rem);
   }
   @media (prefers-reduced-motion: reduce) {
     .switch,

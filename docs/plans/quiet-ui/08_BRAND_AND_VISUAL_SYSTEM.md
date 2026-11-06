@@ -156,3 +156,41 @@ and [FIXED-1293/1294](../FIXED_ITEMS.md#fixed-1293--shared-ui-primitives-drifted
 This refinement does not supply QUI-V05 companion art or qualify native macOS,
 Windows, screen-reader or five-person usability acceptance. Keep this document
 until its remaining work is complete.
+
+## 2026-11-06 — Icon and option-control scale
+
+The owner asked for larger icons and option sliders, then reviewed and rejected
+the proposed long-pill composer shape, asking to restore the previous design.
+Chat, Build and Design therefore retain their existing rounded-card geometry
+and action sizes. The accepted blend pairs Muse's quieter spacing and
+progressive disclosure with Apple's legible icon scale, familiar slider thumb
+and clear switch state. This is a design direction, not a pixel-for-pixel copy:
+Raiker keeps the QUI-V01 palette, Inter, and restrained surfaces. Do not add
+Liquid Glass or replace the existing brand colors.
+
+The accepted changes use shared icon roles and consistent switch/range controls
+across every page. The composer proposal was removed from source and its former
+shape/size rules were restored from the previous revision.
+
+| Item | State |
+|---|---|
+| UI-SCALE-01 | [x] Raise the small icon role to 16 px for legible inline actions. |
+| UI-SCALE-02 | [x] Raise the medium icon role to 18 px for controls and navigation. |
+| UI-SCALE-03 | [x] Raise the large icon role to 22 px for headings and nav emphasis. |
+| UI-SCALE-04 | [x] Raise the empty-state icon role to 28 px. |
+| UI-SCALE-05 | [x] Assert the four icon sizes remain ordered and fixed in the icon regression. |
+| UI-SCALE-06 | [x] Give range sliders a taller 28 px interaction box and a useful minimum width. |
+| UI-SCALE-07 | [x] Use a clear 6 px track and a 12×20 px lozenge thumb across browser engines. |
+| UI-SCALE-08 | [x] Enlarge the Model picker Thinking switch to 48×28 px with a 22 px thumb. |
+| UI-SCALE-09 | [x] Give the Privacy switch the same dimensions, focus ring and reduced-motion behavior. |
+| UI-SCALE-10 | [x] Review the long-pill proposal; the owner rejected it. Keep the existing desktop/mobile card radii. |
+| UI-SCALE-11 | [x] Preserve the existing 20 px focus radius; do not add a new focus shape. |
+| UI-SCALE-12 | [x] Preserve the existing rounded-card draft shape, including after blur. |
+| UI-SCALE-13 | [x] Keep attachment, drop and running states on the existing shared card surface. |
+| UI-SCALE-14 | [x] Restore the existing 40 px desktop composer actions and 44 px narrow-window targets. |
+| UI-SCALE-15 | [x] Review Chat, Build and Design, plus Privacy and Knowledge Map controls, in both themes and narrow layouts; retain screenshots and live cases. |
+
+The slider thumb uses Apple's linear-slider lozenge shape, while the track and
+switches inherit Raiker's accent and semantic tokens. The composer pill was
+captured and reviewed, but the owner rejected it; those screenshots are
+exploratory only. Final evidence uses the restored rounded-card shape.

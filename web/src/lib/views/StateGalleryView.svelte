@@ -14,9 +14,12 @@
   import PageState from "../components/PageState.svelte";
   import StatTile from "../components/StatTile.svelte";
   import TurnControl from "../components/TurnControl.svelte";
+  import { RunningTurn } from "../runningTurn.svelte";
   import ChatContextPanel from "../components/ChatContextPanel.svelte";
   import { applyTheme } from "../theme";
 
+  // No session, so nothing here can be stopped or steered.
+  const galleryTurn = new RunningTurn();
   // The owner's own theme choice comes back when the gallery is left.
   const ownTheme = document.documentElement.dataset.theme;
   let theme = $state<"light" | "dark">(ownTheme === "dark" ? "dark" : "light");
@@ -59,7 +62,7 @@
           <PageState state="loading" title="Loading tasks…" />
           <PageState state="loading" title="Loading tasks…" lines={3} />
         {:else if state === "working"}
-          <TurnControl sessionId={null} activity="Reading 2 emails from Anna" />
+          <TurnControl control={galleryTurn} activity="Reading 2 emails from Anna" />
           <Badge variant="active" />
           <StatTile label="In progress" value={2} detail="Two runs are working." tone="accent" />
         {:else if state === "needs-permission"}

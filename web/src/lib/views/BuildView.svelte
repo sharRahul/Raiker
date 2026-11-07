@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { isSendKeystroke, sendHint } from "../sendKey";
+  import { isSendKeystroke, runningSendHint, sendHint } from "../sendKey";
   import { uiPrefs } from "../prefs.svelte";
   import { askConfirm } from "../confirm.svelte";
   import { shownInline } from "../inlineDecisions.svelte";
@@ -122,6 +122,9 @@
   import SkillLinkNotice from "../components/SkillLinkNotice.svelte";
   import BuildModePicker from "../components/BuildModePicker.svelte";
   import TurnControl from "../components/TurnControl.svelte";
+  import FollowUpPills from "../components/FollowUpPills.svelte";
+  import RunSendButton from "../components/RunSendButton.svelte";
+  import { RunningTurn } from "../runningTurn.svelte";
   import CommandOutputPane from "../components/CommandOutputPane.svelte";
   import {
     focusFor,
@@ -312,8 +315,8 @@
   let streaming = $state(false);
   // Bumped when a turn ends, so the sandbox review rereads the task copy.
   let sandboxRefresh = $state(0);
-  // B17/C13 — whether the owner has already asked this turn to stop.
-  let stopping = $state(false);
+  // B17/C13, 03 execution states — Stop, follow-ups and the running clock.
+  const runningTurn = new RunningTurn();
   let sessionId = $state<string | null>(null);
   // Build runs the same governed turns as Chat against the same providers, so
   // it gets the same read-only context and spend panel rather than a variant.
@@ -696,6 +699,33 @@
     });
   });
   $effect(() => () => reportForegroundWork("build", null));
+  // 03 execution states — the same running bar Chat has, from this turn's events.
+  const runningSteps = $derived.by(() => {
+    const running = [...turns].reverse().find((turn) => turn.streaming);
+    return running ? toolActivity(running.events) : [];
+  });
+  let runningEvents: StreamEvent[] = [];
+  $effect(() => {
+    runningTurn.sessionId = sessionId;
+    // A follow-up typed before a new chat knew its id goes now.
+    if (sessionId !== null) void runningTurn.flush();
+  });
+  $effect(() => {
+    const running = [...turns].reverse().find((turn) => turn.streaming);
+    if (!running) return;
+    runningEvents = running.events;
+    runningTurn.observe(running.events);
+  });
+  let turnWasRunning = false;
+  $effect(() => {
+    const now = streaming;
+    if (now && !turnWasRunning) runningTurn.begin();
+    if (!now && turnWasRunning) {
+      runningTurn.observe(runningEvents);
+      runningTurn.end();
+    }
+    turnWasRunning = now;
+  });
   // QUI-F05 — *Response ready*: the turn this page ran has its answer while
   // Raiker is in the background. A parked turn is announced by its own notice.
   let wasStreaming = false;
@@ -1415,13 +1445,7 @@
   async function stopRunningTurn() {
     if (sessionId === null) return;
     try {
-      await api.interrupt({
-        session_id: sessionId,
-        all: true,
-        action_type: "cancel",
-        reason: "user stopped this turn (/stop)",
-      });
-      stopping = true;
+      await runningTurn.stop("user stopped this turn (/stop)");
     } catch {
       /* The composer's own Stop control reports its failures; a slash command
          that could not reach the runtime leaves the turn exactly as it was. */
@@ -1497,6 +1521,14 @@
     }
     const sentDraft = draft;
     const text = sentDraft.text.trim();
+    // 03 execution states — while a turn runs, the send key queues a follow-up.
+    if (streaming) {
+      if (text !== "" && (await runningTurn.steer(text))) {
+        draft.text = "";
+        queueMicrotask(() => autoGrow(promptEl ?? null));
+      }
+      return;
+    }
     if (text === "" || modelBlocked || streaming || attachStore.uploading) return;
     const voiceState = {
       dictated: voiceDictated,
@@ -1526,7 +1558,6 @@
     queueMicrotask(() => autoGrow(promptEl ?? null));
     attachStore.clear();
     streaming = true;
-    stopping = false;
     void scrollToEnd();
     try {
       await streamPrompt(
@@ -2561,11 +2592,12 @@
       bind:value={draft.text}
       bind:inputEl={promptEl}
       inputProps={{
-        placeholder: activeRepo === null
-          ? "Describe what you want built…"
-          : `Describe the change in ${activeRepo.label}…`,
-        title: `${sendHint(uiPrefs.sendKey)} · @: mention a file · /: commands at the start of the prompt`,
-        disabled: streaming,
+        placeholder: streaming
+          ? "Add an instruction — Raiker reads it at the next safe boundary"
+          : activeRepo === null
+            ? "Describe what you want built…"
+            : `Describe the change in ${activeRepo.label}…`,
+        title: `${streaming ? runningSendHint(uiPrefs.sendKey) : sendHint(uiPrefs.sendKey)} · @: mention a file · /: commands at the start of the prompt`,
         onpaste: onComposerPaste,
         oninput: onPromptInput,
         onselect: trackPromptSelection,
@@ -2585,6 +2617,7 @@
       turnActive={streaming}
     >
       {#snippet above()}
+        <FollowUpPills control={runningTurn} onuse={(text) => { draft.text = draft.text.trim() === "" ? text : `${draft.text}\n${text}`; promptEl?.focus(); }} />
         <ComposerChips store={attachStore} disabled={streaming} oninline={(text) => { draft.text += text; }} />
         <ModelReadinessStrip readiness={modelsKnown() ? modelReadiness : null} draftPreserved={draft.text.trim() !== ""} />
         <SkillLinkNotice text={draft.text} />
@@ -2653,7 +2686,7 @@
       {/snippet}
 
       {#snippet turn()}
-        <TurnControl sessionId={sessionId} bind:stopping />
+        <TurnControl control={runningTurn} activity={workingLine(runningSteps)} steps={runningSteps} />
       {/snippet}
 
       {#snippet left()}
@@ -2732,20 +2765,18 @@
               onactivechange={onVoiceActive}
             />
 
-            <button
-              type="submit"
-              class="btn btn-primary send"
-              disabled={streaming || attachStore.uploading || draft.text.trim() === "" || modelBlocked || !projectReady}
+            <!-- COMPOSER-15 — one state, one obvious next action. The word
+                 follows the posture this turn is already sending, so it can
+                 never promise more than the turn will do. While a turn runs it
+                 is Stop safely, or Queue once a follow-up is typed. -->
+            <RunSendButton
+              {streaming}
+              hasText={draft.text.trim() !== ""}
+              control={runningTurn}
+              label={buildPrimaryAction(mode)}
+              disabled={attachStore.uploading || draft.text.trim() === "" || modelBlocked || !projectReady}
               title={!projectReady ? "Choose a project from the + menu to start" : undefined}
-            >
-              <Icon name={streaming ? "clock" : "arrow-up"} size="sm" />
-              <!-- COMPOSER-15 — one state, one obvious next action. The word
-                   follows the posture this turn is already sending, so it can
-                   never promise more than the turn will do. -->
-              <span class="send-label"
-                >{streaming ? "Working…" : buildPrimaryAction(mode)}</span
-              >
-            </button>
+            />
       {/snippet}
 
 

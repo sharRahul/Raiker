@@ -387,3 +387,63 @@ class TestSteerQueueBound:
 
         assert response.status_code == 429, response.text
         assert response.json()["detail"]["reason_code"] == "steer_queue_full"
+
+
+class TestContinueFromLastStep:
+    """03 execution states — a stopped turn can be continued.
+
+    Before this, a stopped turn was left out of the history replayed to the
+    model, so *Continue from last step* reached a model that had never seen the
+    request. The stopped turn's reply now names the steps that finished (by
+    their transcript label, never their output) and is replayed, marked as
+    stopped.
+    """
+
+    def test_the_stopped_reply_names_the_finished_steps(self, workspace: Path) -> None:
+        envelope = _envelope("summarise the readme")
+        (workspace / "README.md").write_text("hello\n", encoding="utf-8")
+        store = SQLiteStore(workspace)
+
+        def owner_presses_stop(call_index: int) -> None:
+            # Pressed while the model is asked the second time: the read has
+            # finished, and the turn stops at the boundary after that answer.
+            if call_index == 1:
+                store.request_turn_stop(envelope.session_id, envelope.user.id, reason="stop")
+
+        router = ControllingRouter([
+            ModelResponse(text="", tool_calls=[_read_call()]),
+            ModelResponse(text=""),
+        ], on_call=owner_presses_stop)
+        final = _run(_orchestrator(workspace, router), envelope)[-1].response
+        assert final.status == "stopped"
+        assert final.message.startswith("Stopped at your request, at a safe boundary.")
+        assert "Steps already done before the stop:" in final.message
+        assert "README.md" in final.message
+        # The step's label only: the file's content is not in the record.
+        assert "hello" not in final.message
+
+    def test_the_next_turn_is_given_the_stopped_exchange(self, tmp_path: Path) -> None:
+        from raiker.runtime.conversation_history import conversation_messages
+
+        store = SQLiteStore(tmp_path)
+        store.bootstrap()
+        store.create_session("sess_1", "web")
+        store.insert_turn("sess_1", "turn_1", "check three cities")
+        store.complete_turn("turn_1", "stopped", "Started on Paris.")
+        store.insert_turn("sess_1", "turn_2", "this one failed")
+        store.complete_turn("turn_2", "failed", "The provider was unavailable.")
+        messages = conversation_messages(store, "sess_1")
+        assert [(m.role, m.content) for m in messages] == [
+            ("user", "check three cities"),
+            ("assistant", "[The owner stopped this turn at a safe boundary.]\nStarted on Paris."),
+        ]
+
+
+def test_stopped_reply_without_steps_is_the_plain_notice() -> None:
+    from raiker.runtime.conversation_history import STOPPED_NOTICE, stopped_reply
+
+    assert stopped_reply("", []) == STOPPED_NOTICE
+    assert stopped_reply("  Half.  ", []) == "Half."
+    assert stopped_reply("", ["Read file · a.md", "Weather · Paris"]).endswith(
+        "Steps already done before the stop: Read file · a.md; Weather · Paris."
+    )

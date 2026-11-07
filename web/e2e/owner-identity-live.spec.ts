@@ -86,7 +86,7 @@ test("a real turn answers with the owner's name and not with their key", async (
   await expect(answer).toContainText(/\w/, { timeout: 180_000 });
   // Settled, rather than mid-stream: reading a partial answer would let this
   // pass on a sentence the turn had not finished writing. The control is
-  // labelled "Running" while the turn streams and "Send" once it has stopped —
+  // Stop safely while the turn streams and "Send" once it has stopped —
   // and it is *disabled* either way afterwards, because the composer is empty,
   // so the label is the signal and enabledness is not.
   await expect(send).toHaveAttribute("aria-label", "Send", { timeout: 180_000 });

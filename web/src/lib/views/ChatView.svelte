@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { isSendKeystroke, sendHint } from "../sendKey";
+  import { isSendKeystroke, runningSendHint, sendHint } from "../sendKey";
   import { addPin, withPins, type PromptPin } from "../promptPins";
   import { contextWarning, estimateDraftTokens } from "../tokenEstimate";
   import { uiPrefs } from "../prefs.svelte";
@@ -73,6 +73,9 @@
   import SourceChips from "../components/SourceChips.svelte";
   import RecallStrip from "../components/RecallStrip.svelte";
   import TurnControl from "../components/TurnControl.svelte";
+  import FollowUpPills from "../components/FollowUpPills.svelte";
+  import RunSendButton from "../components/RunSendButton.svelte";
+  import { RunningTurn, CONTINUE_PROMPT } from "../runningTurn.svelte";
   import { createAttachmentStore, wireAttachments, type ComposerAttachment } from "../composerAttachments.svelte";
   import { newIdempotencyKey } from "../idempotency";
   import { taskDetailHref } from "../taskHistory";
@@ -245,9 +248,9 @@
   // reports nothing leaves the owner guessing whether it worked.
   let exportNotice = $state<string | null>(null);
   let streaming = $state(false);
-  // B17/C13 — whether the owner has already asked this turn to stop. Held here
-  // rather than inside the control so a new turn always starts un-stopped.
-  let stopping = $state(false);
+  // B17/C13, 03 execution states — Stop, follow-ups and the elapsed clock of
+  // the running turn. `begin()` on every new turn, so it always starts un-stopped.
+  const runningTurn = new RunningTurn();
   // Reuse one session across turns so the governed conversation stays continuous.
   let sessionId = $state<string | null>(null);
   // Provider-reported usage and API cost for this conversation. Null until the
@@ -448,10 +451,34 @@
   }
 
   // QUI-C03 — the running turn's one status line, read from its own events.
-  const runningActivity = $derived.by(() => {
+  const runningSteps = $derived.by(() => {
     const running = [...turns].reverse().find((turn) => turn.streaming);
-    if (!running) return "";
-    return workingLine(toolActivity(running.events));
+    return running ? toolActivity(running.events) : [];
+  });
+  const runningActivity = $derived(workingLine(runningSteps));
+  // 03 execution states — follow-ups turn Read from the turn's own events, and
+  // whatever the turn never reached says Not read once it ends.
+  let runningEvents: StreamEvent[] = [];
+  $effect(() => {
+    runningTurn.sessionId = sessionId;
+    // A follow-up typed before a new chat knew its id goes now.
+    if (sessionId !== null) void runningTurn.flush();
+  });
+  $effect(() => {
+    const running = [...turns].reverse().find((turn) => turn.streaming);
+    if (!running) return;
+    runningEvents = running.events;
+    runningTurn.observe(running.events);
+  });
+  let turnWasRunning = false;
+  $effect(() => {
+    const now = streaming;
+    if (now && !turnWasRunning) runningTurn.begin();
+    if (!now && turnWasRunning) {
+      runningTurn.observe(runningEvents);
+      runningTurn.end();
+    }
+    turnWasRunning = now;
   });
   // QUI-F04 — the turn being written here shows in the top bar's live work
   // line from every page, with the same step the status line says.
@@ -1208,6 +1235,15 @@
     }
     const sentDraft = spoken === null ? draft : { text: spoken.text };
     const typed = sentDraft.text.trim();
+    // 03 execution states — while a turn runs, the send key queues what was
+    // typed as a follow-up for it. Only text: attachments wait for the next turn.
+    if (streaming && spoken === null) {
+      if (typed !== "" && (await runningTurn.steer(typed))) {
+        draft.text = "";
+        queueMicrotask(() => autoGrow(promptEl ?? null));
+      }
+      return "not_sent";
+    }
     if (typed === "" || streaming || attachStore.uploading) return "not_sent";
     // Pinned answers ride as quoted context above what was typed (QUI-C04).
     const text = spoken === null ? withPins(typed, promptPins) : typed;
@@ -1269,7 +1305,6 @@
       promptPins = [];
     }
     streaming = true;
-    stopping = false;
     void scrollToEnd(true);
     try {
       await streamPrompt(
@@ -1624,6 +1659,13 @@
    * that is the owner's decision, so it is put to them, with what would be
    * repeated named rather than implied.
    */
+  /** 03 execution states — pick a stopped turn up again, as a message of its own. */
+  function continueFromLastStep() {
+    if (streaming || draft.text.trim() !== "") return;
+    draft.text = CONTINUE_PROMPT;
+    void submit();
+  }
+
   async function retryPrompt(text: string, rows: ToolCallRow[] = [], sourceTurnId: string | null = null) {
     if (streaming || text.trim() === "") return;
     const consequence = retryConsequence(rows);
@@ -1655,17 +1697,8 @@
 
   async function stopRunningTurn() {
     if (sessionId === null) return;
-    try {
-      await api.interrupt({
-        session_id: sessionId,
-        all: true,
-        action_type: "cancel",
-        reason: "user stopped this turn (/stop)",
-      });
-      stopping = true;
-    } catch {
-      exportNotice = `Stop was not sent. The turn is still running. ${NOT_ANSWERING}`;
-    }
+    await runningTurn.stop("user stopped this turn (/stop)");
+    if (runningTurn.error !== null) exportNotice = `Stop was not sent. The turn is still running. ${NOT_ANSWERING}`;
   }
 
   function onKeydown(e: KeyboardEvent) {
@@ -2472,6 +2505,19 @@
               Stopped at your request — this turn ended at a safe boundary and kept what it had
               already done.
             </p>
+            {#if turn === turns[turns.length - 1]}
+              <!-- 03 execution states — Resume from last step: a new turn, in the
+                   owner's words the transcript shows, never a silent replay. -->
+              <div class="continue-row">
+                <button
+                  type="button"
+                  class="btn btn-ghost btn-sm"
+                  disabled={streaming || draft.text.trim() !== ""}
+                  title={draft.text.trim() !== "" ? "Send or clear the message you are writing first" : `Sends: ${CONTINUE_PROMPT}`}
+                  onclick={() => continueFromLastStep()}
+                ><Icon name="play" size="sm" /> Continue from last step</button>
+              </div>
+            {/if}
           {/if}
 
           {#if answer !== "" && !(turn.response?.status === "needs_approval" && ownerQuestions(turn.response.approval) !== null)}
@@ -2791,9 +2837,12 @@
     bind:value={draft.text}
     bind:inputEl={promptEl}
     inputProps={{
-      placeholder: "What would you like Raiker to do?",
-      title: `${sendHint(uiPrefs.sendKey)} · @: mention a file · /: commands at the start of the prompt`,
-      disabled: streaming,
+      title: `${streaming ? runningSendHint(uiPrefs.sendKey) : sendHint(uiPrefs.sendKey)} · @: mention a file · /: commands at the start of the prompt`,
+      // 03 execution states — the prompt stays open while a turn runs: what is
+      // typed then is queued for it as a follow-up.
+      placeholder: streaming
+        ? "Add an instruction — Raiker reads it at the next safe boundary"
+        : "What would you like Raiker to do?",
       onpaste: onComposerPaste,
       oninput: onPromptInput,
       onselect: trackPromptSelection,
@@ -2833,6 +2882,7 @@
           {/each}
         </div>
       {/if}
+      <FollowUpPills control={runningTurn} onuse={(text) => { draft.text = draft.text.trim() === "" ? text : `${draft.text}\n${text}`; promptEl?.focus(); }} />
       <ComposerChips store={attachStore} disabled={streaming} oninline={(text) => { draft.text += text; }} />
       <ModelReadinessStrip readiness={modelsKnown() ? modelReadiness : null} draftPreserved={draft.text.trim() !== ""} />
       {#if sendWhenReady !== null}
@@ -2896,7 +2946,7 @@
     {/snippet}
 
     {#snippet turn()}
-      <TurnControl sessionId={sessionId} bind:stopping activity={runningActivity} />
+      <TurnControl control={runningTurn} activity={runningActivity} steps={runningSteps} />
     {/snippet}
 
     {#snippet left()}
@@ -2985,15 +3035,12 @@
             onactivechange={onVoiceActive}
           />
 
-          <button
-            type="submit"
-            class="btn btn-primary send"
-            disabled={streaming || attachStore.uploading || draft.text.trim() === ""}
-            aria-label={streaming ? "Running" : "Send"}
-          >
-            <Icon name="arrow-up" size="sm" />
-            <span class="send-label">{streaming ? "Running…" : "Send"}</span>
-          </button>
+          <RunSendButton
+            {streaming}
+            hasText={draft.text.trim() !== ""}
+            control={runningTurn}
+            disabled={attachStore.uploading || draft.text.trim() === ""}
+          />
     {/snippet}
 
     {#snippet footer()}
@@ -3470,6 +3517,7 @@
       opacity: 1;
     }
   }
+  .continue-row { margin-top: var(--space-1); }
   .outcome-line { margin: var(--space-1) 0 0; font-size: var(--text-xs); color: var(--text-3); }
   .outcome-line strong { font-weight: 650; color: var(--text-2); }
   .outcome-partial strong, .outcome-unknown strong { color: var(--warn-text); }

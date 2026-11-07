@@ -47,6 +47,29 @@ _DEFAULT_HISTORY_CHARS = 24_000
 _ELISION = "\n[… {dropped} characters elided to fit the conversation budget …]\n"
 
 
+#: What a stopped turn's stored reply begins with when it wrote no answer.
+STOPPED_NOTICE = "Stopped at your request, at a safe boundary."
+
+# Replayed statuses. A stopped turn is replayed too (03 execution states): the
+# owner ended it, it has a reply (the answer so far, or which steps finished),
+# and without it *Continue from last step* reached a model that had never seen
+# the request it was asked to continue.
+_REPLAYED_STATUSES = frozenset({"completed", "stopped"})
+
+
+def stopped_reply(answer_so_far: str, finished_steps: list[str]) -> str:
+    """The stored reply of a turn the owner stopped.
+
+    The answer written so far, or the stop notice, then the steps that finished
+    by their transcript label (never their output). The steps are what lets a
+    continuation pick up after them rather than start again.
+    """
+    reply = answer_so_far.strip() or STOPPED_NOTICE
+    if finished_steps:
+        reply += "\n\nSteps already done before the stop: " + "; ".join(finished_steps) + "."
+    return reply
+
+
 class ConversationHistoryUnavailable(RuntimeError):
     """The transcript could not be read, which is not the same as empty.
 
@@ -118,10 +141,10 @@ def conversation_messages(
     char_budget: int = _DEFAULT_HISTORY_CHARS,
     max_turns: int = 50,
 ) -> list[ModelMessage]:
-    """Prior completed exchanges for *session_id*, oldest first.
+    """Prior completed (or owner-stopped) exchanges for *session_id*, oldest first.
 
-    Only exchanges that actually completed are replayed — a turn with no reply
-    (still running, failed, or awaiting approval) would otherwise put a user
+    Only exchanges that completed, or that the owner stopped, are replayed — a
+    turn with no reply (still running, failed, or awaiting approval) would otherwise put a user
     message into the transcript that the model never answered, which reads to it
     as an unanswered question and skews the next reply.
 
@@ -146,12 +169,17 @@ def conversation_messages(
     for row in rows:
         if exclude_turn_id and str(row.get("turn_id") or "") == exclude_turn_id:
             continue
-        if str(row.get("status") or "") != "completed":
+        status = str(row.get("status") or "")
+        if status not in _REPLAYED_STATUSES:
             continue
         prompt = str(row.get("prompt_text") or "").strip()
         reply = str(row.get("summary") or "").strip()
         if not prompt or not reply:
             continue
+        if status == "stopped":
+            # Said to the model as a fact of the record, so a partial answer is
+            # not read back as the whole of what was asked.
+            reply = f"[The owner stopped this turn at a safe boundary.]\n{reply}"
         exchanges.append((prompt, reply))
 
     # Walk newest → oldest so the budget keeps the most recent context, then

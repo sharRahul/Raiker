@@ -663,11 +663,17 @@ def _completed_turns(
         raise ConversationHistoryUnavailable(
             f"conversation_history_unreadable:{type(exc).__name__}"
         ) from exc
+    # 03 execution states — an owner-stopped turn is replayed too, marked as
+    # stopped, exactly as `conversation_messages` replays it.
     return [
-        row
+        (
+            {**row, "summary": f"[The owner stopped this turn at a safe boundary.]\n{row.get('summary')}"}
+            if str(row.get("status") or "") == "stopped"
+            else row
+        )
         for row in rows
         if str(row.get("turn_id") or "") != (exclude_turn_id or "")
-        and str(row.get("status") or "") == "completed"
+        and str(row.get("status") or "") in ("completed", "stopped")
         and str(row.get("prompt_text") or "").strip()
         and str(row.get("summary") or "").strip()
     ]

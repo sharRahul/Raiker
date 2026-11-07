@@ -21,7 +21,7 @@ live cases RT-QUI-10 to RT-QUI-13 and RT-QUI-16). Both in
 | QUI-H05 | **Done.** Stale means the newest *verified* backup is seven days old, the same window as *This week*. |
 | QUI-C01 | **Done**: editable title, project chip, search in conversation, Context toggle. |
 | QUI-C02 | Already true before this round; unchanged. |
-| QUI-C03 | **Done**: the status line, Add instruction, Stop safely, the outcome line, and the task receipt at the end of each turn (2026-10-24, [QUI-F16, FIXED-1153](../FIXED_ITEMS.md#fixed-1153--a-tasks-end-did-not-say-what-it-used-read-changed-or-sent-qui-f16); per task in Tasks, [FIXED-1261](../FIXED_ITEMS.md#fixed-1261--a-background-task-had-no-receipt-qui-f16-found-this-round)). |
+| QUI-C03 | **Done**: the status line, follow-ups queued from the prompt and Stop safely in Send's place (2026-11-07, [execution states](#2026-11-07--composer-execution-states)), the outcome line, and the task receipt at the end of each turn (2026-10-24, [QUI-F16, FIXED-1153](../FIXED_ITEMS.md#fixed-1153--a-tasks-end-did-not-say-what-it-used-read-changed-or-sent-qui-f16); per task in Tasks, [FIXED-1261](../FIXED_ITEMS.md#fixed-1261--a-background-task-had-no-receipt-qui-f16-found-this-round)). |
 | QUI-C04 | **Partly done.** Done: the placeholder, the data label and the profile chip (QUI-P02, 2026-10-22); answer style is in Settings › General until *More* exists ([04](04_VISUAL_ANSWERS.md#status), 2026-10-23). Open: *More* (schedule, research depth). |
 | QUI-C05 | **Done.** |
 | QUI-C06 | **Done.** |
@@ -263,3 +263,40 @@ The 15-item checklist:
 
 Evidence: [FIXED-1304](../FIXED_ITEMS.md#fixed-1304--the-composer-was-a-short-solid-box-with-no-context-guardrails-qui-c04)
 and the [Live Test docs](../../architecture/WEB_APP_LIVE_TEST.md#result--2026-11-07-composer-control-deck).
+
+## 2026-11-07 — Composer execution states
+
+The second slice of the composer control deck, under the owner's 2026-11-07
+decision that execution states come after input and context: a morphing send,
+follow-up pills while running, a step drawer and Resume from last step. It
+keeps QUI-C03's rules: every status comes from the turn's own events, Stop is
+the same governed interrupt the top bar uses, and a follow-up grants nothing.
+Chat and Build share it; Design's composer starts a background image job, not
+a streamed turn, so it has nothing to stop.
+
+The 15-item checklist:
+
+1. [x] While a turn runs, Send becomes **Stop safely** in the same place (no second Stop button) while the prompt is empty.
+2. [x] The change of shape is instant under reduced motion.
+3. [x] The prompt stays editable while a turn runs; the send key queues what is typed as a follow-up.
+4. [x] The placeholder and the button name say that it queues: *Add an instruction* and **Queue**.
+5. [x] Each follow-up is a pill above the input with its own words and *Queued* (*Sending…* while a new chat waits for its id).
+6. [x] A pill turns *Read* only when the runtime reports `turn_steered` for it.
+7. [x] A follow-up the turn ended before reading says *Not read* and offers **Use as next message**.
+8. [x] The working line shows the elapsed time of the turn, counted from Send.
+9. [x] A **Steps** toggle in the running bar names the count and opens the step drawer.
+10. [x] Each drawer row says its state in words (Done, Running, Waiting for you, Failed, Refused), not colour alone.
+11. [x] The drawer is a disclosure (`aria-expanded`, keyboard reachable) and closes when the turn ends.
+12. [x] A stopped turn offers **Continue from last step**, which sends a continuation the transcript shows.
+13. [x] The same running bar, morphing send and pills in Build.
+14. [x] Attach, the model and the other bar controls stay disabled while running; only text can be queued.
+15. [x] The shortcut sheet and tooltips say what the send key does while a turn runs.
+
+Evidence: [FIXED-1306](../FIXED_ITEMS.md#fixed-1306--a-running-turn-had-a-second-stop-button-a-separate-steer-field-and-no-step-view-qui-c03-qui-c04).
+The live round found that a stopped turn never reached the model's history,
+so a continuation had nothing to continue
+([FIXED-1307](../FIXED_ITEMS.md#fixed-1307--a-stopped-turn-was-left-out-of-the-conversation-the-model-saw-found-this-round)).
+See the [Live Test docs](../../architecture/WEB_APP_LIVE_TEST.md#result--2026-11-07-composer-execution-states).
+The editor layer (in-composer code blocks, ghost text, `{variable}` injectors),
+*More* (QUI-C04) and `@` personas remain open
+([TO_BE_FIXED](../TO_BE_FIXED.md#composer-agent-personas-for-)).

@@ -1452,10 +1452,26 @@ Before building, a design must say: what a persona is (instructions, tools,
 default model), how it maps onto execution profiles and Permissions so it can
 only narrow authority, where personas are created and listed, how `@` keeps
 file mentions reachable, and what the transcript records about which persona
-answered. The remaining composer slices (execution states: morphing send,
-follow-up pills while running, a step drawer, Resume from last step; and the
-editor layer: in-composer code blocks, ghost text, `{variable}` injectors) are
-also planned in that section and not started.
+answered. The execution-state slice (morphing send, follow-up pills while running, a step
+drawer, Continue from last step) shipped 2026-11-07
+([FIXED-1306](FIXED_ITEMS.md#fixed-1306--a-running-turn-had-a-second-stop-button-a-separate-steer-field-and-no-step-view-qui-c03-qui-c04)).
+The editor layer (in-composer code blocks, ghost text, `{variable}` injectors)
+is planned in the same section and not started. Its open design questions are
+what ghost text may suggest without a model call, and where a `{variable}` gets
+its value.
+
+## The web-access live spec's setup cannot run on a workspace that already keeps Haiku
+
+**Found 2026-11-07, not fixed.** `web-access-turn-control-live.spec.ts` connects
+Anthropic through `useAnthropic`, which waits for Haiku's checkbox in the Models
+dialog. On a workspace where Haiku was already kept, by
+`models-provider-validation-live.spec.ts`, that checkbox is not offered, so the
+spec's first test times out and its serial cases never run. This is a harness
+problem, not a product one, and the same family as
+[BUG-248](#bug-248--twenty-seven-live-specs-still-sign-in-inside-a-test-body).
+Its steer case was rewritten for the composer execution states. The same flow
+is covered live by `composer-execution-states-live.spec.ts` RT-EXEC-01. Fix:
+make `useAnthropic` accept an already-kept model, then re-run the spec.
 
 ## Settings may hold a navigation made the instant a save returns
 

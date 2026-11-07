@@ -13,7 +13,7 @@
  *            mode, the same request fetches a real page and quotes it back. A
  *            host outside the owner's egress allowlist is still refused.
  *   B17/C13 — the owner can stop and steer a turn that is already running. The
- *            composer grows a Stop and a steer field while a turn streams; a
+ *            composer's Send becomes Stop safely (or Queue) while a turn streams; a
  *            steer reaches the model as the owner's own words at the next safe
  *            boundary, and a stop ends the turn as **stopped**, keeping what it
  *            had already produced.
@@ -220,11 +220,13 @@ test("B17/C13 — the owner steers a running turn, and its words reach the model
   await expect(control).toBeVisible({ timeout: 60_000 });
   await capture(page, join(SHOTS, "b17-turn-control-visible.png"));
 
-  await control.getByLabel("Add instruction").fill("Reply with exactly: STEERED MIDTURN");
-  await control.getByRole("button", { name: "Add this instruction" }).click();
-  await expect(page.getByText(/1 instruction queued for this turn/)).toBeVisible({
-    timeout: 30_000,
-  });
+  // 03 execution states — the prompt itself queues the follow-up while a turn runs.
+  // Found by label: the placeholder says *Add an instruction* while the turn runs.
+  await page.getByLabel("Prompt", { exact: true }).fill("Reply with exactly: STEERED MIDTURN");
+  await page.getByRole("button", { name: "Queue", exact: true }).click();
+  await expect(
+    page.getByRole("list", { name: "Follow-ups for the running turn" }),
+  ).toContainText(/STEERED MIDTURN.*(Queued|Read)/, { timeout: 30_000 });
   await capture(page, join(SHOTS, "b17-steer-queued.png"));
 
   await expect(page.getByRole("button", { name: "Copy response" }).last()).toBeVisible({

@@ -1887,3 +1887,82 @@ tests passed.
 - Light primary actions stay blue: the owner's review was of the dark theme.
 - Native macOS/Windows rendering and screen readers are not qualified here.
 
+
+## Result — 2026-11-07 Composer execution states
+
+**Scope.** The fifteen items of
+[03, Composer execution states](../plans/quiet-ui/03_WELCOME_HOME_AND_CHAT.md#2026-11-07--composer-execution-states).
+The built SPA was served by real FastAPI from a disposable workspace on port
+8765, in Windows Chromium at 1440×900. Anthropic was connected through Models
+with the owner-supplied key and workspace ID
+(`models-provider-validation-live.spec.ts`, Anthropic leg). Every turn below is
+a real Haiku 4.5 turn, mostly using the governed weather tool against
+Open-Meteo. Stop and follow-ups go through `POST /api/interrupts`. Nothing is
+seeded or mocked.
+
+| Case | Check |
+|---|---|
+| RT-EXEC-01 | Send becomes **Stop safely** with no second Stop. The prompt stays enabled with *Add an instruction*. Typing turns the button to **Queue**. Enter queues *Also say which city is coldest.* (200) and the pill reads *Queued*. The running line shows the elapsed time. **1 step** opens the drawer (*Check the weather · Done*). The pill turns *Read* on `turn_steered`. When the turn ends, the drawer and pills clear and the answer names the coldest city |
+| RT-EXEC-02 | **Stop safely** sends `cancel`, shows *Stop requested*, then *Stopped at your request*. **Continue from last step** sends its visible message, and the answer continues with the remaining cities |
+| RT-EXEC-03 | A follow-up queued into a no-tool answer is never read. After the turn it says *Not read*, and **Use as next message** puts it back in the prompt |
+| RT-EXEC-04 | The running row in dark. The prompt's tooltip says the send key queues a follow-up |
+| RT-EXEC-05 | In Build, with a project and Haiku chosen, Run becomes **Stop safely**, then **Queue** with text, with the same running row |
+
+**Outcome: 5/5 passed** (RT-EXEC-01 to -04 in 2.0 minutes, RT-EXEC-05 in 34
+seconds) on the final build. Failures on the way are not passing evidence:
+
+* **Found and fixed: a stopped turn was invisible to the model.** The first
+  RT-EXEC-02 run sent the continuation, and Haiku said it had no record of
+  any prior work. Stopped turns were not replayed into history, and their reply
+  did not say what had finished. See
+  [FIXED-1307](../plans/FIXED_ITEMS.md#fixed-1307--a-stopped-turn-was-left-out-of-the-conversation-the-model-saw-found-this-round).
+* **Found and fixed: an early follow-up was dropped.** With the follow-up typed
+  immediately after Send, RT-EXEC-01 saw no `/api/interrupts` request: the new
+  chat had no session id yet. The follow-up is now held as *Sending…* and sent
+  when the id arrives.
+* **Found and fixed: a squeezed drawer.** The first drawer capture showed the
+  step list at half width, because it was a flex item in the composer bar. The
+  running row is now one full-width column.
+* **Harness, not product.** The first RT-EXEC-05 run had no Build model chosen
+  in this workspace. The case now chooses Haiku in Build's model menu first.
+  `web-access-turn-control-live.spec.ts` was brought up to the new controls, but
+  its own setup helper fails on a workspace that already keeps Haiku. This is
+  recorded in
+  [TO_BE_FIXED](../plans/TO_BE_FIXED.md#the-web-access-live-specs-setup-cannot-run-on-a-workspace-that-already-keeps-haiku).
+
+The 11 captures are under
+`output/playwright/2026-11-07-composer-execution-states/` (ignored by Git).
+I reviewed the queued pill, the step drawer, the *Read* pill, the stopping
+note, the stopped turn with **Continue from last step**, the *Not read* pill,
+dark mode and Build. I checked that states are words with icons, not colour
+alone, that the stop and queue states sit in Send's slot, and that the glass
+capsule's margins are unchanged.
+
+**Procedure.** From `web/`, with a private `RAIKER_LIVE_CREDENTIALS_FILE`:
+`npx playwright test --project=live e2e/models-provider-validation-live.spec.ts -g anthropic --workers=1`,
+then
+`npx playwright test --project=live e2e/composer-execution-states-live.spec.ts --workers=1 --trace off`.
+Afterwards the credential file and the workspace were deleted and the host was
+stopped. No key is in source, captures or this record.
+
+**Local checks.**
+* Web: 2,789 component tests, Svelte check and design tokens (0 errors),
+  ESLint, the production build and 27 mocked browser tests.
+* Python: Ruff and the stop/steer, compaction, history and stop-all suites.
+
+**Visual direction.** These references shaped the slice:
+* the installed [Apple design](https://github.com/dickwu/apple-design-skill)
+  and [macOS](https://github.com/ceorkm/macos-design-skill) guidance: one
+  control morphing in place rather than a second competing button;
+* [Impeccable's anti-slop rules](https://impeccable.style/#slop): no invented
+  progress, only elapsed time and real step states;
+* the [better-interface skills](https://github.com/jakubkrehel/skills): state
+  in words beside its icon, a disclosure with `aria-expanded`, and reduced
+  motion respected.
+
+**Limits.**
+* Windows Chromium only. Screen readers and phone width are not qualified.
+* *Read* depends on the runtime draining steers in order. The client matches
+  the n-th `turn_steered` event to the n-th accepted follow-up.
+* Continue from last step names finished steps but does not replay their
+  output, so a model may re-read something it had already read.

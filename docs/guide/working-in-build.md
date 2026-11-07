@@ -436,6 +436,10 @@ under was revoked or ran out, or the Git credential it would use was removed or
 replaced* — and nothing more runs. Check **Connections → Services → GitHub sign-in**, then start a new
 turn.
 
+**While a Build turn runs**, Run becomes **Stop safely**, or **Queue** once you
+type a follow-up. The running row, its step list and the follow-up pills work
+as in Chat; see [Working in Chat](working-in-chat.md).
+
 **Stopping a turn** keeps its record. A Build turn you stop is closed as
 **Stopped** at its next safe boundary; the target it started on stays recorded,
 its outcome is judged against that target, and the folder is free at once — a

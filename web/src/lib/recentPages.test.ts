@@ -27,13 +27,24 @@ describe("recent pages (UX-SETPOP-02)", () => {
   });
 
   it("is empty rather than broken when storage refuses", () => {
-    vi.spyOn(Storage.prototype, "getItem").mockImplementation(() => {
-      throw new Error("blocked");
-    });
-    vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
-      throw new Error("blocked");
-    });
-    expect(() => rememberPage("models")).not.toThrow();
-    expect(recentPages("home")).toEqual([]);
+    // A storage object that refuses, whichever implementation the runtime
+    // provides: Node 25's global localStorage is not jsdom's Storage.prototype.
+    const blocked = {
+      getItem: () => {
+        throw new Error("blocked");
+      },
+      setItem: () => {
+        throw new Error("blocked");
+      },
+    } as unknown as Storage;
+    const real = Object.getOwnPropertyDescriptor(window, "localStorage");
+    Object.defineProperty(window, "localStorage", { configurable: true, get: () => blocked });
+    try {
+      expect(() => rememberPage("models")).not.toThrow();
+      expect(recentPages("home")).toEqual([]);
+    } finally {
+      if (real) Object.defineProperty(window, "localStorage", real);
+      else delete (window as { localStorage?: Storage }).localStorage;
+    }
   });
 });

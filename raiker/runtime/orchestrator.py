@@ -76,6 +76,7 @@ from raiker.runtime.conversation_history import (
     ConversationHistoryUnavailable,
     conversation_messages,
     history_char_budget,
+    stopped_reply,
 )
 from raiker.runtime.environment import EnvironmentContext, environment_context
 from raiker.runtime.identity.lifecycle import TrustedTurnIdentity
@@ -3091,6 +3092,17 @@ class RuntimeOrchestrator:
         def answer_so_far() -> str:
             return "\n\n".join(part for part in (text.strip() for text in answer_segments) if part)
 
+        # 03 execution states — the steps this turn finished, by their transcript
+        # label only (never their output), so a stopped turn's stored reply says
+        # what was already done and *Continue from last step* can pick it up.
+        finished_steps: list[str] = []
+
+        def note_finished(action: ToolAction, result: ToolResult) -> None:
+            if result.status != "success":
+                return
+            row = tool_row(action.tool_name, dict(action.arguments))
+            finished_steps.append(f"{row.label} · {row.action}" if row.action else row.label)
+
         for pending in self._drain_sink():
             yield pending
 
@@ -3202,6 +3214,7 @@ class RuntimeOrchestrator:
                 result=queued_result, started_action_ids=started_action_ids,
             )
             tool_calls_made += 1
+            note_finished(action, queued_result)
             messages.extend(
                 _queued_call_exchange(
                     proposal,
@@ -3246,7 +3259,7 @@ class RuntimeOrchestrator:
                     },
                 )
                 status = "stopped"
-                message = answer_so_far() or "Stopped at your request, at a safe boundary."
+                message = stopped_reply(answer_so_far(), finished_steps)
                 break
             # DEC-12 step 6 — a routine run's own cost limit, read at the same
             # boundary as Stop: before the model is asked again, so the
@@ -3330,7 +3343,7 @@ class RuntimeOrchestrator:
                 )
                 status = "stopped"
                 answer_segments.append(response.text)
-                message = answer_so_far() or "Stopped at your request, at a safe boundary."
+                message = stopped_reply(answer_so_far(), finished_steps)
                 break
             if response.finish_reason == "error":
                 status = "failed"
@@ -3637,6 +3650,7 @@ class RuntimeOrchestrator:
                     envelope, action=completed_action, decision=completed_decision,
                     result=completed_result, started_action_ids=started_action_ids,
                 )
+                note_finished(completed_action, completed_result)
             tool_calls_made += len(batch_results)
             # Executed results and per-call refusals go back together, in the order
             # the model proposed them, so the next model call sees exactly which of

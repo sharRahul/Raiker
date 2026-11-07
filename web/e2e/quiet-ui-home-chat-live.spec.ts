@@ -164,10 +164,13 @@ test("RT-QUI-06 — a running turn reads Stop safely, and stopping says it kept 
     "Without using any tools and without creating a document, reply directly in this chat with a 1500-word essay on the history of maps.",
   );
   await page.getByRole("button", { name: "Send", exact: true }).click();
-  const control = page.getByTestId("turn-control");
-  const stop = control.getByRole("button", { name: "Stop safely" });
+  // 03 execution states — Send becomes Stop safely in its own place, and the
+  // prompt stays open for a follow-up.
+  const composer = page.getByRole("group", { name: "Message composer", exact: true });
+  const stop = composer.getByRole("button", { name: "Stop safely" });
   await expect(stop).toBeVisible({ timeout: 60_000 });
-  await expect(control.getByLabel("Add instruction")).toBeVisible();
+  await expect(page.getByTestId("turn-control")).toBeVisible();
+  await expect(page.getByLabel("Prompt", { exact: true })).toHaveAttribute("placeholder", /Add an instruction/);
   await expect(stop).toBeEnabled({ timeout: 60_000 });
   await capture(page, `${SHOTS}/06-running-turn-stop-safely.png`);
   await stop.click();

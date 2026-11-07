@@ -1610,6 +1610,9 @@ file you can open. The two capture sets that remain — `screenshots/pages/` and
 | [FIXED-1303](#fixed-1303--an-open-approvals-queue-missed-a-decision-raised-after-it-loaded) | Medium | Approvals / top bar | Fixed 2026-11-06 |
 | [FIXED-1304](#fixed-1304--the-composer-was-a-short-solid-box-with-no-context-guardrails-qui-c04) | Medium | Composer / attachments / settings | Fixed 2026-11-07 |
 | [FIXED-1305](#fixed-1305--the-dark-theme-had-no-surface-ladder-and-hover-was-invisible) | Medium | Dark theme / accessibility / composer | Fixed 2026-11-07 |
+| [FIXED-1306](#fixed-1306--a-running-turn-had-a-second-stop-button-a-separate-steer-field-and-no-step-view-qui-c03-qui-c04) | Medium | Composer / turn control | Fixed 2026-11-07 |
+| [FIXED-1307](#fixed-1307--a-stopped-turn-was-left-out-of-the-conversation-the-model-saw-found-this-round) | Medium | Runtime / conversation history | Fixed 2026-11-07 |
+| [FIXED-1308](#fixed-1308--a-storage-refusal-unit-test-failed-on-node-25-found-this-round) | Low | Web unit tests | Fixed 2026-11-07 |
 
 ---
 
@@ -39136,3 +39139,78 @@ Send measured) and `composer-control-deck-live.spec.ts` (RT-COMPOSER-02 five
 lines, RT-COMPOSER-08 dictation). See the
 [Live Test docs](../architecture/WEB_APP_LIVE_TEST.md#result--2026-11-07-dark-ladder-and-five-line-composer).
 
+
+## FIXED-1306 — A running turn had a second Stop button, a separate steer field and no step view (QUI-C03, QUI-C04)
+
+**Severity: Medium. Area: Composer / turn control. Status: Fixed 2026-11-07.**
+
+**Observed.** While a turn ran, the prompt was disabled and Send read
+*Running…*. A second row added its own *Add instruction* field and a red
+**Stop safely** beside it. A queued instruction was only a count (*1
+instruction queued*), never its words, and nothing said whether the turn had
+read it. Tool steps were only in the transcript, and nothing said how long the
+turn had been running. Once a turn was stopped, the only way on was to retype
+the request.
+
+**Fixed.** The fifteen items of
+[03, Composer execution states](quiet-ui/03_WELCOME_HOME_AND_CHAT.md#2026-11-07--composer-execution-states),
+in Chat and Build:
+
+* Send becomes **Stop safely** in its own place while the prompt is empty, and
+  **Queue** once something is typed (`RunSendButton`). There is no second Stop.
+* The prompt stays open while a turn runs. The send key queues the text as a
+  follow-up through the same governed steer (`runningTurn.svelte.ts`).
+  Attachments, the model and the other controls stay disabled.
+* Each follow-up is a pill with its words: *Sending…*, *Queued*, *Read* or
+  *Not read*. A pill turns *Read* only on the runtime's `turn_steered` event.
+  A follow-up the turn never reached says *Not read* and offers **Use as next
+  message**.
+* The running row shows the current step with the elapsed time since Send, and
+  an **N steps** disclosure. The drawer lists each step with its state in words.
+* A stopped turn offers **Continue from last step**, which sends a visible
+  continuation message.
+* The tooltip and placeholder say what the send key does while a turn runs.
+
+**Found live and fixed.** A follow-up typed in the first second of a new chat,
+before its first streamed chunk brought a session id, was silently not sent.
+It is now held as *Sending…* and sent when the id arrives.
+
+**Evidence.** `TurnControl.test.ts` (17 tests: `RunningTurn`, the running row,
+`RunSendButton` and `FollowUpPills`), the existing `ChatView` and `BuildView`
+suites, 27 mocked browser tests, and the running-host
+`web/e2e/composer-execution-states-live.spec.ts` (RT-EXEC-01 to -05); see the
+[Live Test docs](../architecture/WEB_APP_LIVE_TEST.md#result--2026-11-07-composer-execution-states).
+
+## FIXED-1307 — A stopped turn was left out of the conversation the model saw (found this round)
+
+**Severity: Medium. Area: Runtime / conversation history. Status: Fixed 2026-11-07.**
+
+**Observed (RT-EXEC-02, live).** After **Stop safely**, the continuation
+reached Haiku with no trace of the request. The model answered *"I don't have a
+record of a plan or prior work in this conversation."* `conversation_messages`
+and the compaction path replayed only `completed` turns. A stopped turn's reply
+was the bare stop notice, so even a replay would not have said what was done.
+
+**Fixed.** A stopped turn's stored reply is now built by `stopped_reply`: the
+answer so far (or the stop notice), then *Steps already done before the stop:*
+with each finished step's transcript label. Tool output is never included. Both
+history paths replay owner-stopped turns, marked *[The owner stopped this turn
+at a safe boundary.]*. Failed and unanswered turns are still skipped.
+
+**Evidence.** `tests/test_turn_stop_and_steer.py::TestContinueFromLastStep`
+(the reply names a finished read without its content; the stopped exchange is
+replayed and a failed one is not), the stop/steer, compaction and history suites,
+and RT-EXEC-02, where the continuation picks up the remaining cities.
+
+## FIXED-1308 — A storage-refusal unit test failed on Node 25 (found this round)
+
+**Severity: Low. Area: Web unit tests. Status: Fixed 2026-11-07.**
+
+**Observed.** `recentPages.test.ts` stubbed `Storage.prototype`, but Node 25
+provides its own global `localStorage`, so the stub never applied locally. The
+test then read a real stored page. CI's Node was unaffected.
+
+**Fixed.** The test now replaces `window.localStorage` with a storage object
+that refuses, then restores the original. It holds on either runtime.
+
+**Evidence.** `recentPages.test.ts` 4/4 on Node 25.6.1; the full web suite.

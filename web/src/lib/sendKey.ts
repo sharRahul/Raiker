@@ -37,3 +37,9 @@ export function sendHint(mode: SendKey): string {
     ? `${modifierName()} + Enter to send · Enter for a new line`
     : "Enter to send · Shift + Enter for a new line";
 }
+
+/** 03 execution states — the same keys while a turn runs, where they queue a follow-up. */
+export function runningSendHint(mode: SendKey): string {
+  const key = mode === "mod_enter" ? `${modifierName()} + Enter` : "Enter";
+  return `${key} queues a follow-up for the running turn · Stop safely while the prompt is empty`;
+}

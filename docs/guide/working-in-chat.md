@@ -124,12 +124,35 @@ every retry is a question nobody reads. The new turn is recorded as a retry of
 the one it repeats — *Retry of an earlier turn* links back to it, and the
 earlier turn is kept exactly as it was.
 
-**While a turn runs**, the composer grows a row of its own. One line above it
-says what the turn is doing now when there is something specific to say — a
-call in flight, such as *Read file · notes.txt…*, or *Waiting for your
-decision* — read from the turn's own events. **Add instruction** queues your
-words for the running turn; they arrive at its next safe boundary. **Stop
-safely** asks the turn to end at that boundary and keep what it has done.
+**While a turn runs**, the composer grows a row of its own. It says what the
+turn is doing now, such as *Read file · notes.txt…*, *Waiting for your
+decision* or *Writing the answer…*, and how long it has run since you pressed
+Send. Both come from the turn's own events. Once the turn has made a call,
+**N steps** opens a list of its steps, each with its state in words: *Done*,
+*Running*, *Waiting for you*, *Failed*, *Declined* or *Refused*.
+
+Send changes in place while the turn runs:
+
+- With the prompt empty it is **Stop safely**. This asks the turn to end at its
+  next safe boundary and keep what it has done.
+- Once you type, it is **Queue**, and the send key does the same. Your words are
+  queued for the running turn and arrive at its next safe boundary as your own
+  message. They grant nothing.
+
+Each queued follow-up shows as a pill with its words:
+
+- *Queued* until the turn reads it, then *Read*.
+- *Sending…* for a moment if you type before a new chat has started.
+- *Not read* if the turn ended first. **Use as next message** puts it back in
+  the prompt.
+
+Attachments wait for the next turn.
+
+A turn you stopped says so and offers **Continue from last step**. It sends a
+message you can see, asking Raiker to pick up where it stopped. The stopped
+turn's record names the steps that had already finished, so the next turn
+knows where it left off. It does not repeat their results, so a step may be
+read again.
 
 Each tab numbers the stops and steers it sends to a running turn. One that
 arrives after a later one from the same tab is refused rather than applied out

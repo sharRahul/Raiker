@@ -39075,6 +39075,10 @@ under the owner's 2026-11-07 decisions:
 * The shared frame is a floating glass capsule (`--glass-surface`,
   `--glass-blur`), solid without blur support or with reduced transparency;
   Chat's transcript passes beneath its top edge. The input grows to 432 px.
+  The glass is drawn on a `::before` layer behind the content. CI's phone
+  check found that `backdrop-filter` on the card itself made it the containing
+  block for `position: fixed` children, so the composer's bottom-sheet menus
+  sat 29 px in from the edge. The card now isolates a stacking context only.
 * **Settings › Personalisation › Send with**: Enter, or Ctrl/⌘ + Enter
   (`personalisation.send_key`, validated by the host). It applies in Chat,
   Build, Design and Home; tooltips and the shortcut sheet name the keys.

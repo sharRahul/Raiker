@@ -59,10 +59,17 @@ test("RT-COMPOSER-01: the glass capsule floats over Chat, Build and Design in bo
       const card = page.getByRole("group", { name: label, exact: true });
       await expect(card).toBeVisible({ timeout: 60_000 });
       const style = await card.evaluate((el) => {
-        const s = getComputedStyle(el);
-        return { blur: s.backdropFilter || s.getPropertyValue("-webkit-backdrop-filter"), bg: s.backgroundColor };
+        // The glass is a layer behind the content, so fixed menus inside the
+        // card still position against the viewport.
+        const s = getComputedStyle(el, "::before");
+        return {
+          blur: s.backdropFilter || s.getPropertyValue("-webkit-backdrop-filter"),
+          bg: s.backgroundColor,
+          cardFilter: getComputedStyle(el).backdropFilter,
+        };
       });
       expect(style.blur).toContain("blur");
+      expect(style.cardFilter === "" || style.cardFilter === "none").toBe(true);
       // Translucent: the surface is mixed with transparency, never fully opaque.
       expect(style.bg).toMatch(/rgba?\(.*\)|color\(srgb .* \/ 0\.\d+\)|oklab|color-mix/);
       expect(style.bg).not.toMatch(/^rgb\(\d+, \d+, \d+\)$/);

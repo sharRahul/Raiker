@@ -186,11 +186,14 @@
   .composer.overlap { margin-top: calc(-1 * var(--composer-overlap)); padding-top: 0; }
   .composer-card {
     position: relative;
+    /* A stacking context for the glass layer below, without a containing
+       block: `backdrop-filter` on the card itself would make every
+       `position: fixed` menu inside it (the phone bottom sheets) position
+       against the card instead of the viewport. */
+    isolation: isolate;
     border: 1px solid var(--border);
     border-radius: var(--r-xl);
-    background: var(--glass-surface);
-    -webkit-backdrop-filter: var(--glass-blur);
-    backdrop-filter: var(--glass-blur);
+    background: transparent;
     box-shadow: var(--shadow-2);
     transition: border-color 120ms ease, box-shadow 120ms ease;
     /* Even padding all round: a tighter bottom makes the control bar look
@@ -206,12 +209,24 @@
     border-color: var(--accent-border);
     box-shadow: var(--shadow-3);
   }
+  /* The glass itself: a layer behind the card's content. */
+  .composer-card::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    border-radius: inherit;
+    background: var(--glass-surface);
+    -webkit-backdrop-filter: var(--glass-blur);
+    backdrop-filter: var(--glass-blur);
+    pointer-events: none;
+  }
   /* Solid where glass cannot be drawn or is not wanted. */
   @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
-    .composer-card { background: var(--surface); }
+    .composer-card::before { background: var(--surface); }
   }
   @media (prefers-reduced-transparency: reduce) {
-    .composer-card { background: var(--surface); -webkit-backdrop-filter: none; backdrop-filter: none; }
+    .composer-card::before { background: var(--surface); -webkit-backdrop-filter: none; backdrop-filter: none; }
   }
   .composer-card.context-warn,
   .composer-card.context-warn:focus-within { border-color: var(--warn-border); animation: warn-pulse 1.6s ease-out 1; }

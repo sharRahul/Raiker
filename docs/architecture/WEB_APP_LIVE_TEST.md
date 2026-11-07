@@ -1785,6 +1785,12 @@ on the way are not passing evidence:
 * **Found and fixed: a misleading warning.** The meter beside the warning reads
   the conversation so far (*1 file · 0 %*) while the warning counted the file
   being added. The warning now says *With what you are adding, …*.
+* **Found by CI and fixed: glass trapped fixed menus.** The mocked phone check
+  (`composer.spec.ts`, bottom sheets) failed on the first push: `backdrop-filter`
+  on the card made it the containing block for the composer's fixed-position
+  bottom sheets. The glass moved to a `::before` layer; all 27 mocked browser
+  tests then passed, and RT-COMPOSER-01, -02 and -05 passed again on that build,
+  now also asserting that the card itself carries no backdrop filter.
 * **Harness fixes, not product defects.** Settings choices are drafts until
   **Save changes**. The reset step once read the select before Settings had
   loaded and skipped the save. It now asserts the stored value first.

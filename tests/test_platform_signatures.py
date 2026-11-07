@@ -101,3 +101,15 @@ def test_both_authenticode_readers_pass_the_path_in_the_environment(tmp_path: Pa
         )
     assert seen["argv"][-1] == windows_authenticode._SCRIPT
     assert seen["env"]["RAIKER_SIGNED_FILE"] == str(artifact.resolve())
+
+
+def test_the_child_powershell_does_not_inherit_a_module_path(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """From a pwsh step, PowerShell 7's PSModulePath broke 5.1's signature cmdlet."""
+    artifact = tmp_path / "app.exe"
+    artifact.write_bytes(b"x")
+    monkeypatch.setenv("PSModulePath", r"C:\Program Files\PowerShell\Modules")
+    env = ps.powershell_environment(artifact)
+    assert not any(key.upper() == "PSMODULEPATH" for key in env)
+    seen: dict[str, Any] = {}
+    with pytest.raises(ps.SignatureRefused, match="could not be read"):
+        ps.verify_windows([artifact], PIN, runner=_capturing_runner(seen, json.dumps({"status": ""})))

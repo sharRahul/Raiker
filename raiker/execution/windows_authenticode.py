@@ -53,7 +53,10 @@ def verify_windows_authenticode(
             # The path travels in the environment: `-Command` joins any further
             # arguments into the script text, so `$args` was always empty there.
             ["powershell.exe", "-NoProfile", "-NonInteractive", "-Command", _SCRIPT],
-            env={**os.environ, "RAIKER_SIGNED_FILE": str(resolved)},
+            env={
+                **{k: v for k, v in os.environ.items() if k.upper() != "PSMODULEPATH"},
+                "RAIKER_SIGNED_FILE": str(resolved),
+            },
             capture_output=True,
             text=True,
             timeout=30,

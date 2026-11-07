@@ -98,6 +98,19 @@ def judge_authenticode(report: dict[str, Any], pin: dict[str, Any]) -> str:
     return f"Authenticode by the pinned publisher ({trust}, {stamped})"
 
 
+def powershell_environment(file: Path) -> dict[str, str]:
+    """The child's environment: the file to read, and no inherited module path.
+
+    Run from PowerShell 7 (a `pwsh` CI step), `PSModulePath` names PowerShell
+    7's modules, and Windows PowerShell 5.1 then cannot load the module that
+    holds `Get-AuthenticodeSignature`: every file read as unsigned (release
+    run 42426602964). Without the variable 5.1 uses its own default.
+    """
+    env = {key: value for key, value in os.environ.items() if key.upper() != "PSMODULEPATH"}
+    env["RAIKER_SIGNED_FILE"] = str(file.resolve())
+    return env
+
+
 def verify_windows(files: Sequence[Path], pin: dict[str, Any], *, runner: Runner = subprocess.run) -> list[Verdict]:
     verdicts: list[Verdict] = []
     for file in files:
@@ -105,13 +118,18 @@ def verify_windows(files: Sequence[Path], pin: dict[str, Any], *, runner: Runner
             # The path travels in the environment: `-Command` joins further
             # arguments into the script text, so `$args` would be empty.
             ["powershell.exe", "-NoProfile", "-NonInteractive", "-Command", _AUTHENTICODE],
-            env={**os.environ, "RAIKER_SIGNED_FILE": str(file.resolve())},
+            env=powershell_environment(file),
             capture_output=True, text=True, timeout=60, check=False,
         )
         try:
             report = json.loads(completed.stdout or "{}")
         except json.JSONDecodeError as exc:
             raise SignatureRefused(f"{file.name}: the signature could not be read") from exc
+        if not report.get("status"):
+            detail = (completed.stderr or "").strip().splitlines()
+            raise SignatureRefused(
+                f"{file.name}: the signature could not be read ({detail[0][:160] if detail else 'no output'})"
+            )
         try:
             verdicts.append(Verdict(file.name, judge_authenticode(report, pin)))
         except SignatureRefused as refusal:

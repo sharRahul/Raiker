@@ -39,6 +39,9 @@ Projects error recovery is tracked in
 [07](07_QUICK_FIXES_AND_QUALITY.md#2026-11-06--qui-g06-projects-recovery).
 Approvals, Library and Sessions recovery is tracked in
 [07](07_QUICK_FIXES_AND_QUALITY.md#2026-11-06--qui-g06-approvals-library-and-sessions-recovery).
+On 2026-11-07 the owner chose a floating glass capsule for the composer and
+its input-and-context slice shipped; see
+[03](03_WELCOME_HOME_AND_CHAT.md#2026-11-07--composer-control-deck).
 Their implemented slices have live evidence; the unrelated open items and
 release acceptance gates retain their status.
 

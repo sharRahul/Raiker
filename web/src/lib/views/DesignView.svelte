@@ -1,4 +1,6 @@
 <script lang="ts">
+  import { isSendKeystroke, sendHint } from "../sendKey";
+  import { uiPrefs } from "../prefs.svelte";
   import { askConfirm } from "../confirm.svelte";
   import { workDraft } from "../workDraft.svelte";
   import { pickableProjects } from "../projectLifecycle";
@@ -755,7 +757,7 @@
   }
 
   function onKeydown(event: KeyboardEvent) {
-    if (event.key === "Enter" && !event.shiftKey) {
+    if (isSendKeystroke(event, uiPrefs.sendKey)) {
       event.preventDefault();
       if (voiceActive) return;
       void generate();
@@ -1044,7 +1046,7 @@
     bind:value={draft.text}
     inputProps={{
       placeholder: "Describe what you want to create or edit...",
-      title: "Enter to generate, Shift+Enter for a new line",
+      title: sendHint(uiPrefs.sendKey).replace("to send", "to generate"),
       disabled: busy,
       onkeydown: onKeydown,
       onselect: trackPromptSelection,

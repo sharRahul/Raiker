@@ -98,3 +98,18 @@ describe("AttachmentCard", () => {
     expect(onremove).toHaveBeenCalledTimes(1);
   });
 });
+
+describe("chip estimates (QUI-C04)", () => {
+  it("shows size and ≈ tokens for text, and size only for a PDF", () => {
+    const { unmount } = render(AttachmentCard, {
+      attachment: { kind: "document", label: "notes.json", detail: "", mediaType: "application/json", byteSize: 4800 },
+    });
+    expect(screen.getByText("JSON · 5 KB · ≈ 1.2k tokens")).toBeInTheDocument();
+    unmount();
+    render(AttachmentCard, {
+      attachment: { kind: "document", label: "report.pdf", detail: "", mediaType: "application/pdf", byteSize: 1_200_000 },
+    });
+    expect(screen.getByText("PDF · 1.1 MB")).toBeInTheDocument();
+    expect(document.querySelector('.glyph[data-family="pdf"]')).not.toBeNull();
+  });
+});

@@ -1,4 +1,6 @@
 <script lang="ts">
+  import { isSendKeystroke, sendHint } from "../sendKey";
+  import { uiPrefs } from "../prefs.svelte";
   import { askConfirm } from "../confirm.svelte";
   import { shownInline } from "../inlineDecisions.svelte";
   import { NOT_ANSWERING } from "../errorCopy";
@@ -1464,7 +1466,7 @@
       setMode(nextBuildMode(mode));
       return;
     }
-    if (event.key === "Enter" && !event.shiftKey) {
+    if (isSendKeystroke(event, uiPrefs.sendKey)) {
       event.preventDefault();
       void submit();
     }
@@ -2562,7 +2564,7 @@
         placeholder: activeRepo === null
           ? "Describe what you want built…"
           : `Describe the change in ${activeRepo.label}…`,
-        title: "Shift + Enter: new line · @: mention a file · /: commands at the start of the prompt",
+        title: `${sendHint(uiPrefs.sendKey)} · @: mention a file · /: commands at the start of the prompt`,
         disabled: streaming,
         onpaste: onComposerPaste,
         oninput: onPromptInput,

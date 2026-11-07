@@ -7,9 +7,12 @@
    */
   import { shortcuts, type ComposerSurface } from "../composerCommands";
   import Icon from "./Icon.svelte";
+  import { uiPrefs } from "../prefs.svelte";
 
   let { surface, onclose }: { surface: ComposerSurface; onclose: () => void } = $props();
-  const rows = $derived(shortcuts(surface).filter((row) => ["Shift + Enter", "@", "/"].includes(row.keys)));
+  const rows = $derived(
+    shortcuts(surface, uiPrefs.sendKey).filter((row) => row.what === "New line" || ["@", "/"].includes(row.keys)),
+  );
 </script>
 
 <div class="sheet" role="region" aria-label="Keyboard shortcuts">

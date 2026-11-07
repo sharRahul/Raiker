@@ -536,7 +536,8 @@ describe("ChatView streaming transcript", () => {
     await fireEvent.change(fileInput, { target: { files: [file] } });
 
     // The upload resolves and the chip shows the file name.
-    await waitFor(() => expect(screen.getByText("shot.png")).toBeInTheDocument());
+    // The finished chip, not the uploading one: it carries a remove control.
+    await waitFor(() => expect(screen.getByRole("button", { name: "Remove attachment shot.png" })).toBeInTheDocument());
 
     const box = screen.getByRole("textbox", { name: /prompt/i });
     await fireEvent.input(box, { target: { value: "what is in this image?" } });
@@ -592,7 +593,8 @@ describe("ChatView streaming transcript", () => {
     const file = new File(["hello raiker"], "notes.txt", { type: "text/plain" });
     await fireEvent.change(fileInput, { target: { files: [file] } });
 
-    await waitFor(() => expect(screen.getByText("notes.txt")).toBeInTheDocument());
+    // The finished chip, not the uploading one: it carries a remove control.
+    await waitFor(() => expect(screen.getByRole("button", { name: "Remove attachment notes.txt" })).toBeInTheDocument());
 
     const box = screen.getByRole("textbox", { name: /prompt/i });
     await fireEvent.input(box, { target: { value: "summarize this document" } });
@@ -613,7 +615,7 @@ describe("ChatView streaming transcript", () => {
 
     await waitFor(() =>
       expect(
-        screen.getByText(/only plain-text, markdown, csv, pdf, word .* or excel/i),
+        screen.getByText(/only plain-text, markdown, csv, json, pdf, word .* or excel/i),
       ).toBeInTheDocument(),
     );
     expect(screen.queryByText("archive.zip")).not.toBeInTheDocument();

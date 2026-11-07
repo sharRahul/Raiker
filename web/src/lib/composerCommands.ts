@@ -25,6 +25,8 @@
  *    reason a mis-parse can never send something the owner did not type.
  */
 
+import { modifierName, type SendKey } from "./sendKey";
+
 /** Which composer is asking. The two surfaces do different work. */
 export type ComposerSurface = "chat" | "build";
 
@@ -202,7 +204,10 @@ export function applyMention(
  * letterbox. A box that grows without limit pushes the transcript off the
  * screen, so it stops at `maxPx` and scrolls from there.
  */
-export function autoGrow(element: HTMLTextAreaElement | null, maxPx = 320): void {
+/** About twelve lines of prompt before the input scrolls (QUI-C04, 2026-11-07). One cap for every composer. */
+export const MAX_PROMPT_PX = 432;
+
+export function autoGrow(element: HTMLTextAreaElement | null, maxPx = MAX_PROMPT_PX): void {
   if (element === null) return;
   element.style.height = "auto";
   const wanted = element.scrollHeight;
@@ -219,10 +224,17 @@ export interface Shortcut {
  * The keyboard map, per surface. Every row is a binding that really exists —
  * this is documentation of the code, not a wish list.
  */
-export function shortcuts(surface: ComposerSurface): readonly Shortcut[] {
+export function shortcuts(surface: ComposerSurface, sendKey: SendKey = "enter"): readonly Shortcut[] {
   const shared: Shortcut[] = [
-    { keys: "Enter", what: "Send" },
-    { keys: "Shift + Enter", what: "New line" },
+    ...(sendKey === "mod_enter"
+      ? [
+          { keys: `${modifierName()} + Enter`, what: "Send" },
+          { keys: "Enter", what: "New line" },
+        ]
+      : [
+          { keys: "Enter", what: "Send" },
+          { keys: "Shift + Enter", what: "New line" },
+        ]),
     { keys: "/", what: "Slash commands, at the start of the prompt" },
     { keys: "@", what: "Mention a file from the code map" },
     { keys: "↑ / ↓", what: "Move through an open menu" },

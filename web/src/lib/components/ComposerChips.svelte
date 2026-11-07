@@ -13,7 +13,7 @@
   let { store, disabled = false, oninline }: { store: AttachmentStore; disabled?: boolean; oninline?: (text: string) => void } = $props();
 </script>
 
-{#if store.items.length > 0}
+{#if store.items.length > 0 || store.uploadingName !== null}
   <div class="attachment-row" aria-label="Attached to this prompt">
     {#each store.items as item, i (item.attachmentId ?? item.path ?? i)}
       <div class="attachment-with-action">
@@ -26,6 +26,15 @@
         {/if}
       </div>
     {/each}
+    {#if store.uploadingName !== null}
+      <!-- True stages only: the upload is in flight. Its text is read when the
+           turn runs, so no "parsing" or "indexing" step is claimed here. -->
+      <div class="uploading-chip" role="status">
+        <span class="spinner" aria-hidden="true"></span>
+        <span class="uploading-name">{store.uploadingName}</span>
+        <span class="uploading-state">Uploading…</span>
+      </div>
+    {/if}
   </div>
 {/if}
 {#if store.error !== null}
@@ -57,5 +66,29 @@
   }
   .inline-paste:hover:not(:disabled) { text-decoration: underline; }
   .inline-paste:disabled { cursor: default; opacity: 0.55; }
+  .uploading-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    max-width: 15rem;
+    padding: 0.45rem 0.6rem;
+    border: 1px dashed var(--accent-border);
+    border-radius: var(--r-md);
+    background: var(--surface);
+    font-size: var(--text-sm);
+  }
+  .uploading-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
+  .uploading-state { color: var(--text-3); font-size: var(--text-2xs); white-space: nowrap; }
+  .spinner {
+    width: 0.8rem;
+    height: 0.8rem;
+    flex-shrink: 0;
+    border: 2px solid var(--accent-border);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.9s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  @media (prefers-reduced-motion: reduce) { .spinner { animation: none; } }
   .attach-error { margin: 0; color: var(--danger); font-size: var(--text-sm); }
 </style>

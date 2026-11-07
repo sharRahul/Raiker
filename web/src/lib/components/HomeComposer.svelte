@@ -14,6 +14,8 @@
    * Attach uses the same panel and rules as Chat. Files are uploaded here and
    * their references ride the hand-off, so Chat sends exactly what was picked.
    */
+  import { isSendKeystroke, sendHint } from "../sendKey";
+  import { uiPrefs } from "../prefs.svelte";
   import Icon from "./Icon.svelte";
   import ComposerAttach from "./ComposerAttach.svelte";
   import ComposerAttachPanel from "./ComposerAttachPanel.svelte";
@@ -67,7 +69,7 @@
   }
 
   function onKeydown(event: KeyboardEvent) {
-    if (event.key === "Enter" && !event.shiftKey && !event.isComposing) send(event);
+    if (isSendKeystroke(event, uiPrefs.sendKey)) send(event);
   }
 
   function useStarter(prompt: string) {
@@ -89,7 +91,7 @@
     bind:value={text}
     rows="2"
     placeholder="Ask Raiker anything…"
-    title="Enter to send, Shift+Enter for a new line"
+    title={sendHint(uiPrefs.sendKey)}
     onkeydown={onKeydown}
   ></textarea>
   {#if attachOpen}

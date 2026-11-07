@@ -44,16 +44,18 @@
 
   async function pickImage(event: Event) {
     const input = event.currentTarget as HTMLInputElement;
-    const file = input.files?.[0];
+    // QUI-C04 — several files at once; the store queues them and stops on the first refusal.
+    const files = Array.from(input.files ?? []);
     input.value = "";
-    if (file) await store.uploadImage(file);
+    if (files.length > 0) await store.acceptPicked(files, "image");
   }
 
   async function pickDocument(event: Event) {
     const input = event.currentTarget as HTMLInputElement;
-    const file = input.files?.[0];
+    // QUI-C04 — several files at once; the store queues them and stops on the first refusal.
+    const files = Array.from(input.files ?? []);
     input.value = "";
-    if (file) await store.uploadDocument(file);
+    if (files.length > 0) await store.acceptPicked(files, "document");
   }
 </script>
 
@@ -93,6 +95,7 @@
     id={`${idPrefix}-image-upload`}
     type="file"
     accept={IMAGE_MEDIA_TYPES.join(",")}
+    multiple
     onchange={pickImage}
     disabled={disabled || store.uploading || store.full}
     aria-label="Upload image"
@@ -111,6 +114,7 @@
     id={`${idPrefix}-document-upload`}
     type="file"
     accept={[...DOCUMENT_MEDIA_TYPES, ...DOCUMENT_EXTENSIONS].join(",")}
+    multiple
     onchange={pickDocument}
     disabled={disabled || store.uploading || store.full}
     aria-label="Upload document"
@@ -120,7 +124,7 @@
     class:is-disabled={uploadsDisabled}
     aria-disabled={uploadsDisabled}
     for={`${idPrefix}-document-upload`}
-    title="Upload a document (plain text/Markdown/CSV/PDF/Word .docx/Excel .xlsx, 32 MB max). Its extracted text is added to context as untrusted data."
+    title="Upload a document (plain text/Markdown/CSV/JSON/PDF/Word .docx/Excel .xlsx, 32 MB max; several at once). Its extracted text is added to context as untrusted data."
   >
     {store.uploading ? "Uploading…" : "Document…"}
   </label>

@@ -15,9 +15,15 @@
    * breakpoint; a view decides what goes in `left`, `right` and `above`, which
    * is the part that genuinely differs — Build has a mode picker and a
    * repository, while Design exposes a compact image workflow.
+   *
+   * 2026-11-07 — the frame is a floating glass capsule (owner decision, 03
+   * Composer control deck): a translucent, blurred card with margins that the
+   * work above can pass beneath, solid where blur is unavailable or reduced
+   * transparency is asked for. The input grows to `MAX_INPUT_PX` first.
    */
   import type { Snippet } from "svelte";
   import type { HTMLTextareaAttributes } from "svelte/elements";
+  import { MAX_PROMPT_PX as MAX_INPUT_PX } from "../composerCommands";
 
   interface Props {
     /** The draft. Bindable: the view owns the text, this owns the box. */
@@ -61,6 +67,13 @@
      *  with a `role` and the hint is one right-aligned line of key names. */
     footer?: Snippet;
     hint?: Snippet;
+    /** Let the surface above pass beneath the capsule's top edge. Only for a
+     *  view whose scroller pads its end by `--composer-overlap`. */
+    overlap?: boolean;
+    /** A context guardrail sentence; the card turns amber while it is set. */
+    contextWarning?: string | null;
+    /** What a drop adds, said inside the dashed drop zone. */
+    dropLabel?: string;
   }
 
   let {
@@ -82,18 +95,22 @@
     right,
     footer,
     hint,
+    overlap = false,
+    contextWarning = null,
+    dropLabel = "Drop documents, data files or images here to add them as context",
   }: Props = $props();
 
   // Re-measure on draft changes, including restored or programmatically populated drafts.
   $effect(() => {
     if (!inputEl || typeof value !== "string") return;
     inputEl.style.height = "auto";
-    inputEl.style.height = `${Math.min(inputEl.scrollHeight, 180)}px`;
+    inputEl.style.height = `${Math.min(inputEl.scrollHeight, MAX_INPUT_PX)}px`;
   });
 </script>
 
 <form
   class="composer"
+  class:overlap
   onsubmit={(event) => {
     event.preventDefault();
     onsubmit();
@@ -104,17 +121,22 @@
     role="group"
     aria-label={ariaLabel}
     class:drop-active={dropActive}
+    class:context-warn={contextWarning !== null}
     {...dropHandlers}
   >
     {@render above?.()}
 
-    {#if dropActive}<p class="drop-note" role="status">Drop to attach</p>{/if}
+    {#if dropActive}
+      <!-- A drop is a place, not an invisible listener: the zone says what it takes. -->
+      <div class="drop-zone" role="status"><span>{dropLabel}</span></div>
+    {/if}
 
     <label for={inputId} class="sr-only">{inputLabel}</label>
     <div class="composer-upper">
       <textarea
         id={inputId}
         class="prompt-input"
+        style:max-height="{MAX_INPUT_PX}px"
         bind:this={inputEl}
         bind:value
         rows="2"
@@ -138,6 +160,10 @@
       <div class="bar-right">{@render right()}</div>
     </div>
 
+    {#if contextWarning !== null}
+      <p class="context-warning" role="status"><span aria-hidden="true">⚠</span> {contextWarning}</p>
+    {/if}
+
     {@render footer?.()}
 
     {#if hint}<p class="shortcut-hint">{@render hint()}</p>{/if}
@@ -146,16 +172,26 @@
 
 <style>
   .composer {
+    --composer-overlap: var(--space-6);
+    position: relative;
+    z-index: 2;
     padding-top: var(--space-3);
-    width: min(100%, 47.5rem);
+    /* The capsule floats: margin below and at the sides, never flush to the edge. */
+    padding-bottom: var(--space-4);
+    width: min(calc(100% - 2 * var(--space-4)), 47.5rem);
     margin-inline: auto;
-    background: var(--bg);
+    background: transparent;
   }
+  /* The transcript passes beneath the capsule's top edge. */
+  .composer.overlap { margin-top: calc(-1 * var(--composer-overlap)); padding-top: 0; }
   .composer-card {
+    position: relative;
     border: 1px solid var(--border);
     border-radius: var(--r-xl);
-    background: var(--surface);
-    box-shadow: var(--shadow-1);
+    background: var(--glass-surface);
+    -webkit-backdrop-filter: var(--glass-blur);
+    backdrop-filter: var(--glass-blur);
+    box-shadow: var(--shadow-2);
     transition: border-color 120ms ease, box-shadow 120ms ease;
     /* Even padding all round: a tighter bottom makes the control bar look
        cropped against the card edge. */
@@ -168,10 +204,41 @@
      lifts while it has focus instead of only changing a border by one shade. */
   .composer-card:focus-within {
     border-color: var(--accent-border);
-    box-shadow: var(--shadow-2);
+    box-shadow: var(--shadow-3);
   }
+  /* Solid where glass cannot be drawn or is not wanted. */
+  @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+    .composer-card { background: var(--surface); }
+  }
+  @media (prefers-reduced-transparency: reduce) {
+    .composer-card { background: var(--surface); -webkit-backdrop-filter: none; backdrop-filter: none; }
+  }
+  .composer-card.context-warn,
+  .composer-card.context-warn:focus-within { border-color: var(--warn-border); animation: warn-pulse 1.6s ease-out 1; }
+  @keyframes warn-pulse {
+    0% { box-shadow: 0 0 0 0 var(--warn-border); }
+    100% { box-shadow: 0 0 0 6px transparent; }
+  }
+  .context-warning { margin: 0; color: var(--warn); font-size: var(--text-xs); }
+  .drop-zone {
+    position: absolute;
+    inset: var(--space-1);
+    z-index: 3;
+    display: grid;
+    place-items: center;
+    padding: var(--space-3);
+    border: 2px dashed var(--accent-border);
+    border-radius: var(--r-lg);
+    background: var(--surface);
+    color: var(--text-1);
+    font-size: var(--text-sm);
+    text-align: center;
+    pointer-events: none;
+  }
+  .composer-card.drop-active { min-height: 9rem; }
   @media (prefers-reduced-motion: reduce) {
     .composer-card { transition: none; }
+    .composer-card.context-warn { animation: none; }
   }
   /* Upper area: the prompt, and nothing else — the per-turn controls sit below,
      where every composer keeps the model chip. */
@@ -187,7 +254,6 @@
     border: none;
     outline: none;
     resize: none;
-    max-height: 180px;
     overflow-y: auto;
     background: transparent;
     color: var(--text-1);

@@ -103,8 +103,9 @@ export const DOCUMENT_MEDIA_TYPES = [
   "application/pdf",
   DOCX_MEDIA_TYPE,
   XLSX_MEDIA_TYPE,
+  "application/json",
 ];
-export const DOCUMENT_EXTENSIONS = [".txt", ".md", ".markdown", ".csv", ".pdf", ".docx", ".xlsx"];
+export const DOCUMENT_EXTENSIONS = [".txt", ".md", ".markdown", ".csv", ".json", ".pdf", ".docx", ".xlsx"];
 export const MAX_DOCUMENT_BYTES = 32_000_000;
 
 /** The last path segment — chips show a name, not a whole path. */
@@ -124,6 +125,7 @@ export function documentMediaType(file: File): string | null {
   if (lower.endsWith(".csv")) return "text/csv";
   if (lower.endsWith(".md") || lower.endsWith(".markdown")) return "text/markdown";
   if (lower.endsWith(".txt")) return "text/plain";
+  if (lower.endsWith(".json")) return "application/json";
   if (lower.endsWith(".pdf")) return "application/pdf";
   if (lower.endsWith(".docx")) return DOCX_MEDIA_TYPE;
   if (lower.endsWith(".xlsx")) return XLSX_MEDIA_TYPE;
@@ -161,6 +163,9 @@ export interface AttachmentStore {
   readonly items: ComposerAttachment[];
   readonly full: boolean;
   readonly uploading: boolean;
+  /** The file being uploaded right now, for its chip; null when none is. */
+  readonly uploadingName: string | null;
+  acceptPicked(files: Iterable<File>, kind: "image" | "document"): Promise<void>;
   readonly error: string | null;
   clearError(): void;
   /** Add a workspace path. Returns false when it was a duplicate or over cap. */
@@ -186,6 +191,7 @@ export interface AttachmentStore {
 export function createAttachmentStore(): AttachmentStore {
   let items = $state<ComposerAttachment[]>([]);
   let uploading = $state(false);
+  let uploadingName = $state<string | null>(null);
   let error = $state<string | null>(null);
 
   async function upload(
@@ -195,6 +201,7 @@ export function createAttachmentStore(): AttachmentStore {
     pastedText?: string,
   ): Promise<void> {
     uploading = true;
+    uploadingName = file.name;
     try {
       const stored = await api.uploadAttachment({
         filename: file.name,
@@ -226,6 +233,7 @@ export function createAttachmentStore(): AttachmentStore {
             : `The file was not attached. ${NOT_ANSWERING}`;
     } finally {
       uploading = false;
+      uploadingName = null;
     }
   }
 
@@ -249,7 +257,7 @@ export function createAttachmentStore(): AttachmentStore {
     const mediaType = documentMediaType(file);
     if (mediaType === null) {
       error =
-        "Only plain-text, Markdown, CSV, PDF, Word (.docx), or Excel (.xlsx) documents can be attached.";
+        "Only plain-text, Markdown, CSV, JSON, PDF, Word (.docx), or Excel (.xlsx) documents can be attached.";
       return;
     }
     if (file.size > MAX_DOCUMENT_BYTES) {
@@ -263,6 +271,7 @@ export function createAttachmentStore(): AttachmentStore {
     get items() { return items; },
     get full() { return items.length >= MAX_ATTACHMENTS; },
     get uploading() { return uploading; },
+    get uploadingName() { return uploadingName; },
     get error() { return error; },
     clearError() { error = null; },
     addPath(path: string): boolean {
@@ -302,6 +311,18 @@ export function createAttachmentStore(): AttachmentStore {
       const count = items.length;
       await upload(file, "document", "text/plain", text);
       return items.length > count;
+    },
+    async acceptPicked(files: Iterable<File>, kind: "image" | "document") {
+      // QUI-C04 — several files from one picker. The picker decides the kind,
+      // so its own rules apply; the first refusal stops the batch and is named.
+      for (const file of files) {
+        if (items.length >= MAX_ATTACHMENTS) {
+          error = `Only ${MAX_ATTACHMENTS} attachments fit in one prompt; the rest were not added.`;
+          return;
+        }
+        await (kind === "image" ? uploadImage(file) : uploadDocument(file));
+        if (error !== null) return;
+      }
     },
     async acceptFiles(files: Iterable<File>) {
       for (const file of files) {

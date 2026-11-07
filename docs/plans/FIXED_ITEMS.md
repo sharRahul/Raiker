@@ -1608,6 +1608,7 @@ file you can open. The two capture sets that remain — `screenshots/pages/` and
 | [FIXED-1301](#fixed-1301--live-setup-preparation-consumed-the-helpers-navigation-budget) | Low | Live test helper | Fixed 2026-11-06 |
 | [FIXED-1302](#fixed-1302--approvals-library-and-sessions-errors-hid-uncertain-writes-qui-g06) | High | Approvals / Library / Sessions / recovery | Fixed 2026-11-06 |
 | [FIXED-1303](#fixed-1303--an-open-approvals-queue-missed-a-decision-raised-after-it-loaded) | Medium | Approvals / top bar | Fixed 2026-11-06 |
+| [FIXED-1304](#fixed-1304--the-composer-was-a-short-solid-box-with-no-context-guardrails-qui-c04) | Medium | Composer / attachments / settings | Fixed 2026-11-07 |
 
 ---
 
@@ -39054,4 +39055,45 @@ queue re-reads when its own count differs. No second poll was added.
 Coverage: `ApprovalsView.recovery.test.ts` and RT-APPROVAL-RECOVERY-01, where
 the decision raised by a real model turn appears in the open queue without a
 Refresh.
+
+## FIXED-1304 — The composer was a short, solid box with no context guardrails (QUI-C04)
+
+**Severity: Medium. Area: Composer / attachments / settings. Status: Fixed 2026-11-07.**
+
+**Observed.** The composer capped a prompt at 180 px, so a pasted system prompt
+or code block scrolled after about four lines. Enter always sent, so a stray
+Enter sent a half-written instruction. Each picker took one file; JSON was
+refused. A chip showed type and size but no sense of how much context it
+added, nothing warned when a prompt neared the model's window, the drop state
+was one small line, an upload showed nothing until it finished, and building
+on an earlier answer meant copying and pasting it.
+
+**Fixed.** The fifteen items of
+[03, Composer control deck](quiet-ui/03_WELCOME_HOME_AND_CHAT.md#2026-11-07--composer-control-deck),
+under the owner's 2026-11-07 decisions:
+
+* The shared frame is a floating glass capsule (`--glass-surface`,
+  `--glass-blur`), solid without blur support or with reduced transparency;
+  Chat's transcript passes beneath its top edge. The input grows to 432 px.
+* **Settings › Personalisation › Send with**: Enter, or Ctrl/⌘ + Enter
+  (`personalisation.send_key`, validated by the host). It applies in Chat,
+  Build, Design and Home; tooltips and the shortcut sheet name the keys.
+* Image… and Document… take several files; `application/json` is accepted by
+  the client and the host and read like plain text (clean UTF-8 or refused).
+* Chips carry a type mark that is also named in text, the size, and ≈ tokens
+  for text files (`tokenEstimate.ts`); PDF, Word and spreadsheet files show
+  size only because they are not read until the turn. An upload in flight has
+  its own chip; no parsing or indexing stage is claimed.
+* Above 80 % of the model's window (estimate) the card turns amber with one
+  line saying so; it never blocks sending. The drop state is a dashed zone
+  that names what it takes.
+* **Add to prompt** under an answer pins it as a chip; on send it is quoted
+  above the typed text (`promptPins.ts`), so the transcript shows what the
+  model was given.
+
+**Evidence.** `Composer.test.ts`, `sendKey.test.ts`, `promptPins.test.ts`,
+`AttachmentCard.test.ts`, `ChatView.test.ts`, `tests/test_routes_settings.py`,
+`tests/test_document_attachments.py`, and the running-host
+`web/e2e/composer-control-deck-live.spec.ts`; see the
+[Live Test docs](../architecture/WEB_APP_LIVE_TEST.md#result--2026-11-07-composer-control-deck).
 

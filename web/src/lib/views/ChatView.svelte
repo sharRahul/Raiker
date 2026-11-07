@@ -1,4 +1,8 @@
 <script lang="ts">
+  import { isSendKeystroke, sendHint } from "../sendKey";
+  import { addPin, withPins, type PromptPin } from "../promptPins";
+  import { contextWarning, estimateDraftTokens } from "../tokenEstimate";
+  import { uiPrefs } from "../prefs.svelte";
   import { askConfirm } from "../confirm.svelte";
   import { LARGE_PASTE_CHARS } from "../composerAttachments.svelte";
   import { NOT_ANSWERING } from "../errorCopy";
@@ -797,6 +801,21 @@
     return Math.min(100, (used / window) * 100);
   });
 
+  // QUI-C04 (2026-11-07) — earlier answers pinned into the next prompt.
+  let promptPins = $state<PromptPin[]>([]);
+  function pinToPrompt(turnId: string, answerNumber: number, text: string) {
+    promptPins = addPin(promptPins, { turnId, label: `Answer ${answerNumber}`, text });
+    promptEl?.focus();
+  }
+
+  // QUI-C04 — the guardrail: the conversation so far plus what the next prompt
+  // carries, against the model's window. An estimate, and the line says why.
+  const composerWarning = $derived.by(() => {
+    const window = contextUsage?.context_window_tokens ?? activeProfile?.context_window_tokens ?? null;
+    const pinned = promptPins.reduce((sum, pin) => sum + Math.ceil(pin.text.length / 4), 0);
+    return contextWarning(usedTokens + pinned + estimateDraftTokens(draft.text, attachStore.items), window);
+  });
+
   const contextFacts = $derived([
     ...(selectedProject !== null
       ? [
@@ -1188,8 +1207,10 @@
       return "not_sent";
     }
     const sentDraft = spoken === null ? draft : { text: spoken.text };
-    const text = sentDraft.text.trim();
-    if (text === "" || streaming || attachStore.uploading) return "not_sent";
+    const typed = sentDraft.text.trim();
+    if (typed === "" || streaming || attachStore.uploading) return "not_sent";
+    // Pinned answers ride as quoted context above what was typed (QUI-C04).
+    const text = spoken === null ? withPins(typed, promptPins) : typed;
     // QUI-Q04 — Send is never a dead button. With no usable model the press
     // opens the dialog that fixes it, and the draft stays where it is.
     if (modelBlocked) {
@@ -1243,7 +1264,10 @@
     // ever typed into it.
     menuKind = "none";
     queueMicrotask(() => autoGrow(promptEl ?? null));
-    if (spoken === null) attachStore.clear();
+    if (spoken === null) {
+      attachStore.clear();
+      promptPins = [];
+    }
     streaming = true;
     stopping = false;
     void scrollToEnd(true);
@@ -1677,8 +1701,8 @@
         }
       }
     }
-    // Enter submits; Shift+Enter inserts a newline.
-    if (e.key === "Enter" && !e.shiftKey) {
+    // QUI-C04 — Enter (or Ctrl/⌘ + Enter, if chosen) submits; anything else is a new line.
+    if (isSendKeystroke(e, uiPrefs.sendKey)) {
       e.preventDefault();
       void submit();
     }
@@ -2491,6 +2515,21 @@
                 aria-label={copiedTurnId === String(turn.id) ? "Response copied" : "Copy response"}
                 title={copiedTurnId === String(turn.id) ? "Response copied" : "Copy response"}
               ><Icon name={copiedTurnId === String(turn.id) ? "check" : "copy"} size="sm" /></button>
+              {#if turn.response?.turn_id && answer.trim() !== ""}
+                <!-- QUI-C04 — build on this answer without copying it: it becomes
+                     a chip in the composer and rides as quoted context. -->
+                {@const answerNumber = turns.indexOf(turn) + 1}
+                {@const pinned = promptPins.some((pin) => pin.turnId === turn.response?.turn_id)}
+                <button
+                  type="button"
+                  class="copy-message"
+                  class:copied={pinned}
+                  disabled={pinned}
+                  onclick={() => pinToPrompt(turn.response?.turn_id ?? "", answerNumber, answer)}
+                  aria-label={pinned ? `Answer ${answerNumber} is in the prompt` : `Add answer ${answerNumber} to the prompt`}
+                  title={pinned ? "In the prompt" : "Add to prompt"}
+                ><Icon name={pinned ? "check" : "quote"} size="sm" /></button>
+              {/if}
               {#if turn.response?.status === "completed" && !toolRows.some((row) => row.state === "failed" || row.state === "denied" || row.state === "refused")}
                 <!-- QUI-F18 — after a task goes well: make it repeatable. It
                      opens a filled task form in Work › Tasks; nothing is saved
@@ -2753,7 +2792,7 @@
     bind:inputEl={promptEl}
     inputProps={{
       placeholder: "What would you like Raiker to do?",
-      title: "Shift + Enter: new line · @: mention a file · /: commands at the start of the prompt",
+      title: `${sendHint(uiPrefs.sendKey)} · @: mention a file · /: commands at the start of the prompt`,
       disabled: streaming,
       onpaste: onComposerPaste,
       oninput: onPromptInput,
@@ -2772,8 +2811,28 @@
     }}
     onsubmit={() => void submit()}
     turnActive={streaming}
+    overlap
+    contextWarning={composerWarning}
   >
     {#snippet above()}
+      {#if promptPins.length > 0}
+        <div class="prompt-pins" aria-label="Answers added to this prompt">
+          {#each promptPins as pin (pin.turnId)}
+            <span class="prompt-pin" title={pin.text.slice(0, 280)}>
+              <Icon name="quote" size="sm" />
+              <span>{pin.label}</span>
+              <span class="pin-tokens">≈ {Math.ceil(pin.text.length / 4).toLocaleString()} tokens</span>
+              <button
+                type="button"
+                class="pin-remove"
+                aria-label={`Remove ${pin.label} from this prompt`}
+                disabled={streaming}
+                onclick={() => (promptPins = promptPins.filter((held) => held.turnId !== pin.turnId))}
+              ><Icon name="x" size="sm" /></button>
+            </span>
+          {/each}
+        </div>
+      {/if}
       <ComposerChips store={attachStore} disabled={streaming} oninline={(text) => { draft.text += text; }} />
       <ModelReadinessStrip readiness={modelsKnown() ? modelReadiness : null} draftPreserved={draft.text.trim() !== ""} />
       {#if sendWhenReady !== null}
@@ -3192,8 +3251,37 @@
     /* Density, from the Work contract rather than from this file. A
        transcript is read in order and wants air between its turns. */
     gap: var(--surface-gap, var(--space-4));
-    padding-bottom: var(--space-4);
+    /* The composer capsule overlaps the thread's end by --space-6 (2026-11-07),
+       so the last turn ends clear of it. */
+    padding-bottom: calc(var(--space-4) + var(--space-6));
   }
+  .prompt-pins { display: flex; flex-wrap: wrap; gap: 0.4rem; }
+  .prompt-pin {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.25rem 0.3rem 0.25rem 0.55rem;
+    border: 1px solid var(--accent-border);
+    border-radius: var(--r-pill);
+    background: var(--accent-soft);
+    color: var(--text-1);
+    font-size: var(--text-xs);
+  }
+  .pin-tokens { color: var(--text-3); }
+  .pin-remove {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.4rem;
+    height: 1.4rem;
+    padding: 0;
+    border: 0;
+    border-radius: 50%;
+    background: transparent;
+    color: var(--text-2);
+    cursor: pointer;
+  }
+  .pin-remove:hover:not(:disabled) { color: var(--danger); }
   .export-notice {
     color: var(--text-2);
     font-size: var(--text-sm);

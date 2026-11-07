@@ -1440,3 +1440,29 @@ keyboard. QUI-G05 expects every destination to be walkable by keyboard. Fix:
 make the session title a button (or link) that opens the record, and keep the
 checkbox cell for selection. Not changed in this round because it alters the
 row's control structure and its existing tests.
+
+## Composer agent personas for `@`
+
+**Decided 2026-11-07, not built.** The owner chose that `@` in the composer
+routes a prompt to a named specialist agent (for example `@DataAnalyst`,
+`@Copywriter`), as part of the composer control deck in
+[03](quiet-ui/03_WELCOME_HOME_AND_CHAT.md#2026-11-07--composer-control-deck).
+Raiker has no persona concept today; `@` mentions a file from the code map.
+Before building, a design must say: what a persona is (instructions, tools,
+default model), how it maps onto execution profiles and Permissions so it can
+only narrow authority, where personas are created and listed, how `@` keeps
+file mentions reachable, and what the transcript records about which persona
+answered. The remaining composer slices (execution states: morphing send,
+follow-up pills while running, a step drawer, Resume from last step; and the
+editor layer: in-composer code blocks, ghost text, `{variable}` injectors) are
+also planned in that section and not started.
+
+## Settings may hold a navigation made the instant a save returns
+
+Observed once in the 2026-11-07 composer live round. The browser saved a
+Personalisation choice (PUT answered 200) and navigated to Chat in the same
+tick; the page stayed on Settings showing *All changes saved.* A person cannot
+navigate that fast, and waiting for the saved line avoided it in every later
+run. Not reproduced deliberately, so not yet a confirmed defect. Check whether
+the leave guard in `SettingsView.svelte` reads `dirty` before the save's
+recompute runs, and if so settle it before the response promise resolves.

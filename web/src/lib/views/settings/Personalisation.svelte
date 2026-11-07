@@ -2,6 +2,7 @@
   import Icon from "../../components/Icon.svelte";
   import { WEATHER_LOCATION_KEY } from "../../environment";
   import type { ThemeChoice } from "../../theme";
+  import { SEND_KEY_SETTING, modifierName, sendKeyFrom } from "../../sendKey";
 
   /*
    * REM-SET-APPEARANCE / REM-SET-GENERAL — the page an owner changes in a
@@ -59,6 +60,8 @@
       ? (settings["personalisation.chat_text_size"] as string)
       : "110",
   );
+  // QUI-C04 (2026-11-07) — which key sends a prompt.
+  const sendKey = $derived(sendKeyFrom(settings));
   const weatherLocation = $derived((settings[WEATHER_LOCATION_KEY] as string) ?? "");
   /** Open when the owner has tuned either of them, so a non-default is never hidden. */
   const tuned = $derived(spacing !== "comfortable" || font !== "sans");
@@ -126,6 +129,19 @@
       <option value="110">110% (default)</option>
       <option value="125">125%</option>
       <option value="140">140%</option>
+    </select>
+  </label>
+  <label>
+    <span>Send with</span>
+    <small>Writing long instructions? With {modifierName()} + Enter, Enter only starts a new line.</small>
+    <select
+      class="settings-select"
+      aria-label="Send with"
+      value={sendKey}
+      onchange={(e) => save({ [SEND_KEY_SETTING]: e.currentTarget.value })}
+    >
+      <option value="enter">Enter (default)</option>
+      <option value="mod_enter">{modifierName()} + Enter</option>
     </select>
   </label>
 </section>

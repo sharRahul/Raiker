@@ -104,6 +104,12 @@ class TestDocumentValidation:
     def test_valid_markdown_passes(self) -> None:
         validate_document("text/markdown", MD_BYTES)
 
+    def test_valid_json_passes_and_binary_json_is_refused(self) -> None:
+        """QUI-C04 — JSON is read like plain text: clean UTF-8, or refused."""
+        validate_document("application/json", b'{"rows": [1, 2, 3]}')
+        with pytest.raises(AttachmentValidationError):
+            validate_document("application/json", b'{"a": "\x00"}')
+
     def test_valid_pdf_passes(self) -> None:
         validate_document(PDF_MEDIA_TYPE, PDF_BYTES)
 
@@ -316,6 +322,15 @@ class TestDocumentStore:
         store = SQLiteStore(tmp_path)
         with pytest.raises(AttachmentValidationError):
             store_document(store, filename="x.txt", media_type="text/plain", data=b"a\x00b")
+
+    def test_store_and_load_json(self, tmp_path: Path) -> None:
+        store = SQLiteStore(tmp_path)
+        stored = store_document(
+            store, filename="data.json", media_type="application/json", data=b'{"metric": 42}'
+        )
+        record = load_document(store, stored.attachment_id)
+        assert record is not None
+        assert '"metric": 42' in record["extracted_text"]
 
     def test_store_and_load_pdf(self, tmp_path: Path) -> None:
         store = SQLiteStore(tmp_path)

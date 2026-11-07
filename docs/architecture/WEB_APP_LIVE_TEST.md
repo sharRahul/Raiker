@@ -1753,3 +1753,79 @@ held-send undo, download and pin move have component evidence only. Native
 Windows/macOS, screen readers and the five-person study remain open; see
 [TO_BE_FIXED.md](../plans/TO_BE_FIXED.md#qui-g06-approvals-library-and-sessions-recovery--remaining-evidence).
 The five GitHub workflows remain current; none was stale enough to remove.
+
+## Result — 2026-11-07 Composer control deck
+
+**Scope.** The fifteen items of
+[03, Composer control deck](../plans/quiet-ui/03_WELCOME_HOME_AND_CHAT.md#2026-11-07--composer-control-deck)
+under the owner's 2026-11-07 decisions (floating glass capsule; input and
+context slice; labelled token estimates; `@` personas deferred to their own
+design). Built SPA served by real FastAPI from a disposable workspace on port
+8765, Linux Chromium, 1440×900. Anthropic was connected earlier in the round
+through Models with the owner-supplied key and workspace ID; every answer below
+is a real Haiku 4.5 turn. The send-key setting is saved through Settings and
+files are uploaded to the host's governed store. Nothing is seeded or mocked.
+
+| Case | Check |
+|---|---|
+| RT-COMPOSER-01 | Chat, Build and Design composers in light and dark: computed `backdrop-filter` blurs and the surface is translucent; six captures |
+| RT-COMPOSER-02 | A 40-line prompt grows the input to exactly 432 px and then scrolls |
+| RT-COMPOSER-03 | With **Send with: Ctrl + Enter** saved, the tooltip names it, Enter adds a line, Ctrl + Enter sends; Haiku answers `42`; the setting is restored |
+| RT-COMPOSER-04 | One Document… pick uploads `metrics.json` and `table.csv`; chips read `JSON · 2 KB · ≈ 630 tokens` and `CSV · 2 KB · ≈ 525 tokens`; Haiku reads the JSON and answers `EU` |
+| RT-COMPOSER-05 | Dragging a file over the composer shows the dashed zone and its sentence; the drop attaches the file |
+| RT-COMPOSER-06 | A 684 KB text file (≈ 175k tokens) against Haiku's 200k window turns the card amber with the 88 % line; removing it clears the warning |
+| RT-COMPOSER-07 | **Add answer 1 to the prompt** makes an *Answer 1* chip; the sent text begins with the quoted answer; Haiku answers `3`; the chip clears after sending |
+
+**Outcome: 7/7 passed (2.9 minutes)** on the final production build. Failures
+on the way are not passing evidence:
+
+* **Found and fixed: two grow caps.** A separate `autoGrow` helper still capped
+  the input at 320 px, so the frame's cap never applied. Both now share
+  `MAX_PROMPT_PX`.
+* **Found and fixed: a misleading warning.** The meter beside the warning reads
+  the conversation so far (*1 file · 0 %*) while the warning counted the file
+  being added. The warning now says *With what you are adding, …*.
+* **Harness fixes, not product defects.** Settings choices are drafts until
+  **Save changes**. The reset step once read the select before Settings had
+  loaded and skipped the save. It now asserts the stored value first.
+* **Navigating away the instant Save returns.** One run stayed on Settings
+  when it navigated in the same tick as the save's answer. The helper now waits
+  for *All changes saved.*, as a person would. Whether the unsaved-changes
+  guard can hold that instant is recorded in
+  [TO_BE_FIXED](../plans/TO_BE_FIXED.md#settings-may-hold-a-navigation-made-the-instant-a-save-returns).
+
+The 16 captures are under
+`output/playwright/2026-11-07-composer-control-deck/` (ignored by Git). I
+reviewed the long-prompt, dark Chat, Build, chips, drop-zone, context-warning
+and pinned-answer captures for even margins, readable glass in both themes,
+amber used with text rather than alone, and no overlap of the last turn.
+
+**Procedure.** From `web/`:
+`npx playwright test --project=live e2e/composer-control-deck-live.spec.ts --workers=1 --trace off`
+against a host with a connected hosted model. Run the provider spec first with
+a private `RAIKER_LIVE_CREDENTIALS_FILE`. The credential file was deleted and
+the host stopped after the run; no key is in source, captures or this record.
+
+**Local checks.** 2,776 web component tests, Svelte check and design-token
+validation (0 errors), ESLint, Ruff, Mypy on the changed modules, the settings
+route tests and the document-attachment tests (JSON accepted, NUL bytes
+refused) passed.
+
+**Visual direction.** The capsule follows the owner's brief and the requested
+[Apple design reference](https://github.com/dickwu/apple-design-skill),
+[Impeccable](https://github.com/pbakaus/impeccable) and its
+[anti-slop guidance](https://impeccable.style/#slop), and the
+[macOS](https://github.com/ceorkm/macos-design-skill) /
+[macOS skill catalogue](https://skill-repo.io/extensions/skill/davepoon/macos-design)
+references:
+* translucent material with real blur, kept to one surface;
+* honest states: estimates are marked ≈ and no ingest stage is invented;
+* an amber guardrail that never blocks sending;
+* a solid fallback for reduced transparency.
+
+**Limits.** Linux Chromium only: native macOS/Windows vibrancy, the
+reduced-transparency media query on a real OS, screen readers and narrow
+layouts beyond the existing compact rules are not qualified here. Token counts
+are estimates by design. The execution-state and editor slices and `@` personas
+are not built; see
+[TO_BE_FIXED](../plans/TO_BE_FIXED.md#composer-agent-personas-for-).

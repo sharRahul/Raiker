@@ -438,12 +438,15 @@ sets the following shared scale across the routed product:
   retaining Raiker's accent.
 - Setting switches use a 48×28 px track and 22 px thumb. The thumb uses a
   theme-aware control surface, so off remains visible in dark mode.
-- Chat, Build and Design keep their existing rounded-card geometry and action
-  sizes. The owner reviewed and rejected the proposed idle capsule; no composer
-  shape or size change was retained.
+- Chat, Build and Design share one composer frame. On 2026-11-06 the owner
+  rejected the long idle pill; on 2026-11-07 the owner chose a floating glass
+  capsule instead: the existing rounded card, floated with margins, on a
+  translucent `--glass-surface` with `--glass-blur` and a 1 px border, solid
+  where blur is unsupported or reduced transparency is requested. See
+  [03, Composer control deck](../plans/quiet-ui/03_WELCOME_HOME_AND_CHAT.md#2026-11-07--composer-control-deck).
 
 The icon and control scale follows Apple's clear symbols, lozenge slider thumb
 and distinguishable toggle states. This does not change Raiker's palette, Inter
-typography, permission model or add glass effects. Motion follows the
+typography or permission model; glass is limited to the composer capsule. Motion follows the
 established reduced-motion rule. Live cases review each composer in both themes
 and narrow layouts, then inspect the Privacy switch and Knowledge Map sliders.

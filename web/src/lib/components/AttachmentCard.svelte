@@ -18,6 +18,7 @@
     typeLabel,
     type ComposerAttachment,
   } from "../composerAttachments.svelte";
+  import { estimateAttachmentTokens, formatTokenEstimate } from "../tokenEstimate";
 
   let {
     attachment,
@@ -40,12 +41,24 @@
   const isImage = $derived(attachment.kind === "image");
   const size = $derived(formatBytes(attachment.byteSize));
   const badge = $derived(typeLabel(attachment));
+  // QUI-C04 (2026-11-07) — ≈ tokens where the file's size is its text; a PDF,
+  // Word or spreadsheet is not read until the turn, so it shows its size only.
+  const tokens = $derived(estimateAttachmentTokens(attachment));
+  /** A type family for the mark's colour; the badge text says the same thing in words. */
+  const family = $derived.by(() => {
+    if (attachment.kind !== "document") return attachment.kind;
+    if (badge === "PDF") return "pdf";
+    if (badge === "CSV" || badge === "XLSX") return "sheet";
+    if (badge === "JSON") return "data";
+    if (badge === "DOCX") return "word";
+    return "text";
+  });
   // A workspace path is not a file the owner uploaded; naming its type "PATH"
   // and showing its folder is the honest description of what it is.
   const subtitle = $derived(
     attachment.kind === "path"
       ? (attachment.path ?? attachment.detail)
-      : [badge, size].filter(Boolean).join(" · "),
+      : [badge, size, tokens === null ? "" : formatTokenEstimate(tokens)].filter(Boolean).join(" · "),
   );
 </script>
 
@@ -53,7 +66,7 @@
   {#if isImage && image !== null}
     <span class="thumb"><img src={image} alt="" /></span>
   {:else}
-    <span class="glyph" data-kind={attachment.kind} aria-hidden="true">
+    <span class="glyph" data-kind={attachment.kind} data-family={family} aria-hidden="true">
       {#if attachment.kind === "path"}
         <Icon name="folder" size="md" />
       {:else if isImage}
@@ -151,6 +164,9 @@
     color: var(--text-2);
   }
   .glyph[data-kind="document"] { background: var(--accent-soft); color: var(--accent); }
+  .glyph[data-family="pdf"] { background: var(--danger-soft); color: var(--danger); }
+  .glyph[data-family="sheet"] { background: var(--ok-soft); color: var(--ok); }
+  .glyph[data-family="data"] { background: var(--warn-soft); color: var(--warn); }
 
   .text { display: grid; gap: 0.05rem; min-width: 0; }
   .name {

@@ -47,7 +47,8 @@ MAX_IMAGE_BYTES = 5_000_000
 # Plain-text document media types: extraction is a straight UTF-8 decode, so the
 # "magic" check is that the bytes really are clean text (see ``validate_text``).
 TEXT_DOCUMENT_MEDIA_TYPES: frozenset[str] = frozenset(
-    {"text/plain", "text/markdown", "text/csv"}
+    # QUI-C04 (2026-11-07) — JSON is read exactly like plain text: clean UTF-8 or refused.
+    {"text/plain", "text/markdown", "text/csv", "application/json"}
 )
 
 # PDF and Word (.docx) media types. These are binary containers; extraction is a

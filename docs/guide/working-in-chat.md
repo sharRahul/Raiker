@@ -22,6 +22,24 @@ Everything Raiker can do is still there; what changed is that it is not all on
 screen at once. The same composer appears in Build and Design, so learning it
 once is enough.
 
+The composer floats as a glass capsule over the page: the conversation scrolls
+beneath its top edge, and the card is solid instead where your system asks for
+reduced transparency. It grows with what you write, up to about twelve lines,
+before it scrolls, so a long instruction or a pasted snippet stays readable.
+
+**Context guardrail.** When the conversation plus what this prompt carries is
+estimated at more than 80% of the model's context window, the card's border
+turns amber and one line says so: *With what you are adding, this prompt is
+about 86% of the model's context window. The answer may be cut short; remove
+files you do not need.* The **Context** meter beside it counts only the
+conversation so far. It is an
+estimate (about four characters per token), and it never blocks sending.
+
+**Add to prompt.** Under an answer, the quote button pins that answer into the
+composer as a chip (*Answer 3 · ≈ 420 tokens*). When you send, each pinned
+answer is quoted above what you typed, so the transcript shows exactly what the
+model was given. Remove a chip with its ×.
+
 Under the bar, one quiet line says **where the next message goes**: *Stays on
 this computer* for a model that runs on this device, *Sent to Anthropic* (or the
 provider's name) for a hosted one, and *Where it runs is not confirmed* when the
@@ -138,7 +156,10 @@ There is no planning chip in Chat. While dictation is listening, **Done** or the
 first `Enter` stops listening and keeps focus in the draft; **Cancel** discards
 the recording without overwriting later edits. A later `Enter` or **Send** is the
 only way to submit. Outside dictation, `Enter` sends and `Shift+Enter` adds a
-line.
+line. If you write long instructions, **Settings › Personalisation › Send with**
+can be set to **Ctrl + Enter** (**⌘ + Enter** on a Mac): then `Enter` only adds a
+line and nothing is sent by accident. The composer's tooltip and the shortcut
+sheet name whichever keys are set, in Chat, Build, Design and Home.
 
 Dictation requires a configured local speech runtime and a local Raiker page.
 It requests automatic language detection; read-aloud uses only voices the
@@ -545,7 +566,16 @@ evidence it removes rather than among the controls that only tidy.
 ## Attachments
 
 Upload a document, then ask about it — the extracted text goes into the model's
-context for that turn. Images go to vision-capable models as image blocks; a
+context for that turn. **Image…** and **Document…** take several files at once
+(up to eight per prompt); plain text, Markdown, CSV, JSON, PDF, Word (.docx) and
+Excel (.xlsx) are accepted. Drag files onto the composer and it becomes a dashed
+drop zone that says what it takes.
+
+Each file is a chip with a type mark and its facts: *JSON · 5 KB · ≈ 1.2k
+tokens*. Text files show an estimate; a PDF, Word or spreadsheet file shows its
+size only, because its text is read when the turn runs, not before. While a file
+is uploading its chip says *Uploading…*; there is no separate parsing step to
+show, so none is claimed. Images go to vision-capable models as image blocks; a
 profile without vision support has the image withheld before any provider
 contact rather than silently dropped.
 

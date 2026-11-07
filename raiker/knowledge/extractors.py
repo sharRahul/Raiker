@@ -47,6 +47,7 @@ _SUFFIX_MEDIA_TYPES: dict[str, str] = {
     ".md": "text/markdown",
     ".markdown": "text/markdown",
     ".csv": "text/csv",
+    ".json": "application/json",
     ".pdf": PDF_MEDIA_TYPE,
     ".docx": DOCX_MEDIA_TYPE,
     ".xlsx": XLSX_MEDIA_TYPE,

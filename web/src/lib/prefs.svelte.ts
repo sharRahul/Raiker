@@ -3,10 +3,17 @@
 import { setDisplayLocale } from "./format";
 import { NAV_ITEMS } from "./nav";
 import { desktopBridge } from "./desktopShell";
+import { sendKeyFrom, type SendKey } from "./sendKey";
 
 // Notification preferences read by NotificationCenter. Defaults match the
 // settings defaults: in-app popups on, desktop alerts off.
-export const uiPrefs = $state({ inApp: true, desktop: false, responses: true });
+export const uiPrefs = $state<{ inApp: boolean; desktop: boolean; responses: boolean; sendKey: SendKey }>({
+  inApp: true,
+  desktop: false,
+  responses: true,
+  // QUI-C04 (2026-11-07) — which key sends a prompt; Enter unless chosen.
+  sendKey: "enter",
+});
 
 /**
  * Apply density and typeface to the shell — nothing else.
@@ -46,6 +53,7 @@ export function applyUiPrefs(settings: Record<string, unknown>): void {
   uiPrefs.desktop = Boolean(settings["notification.desktop"]);
   // QUI-F05 — *Response ready*: on unless the owner turned it off.
   uiPrefs.responses = settings["notification.interrupt.responses"] !== false;
+  uiPrefs.sendKey = sendKeyFrom(settings);
   // QUI-F11 — the desktop window keeps the account's tray choice.
   desktopBridge()?.setMinimizeToTray?.(settings["desktop.minimize_to_tray"] === true);
 }

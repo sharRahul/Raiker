@@ -158,7 +158,7 @@ switch in the top bar and keep the draft.
 | Element | Decision |
 |---|---|
 | Placeholder | "What would you like Raiker to do?" |
-| Input | Starts 56 px, comfortable 96 px, at most 180 px then scrolls |
+| Input | Starts 56 px, comfortable 96 px, at most 432 px (about twelve lines) then scrolls (2026-11-07; was 180 px) |
 | Action row | 44 px: Attach · Project · Profile chip · context count when relevant · More · Send (40×40, far right) |
 | More | Schedule, research depth, model, work mode, answer style |
 | Data label | "Stays on this computer" / "Sent to Anthropic" ([QUI-F17, FIXED-1154](../FIXED_ITEMS.md#fixed-1154--homes-composer-did-not-say-where-a-message-would-go-qui-f17)) |
@@ -213,3 +213,52 @@ sits beside it and the transcript stays 720 px.
 * No progress indicator shows a step that has not actually started.
 * Home with nothing to show renders only the greeting, composer and starters.
 * A chat with no model accepts and keeps the message.
+
+## 2026-11-07 — Composer control deck
+
+**Owner decisions, 2026-11-07.** The owner supplied an AI-agent composer
+brief and decided four open questions:
+
+* **Shape:** a floating glass capsule. This reverses the 2026-11-06 rejection
+  of the idle capsule recorded in
+  [VISUAL_DESIGN_SPEC.md](../../architecture/VISUAL_DESIGN_SPEC.md). The card
+  floats with margins over the work surface, uses a translucent surface with a
+  backdrop blur and a 1 px border, and lets the transcript pass beneath it.
+  Where the browser cannot blur, or the owner asks for reduced transparency,
+  it falls back to the solid surface.
+* **First slice:** input and context (below). Execution states (morphing send,
+  follow-up pills while running, a step drawer, Resume from last step) and the
+  editor/trigger layer (rich code blocks, ghost text, `{variable}` injectors)
+  come later.
+* **Token counts:** a labelled estimate (≈), never presented as exact. Text is
+  estimated at four characters per token; a PDF, Word or spreadsheet file shows
+  its size only, because its text is not read until the turn.
+* **`@`:** will route a prompt to named agent personas. Personas are a new
+  product concept that needs its own design (what each may do, how it maps to
+  execution profiles and permissions), so this slice keeps `@` for files and
+  records personas as planned work in
+  [TO_BE_FIXED](../TO_BE_FIXED.md#composer-agent-personas-for-).
+
+QUI-C04's input row changes: the input now grows to 432 px (about twelve lines)
+before it scrolls, instead of 180 px.
+
+The 15-item checklist:
+
+1. [x] Floating glass capsule in the shared composer frame (Chat, Build, Design).
+2. [x] Solid fallback without backdrop-filter support or with reduced transparency.
+3. [x] Chat's transcript passes beneath the capsule, and the last turn stays readable.
+4. [x] The input grows to 432 px before scrolling.
+5. [x] Settings › Personalisation: **Send with** Enter (default) or Ctrl/⌘ + Enter.
+6. [x] The send key applies in Chat, Build, Design and Home, and the hint says which.
+7. [x] Pick several files at once in Attach.
+8. [x] `.json` documents accepted, validated and read like plain text.
+9. [x] A token estimate helper, labelled as an estimate.
+10. [x] Each attachment chip shows its size and, for text, ≈ tokens.
+11. [x] Each chip has a type mark (PDF, sheet, text, data, image) with its label, not colour alone.
+12. [x] Uploading is shown on a chip while it happens; no invented later stages.
+13. [x] Above 80 % of the model's context window the card turns amber with a warning line.
+14. [x] The drop state is a visible dashed zone that says what can be dropped.
+15. [x] **Add to prompt** on an answer pins it into the composer as a context chip.
+
+Evidence: [FIXED-1304](../FIXED_ITEMS.md#fixed-1304--the-composer-was-a-short-solid-box-with-no-context-guardrails-qui-c04)
+and the [Live Test docs](../../architecture/WEB_APP_LIVE_TEST.md#result--2026-11-07-composer-control-deck).

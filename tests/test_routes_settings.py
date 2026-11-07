@@ -223,13 +223,20 @@ def test_an_appearance_value_no_page_can_apply_is_refused(client: TestClient) ->
         ("personalisation.spacing", "cramped"),
         ("personalisation.font", "comic"),
         ("personalisation.chat_text_size", "300"),
+        ("personalisation.send_key", "space"),
     ):
         bad = client.put("/api/settings", json={"settings": {key: value}}, headers=_h(token))
         assert bad.status_code == 422, bad.text
         assert bad.json()["detail"] == "invalid_personalisation_value"
     good = client.put(
         "/api/settings",
-        json={"settings": {"personalisation.spacing": "compact", "personalisation.font": "mono"}},
+        json={
+            "settings": {
+                "personalisation.spacing": "compact",
+                "personalisation.font": "mono",
+                "personalisation.send_key": "mod_enter",
+            }
+        },
         headers=_h(token),
     )
     assert good.status_code == 200, good.text

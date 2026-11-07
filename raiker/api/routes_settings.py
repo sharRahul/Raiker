@@ -39,6 +39,8 @@ PERSONALISATION_VALUES: dict[str, frozenset[str]] = {
     "personalisation.font": frozenset({"sans", "system", "mono"}),
     # QUI-F12 — the size of conversation text, apart from the interface's.
     "personalisation.chat_text_size": frozenset({"100", "110", "125", "140"}),
+    # QUI-C04 (2026-11-07) — which key sends a prompt: Enter, or Ctrl/⌘ + Enter.
+    "personalisation.send_key": frozenset({"enter", "mod_enter"}),
 }
 
 #: QUI-A rules — Answer style: how much of an answer Raiker draws. It changes

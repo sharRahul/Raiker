@@ -316,6 +316,10 @@
      rather than over a page region — the command palette and full-screen
      pickers. Nothing below a modal may use it. */
   --shadow-3: 0 4px 8px -2px rgba(27, 28, 30, 0.08), 0 24px 56px -12px rgba(27, 28, 30, 0.24);
+  /* 2026-11-07 — the composer capsule's glass. Mixed from --surface, so it
+     follows both themes without a second definition. */
+  --glass-surface: color-mix(in srgb, var(--surface) 80%, transparent);
+  --glass-blur: blur(18px) saturate(1.4);
   --overlay: rgba(28, 28, 26, 0.48);
   --focus-ring: #2F6F8F;
 

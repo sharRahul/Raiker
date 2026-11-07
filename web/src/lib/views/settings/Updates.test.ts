@@ -22,6 +22,7 @@ function status(partial: Partial<UpdateStatusView> = {}): UpdateStatusView {
       install_root: "F:\\GitHub\\Raiker",
       note: "",
       distribution: "payload",
+      signing_publisher: "",
     },
     channel: null,
     available: null,
@@ -49,6 +50,7 @@ const signedPackage = status({
     install_root: "C:\\Program Files\\Raiker",
     note: "",
     distribution: "desktop",
+    signing_publisher: "",
   },
   channel: {
     url: "https://releases.example/stable.json",
@@ -230,4 +232,14 @@ it("says the release stage and whether the build is signed (beta plan §2)", asy
   render(Updates);
   expect(await screen.findByText("Verified by Raiker")).toBeTruthy();
   expect(screen.getByText("Beta")).toBeTruthy();
+});
+
+it("says a self-signed build is signed by Raiker, not verified by Windows (IN-3)", async () => {
+  vi.spyOn(api, "hostUpdate").mockResolvedValue({
+    ...signedPackage,
+    installation: { ...signedPackage.installation, version: "0.9.0-beta.1", signing_publisher: "self_signed" },
+  });
+  render(Updates);
+  expect(await screen.findByText("Signed by Raiker (self-signed — Windows shows Unknown publisher)")).toBeTruthy();
+  expect(screen.queryByText("Verified by Raiker")).toBeNull();
 });

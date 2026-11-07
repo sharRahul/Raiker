@@ -210,6 +210,7 @@ def desktop_record(
     signed: bool,
     commit: str | None = None,
     update_channel: dict[str, str] | None = None,
+    self_signed: bool = False,
 ) -> dict[str, Any]:
     """``installation.json`` for a desktop package.
 
@@ -230,6 +231,10 @@ def desktop_record(
         commit=commit,
     )
     record["distribution"] = DISTRIBUTION
+    if signed and self_signed:
+        # IN-3 — the signature is real but its publisher is Raiker's own
+        # certificate; Settings says so rather than "verified".
+        record["signing"]["publisher"] = "self_signed"
     if update_channel:
         record["update_channel"] = dict(update_channel)
     return record

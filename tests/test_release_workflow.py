@@ -33,10 +33,13 @@ def test_release_workflow_is_manual_and_publishes_only_a_signed_draft() -> None:
     workflow = _workflow()
 
     assert set(workflow["on"]) == {"workflow_dispatch"}
-    assert workflow["jobs"]["channel"]["if"] == "inputs.signing == 'require'"
+    assert workflow["jobs"]["channel"]["if"] == "inputs.signing != 'skip'"
     publish = workflow["jobs"]["publish"]
     assert "inputs.publish" in publish["if"]
-    assert "inputs.signing == 'require'" in publish["if"]
+    assert "inputs.signing != 'skip'" in publish["if"]
+    # IN-3 — anything short of every platform signed publishes only as beta.
+    refuse = _step(workflow["jobs"]["plan"], "Refuse to publish an unsigned build")
+    assert refuse["if"] == "inputs.publish && inputs.signing != 'require' && inputs.channel != 'beta'"
     assert "--draft" in _step(publish, "Create the draft")["run"]
 
     beta = workflow["jobs"]["beta_publish"]
@@ -68,7 +71,8 @@ def test_the_release_builds_the_desktop_installers_with_its_signing_decision() -
     workflow = _workflow()
     desktop = workflow["jobs"]["desktop"]
     assert desktop["uses"] == "./.github/workflows/desktop-package.yml"
-    assert desktop["with"]["signed"] == "${{ inputs.signing == 'require' }}"
+    assert desktop["with"]["signed"] == "${{ inputs.signing != 'skip' }}"
+    assert desktop["with"]["unsigned_os"] == "${{ inputs.signing == 'require-except-macos' && 'macos' || '' }}"
     assert desktop["secrets"] == "inherit"
     assert "build" not in workflow["jobs"], "the venv-based payload installers are retired"
     text = WORKFLOW_PATH.read_text(encoding="utf-8")
@@ -90,6 +94,22 @@ def test_a_required_signature_is_never_skipped_quietly() -> None:
         step = _step(package, name)
         assert "env.SIGNED == 'true'" in step["if"]
         assert "refused:" in step["run"]
+
+
+def test_signing_is_decided_per_os_and_verified_against_the_pinned_identities() -> None:
+    """IN-3 — Windows and Linux can be signed while macOS waits for Apple."""
+    package = _workflow(PACKAGE_PATH)["jobs"]["package"]
+    assert "!contains(inputs.unsigned_os || '', matrix.os)" in package["env"]["SIGNED"]
+    for name, platform in (
+        ("Verify the Linux signatures against the pinned key", "linux"),
+        ("Verify the Authenticode signatures against the pinned publisher", "windows"),
+    ):
+        step = _step(package, name)
+        assert "env.SIGNED == 'true'" in step["if"]
+        assert f"raiker.app.platform_signatures {platform}" in step["run"]
+    assert "release-key" in _step(package, "Check the release key is the one installed Raiker pins")["run"]
+    arm = _workflow(PACKAGE_PATH)["jobs"]["windows-arm64-emulated"]
+    assert "platform_signatures.py windows" in _step(arm, "Install, smoke-test and uninstall under emulation")["run"]
 
 
 def test_every_target_is_installed_tested_and_uninstalled_on_its_runner() -> None:

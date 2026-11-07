@@ -45,9 +45,9 @@ def _budget(
 def test_model_that_fits_is_fully_offloaded_with_auto_context() -> None:
     plan = plan_launch(_shape(), _budget(), RuntimeSettings())
     assert plan.full_offload and plan.gpu_layers == 33
-    assert plan.context_size == 8192  # auto target, below the 128K trained context
+    assert plan.context_size == 32768  # auto target, below the 128K trained context
     assert plan.verdict == "fits" and plan.allowed
-    assert plan.args[:5] == ("--jinja", "-ngl", "33", "-c", "8192")
+    assert plan.args[:5] == ("--jinja", "-ngl", "33", "-c", "32768")
     assert plan.system_weights_bytes == 0
 
 

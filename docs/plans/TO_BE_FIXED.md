@@ -1503,16 +1503,6 @@ Permissions →* right after loading, before any turn. Not investigated this rou
 Check whether the permissions read races the first render or genuinely fails on
 this workspace, and whether the line should wait for a completed read.
 
-## Settings › General is over its size budget
-
-Measured 2026-11-07 by RT-BETA-10, which now gates the QUI-G01 budget for Chat,
-Build, Models, Settings › General, Privacy and About & updates. General holds
-three subjects (General, Account and Backups): 1,403 px at 1280×800 against a
-1,200 px budget, and about the budget at 1440×900. It is the spec's one tracked
-exception. Trimming copy will not close it. Decide whether Account and Backups
-move to their own sections, or whether Settings' first page gets a larger
-budget. Then remove the exception from `beta-release-round-live.spec.ts`.
-
 ## Build's sandbox review does not reread when the same session is reopened
 
 Seen 2026-11-07. The review rereads the copies when the session changes or a
@@ -1557,3 +1547,47 @@ closes at the connector catalogue.
 Linux, so the gate is green. Guard the call with `sys.platform != "win32"` so
 both platforms check clean.
 
+## Windows builds are signed with a self-signed beta certificate (IN-3)
+
+Owner's decision, 2026-11-07: sign Windows with an OpenSSL self-signed
+certificate until a CA-issued one exists
+([FIXED-1321](FIXED_ITEMS.md#fixed-1321--windows-and-linux-builds-could-not-be-signed-without-an-apple-identity-and-nothing-checked-the-signer-in-3)).
+Windows still shows *Unknown publisher*, and the runner's trust stays
+`package_relative_integrity`, because `runner_publisher.py` requires a chain
+Windows trusts. Let's Encrypt cannot help: it issues only TLS certificates.
+To close: obtain a code-signing certificate (SignPath Foundation for open
+source, Azure Artifact Signing, or an OV certificate), replace the
+`WINDOWS_AUTHENTICODE_*` secrets, set `self_signed: false` and the new
+thumbprint in `desktop/signing/identities.json`, and add the publisher and
+leaf public-key SHA-256 to `WINDOWS_PUBLISHER_PINS`. macOS stays unsigned until
+an Apple Developer ID exists.
+
+## LM Studio live check could not run on the owner machine (MD-1)
+
+2026-11-07: the installed LM Studio (`C:\Program Files\LM Studio`) exits at
+start with *Invalid file descriptor to ICU data received*, and `lms server
+start` times out waiting for its daemon. The install is broken, not Raiker, and
+reinstalling it was outside what this session was permitted to do. Reinstall
+LM Studio, load a model, and add it through **Models › Add › On this
+computer**.
+
+## A served local GGUF is labelled *Where it runs is not confirmed*
+
+Seen 2026-11-07 in RT-GPU-02. With *Local GGUF* chosen in the composer, the
+line under the composer reads *Where it runs is not confirmed*, while the turn
+receipt says *nothing left this computer* and the slot says *Entirely on the
+GPU*. The composer should read the managed slot's loopback endpoint as on this
+computer.
+
+## Raiker's own prompt is about 9,500 tokens before the owner types anything
+
+Measured 2026-11-07: one Chat question to a local model was 9,459 prompt
+tokens. FIXED-1319 sized auto contexts at up to 32,768 so a GPU-served model
+answers. A machine whose memory only fits an 8K or smaller context will still
+refuse every turn, now with a clear message. Trim the system prompt and tool
+list for small contexts, or refuse to plan a context below the turn floor.
+
+## AMD (Vulkan) owner-machine run (MD-2)
+
+The NVIDIA CUDA run passed on 2026-11-07 (RT-GPU-01, RT-GPU-02). Still
+required: the same two checks on an AMD GPU with the Vulkan build.

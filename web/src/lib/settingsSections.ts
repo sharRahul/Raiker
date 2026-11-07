@@ -33,15 +33,18 @@ export interface SettingsSection {
  * subject, and the ten rows stop reading as a flat list with a divider in it.
  */
 export const SETTINGS_SECTIONS: readonly SettingsSection[] = [
-  // QUI-L09 — Account folds into General: the name you are greeted by and the
-  // account it belongs to are one subject.
   { id: "general", label: "General", icon: "settings", group: "Experience" },
   { id: "personalisation", label: "Personalisation", icon: "spark", group: "Experience" },
   { id: "notification", label: "Notifications", icon: "bell", group: "Experience" },
   // Voice spec §6.2 — listening and speaking on this computer.
   { id: "voice", label: "Voice", icon: "mic", group: "Experience" },
+  // Account and Backups left General (2026-11-07): General was over its QUI-G01
+  // size budget, and the account you sign in to and the copies Raiker keeps of
+  // it are decisions about your data, not about how the interface reads.
+  { id: "account", label: "Account", icon: "user", group: "Security & data" },
   { id: "security", label: "Security", icon: "lock", group: "Security & data" },
   { id: "privacy", label: "Privacy", icon: "shield", group: "Security & data" },
+  { id: "backups", label: "Backups", icon: "checkpoints", group: "Security & data" },
   // PA-D02 — where a goal's work may run and what may leave with it. Settings
   // is the only place a profile is made, changed, activated or bound.
   { id: "execution-profiles", label: "Execution profiles", icon: "shield", group: "Security & data" },
@@ -55,7 +58,6 @@ export const SETTINGS_SECTIONS: readonly SettingsSection[] = [
 
 /** Sections that were renamed or folded: an old deep link opens the new one, never General. */
 export const SECTION_ALIASES: Readonly<Record<string, string>> = {
-  account: "general",
   runtime: "advanced",
   "memory-engine": "advanced",
 };

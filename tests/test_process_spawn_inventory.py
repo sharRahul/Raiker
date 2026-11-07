@@ -60,6 +60,7 @@ REVIEWED: dict[str, tuple[str, str]] = {
     "raiker/models/codex_app_server.py": (OWNER, "The owner's Codex app server for ChatGPT sign-in, over stdio"),
     "raiker/storage/sqlcipher_probe.py": (OWNED, "Raiker's own SQLCipher capability probe, in a child interpreter"),
     "raiker/execution/windows_authenticode.py": (FACTS, "Reads a binary's Authenticode signature"),
+    "raiker/app/platform_signatures.py": (FACTS, "Release CI only: reads Authenticode signatures and verifies gpg detached signatures against the pinned keys"),
     "raiker/app/system_check.py": (FACTS, "sysctl for memory and CPU name"),
     "raiker/app/launcher.py": (LIFECYCLE, "Starts the Raiker host and opens the browser"),
     "raiker/app/service.py": (LIFECYCLE, "Registers Raiker's own service with the OS"),

@@ -196,7 +196,7 @@ describe("Topbar backup reminder", () => {
     render(Topbar, { title: "Chat", hint: "Ask anything" });
 
     const reminder = await screen.findByRole("link", { name: /The last backup was 20 days ago\. Make a backup/ });
-    expect(reminder).toHaveAttribute("href", "#/settings?tab=general");
+    expect(reminder).toHaveAttribute("href", "#/settings?tab=backups");
     expect(reminder).toHaveAttribute("title", "The last backup was 20 days ago.");
   });
 

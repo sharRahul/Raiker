@@ -14,8 +14,13 @@
 # looks like a release. `signing: skip` is the way to exercise the pipeline
 # without identities: it records `signing.applied = false` inside every build
 # so the installed product says so, and may publish only as a beta draft.
-# Nothing in between. Filenames name the platform only; whether a build was
-# signed is in the build, its manifest and the release notes, not its name.
+# `signing: require-except-macos` (IN-3, 2026-11-07) signs Windows and Linux
+# and builds macOS unsigned until an Apple Developer ID exists; it may publish
+# only as a beta draft and its notes say which platform is unsigned. The
+# Windows beta certificate is self-signed: Windows checks the file has not
+# changed but names no trusted publisher, and Settings says exactly that.
+# Filenames name the platform only; whether a build was signed is in the
+# build, its manifest and the release notes, not its name.
 #
 # **One download per platform.** A draft release carries exactly five files —
 # Windows x86-64 and Arm, macOS Apple silicon, Linux x86-64 and Arm — chosen by
@@ -37,10 +42,10 @@ on:
         type: choice
         options: [stable, beta]
       signing:
-        description: "require = fail without identities; skip = unsigned test build that cannot publish"
+        description: "require = fail without identities; require-except-macos = sign Windows and Linux, macOS unsigned (beta only); skip = unsigned test build"
         default: require
         type: choice
-        options: [require, skip]
+        options: [require, require-except-macos, skip]
       publish:
         description: "Create a draft GitHub release from the signed artifacts"
         default: false
@@ -91,9 +96,9 @@ jobs:
         env:
           VERSION: ${{ inputs.version }}
       - name: Refuse to publish an unsigned build
-        if: inputs.publish && inputs.signing == 'skip' && inputs.channel != 'beta'
+        if: inputs.publish && inputs.signing != 'require' && inputs.channel != 'beta'
         run: |
-          echo "refused: unsigned artifacts may only be published as a beta draft." >&2
+          echo "refused: a build with any unsigned platform may only be published as a beta draft." >&2
           exit 1
       # Release gate — a release must be made from a commit that passed the
       # complete beta-critical suite, not merely the sandbox runner tests.
@@ -174,7 +179,8 @@ jobs:
     with:
       version: ${{ inputs.version }}
       channel: ${{ inputs.channel }}
-      signed: ${{ inputs.signing == 'require' }}
+      signed: ${{ inputs.signing != 'skip' }}
+      unsigned_os: ${{ inputs.signing == 'require-except-macos' && 'macos' || '' }}
     secrets: inherit
 
   # ── 4. The channel index, signed once over every target ────────────────
@@ -183,7 +189,7 @@ jobs:
     needs: [plan, desktop]
     # Unsigned manual runs end after their per-target artifacts are uploaded.
     # A channel is an updater trust root, so it exists only for signed builds.
-    if: inputs.signing == 'require'
+    if: inputs.signing != 'skip'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -290,7 +296,7 @@ jobs:
   publish:
     name: Draft release
     needs: [plan, channel]
-    if: inputs.publish && inputs.signing == 'require'
+    if: inputs.publish && inputs.signing != 'skip'
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -316,7 +322,15 @@ jobs:
       - name: Choose one installer per platform
         env:
           VERSION: ${{ inputs.version }}
-        run: python source/scripts/select_release_assets.py --version "$VERSION" --from dist --to assets
+        run: |
+          python source/scripts/select_release_assets.py --version "$VERSION" --from dist --to assets
+          # IN-3 — the Linux downloads carry their detached signatures, and the
+          # public halves owners verify them with travel with the release.
+          for file in assets/*.AppImage; do
+            test -f "dist/$(basename "$file").asc" && cp "dist/$(basename "$file").asc" assets/
+          done
+          cp source/desktop/signing/raiker-linux-signing-key.asc assets/
+          cp source/desktop/signing/release-public-key.txt assets/
       # Keyless signing with this repository's GitHub identity: Sigstore
       # binds each file's digest to this workflow, commit and run, and the
       # signature is logged publicly. Owners check a download with
@@ -339,6 +353,7 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GH_REPO: ${{ github.repository }}
+          SIGNING: ${{ inputs.signing }}
         run: |
           cat > notes.md <<'NOTES'
           ## Download and install
@@ -362,11 +377,37 @@ jobs:
 
               gh attestation verify <file> --repo sharRahul/Raiker
 
-          These builds are also signed with the platform identities. The signed
-          update index, per-installer manifests, SBOM, provenance and checksums
-          are in this run's `release-channel` workflow artifact, for hosting at
-          the update channel URL.
+          Linux downloads also carry a detached GPG signature (`.asc`). Check one
+          with the published key (fingerprint
+          `6B31 3343 82D4 6C56 AFE1  25CA 25F9 767F F2DD ACF1`):
+
+              gpg --import raiker-linux-signing-key.asc
+              gpg --verify <file>.AppImage.asc <file>.AppImage
+
+          The signed update index, per-installer manifests, SBOM, provenance and
+          checksums are in this run's `release-channel` workflow artifact, for
+          hosting at the update channel URL.
           NOTES
+          if [ "$SIGNING" = "require-except-macos" ]; then
+            cat >> notes.md <<'NOTES'
+
+          ## Platform signatures in this beta
+
+          - **Windows** is Authenticode-signed with Raiker's own beta certificate
+            (`CN=Raiker (self-signed beta)`, thumbprint
+            `1300BFD1A0894EC033198426144784450AF70C8A`). Windows checks that the
+            installer has not changed since it was signed, but it does not know
+            this publisher, so SmartScreen still shows *Unknown publisher*:
+            choose **More info → Run anyway**. Settings › About & updates says
+            *Signed by Raiker (self-signed)*.
+          - **Linux** packages are signed with the GPG key above.
+          - **macOS** is not signed or notarised yet (no Apple Developer ID).
+            Open it with right-click → **Open** the first time.
+          NOTES
+          else
+            echo >> notes.md
+            echo "These builds are also signed with the platform identities." >> notes.md
+          fi
           {
             echo
             echo '## SHA-256'
@@ -375,7 +416,7 @@ jobs:
             cat assets/SHA256SUMS.txt
             echo '```'
           } >> notes.md
-          gh release create "v${{ inputs.version }}" assets/Raiker-* \
+          gh release create "v${{ inputs.version }}" assets/Raiker-* assets/raiker-linux-signing-key.asc assets/release-public-key.txt \
             --draft --title "Raiker ${{ inputs.version }}" --notes-file notes.md
 
   # Beta distribution can be a deliberate, unsigned download while platform

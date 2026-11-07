@@ -115,7 +115,7 @@
 <section class="settings-card" aria-labelledby="backups-heading" data-testid="backups-card">
   <div class="backups-head">
     <div class="card-heading">
-      <h3 id="backups-heading">Backups</h3>
+      <h3 id="backups-heading">This workspace</h3>
       <p>A checked copy of this workspace; one is also taken before each update, and the last three are kept.{#if !loadError && view && view.backups.length === 0} <span>No backups yet.</span>{/if}</p>
     </div>
     <button type="button" class="btn btn-primary btn-sm" disabled={busy !== null} onclick={backUp}>

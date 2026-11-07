@@ -227,7 +227,7 @@
     <p>
       Forgetting a record removes it from the workspace, not from a backup already written: a backup
       is a copy of the store as it was when it was made. For a deletion you need to be permanent,
-      remove the backups made before it in <a href="#/settings?tab=general">General › Backups</a>.
+      remove the backups made before it in <a href="#/settings?tab=backups">Backups</a>.
     </p>
   </details>
 </section>

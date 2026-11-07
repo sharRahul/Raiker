@@ -133,7 +133,7 @@ configured, and runner publisher pins are empty (`runner_publisher.py`).
 |---|---|---|---|---|---|
 | IN-1 | Working installers per supported OS | 🟡 | P0 | S | The current unsigned matrix passed, including `macos-15`; rerun the full signed candidate on the exact release commit. |
 | IN-2 | Dependencies installed or guided | 🟡 | P0 | M | Bubblewrap/AppArmor on Linux: the setup check names the exact package command per distro and offers **Copy command**. WSL2 Ubuntu Base download from Settings with checksum. llama.cpp and the speech engines are installed by Raiker on demand (done for llama.cpp in PR #245; speech engines in the voice V1 change, with the catalogue pins listed under VD-1) |
-| IN-3 | Signing and runner authenticity | 🔴 | P0 | M | Owner obtains an Apple Developer ID and an Authenticode certificate and adds the secrets; pin the subject, key SHA-256 and Apple team ID in `runner_publisher.py`; release builds require `publisher_verified` |
+| IN-3 | Signing and runner authenticity | 🟡 | P0 | M | **2026-11-07:** `signing: require-except-macos` signs Windows (self-signed beta certificate) and Linux (GPG), and every signed installer is checked against the identities pinned in `desktop/signing/identities.json` ([FIXED-1320](FIXED_ITEMS.md#fixed-1320--both-authenticode-readers-handed-powershell-a-path-it-throws-away-in-3-found-this-round), [FIXED-1321](FIXED_ITEMS.md#fixed-1321--windows-and-linux-builds-could-not-be-signed-without-an-apple-identity-and-nothing-checked-the-signer-in-3)). Still required: a CA-issued Authenticode certificate, then `WINDOWS_PUBLISHER_PINS` and `publisher_verified`; an Apple Developer ID for macOS (TO_BE_FIXED, *Windows builds are signed with a self-signed beta certificate*) |
 | IN-4 | Upgrades, rollback, clean uninstall | 🟡 | P0 | M | Signed-channel update test (0.9.0-beta.1 → beta.2) per platform; a downgrade path that restores the previous app while the schema generation is unchanged (the store already refuses a newer schema — `store_schema_newer`); uninstall removes the sandbox accounts, WFP filter and runner grants on Windows |
 | IN-5 | First launch on clean machines | 🔴 | P0 | M | Run T-01 on fresh VMs: Windows 10 22H2, Windows 11 24H2, macOS 14 and 15, Ubuntu 22.04/24.04, Fedora 40; record in RELEASE_ACCEPTANCE_MATRIX |
 
@@ -175,9 +175,9 @@ configured, and runner publisher pins are empty (`runner_publisher.py`).
 
 | ID | Item | State | P | Effort | Work left |
 |---|---|---|---|---|---|
-| MD-1 | Cloud and local provider connections | 🟡 | P0 | S | **2026-11-07:** providers outside the six are tagged *Experimental* in Models › Add ([FIXED-1315](FIXED_ITEMS.md#fixed-1315--the-betas-labels-and-limits-were-not-visible-where-the-owner-decides-beta-plan-1-2-3-6-8-9)). Anthropic, OpenRouter, OpenAI and Ollama (a cloud model) passed live through the UI ([run record](../architecture/WEB_APP_LIVE_TEST.md#result--2026-11-07-beta-release-plan-round)). Still required: LM Studio and llama.cpp live checks, and all six on the release commit |
-| MD-2 | llama.cpp native install, deploy, GPU config | 🟡 | P0 | S | PR #246 repaired automatic source-only stable-release selection; the `llama-cpp.yml` live jobs passed on Windows, macOS and Linux. Still required: one owner-machine run each on NVIDIA (CUDA) and AMD (Vulkan) GPU hardware, plus fresh signed-installer validation on the release candidate. |
-| MD-3 | GGUF downloads, integrity, inference | 🟡 | P0 | S | **2026-11-07:** every written file is checked against the hub's LFS SHA-256 (or Git blob id) and removed on a mismatch ([FIXED-1313](FIXED_ITEMS.md#fixed-1313--a-downloaded-gguf-was-never-checked-against-the-bytes-the-hub-publishes-md-3)). Still required: a live test that serves a downloaded GGUF |
+| MD-1 | Cloud and local provider connections | 🟡 | P0 | S | **2026-11-07:** providers outside the six are tagged *Experimental* in Models › Add ([FIXED-1315](FIXED_ITEMS.md#fixed-1315--the-betas-labels-and-limits-were-not-visible-where-the-owner-decides-beta-plan-1-2-3-6-8-9)). Anthropic, OpenRouter, OpenAI and Ollama (a cloud model) passed live through the UI ([run record](../architecture/WEB_APP_LIVE_TEST.md#result--2026-11-07-beta-release-plan-round)). The managed llama.cpp engine passed live on the owner's NVIDIA GPU ([RT-GPU-02](../architecture/WEB_APP_LIVE_TEST.md#result--2026-11-07-gpu-signing-and-settings-round)). Still required: LM Studio (the owner machine's install is broken; TO_BE_FIXED), and all six on the release commit |
+| MD-2 | llama.cpp native install, deploy, GPU config | 🟡 | P0 | S | PR #246 repaired automatic source-only stable-release selection; the `llama-cpp.yml` live jobs passed on Windows, macOS and Linux. **2026-11-07:** NVIDIA passed on the owner's RTX 4080 SUPER: Raiker recommended and installed the CUDA build (b12192) and served a model entirely on the GPU ([run record](../architecture/WEB_APP_LIVE_TEST.md#result--2026-11-07-gpu-signing-and-settings-round)). Still required: AMD (Vulkan), plus fresh signed-installer validation on the release candidate. |
+| MD-3 | GGUF downloads, integrity, inference | ✅ | — | — | **2026-11-07:** every written file is checked against the hub's LFS SHA-256 (or Git blob id) and removed on a mismatch ([FIXED-1313](FIXED_ITEMS.md#fixed-1313--a-downloaded-gguf-was-never-checked-against-the-bytes-the-hub-publishes-md-3)). Live RT-GPU-02: a Hugging Face GGUF pinned to a revision, verified, served on the GPU and answering in Chat; it found and fixed every auto-sized turn being refused ([FIXED-1319](FIXED_ITEMS.md#fixed-1319--every-turn-to-a-local-gguf-sized-on-auto-was-refused-with-a-bare-http-400-md-3-found-on-the-owners-gpu), [run record](../architecture/WEB_APP_LIVE_TEST.md#result--2026-11-07-gpu-signing-and-settings-round)) |
 | MD-4 | Detection, readiness, selection, fallback | ✅ | — | — | Model decision service, readiness ledger and fallback sequence (FIXED items) |
 | MD-5 | Failures, rate limits, timeouts, recovery | 🟡 | P0 | M | **2026-11-07:** the matrix runs against a real local socket for both adapters (`tests/test_provider_fault_matrix.py`). It found and fixed a cut-off stream recorded as finished, and `Retry-After` is now carried ([FIXED-1312](FIXED_ITEMS.md#fixed-1312--a-stream-that-closed-early-was-recorded-as-a-finished-answer-md-5-found-this-round)). Still required: show *Rate-limited until …* and the fallback receipt (TO_BE_FIXED, *Provider fault handling*) |
 
@@ -291,7 +291,7 @@ work runs (top bar), and so is the count of running items.
 
 | ID | Item | State | P | Effort | Work left |
 |---|---|---|---|---|---|
-| UX-1 | Quiet UI across retained pages | 🟡 | P0 | M | **2026-11-07:** QUI-G01 is a failing check (RT-BETA-10) for Chat, Build, Models, Settings › General, Privacy and About & updates, with General as one tracked exception (TO_BE_FIXED, *Settings › General is over its size budget*). Still required: close or move the open Quiet UI rows |
+| UX-1 | Quiet UI across retained pages | 🟡 | P0 | M | **2026-11-07:** QUI-G01 is a failing check (RT-BETA-10) for Chat, Build, Models, Settings › General, Privacy and About & updates, and Account and Backups. General's exception is gone: Account and Backups are sections of their own ([FIXED-1318](FIXED_ITEMS.md#fixed-1318--settings--general-was-over-its-size-budget-because-it-held-the-account-and-backups-ux-1)). Still required: close or move the open Quiet UI rows |
 | UX-2 | Composer, navigation, model selection consistent | 🟡 | P0 | S | Existing component coverage names the Chat and Build grammars; this round adds the shared five-state vocabulary and a live `RT-BETA-UX-01` route check. Still required: one explicit parity assertion across Chat, Build and Design that compares the common controls in order. |
 | UX-3 | Permission controls, runtime status, approvals | ✅ | — | — | QUI-P01–P09 (approvals round) |
 | UX-4 | Understandable errors and recovery actions | ✅ | — | — | Whole-route audit `tests/test_route_reason_copy.py`: every literal route refusal has copy, and `failure()` says why ([FIXED-1309](FIXED_ITEMS.md#fixed-1309--eighty-route-refusals-reached-the-owner-as-a-bare-machine-code-ux-4)) |
@@ -414,7 +414,7 @@ a fresh install.
 |---|---|---|---|---|---|
 | CI-1 | All mandatory workflows green on the release commit | 🟡 | P0 | M | The three llama.cpp live jobs are green after PR #246, and the release gate requires the complete beta-critical CI, llama.cpp, native-runner and data-safety suites using the latest GitHub Actions result for the exact commit. Remaining: a green candidate-release run with its signed artifacts and attached evidence. |
 | CI-2 | Ruff, mypy, lint, unit, integration, security, packaging | 🟡 | P0 | S | Already wired; part of CI-1 |
-| CI-3 | Per-platform artifacts verified independently | 🟡 | P0 | S | Each target downloads its own artifact in a fresh job and runs the installed-host smoke (exists); add signature verification once IN-3 lands |
+| CI-3 | Per-platform artifacts verified independently | 🟡 | P0 | S | Each target downloads its own artifact in a fresh job and runs the installed-host smoke (exists); signed builds are now verified against the pinned identities before install and on the installed program (`raiker.app.platform_signatures`, FIXED-1321); a signed candidate run is still required |
 | CI-4 | Dependency vulnerability and secret scans | ✅ | — | — | `pip-audit`/`npm audit` and `scan_secrets.py` in CI |
 | CI-5 | Versioned, verified artifacts with reproducible evidence | 🟡 | P0 | M | The release carries `SHA256SUMS.txt` (exists), an SBOM (`licensing_check.py --sbom`), a provenance attestation (`actions/attest-build-provenance`) and a `RELEASE_EVIDENCE.md` linking the run IDs |
 
@@ -522,6 +522,14 @@ Anything not green at the start of week 4 is moved to *Not in beta* with the
 product refusing it, rather than delaying the date.
 
 ## Changelog
+
+- **2026-11-07 (second round)** — Owner decisions: Account and Backups become
+  Settings sections; this machine (RTX 4080 SUPER) is the GPU test machine;
+  sign Windows and Linux now, macOS later. UX-1's last exception closed
+  (FIXED-1318); MD-3 closed and MD-2's NVIDIA run passed, finding a High defect
+  in auto context sizing (FIXED-1319); IN-3 moved to 🟡 with per-OS signing and
+  pinned verification (FIXED-1320, FIXED-1321). LM Studio could not be checked
+  (broken install). [Run record](../architecture/WEB_APP_LIVE_TEST.md#result--2026-11-07-gpu-signing-and-settings-round).
 
 - **2026-11-07** — Beta round: fifteen items (AG-2, UX-1, UX-4, UX-5, BD-3,
   BD-4, MD-1, MD-3, MD-5, PL-5, VD-2, VD-3, VD-4 and the §1, §2 and §6 UI

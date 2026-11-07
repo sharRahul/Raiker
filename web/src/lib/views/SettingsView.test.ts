@@ -236,13 +236,24 @@ describe("supported-preferences settings", () => {
     await waitFor(() => expect((screen.getByLabelText(/unread notices inside Raiker/i) as HTMLInputElement).checked).toBe(true));
   });
 
-  it("keeps Account, with account deletion, in General", async () => {
+  // General was over its size budget with the account and backups in it; each
+  // is a Security & data section of its own now, and General carries neither.
+  it("gives Account and Backups sections of their own, outside General", async () => {
     stubApi();
     render(SettingsView, { props: { principal: "alice" } });
-    expect(screen.queryByRole("button", { name: "Account" })).toBeNull();
-    await waitFor(() => {
-      expect(screen.getByRole("button", { name: /delete my account/i })).toBeInTheDocument();
-    });
+    const group = screen.getByRole("group", { name: "Security & data settings" });
+    expect(within(group).getByRole("button", { name: "Account" })).toBeInTheDocument();
+    expect(within(group).getByRole("button", { name: "Backups" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /delete my account/i })).toBeNull();
+    expect(screen.queryByTestId("backups-card")).toBeNull();
+
+    await fireEvent.click(within(group).getByRole("button", { name: "Account" }));
+    expect(await screen.findByRole("button", { name: /delete my account/i })).toBeInTheDocument();
+    expect(screen.queryByTestId("backups-card")).toBeNull();
+
+    await fireEvent.click(within(group).getByRole("button", { name: "Backups" }));
+    expect(await screen.findByRole("heading", { level: 2, name: "Backups" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /delete my account/i })).toBeNull();
   });
 
   it("uses the General dropdown treatment in Personalisation", async () => {
@@ -275,7 +286,7 @@ describe("supported-preferences settings", () => {
 
   it("presents Display name as a structured, descriptive profile field", async () => {
     stubApi();
-    render(SettingsView, { props: { principal: "alice" } });
+    render(SettingsView, { props: { principal: "alice", tab: "account" } });
 
     const input = await screen.findByLabelText("Display name");
     expect(input).toHaveClass("settings-input");

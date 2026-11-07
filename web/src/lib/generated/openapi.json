@@ -17825,6 +17825,10 @@
             "title": "Signed",
             "type": "boolean"
           },
+          "signing_publisher": {
+            "title": "Signing Publisher",
+            "type": "string"
+          },
           "target": {
             "anyOf": [
               {
@@ -17852,7 +17856,8 @@
           "installer_formats",
           "install_root",
           "note",
-          "distribution"
+          "distribution",
+          "signing_publisher"
         ],
         "title": "InstallationView",
         "type": "object"

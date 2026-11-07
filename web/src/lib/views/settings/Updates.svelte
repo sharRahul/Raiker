@@ -68,7 +68,11 @@
     update === null
       ? ""
       : update.installation.signed
-        ? "Verified by Raiker"
+        ? update.installation.signing_publisher === "self_signed"
+          // IN-3 — the beta's Windows certificate is Raiker's own: the file is
+          // signed and checked, but Windows names no trusted publisher.
+          ? "Signed by Raiker (self-signed — Windows shows Unknown publisher)"
+          : "Verified by Raiker"
         : update.installation.packaged ? "Unsigned build" : "Unsigned development build",
   );
   const stale = $derived(update !== null && clientIsStale(update.installation.version));

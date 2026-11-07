@@ -56,6 +56,11 @@ on:
         required: false
         default: false
         type: boolean
+      unsigned_os:
+        description: "OS families built unsigned even when signed is true (IN-3: macos until an Apple Developer ID exists)"
+        required: false
+        default: ""
+        type: string
     secrets:
       APPLE_DEVELOPER_ID_CERTIFICATE:
         required: false
@@ -148,6 +153,11 @@ jobs:
     name: ${{ matrix.target }}
     needs: [web, wsl-runner]
     runs-on: ${{ matrix.runner }}
+    env:
+      # IN-3 — signing is decided per OS: a release may sign Windows and Linux
+      # while macOS waits for an Apple Developer ID. The build record, smoke
+      # test and verification all read this one value.
+      SIGNED: ${{ inputs.signed && !contains(inputs.unsigned_os || '', matrix.os) && 'true' || 'false' }}
     timeout-minutes: 75
     strategy:
       fail-fast: false
@@ -243,6 +253,11 @@ jobs:
             echo "WIN_CSC_LINK=$WINDOWS_CERT"
             echo "WIN_CSC_KEY_PASSWORD=$WINDOWS_CERT_PASSWORD"
           } >> "$GITHUB_ENV"
+      - name: Check the release key is the one installed Raiker pins
+        if: env.SIGNED == 'true'
+        env:
+          RAIKER_RELEASE_SIGNING_KEY: ${{ secrets.RAIKER_RELEASE_SIGNING_KEY }}
+        run: python -m raiker.app.platform_signatures release-key
       - name: Prepare the Linux package signing key
         if: matrix.os == 'linux' && env.SIGNED == 'true'
         env:
@@ -262,7 +277,10 @@ jobs:
             --commit "$GITHUB_SHA" \
             --channel-url "${{ vars.RAIKER_DESKTOP_CHANNEL_URL }}" \
             --out desktop-release \
-            $([ "$SIGNED" = "true" ] && echo --signed)
+            $([ "$SIGNED" = "true" ] && echo --signed) \
+            $([ "$SIGNED" = "true" ] && [ "${{ matrix.os }}" = "windows" ] && \
+              python -c "import json,sys; sys.exit(0 if json.load(open('desktop/signing/identities.json'))['windows']['self_signed'] else 1)" && \
+              echo --self-signed)
           ls -la desktop-release
 
       - name: Detached-sign the Linux packages
@@ -273,6 +291,20 @@ jobs:
           for package in desktop-release/*.deb desktop-release/*.rpm desktop-release/*.AppImage; do
             gpg --batch --yes --pinentry-mode loopback --passphrase "$KEY_PASSWORD" --detach-sign --armor "$package"
           done
+      # IN-3 — each signature is checked against the identity the repository
+      # pins (desktop/signing/identities.json) before anything is installed.
+      - name: Verify the Linux signatures against the pinned key
+        if: matrix.os == 'linux' && env.SIGNED == 'true'
+        run: |
+          python -m raiker.app.platform_signatures linux \
+            desktop-release/*.deb desktop-release/*.rpm desktop-release/*.AppImage \
+            --report "desktop-release/signatures-${{ matrix.target }}.txt"
+      - name: Verify the Authenticode signatures against the pinned publisher
+        if: matrix.os == 'windows' && env.SIGNED == 'true'
+        run: |
+          python -m raiker.app.platform_signatures windows \
+            desktop-release/*.exe desktop-release/*.msi desktop/release/win-unpacked/Raiker.exe \
+            --report "desktop-release/signatures-${{ matrix.target }}.txt"
 
       - name: Verify the checksums
         working-directory: desktop-release
@@ -296,6 +328,11 @@ jobs:
           "APP=$root\Raiker.exe" >> $env:GITHUB_ENV
           "HOST=$root\resources\host\Raiker.exe" >> $env:GITHUB_ENV
           "INSTALL_ROOT=$root" >> $env:GITHUB_ENV
+          if ($env:SIGNED -eq "true") {
+            # What the owner runs is what was signed: the installed window.
+            python -m raiker.app.platform_signatures windows "$root\Raiker.exe" "$root\Uninstall Raiker.exe"
+            if ($LASTEXITCODE -ne 0) { throw "the installed program does not carry the pinned signature" }
+          }
       - name: Install (macOS, from the .dmg)
         if: matrix.os == 'macos'
         run: |
@@ -441,7 +478,14 @@ jobs:
           # package would need its dependencies, and cryptography has no
           # win_arm64 wheel (the reason this target is emulated at all).
           Copy-Item raiker\app\desktop_smoke.py "$env:RUNNER_TEMP\desktop_smoke.py"
-          python -I "$env:RUNNER_TEMP\desktop_smoke.py" --host "$root\resources\host\Raiker.exe" --expect-unsigned --report evidence\smoke-installed-windows-arm64.txt
+          $expect = "--expect-unsigned"
+          if ("${{ inputs.signed && !contains(inputs.unsigned_os || '', 'windows') }}" -eq "true") {
+            $expect = "--expect-signed"
+            # Stdlib only and run by path, for the same reason as the smoke script.
+            python -I raiker\app\platform_signatures.py windows $setup.FullName "$root\Raiker.exe" --identities desktop\signing\identities.json --report evidence\signatures-windows-arm64.txt
+            if ($LASTEXITCODE -ne 0) { throw "the installed program does not carry the pinned signature" }
+          }
+          python -I "$env:RUNNER_TEMP\desktop_smoke.py" --host "$root\resources\host\Raiker.exe" $expect --report evidence\smoke-installed-windows-arm64.txt
           if ($LASTEXITCODE -ne 0) { throw "smoke test failed under emulation" }
           $p = Start-Process -FilePath "$root\Uninstall Raiker.exe" -ArgumentList "/S" -Wait -PassThru
           Start-Sleep -Seconds 10
@@ -470,7 +514,7 @@ jobs:
       - name: Summarise
         run: |
           {
-            echo "## Desktop packages — ${{ env.VERSION }} (signed: ${{ env.SIGNED }})"
+            echo "## Desktop packages — ${{ env.VERSION }} (signed: ${{ env.SIGNED }}; built unsigned: ${{ inputs.unsigned_os || 'none' }})"
             echo
             echo "| Target | Installers | Installed smoke | AppImage/MSI smoke | Window + onboarding | Uninstall keeps data |"
             echo "|---|---|---|---|---|---|"

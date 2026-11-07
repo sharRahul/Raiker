@@ -233,8 +233,10 @@ export const HUB_TABS: Record<string, string[]> = {
     "personalisation",
     "notification",
     "voice",
+    "account",
     "security",
     "privacy",
+    "backups",
     "execution-profiles",
     "web-access",
     "advanced",
@@ -299,11 +301,10 @@ const HUB_TAB_ALIASES: Record<string, Record<string, string>> = {
     hooks: "advanced",
     plugins: "advanced",
   },
-  // QUI-L09 — Account folded into General; Runtime configuration and Memory
+  // QUI-L09 — Runtime configuration and Memory
   // engine are segments of Advanced. GitHub moved to Connections, which
   // Settings forwards to (`SECTIONS_MOVED`).
   settings: {
-    account: "general",
     runtime: "advanced",
     "memory-engine": "advanced",
   },

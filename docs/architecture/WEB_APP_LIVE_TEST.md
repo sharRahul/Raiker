@@ -1997,7 +1997,7 @@ has its own CI job).
 | RT-BETA-07 | A session copy whose `main.py` the owner also edited (`scripts/live_task_copy_harness.py`): the header says *Working in an isolated copy — nothing changes in your project until you Apply.*; *1 file was also changed in your project*; Apply is disabled; the diff shows *owner edit* against the copy; **Overwrite with the copy's version** enables Apply; the confirmation names `main.py`; the project file then holds the copy's version |
 | RT-BETA-08 | **Discard** removes the copy and the project's `main.py` is unchanged |
 | RT-BETA-09 | axe (WCAG 2.0/2.1 A and AA) on every destination at 1440×900, 1280×900 and 390×844: no serious or critical violation |
-| RT-BETA-10 | QUI-G01 as a failing check: Chat, Build, Models, Settings › General, Privacy and About & updates within budget at 1440×900 and 1280×800, with Settings › General the one tracked exception ([TO_BE_FIXED](../plans/TO_BE_FIXED.md#settings--general-is-over-its-size-budget)) |
+| RT-BETA-10 | QUI-G01 as a failing check: Chat, Build, Models, Settings › General, Privacy and About & updates within budget at 1440×900 and 1280×800, with Settings › General the one tracked exception (closed the same day by [FIXED-1318](../plans/FIXED_ITEMS.md#fixed-1318--settings--general-was-over-its-size-budget-because-it-held-the-account-and-backups-ux-1)) |
 
 **Outcome: 10/10 passed** (`beta-release-round-live.spec.ts`, 5.3 minutes) on
 the final build, plus the three provider legs and the Ollama answer. Failures on
@@ -2055,3 +2055,79 @@ Raiker can verify.
 unavailable state by replacing one read, because this host's sandbox is
 enforced.
 
+## Result — 2026-11-07 GPU, signing and Settings round
+
+**Scope.** The owner's three decisions of 2026-11-07: Account and Backups
+become Settings sections (UX-1); this machine is the GPU test machine for the
+beta plan (MD-1, MD-2, MD-3); Windows and Linux are signed now and macOS later
+(IN-3). Windows 11 Pro, NVIDIA GeForce RTX 4080 SUPER (16 GB, driver 591.86),
+128 GB memory. The built SPA was served by real FastAPI on port 8765 from the
+previous round's disposable workspace, in Chromium.
+
+| Case | Check |
+|---|---|
+| RT-BETA-10 | QUI-G01 budgets with **no tracked exception**, now also for Settings › Account and Settings › Backups, at 1440×900 and 1280×800 |
+| RT-BETA-11 | The rail lists **Account** and **Backups** under *Security & data*; General shows neither *Delete my account* nor the backups card; `?tab=account` and `?tab=backups` open their sections |
+| RT-BETA-09 | axe at 1440, 1280 and 390 after the split: no serious or critical violation |
+| Backups 390 dark | `round-2026-10-05-backups-live.spec.ts`, now pointed at `?tab=backups`: the card at 390 wide in the dark theme does not bleed |
+| RT-GPU-01 | Settings › Advanced › Model serving names the GPU and recommends **NVIDIA CUDA**; **Install llama.cpp** with the CUDA build installs `b12192 · NVIDIA CUDA`, checked against its published SHA-256 |
+| RT-GPU-02 | Approve a library folder; **Models › Add › Hugging Face** finds `Qwen/Qwen2.5-0.5B-Instruct-GGUF`, pins it to revision `9217f5db79a2`, downloads Q4_K_M (469 MB) and indexes it after the LFS SHA-256 check; **Serve selected** runs it *Entirely on the GPU*; `nvidia-smi` lists Raiker's `llama-server.exe` as a GPU process; **Test** reads *llama.cpp can reach local-gguf*; a Chat turn on *Local GGUF* completes with the receipt *Local GGUF · no charge · nothing left this computer* |
+
+**Outcome.** `beta-release-round-live.spec.ts` RT-BETA-09, -10 and -11 passed
+(2/2 then 1/1). `beta-gpu-local-live.spec.ts` passed 2/2 on the final build.
+
+* **Found and fixed: every auto-sized local turn refused.** RT-GPU-02's first
+  turns failed with *provider_http_error:http_400*. llama-server's log:
+  *request (9459 tokens) exceeds the available context size (8192 tokens)*
+  ([FIXED-1319](../plans/FIXED_ITEMS.md#fixed-1319--every-turn-to-a-local-gguf-sized-on-auto-was-refused-with-a-bare-http-400-md-3-found-on-the-owners-gpu)).
+  After the fix the slot starts with `-c 32768` and the same turn completed in
+  0.47 s (9,589 tokens, 290 tokens/s generation).
+* **Found and fixed: Authenticode path.** The first real signature read on
+  this machine returned a null path
+  ([FIXED-1320](../plans/FIXED_ITEMS.md#fixed-1320--both-authenticode-readers-handed-powershell-a-path-it-throws-away-in-3-found-this-round)).
+* **Not a defect: answer quality.** The 0.5B model answered *France* to *What
+  is the capital of France?*. The case asserts the completed turn and its
+  receipt, not a 0.5B model's wording.
+* **Open: composer location line.** With *Local GGUF* chosen the composer read
+  *Where it runs is not confirmed* (TO_BE_FIXED).
+* **Not run: LM Studio.** The installed app exits at start with an ICU data
+  error, and reinstalling it was outside this session's permissions
+  (TO_BE_FIXED).
+* **Harness, not product.** The first readiness wait matched *Nothing ready*
+  elsewhere on the page; it now waits for the GGUF row to stop saying *not
+  reachable*. The receipt is a `<details>` whose summary is matched by text.
+
+**Signing evidence (IN-3).** Real files on this machine, with the identities
+pinned in `desktop/signing/identities.json`:
+
+| Check | Result |
+|---|---|
+| Rust-built test executable signed with the beta certificate (`Set-AuthenticodeSignature`, DigiCert timestamp) | `PASS … Authenticode by the pinned publisher (self-signed; Windows does not trust the publisher, timestamped)` |
+| The same file with one byte changed | `refused: … changed after it was signed (HashMismatch)` |
+| A Microsoft-signed system executable | `refused: … signed by CN=Microsoft Windows …, not the pinned publisher` |
+| AppImage stand-in with a detached signature, WSL Ubuntu `gpg` | `PASS … detached signature by 6B31334382D46C56AFE125CA25F9767FF2DDACF1` |
+| The same file with one byte appended | `refused: … changed after it was signed (BADSIG)` |
+| The release key held in the secret | `PASS release key: derives the pinned public key c4bac6bdc405b7b4...` |
+
+The release workflow's signed candidate run (`signing: require-except-macos`)
+is recorded in the plan once it has run on the pushed commit.
+
+The captures are under `output/playwright/2026-11-07-beta-round/` (11-*) and
+`output/playwright/2026-11-07-gpu-round/` (ignored by Git). I reviewed each at
+full size. Account and Backups each read as one card under one heading, and the
+rail keeps one selected row.
+
+**Procedure.** From `web/`, with the host on 8765: `npx playwright test
+--project=live e2e/beta-release-round-live.spec.ts -g "RT-BETA-09|RT-BETA-10|RT-BETA-11"`,
+then `npx playwright test --project=live e2e/beta-gpu-local-live.spec.ts`
+(network needed for GitHub and Hugging Face). Signing:
+`python -m raiker.app.platform_signatures windows|linux <files>` and
+`RAIKER_RELEASE_SIGNING_KEY=… python -m raiker.app.platform_signatures release-key`.
+
+**Local checks.** Web: 2,809 component tests, Svelte check (0 errors),
+ESLint, the production build and 27 mocked browser tests. Python: Ruff, mypy
+(`--platform linux`; only the known local `keyring`/`httpx2` stubs), and the
+suites named in FIXED-1318 to -1321.
+
+**Limits.** NVIDIA only (AMD Vulkan still required). One Windows machine; no
+fresh VM.

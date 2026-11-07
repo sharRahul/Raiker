@@ -152,7 +152,8 @@ describe("nav model", () => {
     expect(routeFromHash("#/activity")).toBe("observe");
     // ADD-27 — the old Git credential section opens Settings → GitHub.
     // QUI-L09 — Account folded into General; Runtime into Advanced.
-    expect(tabFromHash("#/settings?tab=account")).toBe("general");
+    expect(tabFromHash("#/settings?tab=account")).toBe("account");
+    expect(tabFromHash("#/settings?tab=backups")).toBe("backups");
     expect(tabFromHash("#/settings?tab=runtime")).toBe("advanced");
     expect(tabFromHash("#/settings?tab=memory-engine")).toBe("advanced");
     expect(tabFromHash("#/activity")).toBe("activity");

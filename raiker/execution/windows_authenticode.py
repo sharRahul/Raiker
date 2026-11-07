@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import subprocess
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -23,7 +24,7 @@ class AuthenticodeVerdict:
 
 
 _SCRIPT = r"""
-$s = Get-AuthenticodeSignature -LiteralPath $args[0]
+$s = Get-AuthenticodeSignature -LiteralPath $env:RAIKER_SIGNED_FILE
 $leaf = $s.SignerCertificate
 $time = $s.TimeStamperCertificate
 [pscustomobject]@{
@@ -49,7 +50,10 @@ def verify_windows_authenticode(
         raise AuthenticodeError("authenticode_artifact_invalid")
     try:
         completed = runner(
-            ["powershell.exe", "-NoProfile", "-NonInteractive", "-Command", _SCRIPT, str(resolved)],
+            # The path travels in the environment: `-Command` joins any further
+            # arguments into the script text, so `$args` was always empty there.
+            ["powershell.exe", "-NoProfile", "-NonInteractive", "-Command", _SCRIPT],
+            env={**os.environ, "RAIKER_SIGNED_FILE": str(resolved)},
             capture_output=True,
             text=True,
             timeout=30,

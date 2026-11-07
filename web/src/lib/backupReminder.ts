@@ -24,7 +24,7 @@ export interface BackupReminder {
   readonly label: string;
 }
 
-const WHERE = "#/settings?tab=general";
+const WHERE = "#/settings?tab=backups";
 
 /**
  * Raised on `window` when this page makes, verifies or removes a backup, so

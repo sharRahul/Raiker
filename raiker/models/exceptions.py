@@ -271,6 +271,24 @@ def tools_unsupported(status: int, body: str) -> bool:
     return any(marker in haystack for marker in _TOOLS_UNSUPPORTED_MARKERS)
 
 
+#: How OpenAI-compatible servers say the prompt is longer than the context the
+#: model was started with: llama-server's own wording, OpenAI's code, vLLM's.
+_CONTEXT_EXCEEDED_MARKERS: tuple[str, ...] = (
+    "exceeds the available context size",
+    "context_length_exceeded",
+    "maximum context length",
+    "exceed_context_size_error",
+)
+
+
+def context_exceeded(status: int, body: str) -> bool:
+    """True when the request was refused because it does not fit the context."""
+    if status not in {400, 413}:
+        return False
+    haystack = body.casefold()
+    return any(marker in haystack for marker in _CONTEXT_EXCEEDED_MARKERS)
+
+
 def needs_workspace_id(status: int, body: str) -> bool:
     """True when the provider refused because no workspace was named.
 
@@ -408,6 +426,13 @@ _PROVIDER_ERROR_SENTENCES: tuple[tuple[str, str], ...] = (
         "provider_quota_exhausted",
         "the provider accepted the credential but the account has no credit or quota left. "
         "Add credit or raise the quota, then try again.",
+    ),
+    (
+        # MD-3, 2026-11-07 — a local model started with too short a context
+        # refused a plain turn with a bare HTTP 400.
+        "provider_context_exceeded",
+        "this conversation is longer than the context the model was started with. "
+        "Raise the model's context in Settings › Advanced › Model serving, or start a new chat.",
     ),
     (
         "provider_rate_limited",

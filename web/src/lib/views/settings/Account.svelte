@@ -1,6 +1,5 @@
 <script lang="ts">
   import { onMount } from "svelte";
-  import BackupsCard from "../../components/BackupsCard.svelte";
   import FormDialog from "../../components/FormDialog.svelte";
   import { auth, getToken, setToken, ApiError } from "../../api";
   import type { AccountDeletionPreview } from "../../generated/apiContract";
@@ -208,8 +207,6 @@
   </div>
 </section>
 
-<BackupsCard />
-
 {#if confirmingDelete}
   <FormDialog title="Delete account" onclose={() => { if (!busy) confirmingDelete = false; }}>
     <p class="sub">This cannot be undone.</p>
@@ -273,7 +270,7 @@
 {/if}
 
 <style>
-  .section-heading { margin:var(--space-4) 0 var(--space-2); }
+  .section-heading { margin-bottom: var(--space-3); }
   .section-heading h2,.card-heading h3 { margin:0; }
   .card-heading p { color:var(--text-2); margin:.3rem 0 0; }
   .settings-card { background:var(--surface); border:1px solid var(--border); border-radius:var(--r-lg); padding:var(--space-4) var(--card-pad-x); margin-bottom:var(--space-3); }

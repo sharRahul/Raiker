@@ -65,6 +65,10 @@ class Installation:
     #: ``"payload"`` for the directory the payload updater swaps, ``"desktop"``
     #: for a desktop package (DIST-10), which updates through its own installer.
     distribution: str = "payload"
+    #: IN-3 — ``self_signed`` when the build's platform signature is Raiker's own
+    #: certificate rather than one the operating system trusts (the Windows beta,
+    #: 2026-11-07). Empty for an unsigned build and for a CA-issued signature.
+    signing_publisher: str = ""
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -79,6 +83,7 @@ class Installation:
             "install_root": str(self.install_root),
             "note": self.note,
             "distribution": self.distribution,
+            "signing_publisher": self.signing_publisher,
         }
 
 
@@ -166,6 +171,11 @@ def detect_installation(install_root: Path | None = None) -> Installation:
             install_root=root,
             note="",
             distribution=str(parsed.get("distribution", "payload")),
+            signing_publisher=(
+                "self_signed"
+                if signing["applied"] and signing.get("publisher") == "self_signed"
+                else ""
+            ),
         )
     except (OSError, ValueError, KeyError, TypeError):
         return Installation(

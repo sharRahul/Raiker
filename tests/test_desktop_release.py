@@ -136,6 +136,23 @@ def test_the_desktop_record_is_read_back_as_a_desktop_installation(tmp_path: Pat
     assert install.version == "1.2.3"
 
 
+def test_a_self_signed_build_says_so_and_an_unsigned_one_cannot(tmp_path: Path) -> None:
+    # IN-3 — the Windows beta is signed with Raiker's own certificate.
+    record = desktop_record(version="1.2.3", target_id="windows-x86_64", channel="beta",
+                            signed=True, self_signed=True)
+    (tmp_path / "installation.json").write_text(json.dumps(record), encoding="utf-8")
+    install = detect_installation(tmp_path)
+    assert install.signed is True
+    assert install.signing_publisher == "self_signed"
+    assert install.to_dict()["signing_publisher"] == "self_signed"
+
+    unsigned = desktop_record(version="1.2.3", target_id="windows-x86_64", channel="beta",
+                              signed=False, self_signed=True)
+    assert "publisher" not in unsigned["signing"]
+    (tmp_path / "installation.json").write_text(json.dumps(unsigned), encoding="utf-8")
+    assert detect_installation(tmp_path).signing_publisher == ""
+
+
 def test_manifests_and_the_signed_desktop_channel_are_what_the_updater_accepts(tmp_path: Path) -> None:
     key = _key()
     for target in DESKTOP_TARGETS:

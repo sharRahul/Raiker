@@ -12,6 +12,7 @@
   import SecurityLogin from "./settings/SecurityLogin.svelte";
   import Privacy from "./settings/Privacy.svelte";
   import Account from "./settings/Account.svelte";
+  import Backups from "./settings/Backups.svelte";
   import Runtime from "./settings/Runtime.svelte";
   import WebAccess from "./settings/WebAccess.svelte";
   import ExecutionProfiles from "./settings/ExecutionProfiles.svelte";
@@ -398,8 +399,10 @@
   <div class="section-body">
     {#if active === "general"}
       <General {settings} {save} />
-      <!-- QUI-L09 — Account folds into General. -->
+    {:else if active === "account"}
       <Account {settings} {save} {status} />
+    {:else if active === "backups"}
+      <Backups />
     {:else if active === "notification"}
       <Notification {settings} {save} />
     {:else if active === "personalisation"}

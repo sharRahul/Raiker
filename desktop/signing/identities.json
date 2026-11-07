@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "note": "Public halves of Raiker's release signing identities. The private halves live only in the repository's Actions secrets and the owner's offline backup. scripts/verify_platform_signatures.py checks every signed build against these pins, so a rotated secret without an updated pin fails the release.",
+  "windows": {
+    "subject": "CN=Raiker (self-signed beta), O=Raiker",
+    "thumbprint_sha1": "1300BFD1A0894EC033198426144784450AF70C8A",
+    "self_signed": true,
+    "not_after": "2029-11-06"
+  },
+  "linux": {
+    "key_file": "raiker-linux-signing-key.asc",
+    "fingerprint": "6B31334382D46C56AFE125CA25F9767FF2DDACF1",
+    "not_after": "2029-11-06"
+  },
+  "release": {
+    "public_key_file": "release-public-key.txt"
+  }
+}

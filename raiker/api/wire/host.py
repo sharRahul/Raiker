@@ -96,6 +96,9 @@ class InstallationView(TypedDict):
     note: str
     #: DIST-10 — ``payload`` or ``desktop``: which updater this installation takes.
     distribution: str
+    #: IN-3 — ``self_signed`` when the platform signature is Raiker's own
+    #: certificate, which the operating system does not trust; otherwise empty.
+    signing_publisher: str
 
 
 class UpdateChannelView(TypedDict):

@@ -621,15 +621,17 @@ test("Settings presents one section rail rather than a wall of fields", async ({
   // The rail is the redesign: personal sections first, system configuration
   // named as such, and nothing that was folded away reachable as a stray tab.
   const rail = page.getByRole("navigation", { name: "Settings sections" });
-  // QUI-L09 — Account folds into General, the developer settings into
-  // Advanced, and GitHub moved to Connections.
+  // QUI-L09 — the developer settings fold into Advanced and GitHub moved to
+  // Connections. Account and Backups left General (2026-11-07).
   await expect(rail.getByRole("button")).toHaveText([
     "General",
     "Personalisation",
     "Notifications",
     "Voice",
+    "Account",
     "Security",
     "Privacy",
+    "Backups",
     "Execution profiles",
     "Web access",
     "Advanced",
@@ -773,7 +775,7 @@ test("desktop view audit covers every route, Models tab, and Settings section", 
     ["settings?tab=general", "Settings", "workspace"],
   ] as const;
   const settingsSections = [
-    "notification", "personalisation", "security", "privacy", "account",
+    "notification", "personalisation", "security", "privacy", "account", "backups",
     "web-access", "advanced", "runtime", "updates",
   ] as const;
   const settingsLabels: Record<string, string> = {
@@ -782,8 +784,9 @@ test("desktop view audit covers every route, Models tab, and Settings section", 
     personalisation: "Personalisation",
     security: "Security",
     privacy: "Privacy",
+    account: "Account",
+    backups: "Backups",
     // QUI-L09 — folded sections open the section that holds them now.
-    account: "General",
     "web-access": "Web access",
     advanced: "Advanced",
     runtime: "Advanced",

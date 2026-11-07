@@ -266,7 +266,7 @@ test("a backup carries the checkpoint files and uploads its rows point at", asyn
   const seen = watchFailures(page);
   await signInAsOwner(page, BASE);
   harness("seed-files");
-  await open(page, "#/settings?tab=account");
+  await open(page, "#/settings?tab=backups");
   await page.getByRole("button", { name: "Back up now" }).click();
   await expect(page.getByText(/Backed up and verified/)).toBeVisible({ timeout: 30_000 });
   await expect(page.getByText(/1 checkpoint file · 1 upload/)).toBeVisible();

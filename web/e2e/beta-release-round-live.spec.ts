@@ -18,6 +18,7 @@
  * RT-BETA-08  Build review: Discard leaves the project unchanged
  * RT-BETA-09  axe: no serious or critical violation on any destination at 1440, 1280, 390
  * RT-BETA-10  QUI-G01 size budgets hold for Chat, Build, Models and Settings
+ * RT-BETA-11  Account and Backups are Settings sections of their own
  */
 import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
@@ -205,10 +206,14 @@ test("RT-BETA-09 — axe finds no serious or critical violation on any destinati
 
 test("RT-BETA-10 — size budgets hold for Chat, Build, Models and Settings (QUI-G01)", async ({ page }) => {
   test.setTimeout(180_000);
-  const gated = ["new-chat", "build", "models", "settings?tab=general", "settings?tab=privacy", "settings?tab=updates"];
-  // Tracked exceptions (TO_BE_FIXED, "Settings › General is over its size
-  // budget"). An entry must still be over, so a fix forces its removal here.
-  const known = new Set(["1280 #/settings?tab=general", "1440 #/settings?tab=general"]);
+  const gated = [
+    "new-chat", "build", "models",
+    "settings?tab=general", "settings?tab=account", "settings?tab=backups",
+    "settings?tab=privacy", "settings?tab=updates",
+  ];
+  // No tracked exceptions: General came under budget once Account and Backups
+  // became sections of their own (2026-11-07).
+  const known = new Set<string>();
   const over: string[] = [];
   const measured: string[] = [];
   for (const viewport of BUDGET_VIEWPORTS) {
@@ -224,4 +229,27 @@ test("RT-BETA-10 — size budgets hold for Chat, Build, Models and Settings (QUI
   }
   await test.info().attach("size-budgets.txt", { body: measured.join("\n"), contentType: "text/plain" });
   expect(over, over.join("\n")).toEqual([]);
+});
+
+test("RT-BETA-11 — Account and Backups are Settings sections of their own", async ({ page }) => {
+  await open(page, "settings?tab=general");
+  const rail = page.getByRole("group", { name: "Security & data settings" });
+  await expect(rail.getByRole("button", { name: "Account" })).toBeVisible();
+  await expect(rail.getByRole("button", { name: "Backups" })).toBeVisible();
+  // General carries neither any more.
+  await expect(page.getByRole("button", { name: /delete my account/i })).toHaveCount(0);
+  await expect(page.getByTestId("backups-card")).toHaveCount(0);
+
+  await rail.getByRole("button", { name: "Account" }).click();
+  await expect(page.getByRole("heading", { level: 2, name: "Account" })).toBeVisible();
+  await expect(page.getByLabel("Display name")).toBeVisible();
+  await expect(page.getByTestId("backups-card")).toHaveCount(0);
+  await capture(page, join(SHOTS, "11-settings-account.png"));
+
+  // The old Backups address and the backup reminder both land on the section.
+  await open(page, "settings?tab=backups");
+  await expect(page.getByRole("heading", { level: 2, name: "Backups" })).toBeVisible();
+  await expect(page.getByTestId("backups-card")).toBeVisible();
+  await expect(page.getByRole("button", { name: /delete my account/i })).toHaveCount(0);
+  await capture(page, join(SHOTS, "11-settings-backups.png"));
 });

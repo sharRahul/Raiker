@@ -233,7 +233,7 @@ test("a backup, then a conversation deleted after it", async ({ page }) => {
   await sendTurn(page, "Reply with exactly: deleted after the backup");
   await expect(page.getByText(/deleted after the backup/i)).toHaveCount(2, { timeout: 120_000 });
   const session = (harness("environment") as { session: string }).session;
-  await page.goto(`${BASE}/#/settings?tab=account`);
+  await page.goto(`${BASE}/#/settings?tab=backups`);
   await settled(page);
   const card = page.getByTestId("backups-card");
   await card.getByRole("button", { name: "Back up now" }).click();

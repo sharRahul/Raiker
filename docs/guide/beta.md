@@ -43,11 +43,15 @@ These are open at the time of the beta and tracked in
 [TO_BE_FIXED](../plans/TO_BE_FIXED.md). The full list of deliberate limits is in
 [Known limits](../architecture/KNOWN_LIMITS.md).
 
-- **Builds may be unsigned.** Until release signing is configured, Windows
-  SmartScreen and macOS Gatekeeper will warn you. On macOS, open the app the
-  first time with **Control-click → Open**. On Windows, choose
-  **More info → Run anyway**. The release notes say whether a beta build is
-  signed.
+- **Signatures in the beta.** Windows downloads are signed with Raiker's own
+  beta certificate. Windows checks that the installer has not been changed,
+  but it does not know this publisher, so SmartScreen still warns *Unknown
+  publisher*: choose **More info → Run anyway**. Settings › About & updates
+  shows *Signed by Raiker (self-signed)*. Linux downloads come with a `.asc`
+  GPG signature; check it with `gpg --import raiker-linux-signing-key.asc`
+  and `gpg --verify <file>.asc <file>`. The macOS build is not signed yet:
+  open it the first time with **Control-click → Open**. The release notes say
+  which platforms are signed.
 - **Commands may be unavailable on your computer.**
   - On Windows, the restricted-account sandbox still has open gaps, so
     commands stay off unless every check passes.

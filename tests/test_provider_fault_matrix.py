@@ -294,3 +294,22 @@ def test_retry_after_reads_seconds(value: str | None, expected: float | None) ->
 
 def test_retry_after_reads_an_http_date() -> None:
     assert retry_after_seconds("Thu, 01 Jan 1970 00:01:40 GMT", now=40.0) == 60.0
+
+
+def test_a_prompt_longer_than_the_context_is_named_not_a_bare_400() -> None:
+    """MD-3, 2026-11-07 — llama-server refused a 9,459-token turn sized at 8,192."""
+    from raiker.models.exceptions import (
+        ProviderConfigurationError,
+        provider_error_code,
+        provider_failure_message,
+    )
+    from raiker.models.providers.http import provider_status_error
+
+    body = '{"error":{"code":400,"message":"request (9459 tokens) exceeds the available context size (8192 tokens), try increasing it","type":"exceed_context_size_error"}}'
+    error = provider_status_error(400, model="local-gguf", body=body)
+    assert isinstance(error, ProviderConfigurationError)
+    code = provider_error_code(error)
+    assert code.startswith("provider_context_exceeded")
+    assert "longer than the context the model was started with" in provider_failure_message(code)
+    # An ordinary 400 is still an ordinary 400.
+    assert provider_error_code(provider_status_error(400, model="m", body="bad request")).startswith("provider_http_error")

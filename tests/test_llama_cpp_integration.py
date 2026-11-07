@@ -119,7 +119,7 @@ def test_load_and_infer_with_planned_offload_and_context(stack: Stack) -> None:
     slot = stack.launch("qwen.gguf")
     answer = stack.chat(slot, "ping")
     # 32 layers + output fit the 8 GiB budget; auto context is 8K of the 128K trained.
-    assert answer == "echo:ping model=local-gguf ngl=33 ctx=8192"
+    assert answer == "echo:ping model=local-gguf ngl=33 ctx=32768"
     log = stack.runtime.log_path(slot)
     assert log is not None and "server is listening" in log.read_text()
 
@@ -155,7 +155,7 @@ def test_out_of_memory_start_recovers_with_fewer_gpu_layers(stack: Stack) -> Non
     # 33 → 24 → 18 fail (the stand-in refuses more than 16), 13 succeeds.
     assert health.plan.gpu_layers == 13
     assert health.last_error == "local_runtime_out_of_memory"
-    assert stack.chat(slot).endswith("ngl=13 ctx=8192")
+    assert stack.chat(slot).endswith("ngl=13 ctx=32768")
 
 
 def test_unsupported_model_is_explained_and_frees_the_slot(stack: Stack) -> None:

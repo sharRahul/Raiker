@@ -90,8 +90,19 @@ resources/host/Raiker>`.
    GitHub Releases download URL does not work. GitHub Pages or any static host
    does.
 
+   The public halves are pinned in `desktop/signing/identities.json` (Windows
+   thumbprint, Linux key and fingerprint, release public key). Every signed
+   installer, and the installed program, is checked against those pins by
+   `python -m raiker.app.platform_signatures`. When you rotate a secret,
+   update its pin in the same change, or the release refuses. The Windows
+   pin's `self_signed: true` lets Windows' *untrusted root* status pass and
+   records the build as self-signed; set it to `false` with a CA certificate.
+
 2. Run **Actions → Release → Run workflow** with the version (`X.Y.Z`), channel
-   (`stable` or `beta`), `signing: require`, and `publish: true`.
+   (`stable` or `beta`), `signing: require`, and `publish: true`. Without an
+   Apple Developer ID, use `signing: require-except-macos`: Windows and Linux
+   are signed, macOS is built unsigned, and the run may publish only a beta
+   draft whose notes say so.
 3. The workflow builds and tests every target with its identity, refuses a
    target whose identity is missing, builds and signs `desktop-<channel>.json`,
    the SBOM and the provenance, verifies all of it the way an installed Raiker

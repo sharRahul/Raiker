@@ -80,7 +80,7 @@ test("Back up now, verify it, and restore it to a separate folder", async ({ pag
   test.setTimeout(180_000);
   const seen = watchFailures(page);
   await signInAsOwner(page, BASE);
-  await page.goto(`${BASE}/#/settings?tab=account`);
+  await page.goto(`${BASE}/#/settings?tab=backups`);
   await settled(page);
   const card = page.getByTestId("backups-card");
   await expect(card).toContainText("No backups yet.");
@@ -106,7 +106,7 @@ test("Back up now, verify it, and restore it to a separate folder", async ({ pag
 test("a backup whose file changed is Damaged, offers no restore, and can be removed", async ({ page }) => {
   test.setTimeout(120_000);
   await signInAsOwner(page, BASE);
-  await page.goto(`${BASE}/#/settings?tab=account`);
+  await page.goto(`${BASE}/#/settings?tab=backups`);
   await settled(page);
   const card = page.getByTestId("backups-card");
   await card.getByRole("button", { name: "Back up now" }).click();
@@ -130,7 +130,7 @@ test("an upgrade takes its own verified snapshot first", async ({ page }) => {
   // the pending migration before either records it; each takes a snapshot.
   expect(upgraded.pre_migration_backups).toBeGreaterThanOrEqual(1);
   await signInAsOwner(page, BASE);
-  await page.goto(`${BASE}/#/settings?tab=account`);
+  await page.goto(`${BASE}/#/settings?tab=backups`);
   await settled(page);
   const card = page.getByTestId("backups-card");
   const row = card.locator("li").filter({ hasText: "Before an update" }).first();
@@ -270,7 +270,7 @@ test("Account's backups at 390 wide in the dark theme, without bleeding", async 
   await page.setViewportSize({ width: 390, height: 844 });
   await page.emulateMedia({ colorScheme: "dark" });
   await signInAsOwner(page, BASE);
-  await page.goto(`${BASE}/#/settings?tab=account`);
+  await page.goto(`${BASE}/#/settings?tab=backups`);
   await settled(page);
   await expect(page.getByTestId("backups-card")).toBeVisible();
   expect(await horizontalBleed(page)).toEqual([]);

@@ -39,7 +39,12 @@ from raiker.contracts.views import View
 GIB = 1024**3
 MIB = 1024**2
 
-AUTO_CONTEXT_TARGET = 8192
+#: 2026-11-07 (owner-machine GPU round, MD-3): 8,192 was the target, and a
+#: plain Chat turn — Raiker's system prompt, tools and one question — measured
+#: 9,459 tokens, so every turn to a model sized on *auto* was refused by
+#: llama-server with HTTP 400 on a 16 GB GPU that had room for four times that.
+#: The planner still halves this until the plan fits memory.
+AUTO_CONTEXT_TARGET = 32_768
 AUTO_CONTEXT_FLOOR = 2048
 MIN_CONTEXT = 512
 MAX_CONTEXT = 1_048_576

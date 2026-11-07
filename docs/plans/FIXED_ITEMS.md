@@ -1622,6 +1622,10 @@ file you can open. The two capture sets that remain — `screenshots/pages/` and
 | [FIXED-1315](#fixed-1315--the-betas-labels-and-limits-were-not-visible-where-the-owner-decides-beta-plan-1-2-3-6-8-9) | Medium | Web / beta scope | Fixed 2026-11-07 |
 | [FIXED-1316](#fixed-1316--a-cloud-ollama-model-was-called-local-in-models-and-in-the-turn-receipt-found-live) | Medium | Models / receipts | Fixed 2026-11-07 |
 | [FIXED-1317](#fixed-1317--settings-sections-were-off-the-card-system-and-the-activity-table-could-not-be-scrolled-by-keyboard-found-this-round-ux-5) | Low | Web / layout and accessibility | Fixed 2026-11-07 |
+| [FIXED-1318](#fixed-1318--settings--general-was-over-its-size-budget-because-it-held-the-account-and-backups-ux-1) | Low | Web / Settings | Fixed 2026-11-07 |
+| [FIXED-1319](#fixed-1319--every-turn-to-a-local-gguf-sized-on-auto-was-refused-with-a-bare-http-400-md-3-found-on-the-owners-gpu) | High | Models / llama.cpp | Fixed 2026-11-07 |
+| [FIXED-1320](#fixed-1320--both-authenticode-readers-handed-powershell-a-path-it-throws-away-in-3-found-this-round) | Medium | Release / signing | Fixed 2026-11-07 |
+| [FIXED-1321](#fixed-1321--windows-and-linux-builds-could-not-be-signed-without-an-apple-identity-and-nothing-checked-the-signer-in-3) | Medium | Release / signing | Fixed 2026-11-07 |
 
 ---
 
@@ -39410,3 +39414,106 @@ labelled region.
 **Evidence.** `BetaFeedback.test.ts`, `General.test.ts`, `ActivityView.test.ts`,
 and live RT-BETA-09: no serious or critical axe violation on any destination at
 1440, 1280 or 390.
+
+
+## FIXED-1318 — Settings › General was over its size budget because it held the account and backups (UX-1)
+
+**Severity: Low. Area: Web / Settings. Status: Fixed 2026-11-07.**
+
+**Observed.** RT-BETA-10 measured Settings › General at 1,403 px against its
+1,200 px QUI-G01 budget at 1280×800. The page held three subjects: General,
+Account and Backups. It was the spec's one tracked exception.
+
+**Fixed (owner's decision, 2026-11-07).** **Account** and **Backups** are
+Settings sections of their own, under *Security & data*. `?tab=account` opens
+Account rather than General, and the backup reminder, Home's *Make a backup*
+and Privacy's backup link open `?tab=backups`. The Backups card heading reads
+*This workspace*, so the section does not say *Backups* twice.
+
+**Evidence.** `SettingsView.test.ts`, `nav.test.ts`, `Topbar.test.ts`,
+`WorkbenchView.test.ts`, mocked `composer.spec.ts` (rail order and the view
+audit), and live RT-BETA-10 (budgets, now with no exception, for General,
+Account and Backups) and RT-BETA-11 (captures `11-settings-account.png` and
+`11-settings-backups.png`).
+
+## FIXED-1319 — Every turn to a local GGUF sized on auto was refused with a bare HTTP 400 (MD-3, found on the owner's GPU)
+
+**Severity: High. Area: Models / llama.cpp. Status: Fixed 2026-11-07.**
+
+**Observed.** On the owner's RTX 4080 SUPER (16 GB), a Qwen2.5 0.5B GGUF
+downloaded through Models was served entirely on the GPU, passed its readiness
+check, and failed the first Chat turn with *the provider refused the request
+(provider_http_error:http_400)*. llama-server's log said why: *request (9459
+tokens) exceeds the available context size (8192 tokens)*. The planner's auto
+target was 8,192 tokens, and Raiker's own system prompt and tools for one
+question are 9,459.
+
+**Fixed.** The auto context target is 32,768 tokens. The planner still halves
+it until the plan fits memory, and never exceeds what the model was trained on.
+A prompt that does not fit the context is classified from the response body
+(llama-server, OpenAI and vLLM wordings) as `provider_context_exceeded`, and
+the turn says *this conversation is longer than the context the model was
+started with*, with the place to raise it.
+
+**Evidence.** `test_llama_cpp_planner.py`, `test_llama_cpp_integration.py`,
+`test_provider_fault_matrix.py::test_a_prompt_longer_than_the_context_is_named_not_a_bare_400`,
+and live RT-GPU-02: the same turn completed in 0.47 s on the GPU (9,589 tokens,
+290 tokens/s generation), receipt *Local GGUF · no charge · nothing left this
+computer*.
+
+## FIXED-1320 — Both Authenticode readers handed PowerShell a path it throws away (IN-3, found this round)
+
+**Severity: Medium. Area: Release / signing. Status: Fixed 2026-11-07.**
+
+**Observed.** `raiker/execution/windows_authenticode.py` ran
+`powershell -Command <script> <path>` and read the path as `$args[0]`.
+`-Command` joins any further arguments into the script text, so `$args` is
+empty and `Get-AuthenticodeSignature` was called with a null path. Every
+signature read as unavailable. No pin had ever been configured, so the runner
+check had never reached this code with a real file.
+
+**Fixed.** The path travels in the `RAIKER_SIGNED_FILE` environment variable,
+in this reader and in the new release verifier.
+
+**Evidence.** `test_platform_signatures.py::test_both_authenticode_readers_pass_the_path_in_the_environment`,
+and real files on this machine: a file signed with the beta certificate is read
+with its thumbprint, a changed byte reads `HashMismatch`, and a Microsoft-signed
+file is refused as *not the pinned publisher*.
+
+## FIXED-1321 — Windows and Linux builds could not be signed without an Apple identity, and nothing checked the signer (IN-3)
+
+**Severity: Medium. Area: Release / signing. Status: Fixed 2026-11-07.**
+
+**Observed.** `signing: require` was all platforms or none, so with no Apple
+Developer ID no build could be signed. A signed build was also trusted on
+`signing.applied` alone: nothing checked the signature was made with Raiker's
+key rather than any certificate in the environment.
+
+**Fixed (owner's decisions, 2026-11-07).**
+* `signing: require-except-macos` signs Windows and Linux, builds macOS
+  unsigned, may publish only as a beta draft, and its release notes say which
+  platform is unsigned. Signing is decided per OS in `desktop-package.yml`
+  (`unsigned_os`).
+* Windows uses a self-signed beta certificate made with OpenSSL
+  (`CN=Raiker (self-signed beta)`), until a CA certificate exists. Windows
+  checks the file has not changed but names no trusted publisher. The build
+  records `signing.publisher = self_signed`, and Settings › About & updates
+  says *Signed by Raiker (self-signed — Windows shows Unknown publisher)*
+  rather than *Verified by Raiker*.
+* Linux packages carry detached GPG signatures with a key made for Raiker;
+  the AppImage `.asc` files, the public key and the release public key are
+  attached to the release.
+* The public halves are pinned in `desktop/signing/identities.json`.
+  `python -m raiker.app.platform_signatures` checks every signed installer and
+  the installed program against those pins (thumbprint for Windows,
+  fingerprint for Linux), and checks the release key derives the pinned public
+  key. A rotated secret without an updated pin fails the release.
+* The keys were generated on the owner's machine and stored as repository
+  secrets. The private halves were backed up outside the repository for the
+  owner to move offline.
+
+**Evidence.** `test_platform_signatures.py`, `test_release_workflow.py`
+(per-OS signing, the verification steps, beta-only publishing),
+`test_desktop_release.py::test_a_self_signed_build_says_so_and_an_unsigned_one_cannot`,
+`Updates.test.ts`, and the Linux verifier run under WSL Ubuntu with real `gpg`:
+a signed AppImage passes, and a changed byte reads `BADSIG`.

@@ -291,3 +291,19 @@ def test_selecting_release_assets_copies_five_files_and_refuses_a_missing_one(tm
     (source / "Raiker-1.2.3-macos-arm64.dmg").unlink()
     with pytest.raises(SystemExit, match="macos-arm64.dmg"):
         module.select("1.2.3", source, tmp_path / "again")
+
+
+def test_the_installer_build_accepts_the_self_signed_flag(monkeypatch: pytest.MonkeyPatch) -> None:
+    """IN-3 — the release passes --self-signed to the installer build, not the freeze."""
+    from raiker.app import desktop_build
+
+    seen: dict[str, object] = {}
+
+    def stop(**kwargs: object) -> dict[str, object]:
+        seen.update(kwargs)
+        raise SystemExit(0)
+
+    monkeypatch.setattr("raiker.app.desktop_release.desktop_record", stop)
+    with pytest.raises(SystemExit):
+        desktop_build.build_app(["--target", "windows-x86_64", "--signed", "--self-signed", "--skip-freeze", "--skip-smoke"])
+    assert seen["self_signed"] is True

@@ -109,10 +109,6 @@ def freeze_host(*, source_root: Path, web_assets: Path, out_dir: Path) -> int:
 def main(argv: list[str] | None = None) -> int:
     """Freeze only the host (``scripts/build_desktop.py``)."""
     parser = argparse.ArgumentParser(description="Build Raiker's host as a self-contained directory.")
-    parser.add_argument(
-        "--self-signed", action="store_true",
-        help="The platform certificate is Raiker's own, not one the OS trusts (IN-3). Recorded for Settings.",
-    )
     parser.add_argument("--source-root", default=".")
     parser.add_argument("--web-assets", default="web/dist")
     parser.add_argument("--out", default="desktop-dist")
@@ -196,6 +192,10 @@ def build_app(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--channel-url", default="",
         help="HTTPS URL of the signed desktop-<channel>.json this build checks by default.",
+    )
+    parser.add_argument(
+        "--self-signed", action="store_true",
+        help="The platform certificate is Raiker's own, not one the OS trusts (IN-3). Recorded for Settings.",
     )
     parser.add_argument("--skip-freeze", action="store_true", help="Reuse desktop-dist/Raiker.")
     parser.add_argument("--skip-smoke", action="store_true", help="Do not start the frozen host.")

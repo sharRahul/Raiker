@@ -183,31 +183,10 @@ export function createRecognitionAdapter(Recognition: RecognitionConstructor | u
   };
 }
 
-function browserRecognitionConstructor(): RecognitionConstructor | undefined {
-  if (typeof window === "undefined") return undefined;
-  const speechWindow = window as typeof window & {
-    SpeechRecognition?: RecognitionConstructor;
-    webkitSpeechRecognition?: RecognitionConstructor;
-  };
-  return speechWindow.SpeechRecognition ?? speechWindow.webkitSpeechRecognition;
-}
-
-let activeBrowserRecognition: VoiceRecognitionAdapter | null = null;
-
-export const browserRecognitionAdapter: VoiceRecognitionAdapter = {
-  supported: () => browserRecognitionConstructor() !== undefined,
-  start(language, handlers) {
-    activeBrowserRecognition?.abort();
-    activeBrowserRecognition = createRecognitionAdapter(browserRecognitionConstructor());
-    activeBrowserRecognition.start(language, handlers);
-  },
-  stop() {
-    activeBrowserRecognition?.stop();
-  },
-  abort() {
-    activeBrowserRecognition?.abort();
-  },
-};
+// Beta plan VD-2 — there is no browser speech-recognition adapter. The
+// browser's `SpeechRecognition` sends audio off the device on Chrome, so the
+// page never reads that global; dictation records and transcribes on this
+// computer (below). `voice.test.ts` fails if a source file reaches for it.
 
 // ── Read aloud, on this device (BUG-269) ─────────────────────────────────────
 //

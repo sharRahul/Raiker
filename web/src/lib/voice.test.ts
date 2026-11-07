@@ -391,3 +391,26 @@ describe("the WAV a local runtime can read", () => {
     expect(resample(new Float32Array([1, 2]), 16_000, 16_000).length).toBe(2);
   });
 });
+
+describe("no browser speech recognition (beta plan VD-2)", () => {
+  it("no source file reads SpeechRecognition or webkitSpeechRecognition", async () => {
+    const { readdirSync, readFileSync, statSync } = await import("node:fs");
+    const { join, resolve } = await import("node:path");
+    const walk = (dir: string, out: string[] = []): string[] => {
+      for (const name of readdirSync(dir)) {
+        const path = join(dir, name);
+        if (statSync(path).isDirectory()) walk(path, out);
+        else if (/\.(svelte|ts)$/.test(name) && !name.includes(".test.")) out.push(path);
+      }
+      return out;
+    };
+    const offenders = walk(resolve(process.cwd(), "src")).filter((file) => {
+      const code = readFileSync(file, "utf8")
+        .replace(/\/\*[\s\S]*?\*\//g, "")
+        .replace(/(^|[^:])\/\/.*$/gm, "$1")
+        .replace(/<!--[\s\S]*?-->/g, "");
+      return /\b(webkit)?SpeechRecognition\b/.test(code);
+    });
+    expect(offenders).toEqual([]);
+  });
+});

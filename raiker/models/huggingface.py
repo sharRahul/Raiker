@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import re
 from dataclasses import dataclass
 from pathlib import Path
@@ -287,7 +288,65 @@ class HuggingFaceService:
             local_dir=destination,
             dry_run=False,
         )
+        self._verify_written(repo_id, variant, destination, token=token)
         return destination
+
+    def _verify_written(
+        self, repo_id: str, variant: HfVariant, destination: Path, *, token: str | None
+    ) -> None:
+        """MD-3 — every file written matches the digest the hub publishes for it.
+
+        A pinned revision says *which* files were asked for; it does not prove
+        that the bytes on disk are those files. Each one is hashed as written and
+        compared with the hub's LFS SHA-256 (or, for a small file kept in Git
+        rather than LFS, its Git blob id). A mismatch, or a file the hub gives no
+        digest for, removes the file and fails the download, so the library
+        never lists a model it cannot vouch for.
+        """
+        info = self.hub.model_info(repo_id, revision=variant.revision, token=token)
+        if str(getattr(info, "sha", "")).lower() != variant.revision:
+            raise ValueError("hugging_face_revision_changed")
+        published = {
+            str(item.rfilename): item for item in (getattr(info, "siblings", None) or [])
+        }
+        for name in variant.files:
+            written = (destination / name).resolve()
+            if destination not in written.parents or not written.is_file():
+                raise ValueError("hugging_face_download_incomplete")
+            item = published.get(name)
+            lfs = getattr(item, "lfs", None) if item is not None else None
+            lfs_sha = getattr(lfs, "sha256", None) if lfs is not None else None
+            if isinstance(lfs, dict):
+                lfs_sha = lfs.get("sha256")
+            blob_id = getattr(item, "blob_id", None) if item is not None else None
+            if lfs_sha:
+                ok = _sha256(written) == str(lfs_sha).lower()
+            elif blob_id:
+                ok = _git_blob_id(written) == str(blob_id).lower()
+            else:
+                written.unlink(missing_ok=True)
+                raise ValueError("hugging_face_download_unverifiable")
+            if not ok:
+                written.unlink(missing_ok=True)
+                raise ValueError("hugging_face_download_hash_mismatch")
+
+
+def _sha256(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def _git_blob_id(path: Path) -> str:
+    """Git's object id for a file: SHA-1 over ``blob <size>``, a NUL byte and the bytes."""
+    digest = hashlib.sha1(usedforsecurity=False)
+    digest.update(f"blob {path.stat().st_size}\0".encode())
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
 
 
 def _validate_repo_id(repo_id: str) -> str:

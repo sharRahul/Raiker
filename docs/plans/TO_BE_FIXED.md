@@ -1503,3 +1503,57 @@ Permissions →* right after loading, before any turn. Not investigated this rou
 Check whether the permissions read races the first render or genuinely fails on
 this workspace, and whether the line should wait for a completed read.
 
+## Settings › General is over its size budget
+
+Measured 2026-11-07 by RT-BETA-10, which now gates the QUI-G01 budget for Chat,
+Build, Models, Settings › General, Privacy and About & updates. General holds
+three subjects (General, Account and Backups): 1,403 px at 1280×800 against a
+1,200 px budget, and about the budget at 1440×900. It is the spec's one tracked
+exception. Trimming copy will not close it. Decide whether Account and Backups
+move to their own sections, or whether Settings' first page gets a larger
+budget. Then remove the exception from `beta-release-round-live.spec.ts`.
+
+## Build's sandbox review does not reread when the same session is reopened
+
+Seen 2026-11-07. The review rereads the copies when the session changes or a
+turn ends. Returning to Build on the session already open (a changed address
+with the same `session=`) shows the list from before, so a copy made meanwhile
+(for example by a background run) appears only after the next turn. Reread on
+route entry and when the window regains focus.
+
+## Provider fault handling: remaining beta evidence (MD-5)
+
+The adapter fault matrix landed this round
+([FIXED-1312](FIXED_ITEMS.md#fixed-1312--a-stream-that-closed-early-was-recorded-as-a-finished-answer-md-5-found-this-round)).
+Still open for MD-5:
+* `retry_after_seconds` is carried on the error but not yet shown. Models should
+  read *Rate-limited until 14:32*, and the readiness ledger should wait that
+  long before re-checking.
+* The plan's turn-level receipt, *Answered by Llama 3.2 3B (local) because Claude
+  was rate-limited*, needs the orchestrator's fallback to record why the
+  first candidate was skipped, and the receipt to name it.
+
+## Voice: fake-microphone browser evidence (VD-2)
+
+The guard that no source reads `SpeechRecognition`, and the permission-denied
+copy, landed this round
+([FIXED-1314](FIXED_ITEMS.md#fixed-1314--the-page-still-carried-a-browser-speech-recognition-adapter-vd-2)).
+Still required: a Playwright run with Chromium's fake microphone for permission
+denied, revoked mid-recording, and cancel. The 6-minute limit is enforced only
+by the host. Decide whether the page should stop the recording itself at six
+minutes and say so.
+
+## MCP servers have no catalogue to label (PL-5)
+
+PL-5 asks for *Supported* and *Experimental* labels on MCP catalogue entries.
+Raiker has no MCP catalogue: every server is added by the owner. Decide whether
+owner-added servers carry an *Experimental* label, or whether the plan's row
+closes at the connector catalogue.
+
+## mypy on Windows: `os.getuid` in model conversion
+
+`python -m mypy raiker apps tests --platform win32` reports
+`raiker/models/conversion.py:174: Module has no attribute "getuid"`. CI checks
+Linux, so the gate is green. Guard the call with `sys.platform != "win32"` so
+both platforms check clean.
+

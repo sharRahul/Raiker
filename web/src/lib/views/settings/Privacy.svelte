@@ -24,6 +24,7 @@
   import type { CapabilityGate } from "../../apiTypes";
   import { capabilityLabel, isAvailable } from "../../capabilityModel";
   import { rowSummary } from "../../permissionLanguage";
+  import { configuredDestinations, type Destination } from "../../privacyDestinations";
 
   let { settings, save }: {
     settings: Record<string, unknown>;
@@ -34,6 +35,19 @@
 
   let gates = $state<CapabilityGate[] | null>(null);
   let gatesError = $state(false);
+
+  // Beta plan §6 — the concrete places this installation is set up to send
+  // to now, beside what each capability would carry. Unread is said as unread.
+  let destinations = $state<Destination[] | null>(null);
+  let destinationsError = $state(false);
+  onMount(async () => {
+    try {
+      const [models, update] = await Promise.all([api.models(), api.hostUpdate().catch(() => null)]);
+      destinations = configuredDestinations(models.profiles, update?.channel?.url ?? null);
+    } catch {
+      destinationsError = true;
+    }
+  });
 
   onMount(async () => {
     try {
@@ -220,9 +234,26 @@
 
 <section class="settings-card" aria-labelledby="outbound-inventory">
   <div class="card-heading">
-    <h3 id="outbound-inventory">What can leave this machine</h3>
-    <p>What each capability would carry, read from your <a href="#/capabilities">Permissions</a>.</p>
+    <h3 id="outbound-inventory">What leaves this computer</h3>
+    <p>Where this installation sends right now, then what each capability would carry, read from your <a href="#/capabilities">Permissions</a>.</p>
   </div>
+  <!-- Beta plan §6 — the concrete destinations first: the places this
+       installation is set up to send to now. Unread is said as unread. -->
+  {#if destinationsError}
+    <p class="notice" role="status">The connected models were not readable, so where requests go is unknown, not nothing.</p>
+  {:else if destinations !== null && destinations.length === 0}
+    <p class="description">Nothing is set up to leave this computer. Every connected model runs on it.</p>
+  {:else if destinations !== null}
+    <ul class="rows destinations-now" data-testid="privacy-destinations" aria-label="Set up to send to now">
+      {#each destinations as row (row.key)}
+        <li>
+          <span class="row-label">{row.destination}</span>
+          <span class="row-value">{row.carries}</span>
+          <a class="row-action" href={row.where}>{row.whereLabel}</a>
+        </li>
+      {/each}
+    </ul>
+  {/if}
   {#if gatesError}
     <p class="notice" role="status">
       Your permissions could not be read, so this page cannot say which of these are available

@@ -27,7 +27,8 @@ runner is the boundary that keeps the task inside it.
 Promotion compares each original file against the content hash taken at
 snapshot time. If the owner changed a file the task also changed, or created a
 path the task also created, promotion refuses (``workspace_promotion_conflict``)
-and nothing is written. Each replaced or removed original is backed up first; a
+and nothing is written, unless the owner saw both versions and chose to
+overwrite that path (:func:`promotion_conflicts` lists them). Each replaced or removed original is backed up first; a
 failure part-way restores every backup and removes every file the promotion
 created. File rollback cannot undo side effects outside the project.
 """
@@ -333,16 +334,47 @@ def _promotion_lock(workspace: TaskWorkspace) -> Iterator[None]:
             lock.unlink()
 
 
+def _conflicts(
+    workspace: TaskWorkspace, diff: WorkspaceDiff, targets: dict[str, Path]
+) -> tuple[str, ...]:
+    found: list[str] = []
+    for relative in diff.created:
+        if targets[relative].exists() or _path_is_link_like(targets[relative]):
+            found.append(relative)
+    for relative in (*diff.modified, *diff.deleted):
+        target = targets[relative]
+        if not target.is_file() or _hash_file(target) != workspace.manifest[relative].sha256:
+            found.append(relative)
+    return tuple(sorted(found))
+
+
+def promotion_conflicts(workspace: TaskWorkspace, diff: WorkspaceDiff) -> tuple[str, ...]:
+    """Paths the owner changed in the project since the copy was taken (BD-4).
+
+    A created path that now exists in the project, or a modified or deleted one
+    whose original no longer matches the snapshot. Promotion refuses each of
+    these unless the owner chooses to overwrite it.
+    """
+    paths = [*diff.created, *diff.modified, *diff.deleted]
+    targets = {relative: _target(workspace.source, relative) for relative in paths}
+    return _conflicts(workspace, diff, targets)
+
+
 def promote(
     workspace: TaskWorkspace,
     diff: WorkspaceDiff,
     *,
     allowed: Callable[[str], bool] | None = None,
+    overwrite: frozenset[str] = frozenset(),
 ) -> PromotionResult:
     """Apply a reviewed diff to the original project, all or nothing.
 
     ``allowed`` is the effective authority's path check; a change it refuses
-    stops the whole promotion before anything is written.
+    stops the whole promotion before anything is written. ``overwrite`` names
+    the conflicting paths (see :func:`promotion_conflicts`) the owner chose to
+    replace after seeing both versions; any other conflict refuses the whole
+    promotion, as before. An overwritten original is backed up like any other,
+    so a failure part-way restores the owner's version too.
     """
     paths = [*diff.created, *diff.modified, *diff.deleted]
     for relative in paths:
@@ -350,23 +382,27 @@ def promote(
             raise WorkspaceError("workspace_promotion_not_permitted", relative)
     with _promotion_lock(workspace):
         targets = {relative: _target(workspace.source, relative) for relative in paths}
-        for relative in diff.created:
-            if targets[relative].exists() or _path_is_link_like(targets[relative]):
+        conflicts = _conflicts(workspace, diff, targets)
+        for relative in conflicts:
+            if relative not in overwrite:
                 raise WorkspaceError("workspace_promotion_conflict", relative)
-        for relative in (*diff.modified, *diff.deleted):
-            original = workspace.manifest[relative]
-            target = targets[relative]
-            if not target.is_file() or _hash_file(target) != original.sha256:
+            if _path_is_link_like(targets[relative]) or (
+                targets[relative].exists() and not targets[relative].is_file()
+            ):
+                # Overwrite replaces a file the owner changed, never a folder or link.
                 raise WorkspaceError("workspace_promotion_conflict", relative)
         backups = Path(tempfile.mkdtemp(prefix=".promote-backup-", dir=workspace.root.parent))
         saved: dict[str, Path] = {}
         written: list[Path] = []
         made_directories: list[Path] = []
         try:
-            for index, relative in enumerate((*diff.modified, *diff.deleted)):
-                backup = backups / str(index)
-                shutil.copyfile(targets[relative], backup)
-                saved[relative] = backup
+            for index, relative in enumerate(paths):
+                # Every original that is about to be replaced or removed, the
+                # owner's overwritten edits included, is backed up first.
+                if targets[relative].is_file():
+                    backup = backups / str(index)
+                    shutil.copyfile(targets[relative], backup)
+                    saved[relative] = backup
             for relative in (*diff.created, *diff.modified):
                 target = targets[relative]
                 for parent in reversed(target.parents):
@@ -375,11 +411,12 @@ def promote(
                         made_directories.append(parent)
                 staged = target.with_name(f".{target.name}.raiker-promote")
                 _copy_file(workspace.root.joinpath(*PurePosixPath(relative).parts), staged)
-                if relative in diff.created:
+                if relative not in saved:
                     written.append(target)
                 os.replace(staged, target)
             for relative in diff.deleted:
-                targets[relative].unlink()
+                with contextlib.suppress(FileNotFoundError):
+                    targets[relative].unlink()
         except BaseException:
             for relative, backup in saved.items():
                 # Copied back, not renamed: the backup may be on another volume.

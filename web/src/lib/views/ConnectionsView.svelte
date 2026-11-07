@@ -23,6 +23,7 @@
   import GuideLink from "../components/GuideLink.svelte";
   import GitHubConnection from "./settings/GitHubConnection.svelte";
   import { api } from "../api";
+  import { askConfirm } from "../confirm.svelte";
   import { connectionFailure } from "../connectionRecovery";
   import { networkClassLabel } from "../mcpEndpoint";
   import { humanize, relativeTime } from "../format";
@@ -111,6 +112,8 @@
         name: connector.display_name,
         category: connector.category,
         description: connector.description,
+        // PL-5 — the label is visible in the list, before anything is chosen.
+        note: connector.support_level === "supported" ? "Supported" : "Experimental",
       })),
   ]);
 
@@ -184,6 +187,18 @@
   }
 
   async function install(connector: StoreConnector) {
+    // PL-5 — an experimental connection asks once more, saying what has not
+    // been verified, before anything is stored.
+    if (
+      connector.support_level !== "supported" &&
+      !(await askConfirm({
+        title: `Add ${connector.display_name}? It is experimental.`,
+        body: `Raiker has not verified this connection end to end for the beta: signing in, its operations against ${connector.host}, and revoking it. It may fail or behave differently from what its description says.`,
+        confirmLabel: "Add experimental connection",
+      }))
+    ) {
+      return;
+    }
     await act(() => api.installConnector(connector.connector_id),
       `Could not add ${connector.display_name}`, "The saved connection is unconfirmed.",
       "Refresh connections and check whether it was added before adding it again.");

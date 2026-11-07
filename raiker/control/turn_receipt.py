@@ -125,6 +125,9 @@ def build_turn_receipt(
             })
 
     local = provider in local_providers if provider else False
+    # BUG-340 — a local runtime's cloud model runs off the device.
+    if local and model and model.strip().lower().endswith(("-cloud", ":cloud")):
+        local = False
     return {
         "turn_id": turn_id,
         "model": model,

@@ -51,6 +51,7 @@ from raiker.execution.workspaces import (
     WorkspaceError,
     diff_workspace,
     promote,
+    promotion_conflicts,
 )
 from raiker.runtime.authority.models import Principal
 
@@ -430,7 +431,17 @@ def _workspace_view(
         "modified": list(diff.modified),
         "deleted": list(diff.deleted),
         "rejected": [{"path": path, "reason": reason} for path, reason in diff.rejected],
+        "conflicts": _safe_conflicts(workspace, diff),
     }
+
+
+def _safe_conflicts(workspace: TaskWorkspace, diff: Any) -> list[str]:
+    """The listing must not fail because one project path became a link: that
+    path is refused at Apply anyway, so it is reported as a conflict here."""
+    try:
+        return list(promotion_conflicts(workspace, diff))
+    except WorkspaceError as exc:
+        return [exc.detail] if exc.detail else []
 
 
 def _refuse_while_running(request: Request, owner: str, session_id: str) -> None:
@@ -533,8 +544,12 @@ def promote_task_workspace(
     reviewed = (sorted(body.created), sorted(body.modified), sorted(body.deleted))
     if reviewed != (list(diff.created), list(diff.modified), list(diff.deleted)):
         raise refusal(status.HTTP_409_CONFLICT, "workspace_review_stale")
+    overwrite = frozenset(body.overwrite)
     try:
-        result = promote(workspace, diff)
+        if not overwrite <= set(promotion_conflicts(workspace, diff)):
+            # An overwrite the owner did not see as a conflict is not consent.
+            raise WorkspaceError("workspace_review_stale")
+        result = promote(workspace, diff, overwrite=overwrite)
     except WorkspaceError as exc:
         raise refusal(status.HTTP_409_CONFLICT, exc.reason_code) from exc
     registry.release(owner, workspace_id)
@@ -546,6 +561,7 @@ def promote_task_workspace(
             "modified": list(result.modified),
             "deleted": list(result.deleted),
             "rejected_count": len(diff.rejected),
+            "overwritten": sorted(overwrite),
         },
     )
     promoted: TaskWorkspacePromoted = {

@@ -38,6 +38,21 @@ describe("posture control", () => {
     });
   });
 
+  it("says commands are unavailable, in amber, even where it shows only exceptions (beta plan §1)", async () => {
+    stubFetch({
+      "GET /api/settings/composer-approval-mode": { approval_mode: "manual" },
+      "GET /api/execution-environments": {
+        environments: [{ ...ENVIRONMENTS.environments[0], available: false }],
+      },
+    });
+    render(PostureControl, { props: { exceptionOnly: true } });
+    const chip = await screen.findByRole("button", { name: /Commands unavailable here · Asks first/i });
+    expect(chip.classList.contains("relaxed")).toBe(true);
+    expect(chip.getAttribute("title")).toMatch(/sandbox could not be confirmed/);
+    await fireEvent.click(chip);
+    expect(screen.getByRole("link", { name: "Set up" }).getAttribute("href")).toBe("#/settings?tab=advanced&kind=runtime");
+  });
+
   it("gives back the approval control and the environment on one click", async () => {
     stubFetch({
       "GET /api/settings/composer-approval-mode": { approval_mode: "manual" },

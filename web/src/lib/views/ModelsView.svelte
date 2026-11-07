@@ -27,10 +27,11 @@
     unreachableProviderNote,
     type ProviderErrorGuidance,
   } from "../providerErrors";
-  import { inferenceLocation } from "../inferenceLocation";
+  import { inferenceLabel, inferenceLocation } from "../inferenceLocation";
   import { modelName } from "../modelPresentation";
   import { readinessLabel, UNPINNED_MODEL } from "../modelReadinessLabels";
   import { modelBetaStatus, withBetaStatus } from "../betaStatus";
+  import { EXPERIMENTAL_PROVIDER_NOTE, isBetaSupportedProvider } from "../providerSupport";
   import { isChoosableModel } from "../modelReadiness.svelte";
   import { installerRuntimeFor, openRuntimeInstaller } from "../runtimeInstall";
   import { detectionNotice, onReturnToApp } from "../returnAndDetect";
@@ -1020,6 +1021,21 @@
     return profile.local_only && inferenceLocation(profile, profile.model).kind === "remote";
   }
 
+  /**
+   * Found 2026-11-07 (beta round) — the Review step said a cloud Ollama model
+   * *Stays on this computer* with *No API cost*, beside a card that said
+   * *Cloud inference*. Where the model runs and who may bill it now come from
+   * the same BUG-340 rule as every other surface.
+   */
+  function whereLine(profile: ModelProfile): string {
+    if (profile.off_machine) return `Sent to ${providerName(profile.provider)}`;
+    return inferenceLabel(inferenceLocation(profile, profile.model));
+  }
+  function costLine(profile: ModelProfile): string {
+    if (profile.off_machine) return `Billed by ${providerName(profile.provider)}`;
+    return usesCloudInference(profile) ? "Provider pricing may apply" : "No API cost";
+  }
+
   function usageLine(profile: ModelProfile): string {
     if (usesCloudInference(profile)) return "Provider pricing may apply";
     if (!profile.billable) return "No API cost — runs on this machine";
@@ -1203,7 +1219,7 @@
             <span>Model in use</span>
             <span>{providerName(inForce.provider)}</span>
             <span>{isChoosableModel(inForce) ? (readinessLabel(inForce.readiness_state) ?? "Set up") : "Not ready"}</span>
-            <span>{inForce.off_machine ? `Sent to ${providerName(inForce.provider)}` : "Stays on this computer"}</span>
+            <span>{whereLine(inForce)}</span>
           </p>
           <p class="profile-tradeoff">
             {inForce.off_machine
@@ -1450,6 +1466,7 @@
                        every configured provider stays usable. -->
                         <div class="row-title">
                           <h3>{profileLabel(p)}</h3>
+                          {#if !isBetaSupportedProvider(p.provider)}<span class="experimental-tag" title={EXPERIMENTAL_PROVIDER_NOTE}>Experimental</span>{/if}
                         </div>
                         <!-- The model line states a fact when there is one and
                              says nothing when there is not; "Select models…"
@@ -1619,6 +1636,7 @@
                         >
                         <div class="pc-title">
                           <h3>{profileLabel(p)}</h3>
+                          {#if !isBetaSupportedProvider(p.provider)}<span class="experimental-tag" title={EXPERIMENTAL_PROVIDER_NOTE}>Experimental</span>{/if}
                         </div>
                       </div>
                       <!-- Same rule as the local rows: name the model when one
@@ -1947,8 +1965,8 @@
             {#each reviewProfiles as profile (`${profile.profile_id}\u0000${profile.model}`)}
               <li>
                 <span class="review-name">{profile.model && profile.model !== UNPINNED_MODEL ? modelName(profile.model) : providerName(profile.provider)}</span>
-                <span>{profile.off_machine ? `Sent to ${providerName(profile.provider)}` : "Stays on this computer"}</span>
-                <span>{profile.off_machine ? `Billed by ${providerName(profile.provider)}` : "No API cost"}</span>
+                <span>{whereLine(profile)}</span>
+                <span>{costLine(profile)}</span>
                 <span>{isChoosableModel(profile) ? (readinessLabel(profile.readiness_state) ?? "Set up") : "Not ready yet"}</span>
                 {#if profile.selected}
                   <span class="review-default">Default</span>
@@ -2506,6 +2524,9 @@
     flex: 1;
     min-width: 0;
   }
+  /* MD-1 — a provider outside the beta's live-checked six. Amber outline,
+     words not colour alone. */
+  .experimental-tag { display:inline-flex; align-items:center; padding:.05rem .45rem; border:1px solid var(--warn); border-radius:var(--r-pill); color:var(--warn); font-size:var(--text-xs); font-weight:600; white-space:nowrap; }
   .row-title {
     display: flex;
     align-items: center;

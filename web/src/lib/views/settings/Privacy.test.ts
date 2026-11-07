@@ -15,6 +15,20 @@ import { makeGate, stubFetch } from "../../test-helpers";
 const NAME = /Keep the model's working with the turn/;
 
 describe("Settings → Privacy", () => {
+  it("lists where this installation sends right now (beta plan §6)", async () => {
+    stubFetch({
+      "GET /api/capability-gates": [],
+      "GET /api/models": {
+        profiles: [{ profile_id: "a", provider: "anthropic", local_only: false, configured: true, connection_configured: true, model_locations: {} }],
+      },
+      "GET /api/host/update": { channel: { url: "https://releases.example/beta.json" } },
+    });
+    render(Privacy, { settings: {}, save: vi.fn() });
+    const list = await screen.findByTestId("privacy-destinations");
+    expect(within(list).getByText("releases.example")).toBeInTheDocument();
+    expect(within(list).getAllByText(/Model prompts/)).toHaveLength(1);
+  });
+
   it("is off until the owner turns it on", () => {
     render(Privacy, { settings: {}, save: vi.fn() });
     expect(screen.getByRole("switch", { name: NAME })).not.toBeChecked();
@@ -81,7 +95,7 @@ describe("Settings → Privacy — the data inventory", () => {
     stubFetch({ "GET /api/capability-gates": GATES });
     render(Privacy, { settings: {}, save: vi.fn() });
 
-    const out = await screen.findByRole("region", { name: "What can leave this machine" });
+    const out = await screen.findByRole("region", { name: "What leaves this computer" });
     expect(within(out).getAllByRole("listitem").length).toBeGreaterThan(3);
     expect(within(out).getByText(/as much of the conversation as the turn needs/)).toBeInTheDocument();
     // The availability sentence is the one Permissions prints, not a second one.
@@ -95,7 +109,7 @@ describe("Settings → Privacy — the data inventory", () => {
     stubFetch({ "GET /api/capability-gates": { __status: 503 } });
     render(Privacy, { settings: {}, save: vi.fn() });
 
-    const out = await screen.findByRole("region", { name: "What can leave this machine" });
+    const out = await screen.findByRole("region", { name: "What leaves this computer" });
     await waitFor(() =>
       expect(within(out).getByText(/could not be read/)).toBeInTheDocument(),
     );

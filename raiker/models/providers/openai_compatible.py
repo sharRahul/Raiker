@@ -585,6 +585,11 @@ class AsyncOpenAICompatibleProvider:
                         )
                         yield ModelStreamEvent(event_type="finish", finish_reason=finish)
                         finish_emitted = True
+                # MD-5 — no `[DONE]` and no finish reason: the connection closed
+                # in order before the answer ended. Reported as a lost answer, so
+                # a turn never records partial text as a completed reply.
+                if not finish_emitted:
+                    raise ProviderStreamError("stream_ended_without_finish")
         except asyncio.CancelledError:
             raise
         except ProviderStreamError:

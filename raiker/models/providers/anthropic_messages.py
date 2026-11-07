@@ -617,6 +617,10 @@ class AsyncAnthropicMessagesProvider:
                                 )
                             yield ModelStreamEvent(event_type="finish", finish_reason="stop")
                         return
+                # MD-5 — the body ended in order, but the provider never said the
+                # answer was done. That is a lost answer, not a finished one.
+                if not finish_emitted:
+                    raise ProviderStreamError("stream_ended_without_finish")
         except asyncio.CancelledError:
             raise
         except ProviderStreamError:

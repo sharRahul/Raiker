@@ -252,7 +252,10 @@
     <EmptyState icon="activity" title="No events match" body="Nothing in the governed record matches these filters." />
   </div>
 {:else}
-  <div class="card list-card">
+  <!-- UX-5 — a table wider than the screen scrolls sideways; the region takes
+       focus so a keyboard can scroll it too (axe scrollable-region-focusable). -->
+  <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
+  <div class="card list-card" tabindex="0" role="region" aria-label="Events">
     <table class="table">
       <thead>
         <tr>

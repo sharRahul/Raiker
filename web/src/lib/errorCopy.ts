@@ -7,6 +7,7 @@
  * than standing in for it ("Stop failed (500).").
  */
 import { ApiError } from "./api";
+import { knownReasonCopy } from "./reasonCodes";
 
 /** What an owner reads when Raiker itself did not answer. */
 export const NOT_ANSWERING = "Raiker did not answer. Check that it is still running, then try again.";
@@ -20,5 +21,8 @@ export const NOT_ANSWERING = "Raiker did not answer. Check that it is still runn
 export function failure(what: string, affected: string, next: string, error?: unknown): string {
   if (error !== undefined && !(error instanceof ApiError)) return `${what}. ${affected} ${NOT_ANSWERING}`;
   const code = error instanceof ApiError ? ` (HTTP ${error.status}${error.reasonCode ? `, ${error.reasonCode}` : ""})` : "";
-  return `${what}${code}. ${affected} ${next}`;
+  // UX-4 — a refusal Raiker has words for says why, between what failed and
+  // what it affected, so the code in brackets is never the only explanation.
+  const why = error instanceof ApiError ? knownReasonCopy(error.reasonCode)?.plain : undefined;
+  return `${what}${code}.${why ? ` ${why}` : ""} ${affected} ${next}`;
 }

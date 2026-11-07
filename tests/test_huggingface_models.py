@@ -166,3 +166,70 @@ def test_trending_reports_hub_failure_as_a_classified_error(tmp_path: Path) -> N
     with pytest.raises(HuggingFaceAccessError) as caught:
         service.trending()
     assert caught.value.code == "hugging_face_unavailable"
+
+
+class WritingHub(FakeHub):
+    """A hub whose download writes real bytes, and whose metadata names their digests."""
+
+    def __init__(self, written: bytes, *, published: bytes | None = None, digest: str = "lfs") -> None:
+        super().__init__()
+        self.written = written
+        self.published = written if published is None else published
+        self.digest = digest
+
+    def model_info(
+        self, repo_id: str, *, revision: str | None, token: str | None
+    ) -> SimpleNamespace:
+        import hashlib
+
+        info = super().model_info(repo_id, revision=revision, token=token)
+        meta: dict[str, object] = {}
+        if self.digest == "lfs":
+            meta["lfs"] = SimpleNamespace(sha256=hashlib.sha256(self.published).hexdigest(), size=800)
+        elif self.digest == "blob":
+            header = f"blob {len(self.published)}".encode() + b"\x00"
+            meta["blob_id"] = hashlib.sha1(header + self.published, usedforsecurity=False).hexdigest()
+        info.siblings = [
+            SimpleNamespace(**{**vars(item), **meta}) if item.rfilename == "model-Q8_0.gguf" else item
+            for item in info.siblings
+        ]
+        return info
+
+    def snapshot_download(self, **kwargs: object) -> Any:
+        if not kwargs.get("dry_run"):
+            target = Path(str(kwargs["local_dir"])) / "model-Q8_0.gguf"
+            target.write_bytes(self.written)
+        return super().snapshot_download(**kwargs)
+
+
+def _q8(service: HuggingFaceService) -> Any:
+    return next(item for item in service.variants("owner/repo") if item.files == ("model-Q8_0.gguf",))
+
+
+@pytest.mark.parametrize("digest", ["lfs", "blob"])
+def test_download_accepts_a_file_whose_bytes_match_the_published_digest(
+    tmp_path: Path, digest: str
+) -> None:
+    """MD-3 — the bytes written are the bytes the pinned revision publishes."""
+    service = HuggingFaceService(WritingHub(b"GGUF weights", digest=digest), cache_dir=tmp_path / "hf")
+
+    out = service.download("owner/repo", _q8(service), tmp_path / "models")
+
+    assert (out / "model-Q8_0.gguf").read_bytes() == b"GGUF weights"
+
+
+def test_download_removes_a_file_whose_bytes_do_not_match(tmp_path: Path) -> None:
+    hub = WritingHub(b"tampered", published=b"GGUF weights")
+    service = HuggingFaceService(hub, cache_dir=tmp_path / "hf")
+
+    with pytest.raises(ValueError, match="hugging_face_download_hash_mismatch"):
+        service.download("owner/repo", _q8(service), tmp_path / "models")
+    assert not (tmp_path / "models" / "model-Q8_0.gguf").exists()
+
+
+def test_download_refuses_a_file_the_hub_gives_no_digest_for(tmp_path: Path) -> None:
+    service = HuggingFaceService(WritingHub(b"GGUF", digest="none"), cache_dir=tmp_path / "hf")
+
+    with pytest.raises(ValueError, match="hugging_face_download_unverifiable"):
+        service.download("owner/repo", _q8(service), tmp_path / "models")
+    assert not (tmp_path / "models" / "model-Q8_0.gguf").exists()

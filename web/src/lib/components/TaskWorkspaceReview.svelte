@@ -23,6 +23,26 @@
   let open = $state<string | null>(null);
   let shown = $state<TaskWorkspaceFileDiff | null>(null);
   let diffError = $state("");
+  // BD-4 — the conflicting files the owner chose to overwrite, per copy. Off
+  // until chosen: Apply never replaces an edit the owner made without asking.
+  let overwrite = $state<Record<string, string[]>>({});
+
+  function chosen(item: TaskWorkspaceView): string[] {
+    return (overwrite[item.workspace_id] ?? []).filter((path) => (item.conflicts ?? []).includes(path));
+  }
+
+  function choose(item: TaskWorkspaceView, path: string, on: boolean) {
+    const current = new Set(overwrite[item.workspace_id] ?? []);
+    if (on) current.add(path);
+    else current.delete(path);
+    overwrite = { ...overwrite, [item.workspace_id]: [...current] };
+  }
+
+  /** Conflicts still waiting for the owner's decision. */
+  function undecided(item: TaskWorkspaceView): string[] {
+    const picked = new Set(chosen(item));
+    return (item.conflicts ?? []).filter((path) => !picked.has(path));
+  }
 
   const mine = $derived(
     workspaces.filter(
@@ -52,7 +72,7 @@
 
   const REFUSALS: Record<string, string> = {
     workspace_review_stale: "The copy changed after you looked. Review the new list and apply again.",
-    workspace_promotion_conflict: "A file changed in your project since the copy was made. Nothing was applied.",
+    workspace_promotion_conflict: "A file changed in your project since the copy was made. Nothing was applied. Compare it below and choose Overwrite, or Discard the copy.",
     workspace_in_use: "A command is still running in this copy. Wait for it to finish.",
   };
 
@@ -86,8 +106,19 @@
   }
 
   async function apply(item: TaskWorkspaceView) {
+    const replaced = chosen(item);
     const title = `Apply ${count(item)} change${count(item) === 1 ? "" : "s"} to ${item.source}?`;
-    if (!(await askConfirm({ title, confirmLabel: "Apply" }))) return;
+    const ok = await askConfirm(
+      replaced.length > 0
+        ? {
+            title,
+            body: `This replaces your own edits to ${replaced.join(", ")} with the copy's version. A backup is kept until the Apply finishes.`,
+            confirmLabel: "Overwrite and apply",
+            danger: true,
+          }
+        : { title, confirmLabel: "Apply" },
+    );
+    if (!ok) return;
     busy = true;
     notice = null;
     try {
@@ -95,6 +126,7 @@
         created: item.created,
         modified: item.modified,
         deleted: item.deleted,
+        overwrite: replaced,
       });
       notice = { kind: "ok", text: `Applied to ${item.source}.` };
     } catch (e) {
@@ -128,8 +160,34 @@
   <section class="task-workspace" aria-label="Sandbox changes">
     <header>
       <strong>Sandbox changes · {item.source}</strong>
-      <span>Not in your project until you apply them</span>
+      <span>Working in an isolated copy — nothing changes in your project until you Apply.</span>
     </header>
+    {#if (item.conflicts ?? []).length > 0}
+      <!-- BD-4 — a file the owner changed since the copy was taken is never
+           replaced silently. Opening it shows both versions: lines marked −
+           are your project now, + the copy. -->
+      <div class="conflicts" role="group" aria-label="Changed in your project too">
+        <p class="conflict-lead">
+          {item.conflicts.length === 1 ? "1 file was" : `${item.conflicts.length} files were`} also changed in your project since the copy was made.
+          Open each to compare, then keep yours or overwrite it.
+        </p>
+        <ul>
+          {#each item.conflicts as path (path)}
+            <li>
+              <span class="mono">{path}</span>
+              <label class="overwrite">
+                <input
+                  type="checkbox"
+                  checked={chosen(item).includes(path)}
+                  onchange={(event) => choose(item, path, (event.currentTarget as HTMLInputElement).checked)}
+                />
+                Overwrite with the copy's version
+              </label>
+            </li>
+          {/each}
+        </ul>
+      </div>
+    {/if}
     <ul>
       {#each [["Added", item.created], ["Changed", item.modified], ["Removed", item.deleted]] as [label, paths] (label)}
         {#each paths as path (path)}
@@ -143,6 +201,7 @@
               {:else}
                 <pre class="diff" aria-label={`Changes to ${path}`}>{#each shown.diff.split("\n") as line, index (index)}<span class={lineClass(line)}>{line}
 </span>{/each}</pre>
+                {#if (item.conflicts ?? []).includes(path as string)}<p class="diff-note">Lines marked − are your project now; + is the copy's version.</p>{/if}
                 {#if shown.truncated}<p class="diff-note">The diff is long; only its start is shown.</p>{/if}
               {/if}
             {/if}
@@ -152,7 +211,13 @@
       {#each item.rejected as rejected (rejected.path)}<li class="rejected"><b>Not applied</b> {rejected.path} · {rejected.reason.replaceAll("_", " ")}</li>{/each}
     </ul>
     <div class="actions">
-      <button class="btn btn-primary btn-sm" type="button" disabled={busy || count(item) === 0} onclick={() => void apply(item)}>Apply to project</button>
+      <button
+        class="btn btn-primary btn-sm"
+        type="button"
+        disabled={busy || count(item) === 0 || undecided(item).length > 0}
+        title={undecided(item).length > 0 ? "Choose Overwrite for each file you also changed, or Discard the copy" : undefined}
+        onclick={() => void apply(item)}
+      >Apply to project</button>
       <button class="btn btn-ghost btn-sm danger" type="button" disabled={busy} onclick={() => void discard(item)}>Discard</button>
     </div>
   </section>
@@ -173,4 +238,10 @@
   li b { display:inline-block; min-width:6.5rem; color:var(--text-2); font-family:var(--font-sans); font-weight:600; }
   li.rejected { color:var(--warn); }
   .actions { display:flex; gap:var(--space-2); }
+  .conflicts { display:grid; gap:var(--space-1); padding:var(--space-2); border:1px solid var(--warn); border-radius:var(--r-sm); }
+  .conflicts ul { max-height:none; }
+  .conflicts li { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:var(--space-2); }
+  .conflict-lead { margin:0; color:var(--text-2); font-size:var(--text-sm); }
+  .overwrite { display:inline-flex; align-items:center; gap:.35rem; font-family:var(--font-sans); color:var(--text-2); }
+  .mono { font-family:var(--font-mono); }
 </style>

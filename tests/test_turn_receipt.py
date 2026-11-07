@@ -67,6 +67,13 @@ def test_a_local_model_is_said_to_be_local_and_bookkeeping_is_not_a_read() -> No
     assert receipt["reads"] == {}
 
 
+def test_a_local_runtimes_cloud_model_is_not_said_to_be_local() -> None:
+    """Found 2026-11-07: `gpt-oss:20b-cloud` was receipted *nothing left this computer*."""
+    for model in ("gpt-oss:20b-cloud", "deepseek-v4-pro:cloud"):
+        receipt = build_turn_receipt("turn_c", _model(provider="ollama", model=model), local_providers=LOCAL)
+        assert receipt["local"] is False
+
+
 def test_a_connector_read_names_its_service() -> None:
     events = [*_model(), _proposed("g1", "gmail_read", query="from:anna"), _done("g1")]
     receipt = build_turn_receipt("turn_4", events, local_providers=LOCAL)

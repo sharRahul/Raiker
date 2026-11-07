@@ -264,7 +264,7 @@
   }
 
   function errorFor(code: string) {
-    if (code === "not-allowed") return "Allow microphone and speech-recognition access in your browser, then try again.";
+    if (code === "not-allowed") return "Allow microphone access for Raiker in your browser, then try again.";
     if (code === "audio-capture") return "No usable microphone was found. Check your device and try again.";
     if (code === "no-speech") return "No speech was recognized. Your original draft was restored.";
     // The reason codes the host returns for the on-device runtime. Each names

@@ -17,6 +17,7 @@ from raiker.execution.workspaces import (
     diff_workspace,
     discard,
     promote,
+    promotion_conflicts,
     sweep_stale,
 )
 
@@ -157,6 +158,53 @@ def test_a_path_the_owner_created_meanwhile_is_a_conflict_not_an_overwrite(tmp_p
     with pytest.raises(WorkspaceError, match="workspace_promotion_conflict"):
         promote(workspace, diff_workspace(workspace))
     assert (project / "notes.md").read_text(encoding="utf-8") == "owner\n"
+
+
+def test_conflicts_are_listed_and_only_a_chosen_overwrite_replaces_them(tmp_path: Path) -> None:
+    """BD-4 — Apply refuses a conflict unless the owner chose to overwrite it."""
+    project = _project(tmp_path)
+    workspace = create_task_workspace(project, tmp_path / "sandboxes", "task")
+    (workspace.root / "src" / "app.py").write_text("task version\n", encoding="utf-8")
+    (workspace.root / "README.md").write_text("task readme\n", encoding="utf-8")
+    (workspace.root / "notes.md").write_text("task notes\n", encoding="utf-8")
+    (project / "src" / "app.py").write_text("owner version\n", encoding="utf-8")
+    (project / "notes.md").write_text("owner notes\n", encoding="utf-8")
+    diff = diff_workspace(workspace)
+
+    assert promotion_conflicts(workspace, diff) == ("notes.md", "src/app.py")
+    with pytest.raises(WorkspaceError, match="workspace_promotion_conflict:notes.md"):
+        promote(workspace, diff, overwrite=frozenset({"src/app.py"}))
+    assert (project / "src" / "app.py").read_text(encoding="utf-8") == "owner version\n"
+    assert (project / "README.md").read_text(encoding="utf-8") == "readme\n"
+
+    promote(workspace, diff, overwrite=frozenset({"src/app.py", "notes.md"}))
+    assert (project / "src" / "app.py").read_text(encoding="utf-8") == "task version\n"
+    assert (project / "notes.md").read_text(encoding="utf-8") == "task notes\n"
+    assert (project / "README.md").read_text(encoding="utf-8") == "task readme\n"
+
+
+def test_a_failed_overwrite_restores_the_owners_version(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    project = _project(tmp_path)
+    workspace = create_task_workspace(project, tmp_path / "sandboxes", "task")
+    (workspace.root / "notes.md").write_text("task\n", encoding="utf-8")
+    (workspace.root / "README.md").write_text("task readme\n", encoding="utf-8")
+    (project / "notes.md").write_text("owner\n", encoding="utf-8")
+    real_replace = os.replace
+    calls = {"count": 0}
+
+    def failing_replace(source: str | os.PathLike[str], target: str | os.PathLike[str]) -> None:
+        calls["count"] += 1
+        if calls["count"] == 2:
+            raise OSError("disk full")
+        real_replace(source, target)
+
+    monkeypatch.setattr(workspaces.os, "replace", failing_replace)
+    with pytest.raises(OSError, match="disk full"):
+        promote(workspace, diff_workspace(workspace), overwrite=frozenset({"notes.md"}))
+    assert (project / "notes.md").read_text(encoding="utf-8") == "owner\n"
+    assert (project / "README.md").read_text(encoding="utf-8") == "readme\n"
 
 
 def test_a_failure_part_way_restores_every_original(

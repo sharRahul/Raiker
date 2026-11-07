@@ -176,6 +176,26 @@ describe("Connections › Services (QUI-L07)", () => {
     );
   });
 
+  it("labels experimental services and asks once more before adding one (PL-5)", async () => {
+    const mock = stubFetch({
+      ...routes([connector({ support_level: "experimental" })]),
+      "POST /api/connector-store/gmail/install": { ok: true, connector_id: "gmail", installed: true },
+    });
+    const confirm = vi.fn<(message?: string) => boolean>(() => false);
+    vi.stubGlobal("confirm", confirm);
+    render(ConnectionsView);
+    await screen.findByText(/nothing is connected yet/i);
+    await fireEvent.click(screen.getAllByRole("button", { name: /add connection/i })[0]);
+    const dialog = screen.getByRole("dialog", { name: "Add connection" });
+    expect(within(dialog).getByRole("button", { name: /Gmail.*Experimental/ })).toBeInTheDocument();
+    await fireEvent.click(within(dialog).getByRole("button", { name: /Gmail/ }));
+    await fireEvent.click(within(dialog).getByRole("button", { name: "Add Gmail" }));
+    await waitFor(() => expect(confirm).toHaveBeenCalled());
+    expect(confirm.mock.calls[0][0]).toMatch(/experimental.*not verified/is);
+    expect(mock).not.toHaveBeenCalledWith(expect.stringContaining("/install"), expect.anything());
+    vi.unstubAllGlobals();
+  });
+
   it("opens the catalogue in the Add connection dialog and adds the chosen service", async () => {
     const mock = stubFetch({
       ...routes([connector(), connector({ connector_id: "slack", display_name: "Slack", category: "Chat" })]),

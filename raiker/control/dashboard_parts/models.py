@@ -886,6 +886,14 @@ class ModelService:
                     profile = None
         if profile is not None:
             receipt["local"] = bool(getattr(profile, "local_only", False)) and not self._profile_is_billable(profile)
+        # Found 2026-11-07 (beta round) — a local runtime's cloud model
+        # (`gpt-oss:20b-cloud`) was receipted *no charge · nothing left this
+        # computer* while the composer said *Sent to ollama.com*. BUG-340's rule:
+        # a model whose name says Cloud runs off the device, and its provider
+        # may bill for it, so it is neither local nor free.
+        cloud_model = bool(model) and str(model).strip().lower().endswith(("-cloud", ":cloud"))
+        if cloud_model:
+            receipt["local"] = False
         cost: float | None = None
         basis = "free" if receipt["local"] else "unknown"
         if profile is not None and model and self._profile_is_billable(profile):
@@ -893,7 +901,7 @@ class ModelService:
             if priced is not None:
                 cost = float(priced)
                 basis = "priced"
-        elif profile is not None and not receipt["local"]:
+        elif profile is not None and not receipt["local"] and not cloud_model:
             # Off the machine with no key (a free endpoint): nothing to price.
             basis = "free"
         receipt["cost_usd"] = cost

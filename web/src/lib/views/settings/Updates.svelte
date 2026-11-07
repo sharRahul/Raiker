@@ -52,6 +52,25 @@
       ? "Not recorded"
       : localDateTime(new Date(update.installation.built_at)),
   );
+  /*
+   * Beta plan §2 — which stage this build is, and whether its signature was
+   * checked. Unsigned is said plainly: a closed beta may ship unsigned, and an
+   * owner must be able to see which one they are running.
+   */
+  const stageLabel = $derived(
+    update === null
+      ? ""
+      : /-(beta|rc)\b/i.test(update.installation.version)
+        ? /-rc\b/i.test(update.installation.version) ? "Release candidate" : "Beta"
+        : update.installation.packaged ? "Release" : "Development build",
+  );
+  const signatureLabel = $derived(
+    update === null
+      ? ""
+      : update.installation.signed
+        ? "Verified by Raiker"
+        : update.installation.packaged ? "Unsigned build" : "Unsigned development build",
+  );
   const stale = $derived(update !== null && clientIsStale(update.installation.version));
 
   const checkedLabel = $derived(
@@ -116,6 +135,8 @@
     <p class="description">{update.message}</p>
     <dl>
       <div><dt>Installed build</dt><dd>{buildLabel}</dd></div>
+      <div><dt>Release stage</dt><dd>{stageLabel}</dd></div>
+      <div><dt>Signature</dt><dd>{signatureLabel}</dd></div>
       <div><dt>Built</dt><dd>{builtLabel}</dd></div>
       <div>
         <dt>This page</dt>

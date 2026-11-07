@@ -17,6 +17,7 @@ const copy = {
   modified: ["main.py"],
   deleted: ["old.txt"],
   rejected: [{ path: "escape", reason: "link" }],
+  conflicts: [] as string[],
 };
 
 it("lists the session's sandbox changes and applies exactly what was shown", async () => {
@@ -34,9 +35,34 @@ it("lists the session's sandbox changes and applies exactly what was shown", asy
 
   await waitFor(() =>
     expect(promote).toHaveBeenCalledWith(copy.workspace_id, {
-      created: ["new.py"], modified: ["main.py"], deleted: ["old.txt"],
+      created: ["new.py"], modified: ["main.py"], deleted: ["old.txt"], overwrite: [],
     }),
   );
+});
+
+it("holds Apply until each conflicting file is chosen for overwrite (BD-4)", async () => {
+  vi.spyOn(api, "taskWorkspaces").mockResolvedValue({ workspaces: [{ ...copy, conflicts: ["main.py"] }] });
+  const promote = vi.spyOn(api, "promoteTaskWorkspace").mockResolvedValue({
+    ok: true, workspace_id: copy.workspace_id, created: ["new.py"], modified: ["main.py"], deleted: ["old.txt"],
+  });
+  const confirm = vi.fn<(message?: string) => boolean>(() => true);
+  vi.stubGlobal("confirm", confirm);
+  render(TaskWorkspaceReview, { sessionId: "sess_build" });
+
+  expect(await screen.findByText(/Working in an isolated copy — nothing changes in your project until you Apply/)).toBeInTheDocument();
+  expect(screen.getByText(/1 file was also changed in your project/)).toBeInTheDocument();
+  const apply = screen.getByRole("button", { name: "Apply to project" });
+  expect(apply).toBeDisabled();
+  await fireEvent.click(screen.getByRole("checkbox", { name: /Overwrite with the copy's version/ }));
+  expect(apply).toBeEnabled();
+  await fireEvent.click(apply);
+
+  await waitFor(() =>
+    expect(promote).toHaveBeenCalledWith(copy.workspace_id, {
+      created: ["new.py"], modified: ["main.py"], deleted: ["old.txt"], overwrite: ["main.py"],
+    }),
+  );
+  expect(confirm.mock.calls[0][0]).toMatch(/replaces your own edits to main.py/);
 });
 
 it("says a stale review was refused and nothing was applied", async () => {

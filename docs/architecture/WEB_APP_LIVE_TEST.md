@@ -1966,3 +1966,92 @@ stopped. No key is in source, captures or this record.
   the n-th `turn_steered` event to the n-th accepted follow-up.
 * Continue from last step names finished steps but does not replay their
   output, so a model may re-read something it had already read.
+
+## Result — 2026-11-07 Beta release plan round
+
+**Scope.** Fifteen items from the
+[beta release plan](../plans/BETA_RELEASE_PLAN.md#changelog) (AG-2, UX-1, UX-4,
+UX-5, BD-3, BD-4, MD-1, MD-3, MD-5, PL-5, VD-2, VD-3/VD-4 and the §1, §2 and
+§6 UI deliverables). The built SPA was served by real FastAPI from a disposable
+workspace on port 8765 (`scripts/reset_live_workspace.py`), in Windows 11
+Chromium. Keys were typed into **Models** by the spec from a private credential
+file in the session's scratch folder, never in the repository.
+
+**Providers (MD-1).** `models-provider-validation-live.spec.ts`: Anthropic
+(identity-linked key with its Workspace ID), OpenRouter and OpenAI each passed
+UI sign-in, catalogue, readiness and an exact-model answer (**3/3**, 3.3
+minutes). Ollama on 127.0.0.1:11434 was added through **Models › Add › On this
+computer**, `gpt-oss:20b-cloud` was kept and chosen in the composer, and it
+answered *42* to *What is 6 times 7?*. The composer said *Sent to ollama.com*.
+LM Studio and llama.cpp were not run (no LM Studio server; the managed engine
+has its own CI job).
+
+| Case | Check |
+|---|---|
+| RT-BETA-01 | Settings › About & updates shows *Release stage: Development build* and *Signature: Unsigned development build* for this source checkout |
+| RT-BETA-02 | Privacy › *What leaves this computer* lists the model destinations, Anthropic and ollama.com among them, in one row |
+| RT-BETA-03 | Models › Add › An account I have: Anthropic carries no *Experimental* tag; providers outside the six do |
+| RT-BETA-04 | Connections › Add: an experimental service (GitHub) is labelled in the list; **Add** asks *Add GitHub? It is experimental.* and says what has not been verified; **Cancel** installs nothing |
+| RT-BETA-05 | Design: the tab reads *Images · Preview* and the panel says image generation has not been verified end to end |
+| RT-BETA-06 | With the environments read answering *not available*, Build's posture chip reads *Commands unavailable here* in amber, with the reason as its tooltip. This host's sandbox is enforced, so only that one read was replaced |
+| RT-BETA-07 | A session copy whose `main.py` the owner also edited (`scripts/live_task_copy_harness.py`): the header says *Working in an isolated copy — nothing changes in your project until you Apply.*; *1 file was also changed in your project*; Apply is disabled; the diff shows *owner edit* against the copy; **Overwrite with the copy's version** enables Apply; the confirmation names `main.py`; the project file then holds the copy's version |
+| RT-BETA-08 | **Discard** removes the copy and the project's `main.py` is unchanged |
+| RT-BETA-09 | axe (WCAG 2.0/2.1 A and AA) on every destination at 1440×900, 1280×900 and 390×844: no serious or critical violation |
+| RT-BETA-10 | QUI-G01 as a failing check: Chat, Build, Models, Settings › General, Privacy and About & updates within budget at 1440×900 and 1280×800, with Settings › General the one tracked exception ([TO_BE_FIXED](../plans/TO_BE_FIXED.md#settings--general-is-over-its-size-budget)) |
+
+**Outcome: 10/10 passed** (`beta-release-round-live.spec.ts`, 5.3 minutes) on
+the final build, plus the three provider legs and the Ollama answer. Failures on
+the way are not passing evidence:
+
+* **Found and fixed: a cloud model called local.** The Ollama step showed
+  *Stays on this computer · No API cost* in Models' review and *nothing left
+  this computer* in the turn receipt
+  ([FIXED-1316](../plans/FIXED_ITEMS.md#fixed-1316--a-cloud-ollama-model-was-called-local-in-models-and-in-the-turn-receipt-found-live)).
+* **Found and fixed: axe.** The first sweep reported the Activity table as a
+  scroll region the keyboard could not reach
+  ([FIXED-1317](../plans/FIXED_ITEMS.md#fixed-1317--settings-sections-were-off-the-card-system-and-the-activity-table-could-not-be-scrolled-by-keyboard-found-this-round-ux-5)).
+  It also reported low contrast on empty-state titles. Those were read mid
+  fade-in; the sweep now runs with reduced motion, which Raiker honours, and the
+  settled titles pass.
+* **Found and fixed: off-system card.** RT-BETA-10 first failed on Settings ›
+  General, where Beta feedback had no card styling. Adding the card raised the
+  page further, so its copy moved into a disclosure. Privacy's new list first
+  cost 148 px; it is now one row.
+* **Harness, not product.** The first RT-BETA-07 picked the Inbox session and
+  wrote CRLF files on Windows; it now picks a real conversation and writes
+  bytes. Element captures of the live review timed out, so those are page
+  captures.
+
+The captures are under `output/playwright/2026-11-07-beta-round/` (ignored by
+Git). I reviewed each at full size: the conflict group sits above the change
+list in the same card, Overwrite is a labelled checkbox rather than colour, and
+the Experimental and Preview marks are words with an outline.
+
+**Procedure.** From `web/`, with `RAIKER_LIVE_CREDENTIALS_FILE` pointing at the
+private file: `npx playwright test --project=live
+e2e/models-provider-validation-live.spec.ts --workers=1`; add the Ollama model
+in **Models › Add › On this computer** and send one turn; then, with
+`RAIKER_LIVE_WORKSPACE` set to the host's workspace, `npx playwright test
+--project=live e2e/beta-release-round-live.spec.ts --workers=1 --trace off`.
+Afterwards the credential file and the workspace were deleted and the host was
+stopped. No key is in source, captures or this record.
+
+**Local checks.** Web: 2,808 component tests, Svelte check and design tokens
+(0 errors), ESLint, the production build and 27 mocked browser tests. Python:
+Ruff, mypy (`--platform linux`), and the suites named in FIXED-1309 to -1317.
+
+**Visual direction.** The installed
+[Apple design](https://github.com/dickwu/apple-design-skill),
+[macOS](https://github.com/ceorkm/macos-design-skill) and
+[better-interface](https://github.com/jakubkrehel/skills) guidance shaped the
+slice: a refusal stays visible and disabled with its reason rather than
+disappearing, a status is a word beside its colour, and a decision that replaces
+the owner's work is a deliberate, named confirmation.
+[Impeccable's rules](https://impeccable.style/#slop) kept the new copy to what
+Raiker can verify.
+
+**Limits.** Windows Chromium only; no screen reader and no fake-microphone run
+(TO_BE_FIXED, *Voice: fake-microphone browser evidence*). RT-BETA-06 shows the
+unavailable state by replacing one read, because this host's sandbox is
+enforced.
+

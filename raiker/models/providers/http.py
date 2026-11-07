@@ -15,8 +15,10 @@ has a refusal of its own (Anthropic's thinking-shape 400) puts it in front of
 from __future__ import annotations
 
 import codecs
+import email.utils
 import json
 import re
+import time
 from collections.abc import AsyncIterator, Callable, Mapping
 from contextlib import asynccontextmanager
 from typing import Any
@@ -109,6 +111,32 @@ def provider_status_error(status: int, *, model: str, body: str = "") -> Excepti
     if status >= 500:
         return ProviderConnectionError(f"provider_unavailable:http_{status}")
     return ProviderConnectionError(f"provider_http_error:http_{status}")
+
+
+def retry_after_seconds(value: str | None, *, now: float | None = None) -> float | None:
+    """``Retry-After`` as seconds from now: a delay, or an HTTP date. None if absent or unreadable."""
+    if not value:
+        return None
+    text = value.strip()
+    try:
+        seconds = float(text)
+    except ValueError:
+        try:
+            when = email.utils.parsedate_to_datetime(text)
+        except (TypeError, ValueError):
+            return None
+        if when is None:
+            return None
+        seconds = when.timestamp() - (time.time() if now is None else now)
+    if seconds != seconds or seconds < 0:  # NaN or in the past
+        return 0.0 if seconds == seconds else None
+    return min(seconds, 24 * 3600.0)
+
+
+def _with_retry_after(error: Exception, response: httpx.Response) -> Exception:
+    if isinstance(error, ProviderRateLimitError):
+        error.retry_after_seconds = retry_after_seconds(response.headers.get("retry-after"))
+    return error
 
 
 def json_object(response: httpx.Response) -> dict[str, Any]:
@@ -225,7 +253,9 @@ class ProviderHttpTransport:
         except httpx.HTTPError as exc:
             raise ProviderConnectionError("provider_connection_failed") from exc
         if response.status_code >= 400:
-            raise self._map_status(response.status_code, body.decode("utf-8", "replace"))
+            raise _with_retry_after(
+                self._map_status(response.status_code, body.decode("utf-8", "replace")), response
+            )
         if over:
             raise ProviderResponseValidationError("provider_response_too_large")
         # The bytes above are already decoded, so the copy must not claim an
@@ -255,5 +285,8 @@ class ProviderHttpTransport:
                 # A streamed body has not been read yet, and classification
                 # needs it — its first part, never all of it (DEC-25).
                 body, _over = await _read_capped(response, MAX_ERROR_BODY_BYTES)
-                raise self._map_status(response.status_code, body.decode("utf-8", "replace"))
+                raise _with_retry_after(
+                    self._map_status(response.status_code, body.decode("utf-8", "replace")),
+                    response,
+                )
             yield response

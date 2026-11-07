@@ -80,6 +80,7 @@
     CapabilityGate,
     ContextUsage,
     ExecutionBoundaryView,
+    ExecutionEnvironment,
     ModelDecision,
     ProjectsList,
     SessionDetail,
@@ -124,6 +125,7 @@
   import TurnControl from "../components/TurnControl.svelte";
   import FollowUpPills from "../components/FollowUpPills.svelte";
   import RunSendButton from "../components/RunSendButton.svelte";
+  import { commandsUnavailableReason } from "../commandAvailability";
   import { RunningTurn } from "../runningTurn.svelte";
   import CommandOutputPane from "../components/CommandOutputPane.svelte";
   import {
@@ -446,6 +448,17 @@
   // to "apply" and nothing that can be refused: the composer shows the mode it
   // will send.
   let mode = $state<BuildMode>(DEFAULT_BUILD_MODE);
+  // Beta plan §1 — Run (Auto) needs commands; Plan and Propose do not. Where
+  // the selected environment cannot run them, Run stays visible but disabled,
+  // with the reason as its tooltip. An unread environment blocks nothing.
+  let runEnvironment = $state<ExecutionEnvironment | null>(null);
+  onMount(() => {
+    void api
+      .executionEnvironments()
+      .then((view) => (runEnvironment = view.environments.find((item) => item.selected) ?? null))
+      .catch(() => (runEnvironment = null));
+  });
+  const runRefusal = $derived(mode === "auto" ? commandsUnavailableReason(runEnvironment) : null);
   // The owner's standing write permissions, read only so the composer can say
   // what Auto will actually amount to. Never written from this page.
   let standingModes = $state<Record<string, string> | null>(null);
@@ -2774,8 +2787,8 @@
               hasText={draft.text.trim() !== ""}
               control={runningTurn}
               label={buildPrimaryAction(mode)}
-              disabled={attachStore.uploading || draft.text.trim() === "" || modelBlocked || !projectReady}
-              title={!projectReady ? "Choose a project from the + menu to start" : undefined}
+              disabled={attachStore.uploading || draft.text.trim() === "" || modelBlocked || !projectReady || runRefusal !== null}
+              title={!projectReady ? "Choose a project from the + menu to start" : (runRefusal ?? undefined)}
             />
       {/snippet}
 

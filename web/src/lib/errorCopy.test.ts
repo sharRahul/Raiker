@@ -16,6 +16,20 @@ describe("failure (QUI-G06)", () => {
     );
   });
 
+  it("says why when the refusal has copy (UX-4)", () => {
+    const error = new ApiError(404, "session_not_found", "gone");
+    expect(failure("The conversation did not open", "Nothing was changed.", "Try again.", error)).toBe(
+      "The conversation did not open (HTTP 404, session_not_found). This conversation no longer exists. Nothing was changed. Try again.",
+    );
+  });
+
+  it("adds nothing for a code without copy", () => {
+    const error = new ApiError(409, "brand_new_code", "x");
+    expect(failure("Save failed", "Nothing was saved.", "Try again.", error)).toBe(
+      "Save failed (HTTP 409, brand_new_code). Nothing was saved. Try again.",
+    );
+  });
+
   it("works without an error object", () => {
     expect(failure("Nothing was found", "No file was attached.", "Check the path.")).toBe(
       "Nothing was found. No file was attached. Check the path.",

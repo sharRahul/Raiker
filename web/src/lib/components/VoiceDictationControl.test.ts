@@ -143,7 +143,7 @@ it("ignores duplicate local transcription results", async () => {
 
 describe("recognition recovery", () => {
   it.each([
-    ["not-allowed", /Allow microphone and speech-recognition access/],
+    ["not-allowed", /Allow microphone access for Raiker/],
     ["audio-capture", /No usable microphone was found/],
     ["no-speech", /No speech was recognized/],
     ["network", /speech runtime on this machine could not be reached/],

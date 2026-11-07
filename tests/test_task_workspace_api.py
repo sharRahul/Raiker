@@ -123,6 +123,36 @@ def test_an_owner_edit_after_the_snapshot_is_a_conflict_and_nothing_is_written(
     assert (workspace / "app" / "old.txt").exists()
 
 
+def test_the_listing_names_conflicts_and_an_overwrite_applies_them(
+    client: TestClient, headers: dict[str, str], workspace: Path
+) -> None:
+    """BD-4 — the owner sees the conflict first, then chooses Overwrite."""
+    key, _ = _task_copy(workspace)
+    (workspace / "app" / "main.py").write_text("owner edit\n", encoding="utf-8")
+    [view] = client.get("/api/command-workspaces", headers=headers).json()["workspaces"]
+    assert view["conflicts"] == ["main.py"]
+    body = {"created": ["new.py"], "modified": ["main.py"], "deleted": ["old.txt"]}
+
+    unseen = client.post(
+        f"/api/command-workspaces/{key}/promote",
+        json={**body, "overwrite": ["new.py"]},
+        headers=headers,
+    )
+    assert unseen.status_code == 409
+    assert unseen.json()["detail"]["reason_code"] == "workspace_review_stale"
+    assert (workspace / "app" / "main.py").read_text(encoding="utf-8") == "owner edit\n"
+
+    applied = client.post(
+        f"/api/command-workspaces/{key}/promote",
+        json={**body, "overwrite": ["main.py"]},
+        headers=headers,
+    )
+    assert applied.status_code == 200, applied.text
+    assert (workspace / "app" / "main.py").read_text(encoding="utf-8") == "print('v2')\n"
+    events = "".join(path.read_text(encoding="utf-8") for path in (workspace / ".raiker").rglob("*.jsonl"))
+    assert "task_workspace_promoted" in events and '"overwritten":["main.py"]' in events.replace(" ", "")
+
+
 def test_discard_throws_the_copy_away_and_leaves_the_project(
     client: TestClient, headers: dict[str, str], workspace: Path
 ) -> None:

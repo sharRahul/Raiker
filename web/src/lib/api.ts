@@ -749,8 +749,8 @@ export const api = {
     contract.taskWorkspaceFileDiff(workspaceId, { path }),
   promoteTaskWorkspace: (
     workspaceId: string,
-    reviewed: { created: string[]; modified: string[]; deleted: string[] },
-  ) => contract.promoteTaskWorkspace(workspaceId, reviewed),
+    reviewed: { created: string[]; modified: string[]; deleted: string[]; overwrite?: string[] },
+  ) => contract.promoteTaskWorkspace(workspaceId, { overwrite: [], ...reviewed }),
   discardTaskWorkspace: (workspaceId: string) => contract.discardTaskWorkspace(workspaceId),
   // Allow-listed downloads for sandboxed commands (off until the owner turns it on).
   commandEgress: () => contract.getCommandEgress(),

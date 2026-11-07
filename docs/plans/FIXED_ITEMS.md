@@ -1613,6 +1613,15 @@ file you can open. The two capture sets that remain — `screenshots/pages/` and
 | [FIXED-1306](#fixed-1306--a-running-turn-had-a-second-stop-button-a-separate-steer-field-and-no-step-view-qui-c03-qui-c04) | Medium | Composer / turn control | Fixed 2026-11-07 |
 | [FIXED-1307](#fixed-1307--a-stopped-turn-was-left-out-of-the-conversation-the-model-saw-found-this-round) | Medium | Runtime / conversation history | Fixed 2026-11-07 |
 | [FIXED-1308](#fixed-1308--a-storage-refusal-unit-test-failed-on-node-25-found-this-round) | Low | Web unit tests | Fixed 2026-11-07 |
+| [FIXED-1309](#fixed-1309--eighty-route-refusals-reached-the-owner-as-a-bare-machine-code-ux-4) | Medium | Web / error copy | Fixed 2026-11-07 |
+| [FIXED-1310](#fixed-1310--thirty-tools-had-no-capability-gate-and-no-reviewed-reason-ag-2) | Medium | Governance / tool registry | Fixed 2026-11-07 |
+| [FIXED-1311](#fixed-1311--a-build-apply-that-met-the-owners-own-edit-had-no-way-forward-bd-4) | Medium | Build / sandbox review | Fixed 2026-11-07 |
+| [FIXED-1312](#fixed-1312--a-stream-that-closed-early-was-recorded-as-a-finished-answer-md-5-found-this-round) | High | Models / provider adapters | Fixed 2026-11-07 |
+| [FIXED-1313](#fixed-1313--a-downloaded-gguf-was-never-checked-against-the-bytes-the-hub-publishes-md-3) | Medium | Models / Hugging Face | Fixed 2026-11-07 |
+| [FIXED-1314](#fixed-1314--the-page-still-carried-a-browser-speech-recognition-adapter-vd-2) | Low | Voice | Fixed 2026-11-07 |
+| [FIXED-1315](#fixed-1315--the-betas-labels-and-limits-were-not-visible-where-the-owner-decides-beta-plan-1-2-3-6-8-9) | Medium | Web / beta scope | Fixed 2026-11-07 |
+| [FIXED-1316](#fixed-1316--a-cloud-ollama-model-was-called-local-in-models-and-in-the-turn-receipt-found-live) | Medium | Models / receipts | Fixed 2026-11-07 |
+| [FIXED-1317](#fixed-1317--settings-sections-were-off-the-card-system-and-the-activity-table-could-not-be-scrolled-by-keyboard-found-this-round-ux-5) | Low | Web / layout and accessibility | Fixed 2026-11-07 |
 
 ---
 
@@ -39214,3 +39223,190 @@ test then read a real stored page. CI's Node was unaffected.
 that refuses, then restores the original. It holds on either runtime.
 
 **Evidence.** `recentPages.test.ts` 4/4 on Node 25.6.1; the full web suite.
+
+## FIXED-1309 — Eighty route refusals reached the owner as a bare machine code (UX-4)
+
+**Severity: Medium. Area: Web / error copy. Status: Fixed 2026-11-07.**
+
+**Observed.** The authority router's refusals had copy, and a test kept them in
+step. The routes' own refusals did not: 83 of the 131 literal
+`refusal(status, "code")` codes in `raiker/api` had no words anywhere in the
+web client, so a failed action read *Save failed (HTTP 404, session_not_found)*
+with nothing that said why.
+
+**Fixed.** `reasonCodes.ts` has copy for every one of them, grouped by area
+(approvals and questions, channels, sign-in, repeated requests, things that are
+gone, Design and images). `failure()` now puts the plain sentence between what
+failed and what it affected whenever Raiker has words for the code, so its 85
+call sites gain it without edits. `tests/test_route_reason_copy.py` scans every
+route and fails when a new literal refusal has no copy.
+
+**Evidence.** `tests/test_route_reason_copy.py`, `tests/test_reason_code_catalogue.py`,
+`errorCopy.test.ts` (two new cases), `reasonCodes.test.ts`.
+
+## FIXED-1310 — Thirty tools had no capability gate and no reviewed reason (AG-2)
+
+**Severity: Medium. Area: Governance / tool registry. Status: Fixed 2026-11-07.**
+
+**Observed.** 30 of the 58 registered tools name no capability, so the owner has
+no switch for them. Each was governed some other way (the path authority, a
+connector grant, the session command grant), but nothing recorded which, and a
+new ungated tool would have landed unnoticed.
+
+**Fixed.** `tests/test_tool_governance_inventory.py` lists every ungated tool
+with the authority it answers to (*project read*, *connector grant*, *command
+grant*, *own gate*, *turn only*). It fails when a tool names a capability with no
+gate, when the router would not find a gated tool's switch, when an ungated tool
+is not listed, when a listed one is gated or gone, or when a *project read* is
+anything but a low-risk read.
+
+**Evidence.** `tests/test_tool_governance_inventory.py` (4 tests).
+
+## FIXED-1311 — A Build Apply that met the owner's own edit had no way forward (BD-4)
+
+**Severity: Medium. Area: Build / sandbox review. Status: Fixed 2026-11-07.**
+
+**Observed.** Apply refused when a file had changed in the project since the
+copy was taken, and said only *Nothing was applied*. The review did not say
+which file, the owner could not compare the two versions, and the only way on
+was to discard the whole copy.
+
+**Fixed.**
+* The listing names each conflict (`conflicts`, from `promotion_conflicts`).
+* The review shows them in their own group before Apply. Opening a file shows
+  both versions, with a legend: *−* is your project now, *+* is the copy.
+* Each conflict has **Overwrite with the copy's version**, off by default.
+  Apply stays disabled until each conflict is chosen, and its confirmation names
+  the files whose edits it replaces.
+* `promote(…, overwrite=…)` replaces only the chosen conflicts and backs each
+  original up first, so a failure part-way restores the owner's version too.
+* The route refuses an overwrite of a path that is not a current conflict as a
+  stale review, and the audit event records `overwritten`.
+* The review header says *Working in an isolated copy — nothing changes in your
+  project until you Apply.*
+
+**Evidence.** `tests/test_task_workspaces.py` (two new cases),
+`tests/test_task_workspace_api.py` (one new case), `TaskWorkspaceReview.test.ts`,
+the mocked `composer.spec.ts` sandbox cases, and live RT-BETA-07/08 (see the
+[Live Test docs](../architecture/WEB_APP_LIVE_TEST.md#result--2026-11-07-beta-release-plan-round)).
+
+## FIXED-1312 — A stream that closed early was recorded as a finished answer (MD-5, found this round)
+
+**Severity: High. Area: Models / provider adapters. Status: Fixed 2026-11-07.**
+
+**Observed.** The new fault matrix found it. When a provider closed the
+connection in order, with no `[DONE]` (OpenAI-compatible) or `message_stop`
+(Anthropic), both adapters ended the stream without error. The orchestrator
+then recorded the partial text with `finish_reason="stop"`, so a cut-off answer
+read as complete. A 429's `Retry-After` was also thrown away, so Raiker could
+not say how long to wait.
+
+**Fixed.** Both adapters raise `ProviderStreamError("stream_ended_without_finish")`
+when the body ends without its end marker. The turn keeps the text already shown
+and says *the provider stopped sending before the answer was finished*. A rate
+limit now carries `retry_after_seconds`, read from a delay or an HTTP date.
+
+**Evidence.** `tests/test_provider_fault_matrix.py` (16 cases against a real
+socket on 127.0.0.1: a 429 with `Retry-After`, a streamed 429, a 500, an
+exhausted quota, a reset before the answer, a reset mid-answer, a silent stall,
+a malformed event, a clean close without the end marker, and the `Retry-After`
+parser), plus the existing provider, async-runtime and completion suites.
+
+## FIXED-1313 — A downloaded GGUF was never checked against the bytes the hub publishes (MD-3)
+
+**Severity: Medium. Area: Models / Hugging Face. Status: Fixed 2026-11-07.**
+
+**Observed.** A download pinned the revision, but nothing checked that the file
+written was that revision's file.
+
+**Fixed.** After the download, every file is hashed and compared with the hub's
+LFS SHA-256 for the pinned revision, or its Git blob id for a small file kept in
+Git. A mismatch, or a file with no published digest, removes the file and fails
+the operation (`hugging_face_download_hash_mismatch`,
+`hugging_face_download_unverifiable`), so the library never lists it.
+
+**Evidence.** `tests/test_huggingface_models.py` (four new cases: LFS and blob
+matches, a tampered file, a file with no digest).
+
+## FIXED-1314 — The page still carried a browser speech-recognition adapter (VD-2)
+
+**Severity: Low. Area: Voice. Status: Fixed 2026-11-07.**
+
+**Observed.** The beta decision is that browser speech recognition is never
+used. `voice.ts` still exported `browserRecognitionAdapter`, which constructed
+`SpeechRecognition`. Nothing imported it, but nothing stopped a future import.
+The permission-denied message also asked for *speech-recognition access*.
+
+**Fixed.** The adapter is removed. A test walks every source file and fails if
+any reads `SpeechRecognition` or `webkitSpeechRecognition`. The denied message
+now says *Allow microphone access for Raiker in your browser*.
+
+**Evidence.** `voice.test.ts` (*no browser speech recognition*),
+`VoiceDictationControl.test.ts`.
+
+## FIXED-1315 — The beta's labels and limits were not visible where the owner decides (beta plan §1, §2, §3, §6, §8, §9)
+
+**Severity: Medium. Area: Web / beta scope. Status: Fixed 2026-11-07.**
+
+**Fixed.** The beta plan's UI decisions, each where the owner acts:
+* **Commands unavailable here** (§1). When the selected environment cannot run
+  commands, the composer's posture chip turns amber with that label, even where
+  it otherwise shows only exceptions, and links to **Set up**. Build's **Run**
+  (Auto mode) stays visible but disabled with the reason; Plan and Propose still
+  work (`commandAvailability.ts`).
+* **About & updates** (§2) shows **Release stage** (*Beta*, *Release candidate*,
+  *Release* or *Development build*) and **Signature** (*Verified by Raiker*,
+  *Unsigned build* or *Unsigned development build*).
+* **Privacy › What leaves this computer** (§6) starts with where this
+  installation sends right now: one row naming every place a model prompt can
+  go (hosted providers and a local runtime's remote host), and the update
+  channel (`privacyDestinations.ts`).
+* **Design** (§8, VD-3) labels image generation **Preview** on its tab and at the
+  top of the panel. A guard test keeps the export menu to the formats that
+  exist and BUG-348's unfinished features out of the menus (VD-4).
+* **Connections** (§9, PL-5) shows *Supported* or *Experimental* in the Add
+  list. Adding an experimental service asks once more and says what has not
+  been verified.
+* **Models › Add** (§3, MD-1) tags every provider outside the six live-checked
+  ones *Experimental*, in words with an amber outline (`providerSupport.ts`).
+
+**Evidence.** `commandAvailability.test.ts`, `PostureControl.test.ts`,
+`Updates.test.ts`, `privacyDestinations.test.ts`, `Privacy.test.ts`,
+`DesignView.test.ts`, `ConnectionsView.test.ts`, `providerSupport.test.ts`, and
+live RT-BETA-01 to -06.
+
+## FIXED-1316 — A cloud Ollama model was called local in Models and in the turn receipt (found live)
+
+**Severity: Medium. Area: Models / receipts. Status: Fixed 2026-11-07.**
+
+**Observed (live, `gpt-oss:20b-cloud`).** Models › Add › Review said *Stays on
+this computer · No API cost* beside a card that said *Cloud inference*. After a
+real answer, the turn receipt said *no charge · nothing left this computer*,
+while the composer said *Sent to ollama.com*.
+
+**Fixed.** The Review row and the in-use card use BUG-340's shared location rule
+(`inferenceLabel`), and a cloud model's cost reads *Provider pricing may apply*.
+The receipt treats a model whose name says Cloud as off the device, and its
+cost as unknown rather than free.
+
+**Evidence.** `tests/test_turn_receipt.py` (new case), `ModelsView.test.ts`, and
+the live Ollama step of this round.
+
+## FIXED-1317 — Settings sections were off the card system, and the Activity table could not be scrolled by keyboard (found this round, UX-5)
+
+**Severity: Low. Area: Web / layout and accessibility. Status: Fixed 2026-11-07.**
+
+**Observed.** Settings › General's **Beta feedback** rendered as bare text with a
+larger body, because General's card styles are scoped to that file. The
+time-zone proposal line was also larger than its neighbours. The axe sweep
+found the Activity events table scrollable sideways but not focusable
+(`scrollable-region-focusable`).
+
+**Fixed.** Beta feedback uses the same card as its neighbours: one lead line,
+the actions, and *What the form includes* in a disclosure. The proposal line
+uses the small text size. The Activity table's scroll region is a focusable,
+labelled region.
+
+**Evidence.** `BetaFeedback.test.ts`, `General.test.ts`, `ActivityView.test.ts`,
+and live RT-BETA-09: no serious or critical axe violation on any destination at
+1440, 1280 or 390.

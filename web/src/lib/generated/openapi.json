@@ -27276,6 +27276,13 @@
             },
             "title": "Modified",
             "type": "array"
+          },
+          "overwrite": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Overwrite",
+            "type": "array"
           }
         },
         "required": [
@@ -34389,6 +34396,13 @@
       "TaskWorkspaceView": {
         "description": "A session's disposable copy and what its commands changed in it.\n\nPaths are relative to the copied folder (``source``, itself relative to the\nRaiker workspace). Nothing here has reached the project until promoted.",
         "properties": {
+          "conflicts": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Conflicts",
+            "type": "array"
+          },
           "created": {
             "items": {
               "type": "string"
@@ -34442,7 +34456,8 @@
           "created",
           "modified",
           "deleted",
-          "rejected"
+          "rejected",
+          "conflicts"
         ],
         "title": "TaskWorkspaceView",
         "type": "object"

@@ -53,7 +53,10 @@ class ProviderAuthenticationError(ModelProviderError):
 
 
 class ProviderRateLimitError(ModelProviderError):
-    pass
+    """Throttled: waiting fixes it. ``retry_after_seconds`` is the provider's own
+    ``Retry-After`` when it sent one (MD-5), so the wait can be stated, not guessed."""
+
+    retry_after_seconds: float | None = None
 
 
 class ProviderQuotaExhaustedError(ModelProviderError):
@@ -485,6 +488,12 @@ _PROVIDER_ERROR_SENTENCES: tuple[tuple[str, str], ...] = (
     (
         "provider_stream_failed",
         "the connection to the provider ended before the answer did. Try again.",
+    ),
+    (
+        # MD-5 — the stream closed in order but never said the answer was done.
+        "stream_ended_without_finish",
+        "the provider stopped sending before the answer was finished, so what arrived "
+        "is not a complete reply. Try again.",
     ),
     (
         "provider_connection_failed",

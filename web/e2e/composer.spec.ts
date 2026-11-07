@@ -1105,7 +1105,7 @@ function sandboxCopy() {
   return {
     workspace_id: "ws_review", session_id: "sess_review", source: "project",
     created_at: "2026-11-02T00:00:00Z",
-    created: ["notes.md"], modified: ["app.py"], deleted: [], rejected: [],
+    created: ["notes.md"], modified: ["app.py"], deleted: [], rejected: [], conflicts: [],
   };
 }
 
@@ -1144,7 +1144,7 @@ test("Build applies exactly the sandbox changes the owner reviewed", async ({ pa
   await expect.poll(() => state.posted.length).toBe(1);
   expect(state.posted[0]).toEqual({
     path: "/api/command-workspaces/ws_review/promote",
-    body: { created: ["notes.md"], modified: ["app.py"], deleted: [] },
+    body: { created: ["notes.md"], modified: ["app.py"], deleted: [], overwrite: [] },
   });
   await expect(page.getByText("Applied to project.")).toBeVisible();
 });

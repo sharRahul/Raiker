@@ -5240,6 +5240,7 @@ export type PromoteTaskWorkspaceRequest = {
   created: string[];
   modified: string[];
   deleted: string[];
+  overwrite?: string[];
 };
 
 export type PromptRequest = {
@@ -6621,6 +6622,7 @@ export type TaskWorkspaceView = {
   modified: string[];
   deleted: string[];
   rejected: TaskWorkspaceRejection[];
+  conflicts: string[];
 };
 
 export type TelemetryCadenceRequest = {

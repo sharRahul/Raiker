@@ -1311,4 +1311,7 @@ class PromoteTaskWorkspaceRequest(StrictRequest):
     created: list[str]
     modified: list[str]
     deleted: list[str]
+    #: BD-4 — conflicting paths the owner chose to overwrite after seeing both
+    #: versions. Each must be a current conflict; any other conflict refuses.
+    overwrite: list[str] = Field(default_factory=list)
 

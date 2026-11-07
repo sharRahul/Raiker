@@ -27,10 +27,10 @@ The release criteria behind this page are in the
 | Feature | Status | What that means |
 |---|---|---|
 | Chat, Tasks, Schedule, Memory, Models, Settings | **Included** | — |
-| Hosted providers (Anthropic, OpenAI, OpenRouter) and local runtimes (Ollama, LM Studio) | **Included** | — |
+| Hosted providers (Anthropic, OpenAI, OpenRouter) and local runtimes (Ollama, LM Studio) | **Included** | Other providers still connect, and are marked *Experimental* in **Models › Add** |
 | Local GGUF models on the llama.cpp engine Raiker installs | **Included** | See [The llama.cpp engine Raiker manages](connecting-a-model.md#the-llamacpp-engine-raiker-manages) |
-| Build (coding agent) | **Included, limited** | Works in an isolated copy of your project; commands run only where the sandbox is confirmed on your computer |
-| Running commands | **Included where confirmed** | Raiker checks its sandbox on your computer at start. Where any protection cannot be confirmed, commands are turned off and the app says why. They never fall back to running unprotected |
+| Build (coding agent) | **Included, limited** | Works in an isolated copy of your project. If you edit a file the copy also changed, **Apply** shows both versions and waits until you choose **Overwrite** for it |
+| Running commands | **Included where confirmed** | Raiker checks its sandbox on your computer at start. Where any protection cannot be confirmed, commands are turned off: the composer says *Commands unavailable here* and Build's **Run** waits, while Plan and Propose still work. Commands never fall back to running unprotected |
 | Voice dictation and read-aloud | **Included, limited** | On-device only. Until the managed speech engines land, dictation needs a local transcription server you set up yourself |
 | Talking with Raiker (hands-free conversation) | **Preview** | Off by default; see the [voice plan](../plans/VOICE_CONVERSATION_SPEC.md) |
 | Design documents and exports | **Included** | Image generation is **Preview** until a real provider round trip is verified |

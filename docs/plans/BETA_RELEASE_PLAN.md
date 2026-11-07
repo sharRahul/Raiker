@@ -113,9 +113,9 @@ tools refuse with a sentence and a link.
   not enforced / unknown) and one line on what that means: *"Commands run in
   an isolated copy of your project"*, or *"Commands are turned off on this
   computer because X could not be confirmed"*.
-- The composer's runtime chip turns amber with *"Commands unavailable here"*
+- ✅ The composer's runtime chip turns amber with *"Commands unavailable here"*
   when the probe fails. Build's Run button is disabled with that tooltip, not
-  hidden.
+  hidden; Plan and Propose still work (FIXED-1315, RT-BETA-06).
 - An approval card for a command always states where it will run (*isolated
   copy*, *WSL2*, *restricted account*).
 
@@ -146,7 +146,8 @@ configured, and runner publisher pins are empty (`runner_publisher.py`).
   skipped, each with a *Set up later in Settings* link.
 - Settings → **About & updates** shows the channel (*Beta*), the installed version,
   a signature status (*Verified by Raiker* / *Unsigned development build*), and
-  **Roll back to previous version** when one is kept.
+  **Roll back to previous version** when one is kept. ✅ Release stage and
+  signature (FIXED-1315, RT-BETA-01); the rollback action waits on IN-4.
 
 ---
 
@@ -174,11 +175,11 @@ configured, and runner publisher pins are empty (`runner_publisher.py`).
 
 | ID | Item | State | P | Effort | Work left |
 |---|---|---|---|---|---|
-| MD-1 | Cloud and local provider connections | 🟡 | P0 | S | One recorded live check per supported provider on the release commit: Anthropic, OpenAI, OpenRouter, Ollama, LM Studio, llama.cpp; unsupported providers marked *Experimental* in the Add list |
+| MD-1 | Cloud and local provider connections | 🟡 | P0 | S | **2026-11-07:** providers outside the six are tagged *Experimental* in Models › Add ([FIXED-1315](FIXED_ITEMS.md#fixed-1315--the-betas-labels-and-limits-were-not-visible-where-the-owner-decides-beta-plan-1-2-3-6-8-9)). Anthropic, OpenRouter, OpenAI and Ollama (a cloud model) passed live through the UI ([run record](../architecture/WEB_APP_LIVE_TEST.md#result--2026-11-07-beta-release-plan-round)). Still required: LM Studio and llama.cpp live checks, and all six on the release commit |
 | MD-2 | llama.cpp native install, deploy, GPU config | 🟡 | P0 | S | PR #246 repaired automatic source-only stable-release selection; the `llama-cpp.yml` live jobs passed on Windows, macOS and Linux. Still required: one owner-machine run each on NVIDIA (CUDA) and AMD (Vulkan) GPU hardware, plus fresh signed-installer validation on the release candidate. |
-| MD-3 | GGUF downloads, integrity, inference | 🟡 | P0 | S | Hugging Face download: verify the LFS SHA-256 against the file actually written (today a revision is pinned); live test serves a downloaded GGUF |
+| MD-3 | GGUF downloads, integrity, inference | 🟡 | P0 | S | **2026-11-07:** every written file is checked against the hub's LFS SHA-256 (or Git blob id) and removed on a mismatch ([FIXED-1313](FIXED_ITEMS.md#fixed-1313--a-downloaded-gguf-was-never-checked-against-the-bytes-the-hub-publishes-md-3)). Still required: a live test that serves a downloaded GGUF |
 | MD-4 | Detection, readiness, selection, fallback | ✅ | — | — | Model decision service, readiness ledger and fallback sequence (FIXED items) |
-| MD-5 | Failures, rate limits, timeouts, recovery | 🟡 | P0 | M | A provider fault-injection matrix (429 with Retry-After, 500, timeout mid-stream, connection reset, malformed stream, quota exhausted) run against a local fault server; assert the turn retries or falls back with a receipt and never claims an answer it did not get |
+| MD-5 | Failures, rate limits, timeouts, recovery | 🟡 | P0 | M | **2026-11-07:** the matrix runs against a real local socket for both adapters (`tests/test_provider_fault_matrix.py`). It found and fixed a cut-off stream recorded as finished, and `Retry-After` is now carried ([FIXED-1312](FIXED_ITEMS.md#fixed-1312--a-stream-that-closed-early-was-recorded-as-a-finished-answer-md-5-found-this-round)). Still required: show *Rate-limited until …* and the fallback receipt (TO_BE_FIXED, *Provider fault handling*) |
 
 **UI / UX.**
 - Settings → Advanced → Model serving: Running models holds the engine;
@@ -206,7 +207,7 @@ configured, and runner publisher pins are empty (`runner_publisher.py`).
 | ID | Item | State | P | Effort | Work left |
 |---|---|---|---|---|---|
 | AG-1 | Plan, execute, complete multi-step tasks | 🟡 | P0 | M | T-03 with a real model, five runs on fresh state (TESTING protocol) |
-| AG-2 | Every tool call through permissions and governance | 🟡 | P0 | S | A test that every registered tool resolves to a capability gate (no tool without one); extend `test_governance_entry_paths.py` to voice-originated turns once voice lands |
+| AG-2 | Every tool call through permissions and governance | 🟡 | P0 | S | **2026-11-07:** every tool resolves to a gate or is listed with the authority it answers to ([FIXED-1310](FIXED_ITEMS.md#fixed-1310--thirty-tools-had-no-capability-gate-and-no-reviewed-reason-ag-2)). Still required: extend `test_governance_entry_paths.py` to voice-originated turns |
 | AG-3 | Approve, reject, cancel, emergency stop | ✅ | — | — | Approval relay, STOP and cancel (FIXED items, live specs) |
 | AG-4 | Scheduling, background, restart recovery | 🟡 | P0 | M | BUG-355 restart scenario: kill the host mid-goal, restart, and assert the goal resumes or parks with an honest state; no duplicate effects |
 | AG-5 | Accurate reporting, no false claims | 🟡 | P0 | M | An honesty suite in which the model is told a tool succeeded when it failed (fault injection). Assert the receipt reports the failure and the final message does not claim it; use a real model for one run |
@@ -231,8 +232,8 @@ work runs (top bar), and so is the count of running items.
 |---|---|---|---|---|---|
 | BD-1 | Repo analysis, editing, test execution | 🟡 | P0 | S | T-08 on a disposable repository with a real model, on Linux and on Windows (restricted account) |
 | BD-2 | Works in disposable copies | ✅ | — | — | Per-session task tree (TO_BE_FIXED sandbox table) |
-| BD-3 | Diffs, review, Apply, Discard | 🟡 | P0 | S | Playwright evidence of Apply and Discard with screenshots |
-| BD-4 | Git safety, protected files, conflicts | 🟡 | P0 | M | The conflict check is advisory today. Make Apply refuse when a file changed in the original since the copy was taken, unless the owner chooses **Overwrite** in a dialog that shows both versions |
+| BD-3 | Diffs, review, Apply, Discard | ✅ | — | — | Live RT-BETA-07/08 with captures ([run record](../architecture/WEB_APP_LIVE_TEST.md#result--2026-11-07-beta-release-plan-round), [FIXED-1311](FIXED_ITEMS.md#fixed-1311--a-build-apply-that-met-the-owners-own-edit-had-no-way-forward-bd-4)) |
+| BD-4 | Git safety, protected files, conflicts | ✅ | — | — | Apply refuses a conflict unless the owner chooses **Overwrite** after seeing both versions; the original is backed up and the choice audited ([FIXED-1311](FIXED_ITEMS.md#fixed-1311--a-build-apply-that-met-the-owners-own-edit-had-no-way-forward-bd-4)) |
 | BD-5 | Diagnose failures, iterate, report | 🟡 | P1 | M | A scripted failing test that the agent must fix within three iterations; the report lists each attempt |
 
 **UI / UX.**
@@ -240,8 +241,8 @@ work runs (top bar), and so is the count of running items.
   Apply and Discard as well as *Apply all*.
 - A conflict shows a three-way view (original at copy time, original now, the
   copy) with **Keep mine**, **Keep theirs** and **Open both**.
-- The Build header always says *"Working in an isolated copy — nothing changes
-  in your project until you Apply."*
+- ✅ The Build header always says *"Working in an isolated copy — nothing changes
+  in your project until you Apply."* (on the sandbox review, FIXED-1311).
 
 ---
 
@@ -268,7 +269,7 @@ work runs (top bar), and so is the count of running items.
 **UI / UX.**
 - Settings → **Privacy** gains a *"What leaves this computer"* panel, listing
   each configured destination and what may be sent there (model prompts,
-  connector calls, update checks).
+  connector calls, update checks). ✅ FIXED-1315, RT-BETA-02.
 - ✅ Backup reminders appear in the top bar when no verified backup is newer than
   14 days. Evidence: `web/src/lib/components/Topbar.svelte` shows a *Make a
   backup* link to Settings → General from every page (reachable at every width;
@@ -290,11 +291,11 @@ work runs (top bar), and so is the count of running items.
 
 | ID | Item | State | P | Effort | Work left |
 |---|---|---|---|---|---|
-| UX-1 | Quiet UI across retained pages | 🟡 | P0 | M | Close the open rows in TO_BE_FIXED's Quiet UI sections or move them to beta.2 with a known-issue entry; turn the QUI-G01 size budget into a failing check for Chat, Build, Models and Settings |
+| UX-1 | Quiet UI across retained pages | 🟡 | P0 | M | **2026-11-07:** QUI-G01 is a failing check (RT-BETA-10) for Chat, Build, Models, Settings › General, Privacy and About & updates, with General as one tracked exception (TO_BE_FIXED, *Settings › General is over its size budget*). Still required: close or move the open Quiet UI rows |
 | UX-2 | Composer, navigation, model selection consistent | 🟡 | P0 | S | Existing component coverage names the Chat and Build grammars; this round adds the shared five-state vocabulary and a live `RT-BETA-UX-01` route check. Still required: one explicit parity assertion across Chat, Build and Design that compares the common controls in order. |
 | UX-3 | Permission controls, runtime status, approvals | ✅ | — | — | QUI-P01–P09 (approvals round) |
-| UX-4 | Understandable errors and recovery actions | 🟡 | P0 | M | The connector UI now gives action-oriented copy for missing, expired/revoked, and refresh-failed credentials; PR #245 does this for the llama.cpp engine. Still required: an automated whole-route `reason_code` label audit. |
-| UX-5 | Responsive layouts, accessibility, desktop usability | 🟡 | P0 | M | axe-core run in Playwright on every page at 1440, 1280 and 390 widths with zero serious violations; keyboard-only T-14; screen-reader pass with NVDA and VoiceOver |
+| UX-4 | Understandable errors and recovery actions | ✅ | — | — | Whole-route audit `tests/test_route_reason_copy.py`: every literal route refusal has copy, and `failure()` says why ([FIXED-1309](FIXED_ITEMS.md#fixed-1309--eighty-route-refusals-reached-the-owner-as-a-bare-machine-code-ux-4)) |
+| UX-5 | Responsive layouts, accessibility, desktop usability | 🟡 | P0 | M | **2026-11-07:** RT-BETA-09 finds no serious or critical axe violation on any destination at 1440, 1280 and 390 ([FIXED-1317](FIXED_ITEMS.md#fixed-1317--settings-sections-were-off-the-card-system-and-the-activity-table-could-not-be-scrolled-by-keyboard-found-this-round-ux-5)). Still required: keyboard-only T-14; NVDA and VoiceOver passes |
 
 **2026-11-06 shared UI refinement.** The owner's settings cog, simpler Models
 and shared Apple/macOS design pass are implemented. The running-host review
@@ -343,9 +344,9 @@ because the Playwright browser download was unavailable.
 | ID | Item | State | P | Effort | Work left |
 |---|---|---|---|---|---|
 | VD-1 | On-device dictation and read-aloud setup | 🟡 | P0 | L | **Implemented** (voice spec V1): verified catalogue (`raiker/config/voice-catalogue.json`), profiles with a hardware recommendation, shared `ResourceLedger` and placement planner, digest-verified installer run as a model operation, contained whisper-server and a token-protected speaking worker (Kokoro/Piper), idle and low-memory unload, Settings › Voice, the *Voice* first-run step, dictation and read-aloud on the managed engines. Kokoro speaking was installed, verified and run for real here (`tests/test_voice_live.py`). Still required: pin the Whisper models and Piper voices (`python -m scripts.pin_voice_catalogue --write` where Hugging Face is reachable; Piper voice licences reviewed), build Linux/macOS `whisper-server` in the release workflow, bundle `kokoro-onnx` once its espeak-ng (GPL-3.0) use is signed off, and run the §14 acceptance on all three OSes |
-| VD-2 | Mic permissions, cancellation, audio privacy, no browser speech | 🟡 | P0 | M | Playwright with a fake microphone: permission denied, revoked mid-recording, cancel, the 6-minute limit; a test that `SpeechRecognition` is never constructed; read-aloud refuses non-local voices (done) |
-| VD-3 | Design composer, templates, attachments, image generation | 🟡 | P1 | M | Ship the document editor; label image generation **Preview** until BUG-287 has a real-provider round trip |
-| VD-4 | Disable unfinished capabilities clearly | 🟡 | P0 | S | Hands-free conversation is **Preview** behind Settings › Voice (*Hands-free conversation*), and the conversation panel carries a *Preview* label; voice components that cannot be offered yet are shown with their reason, not hidden. Still required: remove the partial BUG-348 canvas features from menus |
+| VD-2 | Mic permissions, cancellation, audio privacy, no browser speech | 🟡 | P0 | M | **2026-11-07:** the unused browser adapter is removed and a test fails if any source reads `SpeechRecognition` ([FIXED-1314](FIXED_ITEMS.md#fixed-1314--the-page-still-carried-a-browser-speech-recognition-adapter-vd-2)); read-aloud refuses non-local voices (done). Still required: the fake-microphone Playwright run and the 6-minute limit |
+| VD-3 | Design composer, templates, attachments, image generation | 🟡 | P1 | M | Image generation is labelled **Preview** (2026-11-07, FIXED-1315). Still required: ship the document editor; drop the label once BUG-287 has a real-provider round trip |
+| VD-4 | Disable unfinished capabilities clearly | ✅ | — | — | Hands-free conversation is **Preview** behind Settings › Voice (*Hands-free conversation*), and the conversation panel carries a *Preview* label; voice components that cannot be offered yet are shown with their reason, not hidden. BUG-348's unfinished rows are absent from the menus, and a guard test keeps them out (2026-11-07, FIXED-1315) |
 | VD-5 | Native voice conversation | 🟡 | P1 | L | **V2 Preview implemented**: conversation panel in Chat (*Talk*), push to talk, hands-free with Silero VAD v5 (onnxruntime-web, bundled; real-model test), streaming sentence-by-sentence speech, barge-in that stops audio and cancels the turn, approvals asked for on screen only, `input_mode: spoken` with a spoken-style hint. Still required: the §14 V2 acceptance on the reference laptop (P50 first audio < 1.5 s, barge-in < 200 ms), a Playwright fake-microphone end-to-end run; V3 after beta |
 
 **UI / UX.** See [VOICE_CONVERSATION_SPEC.md §8](VOICE_CONVERSATION_SPEC.md#8-ui-and-ux).
@@ -371,7 +372,7 @@ The composer microphone has three states (*Set up voice*, *Dictate*,
 | PL-2 | Grants, revocation, audit | ✅ | — | — | Governance suite |
 | PL-3 | OAuth and credential storage | 🟡 | P0 | S | Vault encryption and expiry checks are tested; a provider 401 marks the local credential `reauth_required` so it is not retried. Still required: expired-token and owner-revoked-token live checks for GitHub on the release candidate. Provider-specific OAuth revoke endpoints are not claimed until Raiker has registered clients. |
 | PL-4 | Plugins and MCP cannot bypass the sandbox | 🟡 | P0 | S | Covered by SB-4/SB-6; add an MCP server that tries network, a home read and a spawn outside its folder |
-| PL-5 | Supported vs experimental | 🟡 | P0 | S | Every connector now has a `support_level` field and is labelled **Experimental** by default, preventing a catalogue listing from implying beta support. Still required: live evidence to promote the supported beta list, the same labels for MCP catalogue entries, and an extra installation confirmation for experimental entries. |
+| PL-5 | Supported vs experimental | 🟡 | P0 | S | Every connector has a `support_level` and is **Experimental** by default; the Add list shows the label and an experimental install asks once more (2026-11-07, FIXED-1315, RT-BETA-04). Still required: live evidence to promote the supported beta list; MCP has no catalogue to label (TO_BE_FIXED, *MCP servers have no catalogue to label*) |
 
 **UI / UX.** The Extensions page has two sections, *Supported* and
 *Experimental*. An experimental card has an amber badge and the install dialog
@@ -521,6 +522,13 @@ Anything not green at the start of week 4 is moved to *Not in beta* with the
 product refusing it, rather than delaying the date.
 
 ## Changelog
+
+- **2026-11-07** — Beta round: fifteen items (AG-2, UX-1, UX-4, UX-5, BD-3,
+  BD-4, MD-1, MD-3, MD-5, PL-5, VD-2, VD-3, VD-4 and the §1, §2 and §6 UI
+  deliverables), FIXED-1309 to FIXED-1317. Four defects were found and fixed on
+  the way: a cut-off stream recorded as finished, a cloud model called local, an
+  off-system Settings card, and an unfocusable table. Live evidence: the
+  [run record](../architecture/WEB_APP_LIVE_TEST.md#result--2026-11-07-beta-release-plan-round), 10/10 plus three hosted providers and Ollama.
 
 - **2026-11-06** — Recorded the owner-requested cog/Models simplification,
   shared cross-page refinement and three real hosted-provider UI checks.

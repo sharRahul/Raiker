@@ -302,7 +302,7 @@
   .resolved { color: var(--text-2); margin: var(--space-2) 0 0; font-size: var(--text-sm); }
   .resolved strong { color: var(--text-1); }
   .clock { font-variant-numeric: tabular-nums; }
-  .proposal { color: var(--text-2); margin: var(--space-2) 0 0; max-width: 34rem; }
+  .proposal { color: var(--text-2); margin: var(--space-2) 0 0; max-width: 34rem; font-size: var(--text-sm); }
   .proposal strong { color: var(--text-1); }
   .setup-row { display: flex; align-items: center; justify-content: space-between; gap: var(--space-4); margin-top: var(--space-2); }
   .setup-row > div:first-child { display: grid; gap: .15rem; }

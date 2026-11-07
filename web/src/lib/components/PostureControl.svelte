@@ -25,6 +25,7 @@
   import Icon from "./Icon.svelte";
   import ApprovalModeControl from "./ApprovalModeControl.svelte";
   import ExecutionEnvironmentBadge from "./ExecutionEnvironmentBadge.svelte";
+  import { COMMANDS_SETUP_HREF, COMMANDS_UNAVAILABLE, commandsUnavailableReason } from "../commandAvailability";
 
   let {
     showEnvironment = true,
@@ -75,11 +76,16 @@
     })();
   });
 
+  // Beta plan §1 — a host that cannot run commands says so on the chip, in
+  // amber, even where the chip is otherwise shown only for an exception.
+  const commandsOff = $derived(showEnvironment ? commandsUnavailableReason(environment) : null);
+
   /** The shortest true thing about where work runs. */
   const whereSummary = $derived.by(() => {
     if (!showEnvironment) return null;
     if (environmentUnavailable) return "Environment unknown";
     if (environment === null) return null;
+    if (commandsOff !== null) return COMMANDS_UNAVAILABLE;
     return environment.kind === "native" ? "Local sandbox" : environment.kind === "retired" ? "Removed environment" : "Remote";
   });
 
@@ -134,12 +140,13 @@
   });
 </script>
 
-{#if !exceptionOnly || relaxed}
+{#if !exceptionOnly || relaxed || commandsOff !== null}
 <div class="posture" bind:this={root}>
   <button
     type="button"
     class="chip"
-    class:relaxed
+    class:relaxed={relaxed || commandsOff !== null}
+    title={commandsOff ?? undefined}
     aria-expanded={open}
     aria-haspopup="dialog"
     aria-label={`Governance posture: ${summary}`}
@@ -163,6 +170,9 @@
         <div class="field">
           <p class="field-label">Where work runs</p>
           <ExecutionEnvironmentBadge />
+          {#if commandsOff}
+            <p class="field-detail">{commandsOff} <a href={COMMANDS_SETUP_HREF}>Set up</a></p>
+          {/if}
         </div>
       {/if}
 

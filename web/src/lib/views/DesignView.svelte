@@ -802,7 +802,7 @@
   <div class="mode-switch">
     <TabStrip
       tabs={[
-        { id: "images", label: "Images" },
+        { id: "images", label: "Images · Preview" },
         { id: "documents", label: "Documents" },
       ]}
       selected={mode}
@@ -821,6 +821,12 @@
     </div>
   {:else}
   <div class="thread" id="panel-images" role="tabpanel" aria-labelledby="tab-images" bind:this={threadEl}>
+    <!-- Beta plan VD-3 — image generation is a Preview until a real image
+         provider round trip is recorded (BUG-287). Said once, at the top. -->
+    <p class="preview-note" data-testid="image-preview-note">
+      <span class="pill">Preview</span>
+      Image generation has not been verified end to end with a real image provider in this beta.
+    </p>
     {#if lifecycleNotice !== null}
       <p class="notice" role="alert">{lifecycleNotice}</p>
     {/if}
@@ -1381,4 +1387,6 @@
     .design { height: auto; min-height: var(--content-h); }
     .thread { overflow-y: visible; }
   }
+  .preview-note .pill { padding:.05rem .45rem; border:1px solid var(--warn); border-radius:var(--r-pill); color:var(--warn); font-weight:600; }
+  .preview-note { display:flex; align-items:center; gap:var(--space-2); margin:0 0 var(--space-2); color:var(--text-3); font-size:var(--text-xs); }
 </style>

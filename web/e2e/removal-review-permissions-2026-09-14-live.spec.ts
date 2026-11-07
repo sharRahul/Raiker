@@ -157,7 +157,7 @@ test("Privacy is an inventory of what is kept and what can leave (REM-SET-PRIVAC
   await expect(kept.getByRole("link", { name: "Memory" })).toHaveAttribute("href", "#/memory");
   await expect(kept.getByText(/not from a backup already written/)).toBeVisible();
 
-  const outbound = page.getByRole("region", { name: "What can leave this machine" });
+  const outbound = page.getByRole("region", { name: "What leaves this computer" });
   await expect(outbound).toBeVisible();
   // Availability is read from the same gate list Permissions reads, in the same
   // words — so the two pages cannot disagree about whether something can leave.

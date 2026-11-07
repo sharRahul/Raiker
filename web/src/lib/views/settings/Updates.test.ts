@@ -216,3 +216,18 @@ it("says a release that recorded neither does not state them, rather than guessi
   expect(await screen.findByText("Not stated by this release", { selector: "dd" })).toBeInTheDocument();
   expect(screen.getByText("This release does not say what it changes.")).toBeInTheDocument();
 });
+
+it("says the release stage and whether the build is signed (beta plan §2)", async () => {
+  vi.spyOn(api, "hostUpdate").mockResolvedValue(status());
+  const { unmount } = render(Updates);
+  expect(await screen.findByText("Unsigned development build")).toBeTruthy();
+  expect(screen.getByText("Development build")).toBeTruthy();
+  unmount();
+  vi.spyOn(api, "hostUpdate").mockResolvedValue({
+    ...signedPackage,
+    installation: { ...signedPackage.installation, version: "0.9.0-beta.1" },
+  });
+  render(Updates);
+  expect(await screen.findByText("Verified by Raiker")).toBeTruthy();
+  expect(screen.getByText("Beta")).toBeTruthy();
+});

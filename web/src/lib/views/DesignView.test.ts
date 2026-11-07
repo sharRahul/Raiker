@@ -88,6 +88,24 @@ afterEach(() => {
   arriveAt("#/design");
 });
 
+describe("beta scope (VD-3, VD-4)", () => {
+  it("labels image generation Preview", async () => {
+    stubFetch(routes());
+    render(DesignView);
+    expect(await screen.findByTestId("image-preview-note")).toHaveTextContent(/Preview.*not been verified/);
+    expect(screen.getByRole("tab", { name: "Images · Preview" })).toBeInTheDocument();
+  });
+
+  it("offers only the export formats that exist and no partial canvas features", async () => {
+    const { readFileSync } = await import("node:fs");
+    const source = readFileSync("src/lib/components/DesignDocuments.svelte", "utf8");
+    const formats = [...source.matchAll(/<option value="(png|pdf|vector_pdf|svg|json|pptx|docx|key)">/g)].map((m) => m[1]);
+    expect(new Set(formats)).toEqual(new Set(["png", "vector_pdf", "pdf", "svg", "json"]));
+    // BUG-348's unfinished rows stay absent until they are built.
+    expect(source).not.toMatch(/Import brand guide|Share component|Presentation \(/i);
+  });
+});
+
 describe("arriving at Design from a project", () => {
   it("offers local dictation beside the image composer action", async () => {
     stubFetch(routes());

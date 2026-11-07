@@ -141,6 +141,9 @@ class TaskWorkspaceView(TypedDict):
     deleted: list[str]
     #: Produced by the task but never promotable: links, special files, `.git`.
     rejected: list[TaskWorkspaceRejection]
+    #: BD-4 — changed paths the owner also changed in the project since the copy
+    #: was taken. Apply refuses them unless each is chosen for overwrite.
+    conflicts: list[str]
 
 
 class TaskWorkspaceList(TypedDict):

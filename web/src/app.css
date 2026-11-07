@@ -228,6 +228,14 @@
   --bg: #F7F6F2;
   --surface: #FFFFFF;
   --sunken: #EFEEE9;
+  /* 2026-11-07 — roles the dark ladder needs; light keeps its current look. */
+  --sidebar-bg: var(--surface);
+  --composer-edge: var(--border);
+  --nav-selected: var(--accent-soft);
+  --dialog-bg: var(--surface);
+  --action: var(--accent);
+  --action-strong: var(--accent-strong);
+  --action-text: var(--text-inverse);
   --raised: #FFFFFF;
   --control-thumb: #FFFFFF;
   --border: #E4E2DA;
@@ -381,24 +389,35 @@
 :root[data-theme="dark"] {
   color-scheme: dark;
 
-  --bg: #121212;
-  --surface: #1B1B1B;
-  --sunken: #161616;
-  --raised: #222222;
-  --control-thumb: #F4F1EA;
-  --border: #2A2A2A;
-  --border-strong: #3B3B3B;
+  --bg: #101216;
+  --surface: #1C2027;
+  --sunken: #232832;
+  --raised: #272D36;
+  --control-thumb: #F2F4F7;
+  --border: #343B46;
+  --border-strong: #4A5361;
   /* Dark separates a card from the ground by luminance: the ground
      is #0B0D10 and the card #12161F. An outline on top of that step is a
      second edge doing a job the step already did, and it is what made a page
      of cards read as a grid of boxes rather than as raised paper. */
   --card-edge: transparent;
 
-  --text-1: #F4F1EA;
-  --palette-secondary: #8C8A84;
-  --text-2: #B7B4AC;
-  --text-3: #B7B4AC;
-  --text-inverse: #121212;
+  --text-1: #F2F4F7;
+  --palette-secondary: #A0A7B2;
+  --text-2: #C1C7D0;
+  --text-3: #A0A7B2;
+  --text-inverse: #101216;
+  /* 2026-11-07 dark ladder: canvas #101216 < sidebar < cards and composer
+     #1C2027 < hover wells #232832 < menus and dialogs #272D36. */
+  --sidebar-bg: #15181E;
+  --composer-edge: #5A6474;
+  --nav-selected: rgba(120, 183, 213, 0.2);
+  --dialog-bg: var(--raised);
+  /* Gold for primary actions and key highlights, blue for secondary
+     interaction and focus, semantic colours for status. */
+  --action: #E0B64A;
+  --action-strong: #ECCB78;
+  --action-text: #101216;
 
   --accent: #78B7D5;
   --accent-strong: #A3CFE4;
@@ -448,7 +467,7 @@
      #0B0D10 a dark edge disappears, and the boundary of an image is exactly
      what must not. */
   --elevation-edge: var(--border-strong);
-  --canvas-edge: rgba(244, 241, 234, 0.24);
+  --canvas-edge: rgba(242, 244, 247, 0.24);
   --canvas-lift: none;
   --warning: var(--warn);
   --ok-text: var(--ok);
@@ -475,19 +494,30 @@
   :root:not([data-theme]) {
     color-scheme: dark;
 
-    --bg: #121212;
-    --surface: #1B1B1B;
-    --sunken: #161616;
-    --raised: #222222;
-    --border: #2A2A2A;
-    --border-strong: #3B3B3B;
+    --bg: #101216;
+    --surface: #1C2027;
+    --sunken: #232832;
+    --raised: #272D36;
+    --border: #343B46;
+    --border-strong: #4A5361;
     --card-edge: transparent;
 
-    --text-1: #F4F1EA;
-    --palette-secondary: #8C8A84;
-    --text-2: #B7B4AC;
-    --text-3: #B7B4AC;
-    --text-inverse: #121212;
+    --text-1: #F2F4F7;
+    --palette-secondary: #A0A7B2;
+    --text-2: #C1C7D0;
+    --text-3: #A0A7B2;
+    --text-inverse: #101216;
+  /* 2026-11-07 dark ladder: canvas #101216 < sidebar < cards and composer
+     #1C2027 < hover wells #232832 < menus and dialogs #272D36. */
+  --sidebar-bg: #15181E;
+  --composer-edge: #5A6474;
+  --nav-selected: rgba(120, 183, 213, 0.2);
+  --dialog-bg: var(--raised);
+  /* Gold for primary actions and key highlights, blue for secondary
+     interaction and focus, semantic colours for status. */
+  --action: #E0B64A;
+  --action-strong: #ECCB78;
+  --action-text: #101216;
 
     --accent: #78B7D5;
     --accent-strong: #A3CFE4;
@@ -537,7 +567,7 @@
        #0B0D10 a dark edge disappears, and the boundary of an image is exactly
        what must not. */
     --elevation-edge: var(--border-strong);
-    --canvas-edge: rgba(244, 241, 234, 0.24);
+    --canvas-edge: rgba(242, 244, 247, 0.24);
     --canvas-lift: none;
     --warning: var(--warn);
     --ok-text: var(--ok);
@@ -974,13 +1004,13 @@ time {
 }
 
 .btn-primary {
-  background: var(--accent);
-  border-color: var(--accent);
-  color: var(--text-inverse);
+  background: var(--action);
+  border-color: var(--action);
+  color: var(--action-text);
 }
 .btn-primary:hover:not(:disabled) {
-  background: var(--accent-strong);
-  border-color: var(--accent-strong);
+  background: var(--action-strong);
+  border-color: var(--action-strong);
 }
 
 .btn-soft {

@@ -26,11 +26,12 @@ live cases RT-QUI-57 and RT-QUI-70).
 
 | Role | Light | Dark | Use |
 |---|---|---|---|
-| Background | `#F7F6F2` | `#121212` | App canvas |
-| Surface | `#FFFFFF` | `#1B1B1B` | Cards, panels, sheets |
-| Main text | `#1C1C1A` | `#F4F1EA` | Reading text |
-| Secondary text | `#686761` | `#B7B4AC` | Metadata |
-| Primary action | `#2F6F8F` | `#78B7D5` | Primary actions, focus |
+| Background | `#F7F6F2` | `#101216` (was `#121212`) | App canvas |
+| Surface | `#FFFFFF` | `#1C2027` (was `#1B1B1B`) | Cards, panels, sheets, the composer |
+| Main text | `#1C1C1A` | `#F2F4F7` (was `#F4F1EA`) | Reading text |
+| Secondary text | `#686761` | `#C1C7D0` (was `#B7B4AC`); muted `#A0A7B2` (was `#8C8A84`) | Metadata, descriptions, placeholders |
+| Primary action | `#2F6F8F` | gold `#E0B64A` with `#101216` text (`--action`, 2026-11-07) | Primary actions and key highlights |
+| Interactive accent | `#2F6F8F` | `#78B7D5` | Secondary interaction, selection, focus |
 | Attention | `#B8871B` fill / **`#8A6411` text** | `#E0B64A` | Decisions required |
 | Success | `#2F7D5C` | `#62B68D` | Verified completion |
 | Risk | `#B5453C` | `#E47B70` | Destructive and error |
@@ -166,7 +167,10 @@ and action sizes. The accepted blend pairs Muse's quieter spacing and
 progressive disclosure with Apple's legible icon scale, familiar slider thumb
 and clear switch state. This is a design direction, not a pixel-for-pixel copy:
 Raiker keeps the QUI-V01 palette, Inter, and restrained surfaces. Do not add
-Liquid Glass or replace the existing brand colors.
+Liquid Glass or replace the existing brand colors. *(Superseded for the
+composer on 2026-11-07: the owner chose a glass capsule, see
+[03](03_WELCOME_HOME_AND_CHAT.md#2026-11-07--composer-control-deck); and the
+dark palette below.)*
 
 The accepted changes use shared icon roles and consistent switch/range controls
 across every page. The composer proposal was removed from source and its former
@@ -194,3 +198,47 @@ The slider thumb uses Apple's linear-slider lozenge shape, while the track and
 switches inherit Raiker's accent and semantic tokens. The composer pill was
 captured and reviewed, but the owner rejected it; those screenshots are
 exploratory only. Final evidence uses the restored rounded-card shape.
+
+## 2026-11-07 — Dark theme luminance ladder
+
+**Owner decision, 2026-11-07.** The owner reviewed the dark theme and supplied
+the palette and priorities below. They apply to the dark theme; light keeps its
+QUI-V01 values, including blue primary actions, until the owner decides
+otherwise.
+
+| Role | Was | Now | Token |
+|---|---|---|---|
+| Main background | `#121212` | `#101216` | `--bg` |
+| Sidebar | `#1B1B1B` (as cards) | `#15181E` | `--sidebar-bg` |
+| Cards, panels, composer | `#1B1B1B` | `#1C2027` | `--surface` |
+| Hover and wells | `#161616` (darker than cards) | `#232832` | `--sunken` |
+| Raised surfaces, menus, dialogs | `#222222` | `#272D36` | `--raised`, `--dialog-bg` |
+| Borders | `#2A2A2A` | `#343B46` (strong `#4A5361`) | `--border`, `--border-strong` |
+| Composer edge | as borders | `#5A6474` (3.1:1 on the canvas) | `--composer-edge` |
+| Primary text | `#F4F1EA` | `#F2F4F7` | `--text-1` |
+| Secondary text | `#B7B4AC` | `#C1C7D0` | `--text-2` |
+| Muted text | `#8C8A84` (`--text-3` aliased secondary) | `#A0A7B2` | `--text-3` |
+| Primary actions | blue | gold `#E0B64A`, `#101216` text | `--action` |
+| Selected navigation | blue at 13 % | blue at 20 % | `--nav-selected` |
+
+The 15-item checklist:
+
+1. [x] Canvas, sidebar, cards, hover wells and menus form one ordered ladder.
+2. [x] The sidebar is its own step between the canvas and the cards.
+3. [x] Dialog shells (Add, form and confirm dialogs) sit on the raised step.
+4. [x] Primary, secondary and muted text use the supplied values; muted is its own step again.
+5. [x] Borders and strong borders use the supplied values.
+6. [x] Hover moves up the ladder in dark: `--sunken` was darker than a card, so hovers barely showed.
+7. [x] Selected navigation is a clearer tint than hover.
+8. [x] Focus stays a blue 2 px ring with its halo, at least 3:1 on every step.
+9. [x] The composer has its own edge token at 3:1 against the workspace.
+10. [x] Gold is the primary action (`.btn-primary`, Send, Run, the model-setup primaries); blue stays for secondary interaction.
+11. [x] Semantic status colours are unchanged.
+12. [x] A unit test keeps the ladder ordered and every text role at AA on every step.
+13. [x] axe colour-contrast runs on every destination in dark and light against a running host.
+14. [x] Dark screenshots of every destination are kept for review.
+15. [x] All composers stop growing at five lines (owner decision, same day), and Build shows dictation beside Run.
+
+Evidence: [FIXED-1305](../FIXED_ITEMS.md#fixed-1305--the-dark-theme-had-no-surface-ladder-and-hover-was-invisible)
+and the [Live Test docs](../../architecture/WEB_APP_LIVE_TEST.md#result--2026-11-07-dark-ladder-and-five-line-composer).
+

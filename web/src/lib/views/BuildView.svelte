@@ -2674,19 +2674,6 @@
               onchoose={runComposerAction}
             />
             <BuildModePicker {mode} onchange={setMode} disabled={streaming} />
-            <VoiceDictationControl
-              bind:this={voiceControl}
-              showTrigger={false}
-              draft={draft.text}
-              selectionStart={promptSelectionStart}
-              selectionEnd={promptSelectionEnd}
-              runtime={speechRuntime}
-              disabled={streaming}
-              onchange={onVoiceDraft}
-              onfinalized={() => (voiceDictated = true)}
-              onrestored={restoreVoiceProvenance}
-              onactivechange={onVoiceActive}
-            />
             <!-- COMPOSER-06/08 — project, repository, attachments and context
                  as one inspectable line. A turn that may edit files or run a
                  command has to say which tree it is pointed at, and that was
@@ -2729,6 +2716,21 @@
       {/snippet}
 
       {#snippet right()}
+            <!-- Dictation is a visible control beside Run, as in Chat and Design
+                 (2026-11-07); it was reachable only from the + menu. -->
+            <VoiceDictationControl
+              bind:this={voiceControl}
+              showPrivacy={false}
+              draft={draft.text}
+              selectionStart={promptSelectionStart}
+              selectionEnd={promptSelectionEnd}
+              runtime={speechRuntime}
+              disabled={streaming}
+              onchange={onVoiceDraft}
+              onfinalized={() => (voiceDictated = true)}
+              onrestored={restoreVoiceProvenance}
+              onactivechange={onVoiceActive}
+            />
 
             <button
               type="submit"

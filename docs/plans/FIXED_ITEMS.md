@@ -1609,6 +1609,7 @@ file you can open. The two capture sets that remain — `screenshots/pages/` and
 | [FIXED-1302](#fixed-1302--approvals-library-and-sessions-errors-hid-uncertain-writes-qui-g06) | High | Approvals / Library / Sessions / recovery | Fixed 2026-11-06 |
 | [FIXED-1303](#fixed-1303--an-open-approvals-queue-missed-a-decision-raised-after-it-loaded) | Medium | Approvals / top bar | Fixed 2026-11-06 |
 | [FIXED-1304](#fixed-1304--the-composer-was-a-short-solid-box-with-no-context-guardrails-qui-c04) | Medium | Composer / attachments / settings | Fixed 2026-11-07 |
+| [FIXED-1305](#fixed-1305--the-dark-theme-had-no-surface-ladder-and-hover-was-invisible) | Medium | Dark theme / accessibility / composer | Fixed 2026-11-07 |
 
 ---
 
@@ -39100,4 +39101,38 @@ under the owner's 2026-11-07 decisions:
 `tests/test_document_attachments.py`, and the running-host
 `web/e2e/composer-control-deck-live.spec.ts`; see the
 [Live Test docs](../architecture/WEB_APP_LIVE_TEST.md#result--2026-11-07-composer-control-deck).
+
+## FIXED-1305 — The dark theme had no surface ladder, and hover was invisible
+
+**Severity: Medium. Area: Dark theme / accessibility / composer. Status: Fixed 2026-11-07.**
+
+**Observed (owner review, 2026-11-07).** The sidebar, cards and composer shared
+one colour (`#1B1B1B`), so the shell read as one flat sheet. `--sunken`, used for
+hover in 77 places, was *darker* than a card, so hovers barely showed. Muted text
+was aliased to secondary. Primary actions and secondary links were both blue.
+The composer grew to about eighteen lines. Build's dictation was only in its
+**+** menu, while Chat and Design showed a microphone.
+
+**Fixed.** The owner's palette and priorities, recorded in
+[08, Dark theme luminance ladder](quiet-ui/08_BRAND_AND_VISUAL_SYSTEM.md#2026-11-07--dark-theme-luminance-ladder):
+* the canvas, sidebar, cards and composer, hover wells, and menus and dialogs
+  are five ordered steps;
+* new role tokens: `--sidebar-bg`, `--dialog-bg`, `--nav-selected`,
+  `--composer-edge` (3.1:1 against the canvas) and `--action`, which is gold
+  with dark text for primary actions in dark;
+* text is `#F2F4F7`, `#C1C7D0` and `#A0A7B2`; borders are `#343B46` and `#4A5361`.
+
+Light keeps its values. All composers stop at five lines, measured from the
+input's own line height (`promptCapPx`), so the cap holds at any text size. Build
+shows its microphone beside Run; COMPOSER-02's "not a permanent button" rule no
+longer lists Dictate.
+
+**Evidence.** `appCss.test.ts` checks that the ladder stays ordered and that
+every text role is at least 4.5:1 on every step; `Composer.test.ts`;
+`e2e/composer.spec.ts` (mocked). Running-host checks:
+`dark-ladder-contrast-live.spec.ts` (axe colour-contrast on 37 destinations in
+both themes, 0 findings; ladder, hover, focus, selection, composer edge and gold
+Send measured) and `composer-control-deck-live.spec.ts` (RT-COMPOSER-02 five
+lines, RT-COMPOSER-08 dictation). See the
+[Live Test docs](../architecture/WEB_APP_LIVE_TEST.md#result--2026-11-07-dark-ladder-and-five-line-composer).
 

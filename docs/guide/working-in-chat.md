@@ -24,8 +24,10 @@ once is enough.
 
 The composer floats as a glass capsule over the page: the conversation scrolls
 beneath its top edge, and the card is solid instead where your system asks for
-reduced transparency. It grows with what you write, up to about twelve lines,
-before it scrolls, so a long instruction or a pasted snippet stays readable.
+reduced transparency. It grows with what you write, up to five lines, then
+scrolls, so the conversation stays in view while you write a long instruction.
+In Chat, Build and Design the microphone beside **Send** (or **Run**) starts
+dictation.
 
 **Context guardrail.** When the conversation plus what this prompt carries is
 estimated at more than 80% of the model's context window, the card's border

@@ -78,12 +78,21 @@ test("RT-COMPOSER-01: the glass capsule floats over Chat, Build and Design in bo
   }
 });
 
-test("RT-COMPOSER-02: the input grows to about twelve lines, then scrolls", async ({ page }) => {
+test("RT-COMPOSER-02: the input grows to five lines, then scrolls", async ({ page }) => {
   const composer = await newChat(page);
   const box = composer.getByRole("textbox").first();
-  await box.fill(Array.from({ length: 40 }, (_, i) => `Line ${i + 1} of a long system prompt`).join("\n"));
-  const { height, scrolls } = await box.evaluate((el) => ({ height: el.getBoundingClientRect().height, scrolls: el.scrollHeight > el.clientHeight }));
-  expect(Math.round(height)).toBe(432);
+  await box.fill(Array.from({ length: 12 }, (_, i) => `Line ${i + 1} of a long system prompt`).join("\n"));
+  // Five lines (owner decision, 2026-11-07), measured from the input's own line height.
+  const { height, line, padding, scrolls } = await box.evaluate((el) => {
+    const style = getComputedStyle(el);
+    return {
+      height: el.getBoundingClientRect().height,
+      line: parseFloat(style.lineHeight),
+      padding: parseFloat(style.paddingTop) + parseFloat(style.paddingBottom),
+      scrolls: el.scrollHeight > el.clientHeight,
+    };
+  });
+  expect(Math.abs(height - (line * 5 + padding))).toBeLessThanOrEqual(1);
   expect(scrolls).toBe(true);
   await capture(page, `${SHOTS}/02-long-prompt.png`);
   await box.fill("");
@@ -175,4 +184,15 @@ test("RT-COMPOSER-07: Add to prompt pins an earlier answer and sends it as quote
   await expect(page.getByRole("button", { name: "Copy response", exact: true })).toHaveCount(2, { timeout: 180_000 });
   await expect(page.locator(".message-group-raiker").last()).toContainText("3");
   await expect(composer.getByText("Answer 1", { exact: true })).toHaveCount(0);
+});
+
+test("RT-COMPOSER-08: Build shows dictation beside Run, as Chat and Design do", async ({ page }) => {
+  for (const [route, label] of [["build", "Build composer"], ["new-chat", "Message composer"], ["design", "Image composer"]] as const) {
+    await page.goto(`${BASE}/#/${route}`);
+    const composer = page.getByRole("group", { name: label, exact: true });
+    await expect(composer).toBeVisible({ timeout: 60_000 });
+    await expect(composer.getByRole("button", { name: "Dictate", exact: true })).toBeVisible();
+  }
+  await page.goto(`${BASE}/#/build`);
+  await capture(page, `${SHOTS}/08-build-dictation.png`, page.getByRole("group", { name: "Build composer", exact: true }));
 });

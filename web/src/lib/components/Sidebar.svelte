@@ -121,7 +121,7 @@
 </nav>
 
 <style>
-  .sidebar { width:var(--sidebar-w); flex-shrink:0; display:flex; flex-direction:column; min-height:0; overflow-y: auto; overflow-x:hidden; padding:var(--space-4) var(--space-3); border-right:1px solid var(--border); background:var(--surface); position: relative; transition:width var(--motion-shell) var(--ease-shell),padding var(--motion-shell) var(--ease-shell),transform var(--motion-shell) var(--ease-shell); }
+  .sidebar { width:var(--sidebar-w); flex-shrink:0; display:flex; flex-direction:column; min-height:0; overflow-y: auto; overflow-x:hidden; padding:var(--space-4) var(--space-3); border-right:1px solid var(--border); background:var(--sidebar-bg); position: relative; transition:width var(--motion-shell) var(--ease-shell),padding var(--motion-shell) var(--ease-shell),transform var(--motion-shell) var(--ease-shell); }
 
   /* Collapsed is a rail, not gone: the icons stay, the active row stays marked,
      and the labels are what the width buys you. Collapsing costs the words,
@@ -160,7 +160,7 @@
      emphasis, it is noise, and the row still had to be read to find out which
      one it was. Two remain, and they are the two that survive a rail with no
      labels: the tinted row, and the filled glyph. */
-  .nav-link.active { background:var(--accent-soft); color:var(--text-1); }
+  .nav-link.active { background:var(--nav-selected); color:var(--text-1); }
   /* QUI-C06 — quieter than the destinations above them: indented under Chat,
      one line each, the title cut with an ellipsis and whole in its tooltip. */
   /* Grid items size to their content unless told otherwise, which let a long

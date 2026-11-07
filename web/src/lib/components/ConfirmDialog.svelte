@@ -75,7 +75,7 @@
 
 <style>
   .confirm-dialog::backdrop{background:var(--overlay)}
-  .confirm-dialog{color:var(--text-1);width:min(440px,calc(100vw - 2rem));max-height:calc(100dvh - var(--space-6));overflow:auto;overflow-wrap:anywhere;padding:var(--space-5);border:1px solid var(--border);border-radius:var(--r-lg);background:var(--surface);box-shadow:var(--shadow-2)}
+  .confirm-dialog{color:var(--text-1);width:min(440px,calc(100vw - 2rem));max-height:calc(100dvh - var(--space-6));overflow:auto;overflow-wrap:anywhere;padding:var(--space-5);border:1px solid var(--border);border-radius:var(--r-lg);background:var(--dialog-bg);box-shadow:var(--shadow-2)}
   h2{margin:0;font-size:var(--text-md)}
   p{margin:var(--space-2) 0 0;color:var(--text-2);font-size:var(--text-sm)}
   .actions{display:flex;flex-wrap:wrap;justify-content:flex-end;gap:var(--space-2);margin-top:var(--space-5)}

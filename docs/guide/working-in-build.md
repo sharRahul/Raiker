@@ -127,7 +127,8 @@ model that cannot run — the line under the composer names that one link and
 offers the place that fixes it.
 
 `+` adds to this turn: **Upload a file**, **Choose from the project**, **Mention
-a file from the code map**, **Work in a project**, **Dictate**.
+a file from the code map**, **Work in a project**, **Dictate**. Dictation also has its own microphone button beside **Run**, as in Chat and
+Design.
 
 **Tools** carries what Build can be asked to do, including two Chat does not
 have — **Run a command** in the governed terminal, and the code-map mention

@@ -204,10 +204,26 @@ export function applyMention(
  * letterbox. A box that grows without limit pushes the transcript off the
  * screen, so it stops at `maxPx` and scrolls from there.
  */
-/** About twelve lines of prompt before the input scrolls (QUI-C04, 2026-11-07). One cap for every composer. */
-export const MAX_PROMPT_PX = 432;
+/**
+ * Five lines of prompt before the input scrolls (QUI-C04; owner decision
+ * 2026-11-07, revised from about eighteen the same day). One cap for every
+ * composer, measured from the input's own line height so it stays five lines
+ * when the chat text size or density changes.
+ */
+export const MAX_PROMPT_LINES = 5;
+/** The cap at the default text size (14.4 px × 1.55), for when nothing can be measured. */
+export const MAX_PROMPT_PX = 112;
 
-export function autoGrow(element: HTMLTextAreaElement | null, maxPx = MAX_PROMPT_PX): void {
+export function promptCapPx(element: HTMLTextAreaElement | null): number {
+  if (element === null || typeof getComputedStyle !== "function") return MAX_PROMPT_PX;
+  const style = getComputedStyle(element);
+  const line = parseFloat(style.lineHeight);
+  if (!Number.isFinite(line) || line <= 0) return MAX_PROMPT_PX;
+  const padding = (parseFloat(style.paddingTop) || 0) + (parseFloat(style.paddingBottom) || 0);
+  return Math.round(line * MAX_PROMPT_LINES + padding);
+}
+
+export function autoGrow(element: HTMLTextAreaElement | null, maxPx = promptCapPx(element)): void {
   if (element === null) return;
   element.style.height = "auto";
   const wanted = element.scrollHeight;

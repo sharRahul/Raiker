@@ -1769,7 +1769,7 @@ files are uploaded to the host's governed store. Nothing is seeded or mocked.
 | Case | Check |
 |---|---|
 | RT-COMPOSER-01 | Chat, Build and Design composers in light and dark: computed `backdrop-filter` blurs and the surface is translucent; six captures |
-| RT-COMPOSER-02 | A 40-line prompt grows the input to exactly 432 px and then scrolls |
+| RT-COMPOSER-02 | A long prompt grows the input to five lines (line height × 5 + padding) and then scrolls; it was 432 px until the owner's same-day revision |
 | RT-COMPOSER-03 | With **Send with: Ctrl + Enter** saved, the tooltip names it, Enter adds a line, Ctrl + Enter sends; Haiku answers `42`; the setting is restored |
 | RT-COMPOSER-04 | One Document… pick uploads `metrics.json` and `table.csv`; chips read `JSON · 2 KB · ≈ 630 tokens` and `CSV · 2 KB · ≈ 525 tokens`; Haiku reads the JSON and answers `EU` |
 | RT-COMPOSER-05 | Dragging a file over the composer shows the dashed zone and its sentence; the drop attaches the file |
@@ -1835,3 +1835,55 @@ layouts beyond the existing compact rules are not qualified here. Token counts
 are estimates by design. The execution-state and editor slices and `@` personas
 are not built; see
 [TO_BE_FIXED](../plans/TO_BE_FIXED.md#composer-agent-personas-for-).
+
+## Result — 2026-11-07 Dark ladder and five-line composer
+
+**Scope.** The owner's dark-theme review and composer requests, recorded in
+[08, Dark theme luminance ladder](../plans/quiet-ui/08_BRAND_AND_VISUAL_SYSTEM.md#2026-11-07--dark-theme-luminance-ladder):
+- the supplied palette as a five-step ladder;
+- visible selection, hover and focus;
+- a 3:1 composer edge;
+- gold primary actions;
+- a five-line composer;
+- dictation in Build.
+
+Built SPA served by real FastAPI from the round's disposable workspace on port
+8765, Linux Chromium, 1440×900. No provider call is needed for these checks.
+
+| Case | Check |
+|---|---|
+| RT-DARK-01 | axe `color-contrast` on all 37 destinations from `destinations.ts`, dark then light: **0 findings in either theme**; a dark capture of every destination |
+| RT-DARK-02 | In dark: the sidebar differs from the canvas, the selected row from the sidebar, and hover changes a row; keyboard focus shows an outline; the composer edge computes to `rgb(90, 100, 116)`; Send is gold `rgb(224, 182, 74)` |
+| RT-COMPOSER-02 | Twelve lines stop at five lines: 125 px = 5 × 22.32 px + 13.44 px padding, then the input scrolls |
+| RT-COMPOSER-05 | The drop zone still shows and attaches the file on the new surfaces |
+| RT-COMPOSER-08 | Build, Chat and Design composers each show a visible **Dictate** button |
+
+**Outcome: 5/5 passed (3.2 minutes).** One first attempt at RT-COMPOSER-02 is
+not passing evidence: the harness compared the height with five line heights and
+left out the input's padding. The product was right; the assertion now includes
+the padding. The mocked suite caught COMPOSER-02's old rule that Build must
+not show Dictate as a permanent button. The owner's request supersedes that
+rule, and the test now says so; 27/27 mocked browser tests pass.
+
+**Visual review.** I reviewed these dark captures:
+- Chat with hover and focus states;
+- Work › Projects, where the gold primary and the disabled gold Create project
+  stay distinguishable;
+- Settings › Personalisation;
+- Build with its microphone beside Run.
+
+They are under `output/playwright/2026-11-07-dark-ladder/` and
+`output/playwright/2026-11-07-composer-control-deck/` (ignored by Git), with
+`contrast.json` recording the axe results.
+
+**Local checks.** 2,779 web component tests (including the new ladder contrast
+test), Svelte check and design tokens (0 errors), ESLint, and 27 mocked browser
+tests passed.
+
+**Limits.**
+- axe measures text contrast on rendered pages with this workspace's content;
+  states it cannot render (every menu open, every error) are covered by the
+  token-level test, not by axe.
+- Light primary actions stay blue: the owner's review was of the dark theme.
+- Native macOS/Windows rendering and screen readers are not qualified here.
+

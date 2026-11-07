@@ -158,7 +158,7 @@ switch in the top bar and keep the draft.
 | Element | Decision |
 |---|---|
 | Placeholder | "What would you like Raiker to do?" |
-| Input | Starts 56 px, comfortable 96 px, at most 432 px (about twelve lines) then scrolls (2026-11-07; was 180 px) |
+| Input | Grows to five lines, measured from its own line height, then scrolls (owner decision 2026-11-07; briefly about eighteen lines that day, 180 px before) |
 | Action row | 44 px: Attach · Project · Profile chip · context count when relevant · More · Send (40×40, far right) |
 | More | Schedule, research depth, model, work mode, answer style |
 | Data label | "Stays on this computer" / "Sent to Anthropic" ([QUI-F17, FIXED-1154](../FIXED_ITEMS.md#fixed-1154--homes-composer-did-not-say-where-a-message-would-go-qui-f17)) |
@@ -239,15 +239,16 @@ brief and decided four open questions:
   records personas as planned work in
   [TO_BE_FIXED](../TO_BE_FIXED.md#composer-agent-personas-for-).
 
-QUI-C04's input row changes: the input now grows to 432 px (about twelve lines)
-before it scrolls, instead of 180 px.
+QUI-C04's input row changes: the input grows to five lines before it scrolls
+(revised the same day from 432 px, about eighteen lines, at the owner's
+request; 180 px before).
 
 The 15-item checklist:
 
 1. [x] Floating glass capsule in the shared composer frame (Chat, Build, Design).
 2. [x] Solid fallback without backdrop-filter support or with reduced transparency.
 3. [x] Chat's transcript passes beneath the capsule, and the last turn stays readable.
-4. [x] The input grows to 432 px before scrolling.
+4. [x] The input grows to five lines before scrolling (revised from 432 px the same day).
 5. [x] Settings › Personalisation: **Send with** Enter (default) or Ctrl/⌘ + Enter.
 6. [x] The send key applies in Chat, Build, Design and Home, and the hint says which.
 7. [x] Pick several files at once in Attach.

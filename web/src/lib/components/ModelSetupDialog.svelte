@@ -164,5 +164,5 @@
   button { border-radius: var(--r-pill); padding: .42rem .72rem; font: inherit; font-size: var(--text-sm); font-weight: 750; cursor: pointer; }
   button:disabled { opacity: .62; cursor: wait; }
   .secondary { border: 1px solid var(--neutral-border); background: var(--surface); color: var(--text-1); }
-  .primary { border: 1px solid var(--accent-border); background: var(--accent); color: var(--accent-contrast, white); }
+  .primary { border: 1px solid var(--action); background: var(--action); color: var(--action-text); }
 </style>

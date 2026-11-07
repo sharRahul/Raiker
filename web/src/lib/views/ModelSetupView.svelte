@@ -872,7 +872,7 @@
   label { display: grid; gap: var(--space-2); max-width: 36rem; color: var(--text-1); } input { padding: .75rem .9rem; border: 1px solid var(--neutral-border); border-radius: var(--r-md); background: var(--surface); color: var(--text-1); }
   .summary { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-2); margin: 0; } .summary div { padding: var(--space-3); border: 1px solid var(--neutral-border); border-radius: var(--r-md); background: var(--sunken); } dt { color: var(--text-3); font-family: var(--font-mono); font-size: var(--text-2xs); } dd { margin: .35rem 0 0; color: var(--text-1); }
   .actions { display: flex; flex-wrap: wrap; gap: var(--space-2); align-items: center; } .quiet, .primary { width: max-content; border-radius: var(--r-pill); padding: .55rem .9rem; font: inherit; font-size: var(--text-sm); font-weight: 750; cursor: pointer; text-decoration: none; }
-  .quiet { border: 1px solid var(--neutral-border); background: var(--surface); color: var(--text-2); } .primary { border: 1px solid var(--accent-border); background: var(--accent); color: white; } .error { color: var(--danger); }
+  .quiet { border: 1px solid var(--neutral-border); background: var(--surface); color: var(--text-2); } .primary { border: 1px solid var(--action); background: var(--action); color: var(--action-text); } .error { color: var(--danger); }
   /* DIST-05/06 — check rows say their state in words, with colour as a second
      cue. Flat rows on one surface rather than a card per check: a dozen boxed
      rows read as a dozen problems even when every one of them passed. */

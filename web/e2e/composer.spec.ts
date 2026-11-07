@@ -429,8 +429,9 @@ test("every Work mode composes the same way, simple at rest", async ({ page }) =
     const composer = page.locator("form.composer:visible");
     await expect(composer.getByRole("button", { name: "Add to this turn" })).toBeVisible();
     await expect(composer.getByRole("button", { name: "Tools" })).toHaveCount(tools ? 1 : 0);
-    // COMPOSER-02's list of what must not be a permanent button.
-    for (const gone of ["Add attachment", ...(route === "build" ? ["Dictate"] : [])]) {
+    // COMPOSER-02's list of what must not be a permanent button. Dictate left
+    // it on 2026-11-07: the owner asked for dictation visible in Build, as in Chat.
+    for (const gone of ["Add attachment"]) {
       await expect(composer.getByRole("button", { name: gone })).toHaveCount(0);
     }
     // COMPOSER-12 — no governance control at the careful default.

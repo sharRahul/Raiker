@@ -2,16 +2,17 @@ import { fireEvent, render, screen } from "@testing-library/svelte";
 import { expect, it } from "vitest";
 import ComposerFixture from "./ComposerFixture.svelte";
 
-it("expands the prompt to its content and caps it at about twelve lines (432px)", async () => {
+it("expands the prompt to its content and caps it at five lines", async () => {
   render(ComposerFixture);
   const input = screen.getByLabelText("Prompt") as HTMLTextAreaElement;
-  Object.defineProperty(input, "scrollHeight", { configurable: true, value: 240 });
+  Object.defineProperty(input, "scrollHeight", { configurable: true, value: 90 });
   await fireEvent.input(input, { target: { value: "A longer prompt" } });
-  expect(input.style.height).toBe("240px");
+  expect(input.style.height).toBe("90px");
   Object.defineProperty(input, "scrollHeight", { configurable: true, value: 900 });
   await fireEvent.input(input, { target: { value: "An even longer prompt" } });
-  expect(input.style.height).toBe("432px");
-  expect(input.style.maxHeight).toBe("432px");
+  // jsdom has no line height, so the default five-line cap applies.
+  expect(input.style.height).toBe("112px");
+  expect(input.style.maxHeight).toBe("112px");
 });
 
 it("says what a drop adds inside a visible zone", () => {

@@ -19,11 +19,11 @@
    * 2026-11-07 — the frame is a floating glass capsule (owner decision, 03
    * Composer control deck): a translucent, blurred card with margins that the
    * work above can pass beneath, solid where blur is unavailable or reduced
-   * transparency is asked for. The input grows to `MAX_INPUT_PX` first.
+   * transparency is asked for. The input grows to five lines first (`promptCapPx`).
    */
   import type { Snippet } from "svelte";
   import type { HTMLTextareaAttributes } from "svelte/elements";
-  import { MAX_PROMPT_PX as MAX_INPUT_PX } from "../composerCommands";
+  import { promptCapPx } from "../composerCommands";
 
   interface Props {
     /** The draft. Bindable: the view owns the text, this owns the box. */
@@ -103,8 +103,10 @@
   // Re-measure on draft changes, including restored or programmatically populated drafts.
   $effect(() => {
     if (!inputEl || typeof value !== "string") return;
+    const cap = promptCapPx(inputEl);
+    inputEl.style.maxHeight = `${cap}px`;
     inputEl.style.height = "auto";
-    inputEl.style.height = `${Math.min(inputEl.scrollHeight, MAX_INPUT_PX)}px`;
+    inputEl.style.height = `${Math.min(inputEl.scrollHeight, cap)}px`;
   });
 </script>
 
@@ -136,7 +138,6 @@
       <textarea
         id={inputId}
         class="prompt-input"
-        style:max-height="{MAX_INPUT_PX}px"
         bind:this={inputEl}
         bind:value
         rows="2"
@@ -191,7 +192,8 @@
        `position: fixed` menu inside it (the phone bottom sheets) position
        against the card instead of the viewport. */
     isolation: isolate;
-    border: 1px solid var(--border);
+    /* A clearer edge against the workspace in dark (2026-11-07). */
+    border: 1px solid var(--composer-edge);
     border-radius: var(--r-xl);
     background: transparent;
     box-shadow: var(--shadow-2);

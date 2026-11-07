@@ -33,7 +33,8 @@ describe("subtle semantic palette", () => {
     const dark = themeTokens(":root[data-theme=\"dark\"]");
         // QUI-V01 — the Quiet UI palette (08_BRAND_AND_VISUAL_SYSTEM.md).
     expect(light).toMatchObject({ "--bg": "#F7F6F2", "--surface": "#FFFFFF", "--text-1": "#1C1C1A", "--text-2": "#686761", "--accent": "#2F6F8F", "--warn": "#8A6411", "--brand": "#B8871B", "--ok": "#2F7D5C", "--danger": "#B5453C" });
-    expect(dark).toMatchObject({ "--bg": "#121212", "--surface": "#1B1B1B", "--text-1": "#F4F1EA", "--text-2": "#B7B4AC", "--accent": "#78B7D5", "--warn": "#E0B64A", "--ok": "#62B68D", "--danger": "#E47B70" });
+    // 2026-11-07 owner-chosen dark ladder (08, QUI-V01 dark revision).
+    expect(dark).toMatchObject({ "--bg": "#101216", "--surface": "#1C2027", "--raised": "#272D36", "--border": "#343B46", "--text-1": "#F2F4F7", "--text-2": "#C1C7D0", "--text-3": "#A0A7B2", "--accent": "#78B7D5", "--action": "#E0B64A", "--warn": "#E0B64A", "--ok": "#62B68D", "--danger": "#E47B70" });
   });
 
   it("keeps normal muted and semantic state text at AA contrast", () => {
@@ -49,6 +50,24 @@ describe("subtle semantic palette", () => {
     }
     // The light attention fill fails as text (2.98:1); it is for fills only.
     expect(contrast("#B8871B", "#F7F6F2")).toBeLessThan(3);
+  });
+
+  it("keeps the 2026-11-07 dark ladder ordered and every text role at AA on every step", () => {
+    const dark = themeTokens(":root[data-theme=\"dark\"]");
+    const steps = ["--bg", "--sidebar-bg", "--surface", "--sunken", "--raised"] as const;
+    // Each step is lighter than the one below it: canvas, sidebar, cards, wells, menus.
+    for (let i = 1; i < steps.length; i += 1) {
+      expect(contrast(dark[steps[i]], "#000000")).toBeGreaterThan(contrast(dark[steps[i - 1]], "#000000"));
+    }
+    for (const background of steps) {
+      for (const text of ["--text-1", "--text-2", "--text-3", "--accent", "--action", "--ok", "--danger"] as const) {
+        expect(contrast(dark[text], dark[background]), `${text} on ${background}`).toBeGreaterThanOrEqual(4.5);
+      }
+    }
+    // Gold primary actions carry dark text; the composer edge meets 3:1 against the workspace.
+    expect(contrast(dark["--action-text"], dark["--action"])).toBeGreaterThanOrEqual(4.5);
+    expect(contrast(dark["--composer-edge"], dark["--bg"])).toBeGreaterThanOrEqual(3);
+    expect(contrast(dark["--focus-ring"], dark["--surface"])).toBeGreaterThanOrEqual(3);
   });
 });
 
@@ -89,7 +108,7 @@ describe("sliders and switch controls", () => {
 
   it("provides a light thumb surface that stays visible in both themes", () => {
     expect(themeTokens(":root[data-theme=\"light\"]")["--control-thumb"]).toBe("#FFFFFF");
-    expect(themeTokens(":root[data-theme=\"dark\"]")["--control-thumb"]).toBe("#F4F1EA");
+    expect(themeTokens(":root[data-theme=\"dark\"]")["--control-thumb"]).toBe("#F2F4F7");
   });
 
   it("keeps both the model and Privacy switches on the shared 48×28 scale", () => {

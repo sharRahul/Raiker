@@ -1466,3 +1466,24 @@ navigate that fast, and waiting for the saved line avoided it in every later
 run. Not reproduced deliberately, so not yet a confirmed defect. Check whether
 the leave guard in `SettingsView.svelte` reads `dirty` before the save's
 recompute runs, and if so settle it before the response promise resolves.
+
+## Dark theme: gold primary actions share a hue with attention notices
+
+Observed in the 2026-11-07 dark-ladder review. Gold is now the dark primary
+action (`--action` `#E0B64A`), and the dark attention colour (`--warn`, for
+example *No model is chosen*) is the same `#E0B64A`. They read differently: an
+action is a solid gold button with dark text, while a notice is a translucent
+tint with a dot and words. They still compete for the same "look here" signal.
+The owner's brief keeps semantic colours for status. Decide whether dark
+attention moves to a distinct amber, or stays as it is because its text and
+shape already distinguish it. Light primary actions also remain blue until the
+owner decides whether gold applies there too.
+
+## Build reports unreadable standing permissions on a fresh load
+
+Seen in the 2026-11-07 captures on the round's disposable host. Build's composer
+showed *Raiker could not read your standing permissions for this turn. Change in
+Permissions →* right after loading, before any turn. Not investigated this round.
+Check whether the permissions read races the first render or genuinely fails on
+this workspace, and whether the line should wait for a completed read.
+

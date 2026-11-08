@@ -118,17 +118,24 @@ test("RT-GPU-02 — a Hugging Face GGUF is verified, served on the GPU, and answ
   await test.info().attach("nvidia-smi.txt", { body: onGpu, contentType: "text/plain" });
 });
 
+// The model RT-GPU-03 downloads; defaults to the two-shard 7B. Set
+// RAIKER_GPU_REPO / RAIKER_GPU_QUANT / RAIKER_GPU_FILES to try another.
+const GPU_REPO = process.env.RAIKER_GPU_REPO ?? "Qwen/Qwen2.5-7B-Instruct-GGUF";
+const GPU_QUANT = new RegExp(process.env.RAIKER_GPU_QUANT ?? "Q4_K_M");
+const GPU_FILES = process.env.RAIKER_GPU_FILES ?? "2";
+const GPU_NAME = GPU_REPO.split("/")[1].replace(/-GGUF$/i, "").toLowerCase();
+
 test("RT-GPU-03 — a two-shard 7B GGUF is downloaded, verified and served on the GPU", async ({ page }) => {
   test.setTimeout(1_800_000);
   await open(page, "models?tab=huggingface");
   const dialog = page.getByRole("dialog");
-  await dialog.getByRole("searchbox").or(dialog.getByRole("textbox").first()).first().fill("Qwen2.5-7B-Instruct-GGUF");
+  await dialog.getByRole("searchbox").or(dialog.getByRole("textbox").first()).first().fill(GPU_REPO.split("/")[1]);
   await page.keyboard.press("Enter");
-  await dialog.getByText("Qwen/Qwen2.5-7B-Instruct-GGUF", { exact: true }).first().click();
-  await dialog.getByRole("button", { name: /Q4_K_M/ }).first().click({ timeout: 60_000 });
+  await dialog.getByText(GPU_REPO, { exact: true }).first().click();
+  await dialog.getByRole("button", { name: GPU_QUANT }).first().click({ timeout: 60_000 });
   await expect(dialog.getByText(/Pinned to [0-9a-f]{12}/)).toBeVisible();
   // Two shards, each checked against the hub's LFS SHA-256 (FIXED-1313).
-  await expect(dialog.getByText(/2 selected files/)).toBeVisible();
+  await expect(dialog.getByText(GPU_FILES === "1" ? /1 selected file(?!s)/ : new RegExp(`${GPU_FILES} selected files`))).toBeVisible();
   await capture(page, join(OUT, "05-7b-review.png"));
   await dialog.getByRole("button", { name: "Confirm download" }).click();
   await expect(page.getByText("GGUF downloaded and indexed in your local library.")).toBeVisible({ timeout: 1_500_000 });
@@ -137,7 +144,7 @@ test("RT-GPU-03 — a two-shard 7B GGUF is downloaded, verified and served on th
   await open(page, "settings?tab=advanced&kind=models");
   const gguf = page.getByRole("group", { name: "GGUF" });
   const slot = gguf.getByLabel("GGUF model 1");
-  const option = slot.locator("option", { hasText: /qwen2\.5-7b-instruct/i });
+  const option = slot.locator("option", { hasText: GPU_NAME });
   await expect(option).toHaveCount(1, { timeout: 60_000 });
   await slot.selectOption({ label: (await option.textContent())! });
   await gguf.getByRole("button", { name: /^Serve selected/ }).click();
@@ -149,7 +156,7 @@ test("RT-GPU-03 — a two-shard 7B GGUF is downloaded, verified and served on th
   // The running-models card names the model the slot now serves; both models
   // answer to the same alias, so the readiness line alone cannot tell them apart.
   const engine = page.getByRole("region", { name: "llama.cpp engine" });
-  await expect(engine.getByText(/qwen2\.5-7b-instruct-q4_k_m/)).toBeVisible({ timeout: 120_000 });
+  await expect(engine.locator("strong, h4, .slot-name, span, p", { hasText: GPU_NAME }).first()).toBeVisible({ timeout: 120_000 });
   await expect(engine.getByText(/Entirely on the GPU/)).toBeVisible();
   await capture(page, join(OUT, "06-7b-serving.png"));
   await test.info().attach("nvidia-smi.txt", { body: gpuProcesses(), contentType: "text/plain" });

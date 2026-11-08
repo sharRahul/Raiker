@@ -134,7 +134,10 @@ class TestTheCycleRunsOnIt:
 
         chat = _system_messages("chat")
         build = _system_messages("build")
-        assert len(build) == len(chat) + 1
+        # Different standing instructions: Build adds its operating protocol and
+        # leaves out the typed-answer vocabulary Chat carries.
+        assert build != chat
+        assert any("Operating protocol" in message for message in build)
 
         project_id = _project(store, workspace)
         task = DashboardService(workspace).create_task(

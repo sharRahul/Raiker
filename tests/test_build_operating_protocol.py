@@ -37,6 +37,7 @@ from raiker.runtime.identity.lifecycle import TurnMachineIdentityLifecycle
 from raiker.runtime.orchestrator import (
     _BUILD_PROCESS_PROMPT,
     _SYSTEM_PROMPT,
+    _TYPED_ANSWERS_PROMPT,
     RuntimeOrchestrator,
     _system_messages,
 )
@@ -123,11 +124,11 @@ def _system_text(messages: list[ModelMessage]) -> str:
 
 def test_system_messages_selects_the_protocol_by_surface() -> None:
     assert _system_messages("build") == [_SYSTEM_PROMPT, _BUILD_PROCESS_PROMPT]
-    assert _system_messages("chat") == [_SYSTEM_PROMPT]
+    assert _system_messages("chat") == [_SYSTEM_PROMPT, _TYPED_ANSWERS_PROMPT]
     # An unrecognised surface must not be read as Build. The gateway refuses one
     # outright; if anything ever reaches here without a surface, the quiet
     # answer is the conservative one.
-    assert _system_messages("") == [_SYSTEM_PROMPT]
+    assert _system_messages("") == [_SYSTEM_PROMPT, _TYPED_ANSWERS_PROMPT]
 
 
 def test_a_build_turn_receives_the_operating_protocol(tmp_path: Path) -> None:

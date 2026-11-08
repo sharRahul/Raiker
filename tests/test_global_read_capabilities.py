@@ -462,11 +462,12 @@ class TestDesignIntegration:
         from raiker.runtime.orchestrator import _system_messages
 
         messages = _system_messages("design")
-        assert len(messages) == 2
-        assert "researching visual references" in messages[1]
+        # The base prompt, the typed-answer vocabulary, then the research protocol.
+        assert len(messages) == 3
+        assert "researching visual references" in messages[-1]
         # It is told to read rather than recall, which is the whole difference
         # between a reference and a plausible sentence about one.
-        assert "Do not describe a reference from memory" in messages[1]
+        assert "Do not describe a reference from memory" in messages[-1]
 
     def test_image_generation_never_receives_a_web_or_browser_capability(self) -> None:
         """The arrow that is deliberately absent from the architecture."""

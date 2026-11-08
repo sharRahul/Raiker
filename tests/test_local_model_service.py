@@ -366,3 +366,23 @@ def test_the_watch_only_reads_watched_local_profiles(
     store.save_configured_model(principal_id, "anthropic-hosted", "claude-haiku-4-5")
     store.save_configured_model(principal_id, OLLAMA, "llama3.2:3b")
     assert local_watch.owner_targets(store, principal_id) == [(OLLAMA, "llama3.2:3b")]
+
+
+def test_a_managed_loopback_slot_is_located_on_this_device() -> None:
+    """RT-GPU-02 — a Raiker-started llama.cpp slot is not 'not confirmed'."""
+    from types import SimpleNamespace
+
+    from raiker.control.dashboard_parts.models import _model_locations
+
+    slot = SimpleNamespace(
+        local_only=True,
+        provider="llama.cpp",
+        raw={"managed_slot": True, "endpoint": "http://127.0.0.1:8080", "served_model_name": "local-gguf", "model": "local-gguf"},
+    )
+    assert _model_locations(slot, {}, "local-gguf") == {"local-gguf": "device"}
+    # Moved off loopback, the same slot no longer earns the claim.
+    away = SimpleNamespace(local_only=True, provider="llama.cpp", raw={**slot.raw, "endpoint": "http://10.0.0.5:8080"})
+    assert _model_locations(away, {}, "local-gguf") == {}
+    # A hosted profile never carries locations.
+    hosted = SimpleNamespace(local_only=False, provider="anthropic", raw={})
+    assert _model_locations(hosted, {}, "claude") == {}

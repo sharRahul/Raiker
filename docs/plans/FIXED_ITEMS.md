@@ -1626,6 +1626,11 @@ file you can open. The two capture sets that remain — `screenshots/pages/` and
 | [FIXED-1319](#fixed-1319--every-turn-to-a-local-gguf-sized-on-auto-was-refused-with-a-bare-http-400-md-3-found-on-the-owners-gpu) | High | Models / llama.cpp | Fixed 2026-11-07 |
 | [FIXED-1320](#fixed-1320--both-authenticode-readers-handed-powershell-a-path-it-throws-away-in-3-found-this-round) | Medium | Release / signing | Fixed 2026-11-07 |
 | [FIXED-1321](#fixed-1321--windows-and-linux-builds-could-not-be-signed-without-an-apple-identity-and-nothing-checked-the-signer-in-3) | Medium | Release / signing | Fixed 2026-11-07 |
+| [FIXED-1322](#fixed-1322--a-served-local-gguf-said-where-it-runs-is-not-confirmed-found-on-the-owners-gpu) | Low | Models / composer | Fixed 2026-11-08 |
+| [FIXED-1323](#fixed-1323--rate-limits-and-fallbacks-were-not-said-where-the-owner-reads-them-md-5) | Medium | Models / provider failures | Fixed 2026-11-08 |
+| [FIXED-1324](#fixed-1324--builds-sandbox-review-kept-a-stale-list-when-the-owner-came-back-to-it) | Low | Build / sandbox review | Fixed 2026-11-08 |
+| [FIXED-1325](#fixed-1325--automatic-llamacpp-install-picked-a-release-still-uploading-found-in-ci) | Medium | Models / llama.cpp | Fixed 2026-11-08 |
+| [FIXED-1326](#fixed-1326--build-and-chat-ordered-the-shared-composer-controls-differently-ux-2) | Low | Web / composer | Fixed 2026-11-08 |
 
 ---
 
@@ -39522,3 +39527,83 @@ passed end to end. The two runs before it found that a `pwsh` step hid the
 signature cmdlet from PowerShell 5.1, and that a CRLF passphrase file broke the
 first Linux key; both are fixed, and the first key was replaced before it
 signed anything.
+
+## FIXED-1322 — A served local GGUF said *Where it runs is not confirmed* (found on the owner's GPU)
+
+**Severity: Low. Area: Models / composer. Status: Fixed 2026-11-08.**
+
+**Observed.** RT-GPU-02: with *Local GGUF* chosen, the composer read *Where it
+runs is not confirmed*, while the slot said *Entirely on the GPU* and the
+receipt *nothing left this computer*. Only a running service that described
+its models (Ollama) earned the on-device label.
+
+**Fixed.** A Raiker-managed slot whose endpoint is loopback reports its model
+as on this device: Raiker started that server itself, from a file on this
+disk. A slot moved off loopback no longer earns the claim.
+
+**Evidence.** `test_local_model_service.py::test_a_managed_loopback_slot_is_located_on_this_device`.
+
+## FIXED-1323 — Rate limits and fallbacks were not said where the owner reads them (MD-5)
+
+**Severity: Medium. Area: Models / provider failures. Status: Fixed 2026-11-08.**
+
+**Observed.** FIXED-1312 carried a provider's `Retry-After`, but nothing showed
+it, and the readiness check could ask the provider again inside the window it
+had asked for. A turn answered by a fallback model read like the owner's
+choice: its receipt named only the model that answered.
+
+**Fixed.**
+* A rate limit with `Retry-After` is stored as `rate_limited_until`. Models
+  shows *Rate-limited until 14:32* in the owner's clock, and the readiness
+  ledger returns the stored answer instead of asking again until that time
+  passes.
+* A turn's receipt carries `fallback`: the provider it replaced and why. The
+  line reads *Llama 3 (fallback: Anthropic was rate-limited)*, and the
+  expanded rows say *Answered by a fallback because Anthropic was
+  rate-limited.*
+
+**Evidence.** `test_model_readiness_rate_limit.py`,
+`test_turn_receipt.py::test_a_fallback_answer_names_the_candidate_it_replaced_and_why`,
+`modelReadinessRateLimit.test.ts`, `turnReceipt.test.ts`.
+
+## FIXED-1324 — Build's sandbox review kept a stale list when the owner came back to it
+
+**Severity: Low. Area: Build / sandbox review. Status: Fixed 2026-11-08.**
+
+**Observed.** The review reread the copies only when the session changed or a
+turn ended, so returning to the same session showed the list from before.
+
+**Fixed.** It also rereads when the window regains focus, when the page becomes
+visible again, and when the address changes.
+
+**Evidence.** `TaskWorkspaceReview.test.ts::rereads the copy when the owner returns to the window or the address`.
+
+## FIXED-1325 — Automatic llama.cpp install picked a release still uploading (found in CI)
+
+**Severity: Medium. Area: Models / llama.cpp. Status: Fixed 2026-11-08.**
+
+**Observed.** llama.cpp published b12195 at 01:11:25 UTC. The three live
+install jobs started a minute later, chose it, and failed on an archive that
+had not been uploaded yet. The same jobs passed on rerun. An owner pressing
+**Install llama.cpp** in that window would have failed the same way.
+
+**Fixed.** Automatic installation takes the newest release that has been
+public for 30 minutes, and falls back to the newest only when none has. An
+explicitly named tag is still exact.
+
+**Evidence.** `test_llama_cpp_releases.py::test_automatic_install_skips_a_release_still_uploading`;
+llama.cpp engine run 42433147694 (failed, then passed on rerun).
+
+## FIXED-1326 — Build and Chat ordered the shared composer controls differently (UX-2)
+
+**Severity: Low. Area: Web / composer. Status: Fixed 2026-11-08.**
+
+**Observed.** Chat's bar read *Add · Tools · Context · autonomy · Model ·
+Dictate · Send*, while Build put autonomy before Context.
+
+**Fixed.** Build follows Chat's order. A mocked browser check now compares the
+three composers' controls in order. Design shares the prompt, Dictate and its
+primary action, because its image model is chosen in the panel.
+
+**Evidence.** `composer.spec.ts` (*UX-2 — Chat, Build and Design share one
+composer grammar, in one order*), `visualRubric.test.ts`.

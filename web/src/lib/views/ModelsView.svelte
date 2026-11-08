@@ -32,7 +32,7 @@
   import { readinessLabel, UNPINNED_MODEL } from "../modelReadinessLabels";
   import { modelBetaStatus, withBetaStatus } from "../betaStatus";
   import { EXPERIMENTAL_PROVIDER_NOTE, isBetaSupportedProvider } from "../providerSupport";
-  import { isChoosableModel } from "../modelReadiness.svelte";
+  import { isChoosableModel, rateLimitedLabel } from "../modelReadiness.svelte";
   import { installerRuntimeFor, openRuntimeInstaller } from "../runtimeInstall";
   import { detectionNotice, onReturnToApp } from "../returnAndDetect";
   import { setModels } from "../models.svelte";
@@ -759,6 +759,10 @@
   // A short chip label for the exact readiness state, so a card says what a
   // check actually found instead of only whether a credential is stored.
   function readinessChip(profile: ModelProfile): string | null {
+    // MD-5 — the provider said when it will take requests again; say that
+    // time rather than a generic "unreachable".
+    const limited = rateLimitedLabel(profile.readiness_rate_limited_until);
+    if (limited) return limited;
     const label = readinessLabel(profile.readiness_state);
     if (label === null) return null;
     const state = profile.readiness_state;

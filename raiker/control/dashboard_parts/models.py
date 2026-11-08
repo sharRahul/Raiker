@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import contextlib
 import os
+from collections.abc import Mapping
 from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
@@ -339,11 +340,7 @@ class ModelService:
                     else None
                 ),
                 provider_running=running.get(profile.provider),
-                model_locations=(
-                    dict(services[profile.provider].locations)
-                    if profile.local_only and profile.provider in services
-                    else {}
-                ),
+                model_locations=_model_locations(profile, services, effective_model),
                 readiness_state=(readiness.state.value if readiness else "not_configured"),
                 readiness_summary=(
                     readiness.summary
@@ -360,6 +357,7 @@ class ModelService:
                     if readiness
                     else "Choose a model, then check the connection."
                 ),
+                readiness_rate_limited_until=_rate_limited_until(readiness),
                 ready=bool(readiness and readiness.ready),
                 supports_reasoning=bool(profile.raw.get("supports_reasoning", False)),
                 supports_reasoning_effort=bool(profile.raw.get("supports_reasoning_effort", False)),
@@ -2116,3 +2114,40 @@ def memory_pressure(read: Any = None) -> MemoryPressure:
     else:
         state = "ok"
     return MemoryPressure(state=state, available_bytes=available, total_bytes=total)
+
+
+def _model_locations(profile: Any, services: Mapping[str, Any], model: str) -> dict[str, str]:
+    """Where each model this profile serves is processed, as the composer says it.
+
+    A running local service describes its own models (Ollama names its cloud
+    ones). A Raiker-managed slot needs no description: Raiker started its
+    llama.cpp or MLX server itself, from a file on this disk, on a loopback
+    port, so the model it serves runs here. Before 2026-11-07 the slot fell
+    through to *Where it runs is not confirmed* while its receipt said
+    *nothing left this computer* (RT-GPU-02).
+    """
+    if not profile.local_only:
+        return {}
+    if profile.provider in services:
+        return dict(services[profile.provider].locations)
+    if profile.raw.get("managed_slot") and _loopback(str(profile.raw.get("endpoint", ""))):
+        names = {model, str(profile.raw.get("served_model_name", "")), str(profile.raw.get("model", ""))}
+        return {name: "device" for name in names if name}
+    return {}
+
+
+def _loopback(endpoint: str) -> bool:
+    from urllib.parse import urlsplit
+
+    host = (urlsplit(endpoint).hostname or "").lower()
+    return host in {"127.0.0.1", "localhost", "::1"}
+
+
+def _rate_limited_until(readiness: Any) -> str | None:
+    """MD-5 — the stored "ask again after" time, while it is still ahead."""
+    from raiker.models.readiness import rate_limited_until
+
+    until = rate_limited_until(readiness)
+    if until is None or until <= datetime.now(UTC):
+        return None
+    return until.isoformat()

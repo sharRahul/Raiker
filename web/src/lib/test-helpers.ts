@@ -324,6 +324,7 @@ export function modelProfile(over: Partial<ModelProfile> = {}): ModelProfile {
     readiness_checked_at: null,
     readiness_expires_at: null,
     readiness_remediation: "Set up or check this model before sending.",
+    readiness_rate_limited_until: null,
     ready: false,
     billable: false,
     models_used: 0,

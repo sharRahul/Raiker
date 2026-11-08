@@ -19,9 +19,31 @@ function at(iso: string): string {
   return Number.isNaN(parsed.getTime()) ? iso : localTime(parsed, { hour: "2-digit", minute: "2-digit" });
 }
 
+/** MD-5 — why the first candidate did not answer, in a few words. */
+const FALLBACK_REASONS: Record<string, string> = {
+  provider_rate_limited: "was rate-limited",
+  provider_quota_exhausted: "had no credit left",
+  provider_timeout: "timed out",
+  provider_auth_failed: "rejected its key",
+  provider_unavailable: "was unavailable",
+  provider_connection_failed: "could not be reached",
+  provider_context_exceeded: "could not fit the conversation",
+};
+
+/** "Anthropic was rate-limited", or null when no fallback answered. */
+export function fallbackReason(receipt: TurnReceipt): string | null {
+  const fallback = receipt.fallback;
+  if (!fallback) return null;
+  const base = fallback.reason.split(":", 1)[0];
+  return `${providerName(fallback.after_provider)} ${FALLBACK_REASONS[base] ?? "failed"}`;
+}
+
 export function receiptParts(receipt: TurnReceipt): string[] {
   const parts: string[] = [];
-  if (receipt.model) parts.push(modelName(receipt.model));
+  if (receipt.model) {
+    const why = fallbackReason(receipt);
+    parts.push(why ? `${modelName(receipt.model)} (fallback: ${why})` : modelName(receipt.model));
+  }
   if (receipt.cost_basis === "priced" && receipt.cost_usd !== null) {
     parts.push(`≈ ${formatCost(String(receipt.cost_usd), "USD") ?? `$${receipt.cost_usd}`}`);
   } else if (receipt.cost_basis === "free") {
@@ -54,6 +76,8 @@ export function receiptRows(receipt: TurnReceipt): { label: string; value: strin
   const rows: { label: string; value: string }[] = [];
   const provider = receipt.provider ? ` (${providerName(receipt.provider)})` : "";
   rows.push({ label: "Model", value: receipt.model ? `${modelName(receipt.model)}${provider}` : "Not recorded" });
+  const why = fallbackReason(receipt);
+  if (why) rows.push({ label: "Fallback", value: `Answered by a fallback because ${why}.` });
   rows.push({
     label: "Cost",
     value:
@@ -92,6 +116,7 @@ function asTurn(receipt: TaskReceipt): TurnReceipt {
     model: receipt.models[0] ?? null,
     provider: null,
     local: receipt.local,
+    fallback: null,
     cost_usd: receipt.cost_usd,
     cost_basis: receipt.cost_basis,
     reads: receipt.reads,

@@ -30,6 +30,7 @@ import os
 import re
 from collections.abc import Sequence
 from dataclasses import dataclass
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 import httpx
@@ -214,7 +215,32 @@ def parse_release(payload: Any) -> Release:
     return Release(tag, published if isinstance(published, str) else None, tuple(assets))
 
 
-def fetch_release(tag: str | None = None, *, client: httpx.Client | None = None) -> Release:
+#: 2026-11-08 — llama.cpp publishes a release and then uploads its ~40
+#: archives over several minutes. Every live install job that ran in the
+#: minute after b12195 appeared failed on an asset that was not there yet.
+#: Automatic installation takes the newest release that has been public this
+#: long; a newer one is offered on the next update check.
+RELEASE_SETTLE = timedelta(minutes=30)
+
+
+def settled_release(candidates: Sequence[Release], *, now: datetime | None = None) -> Release:
+    """The newest release old enough to have finished uploading, else the newest."""
+    moment = now or datetime.now(UTC)
+    for release in candidates:
+        if release.published_at is None:
+            continue
+        try:
+            published = datetime.fromisoformat(release.published_at.replace("Z", "+00:00"))
+        except ValueError:
+            continue
+        if moment - published >= RELEASE_SETTLE:
+            return release
+    return candidates[0]
+
+
+def fetch_release(
+    tag: str | None = None, *, client: httpx.Client | None = None, now: datetime | None = None
+) -> Release:
     """A usable official build release, or the one named ``tag``.
 
     ``/releases/latest`` follows GitHub's stable-release flag, not llama.cpp's
@@ -253,12 +279,15 @@ def fetch_release(tag: str | None = None, *, client: httpx.Client | None = None)
             return parse_release(payload)
         if not isinstance(payload, list):
             raise ReleaseError("llama_cpp_release_unreadable")
+        candidates: list[Release] = []
         for entry in payload:
             with contextlib.suppress(ReleaseError):
                 release = parse_release(entry)
                 if release.assets:
-                    return release
-        raise ReleaseError("llama_cpp_release_not_found")
+                    candidates.append(release)
+        if not candidates:
+            raise ReleaseError("llama_cpp_release_not_found")
+        return settled_release(candidates, now=now)
     except ValueError as exc:
         if isinstance(exc, ReleaseError):
             raise

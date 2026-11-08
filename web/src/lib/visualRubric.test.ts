@@ -189,7 +189,8 @@ describe("visual rubric", () => {
       const text = readFileSync(resolve(VIEWS, view), "utf8");
       const from = text.indexOf("snippet left()");
       expect(from, view + " has no composer left cluster").toBeGreaterThan(-1);
-      const cluster = text.slice(from, text.indexOf("{/snippet}", from));
+      // Up to the right cluster: a control may hold a nested snippet of its own.
+      const cluster = text.slice(from, text.indexOf("snippet right()", from));
       return TURN_CONTROLS.reduce(
         (total, control) => total + cluster.split(control).length - 1,
         0,

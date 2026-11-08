@@ -2719,7 +2719,6 @@
               disabled={streaming}
               onchoose={runComposerAction}
             />
-            <BuildModePicker {mode} onchange={setMode} disabled={streaming} />
             <!-- COMPOSER-06/08 — project, repository, attachments and context
                  as one inspectable line. A turn that may edit files or run a
                  command has to say which tree it is pointed at, and that was
@@ -2745,6 +2744,9 @@
               />
             {/snippet}
             </ComposerContext>
+            <!-- UX-2 — the same order as Chat: what you bring, tools, context,
+                 then how much Raiker may do, then the model. -->
+            <BuildModePicker {mode} onchange={setMode} disabled={streaming} />
             <ModelPicker
               bind:profileId={modelProfile}
               bind:model

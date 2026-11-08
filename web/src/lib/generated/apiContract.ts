@@ -4541,6 +4541,7 @@ export type ModelProfileView = {
   readiness_checked_at: string | null;
   readiness_expires_at: string | null;
   readiness_remediation: string;
+  readiness_rate_limited_until: string | null;
   ready: boolean;
   billable: boolean;
   models_used: number;
@@ -6803,11 +6804,18 @@ export type TurnReceipt = {
   model: string | null;
   provider: string | null;
   local: boolean;
+  fallback: TurnReceiptFallback | null;
   cost_usd: number | null;
   cost_basis: "priced" | "free" | "unknown";
   reads: Record<string, number>;
   changes: TurnReceiptLine[];
   left_computer: string[];
+};
+
+/** MD-5 — the candidate a fallback replaced, and the reason code it gave. */
+export type TurnReceiptFallback = {
+  after_provider: string;
+  reason: string;
 };
 
 /** QUI-F16 — one thing a turn changed or sent, with when it was approved. */

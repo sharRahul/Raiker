@@ -20,6 +20,13 @@ class TurnReceiptLine(TypedDict):
     approved_at: str | None
 
 
+class TurnReceiptFallback(TypedDict):
+    """MD-5 — the candidate a fallback replaced, and the reason code it gave."""
+
+    after_provider: str
+    reason: str
+
+
 class TurnReceipt(TypedDict):
     """QUI-F16 — what one turn used, read, changed and sent, from its own records."""
 
@@ -29,6 +36,8 @@ class TurnReceipt(TypedDict):
     provider: str | None
     #: True when that provider runs on this computer.
     local: bool
+    #: Set when a fallback answered: whom it replaced and why.
+    fallback: TurnReceiptFallback | None
     #: Approximate cost in US dollars; ``None`` when no price is known or it is free.
     cost_usd: float | None
     #: ``priced``, ``free`` (a local model), or ``unknown`` (billable, no rate).

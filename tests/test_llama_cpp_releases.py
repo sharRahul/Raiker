@@ -189,3 +189,20 @@ def test_automatic_release_selection_refuses_when_no_build_release_exists() -> N
     ))
     with pytest.raises(ReleaseError, match="llama_cpp_release_not_found"):
         fetch_release(client=client)
+
+
+def test_automatic_install_skips_a_release_still_uploading() -> None:
+    """2026-11-08 — live install jobs started a minute after b12195 appeared."""
+    from datetime import UTC, datetime
+
+    from raiker.models.llama_cpp.releases import Release, settled_release
+
+    now = datetime(2026, 11, 8, 1, 12, tzinfo=UTC)
+    fresh = Release("b12195", "2026-11-08T01:11:25Z", ())
+    settled = Release("b12194", "2026-11-08T00:19:23Z", ())
+    assert settled_release([fresh, settled], now=now).tag == "b12194"
+    # Nothing settled yet: the newest is still better than nothing.
+    assert settled_release([fresh], now=now).tag == "b12195"
+    # Once it has settled, the newest is taken.
+    later = datetime(2026, 11, 8, 2, 0, tzinfo=UTC)
+    assert settled_release([fresh, settled], now=later).tag == "b12195"

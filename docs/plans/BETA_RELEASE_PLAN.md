@@ -179,7 +179,7 @@ configured, and runner publisher pins are empty (`runner_publisher.py`).
 | MD-2 | llama.cpp native install, deploy, GPU config | 🟡 | P0 | S | PR #246 repaired automatic source-only stable-release selection; the `llama-cpp.yml` live jobs passed on Windows, macOS and Linux. **2026-11-07:** NVIDIA passed on the owner's RTX 4080 SUPER: Raiker recommended and installed the CUDA build (b12192) and served a model entirely on the GPU ([run record](../architecture/WEB_APP_LIVE_TEST.md#result--2026-11-07-gpu-signing-and-settings-round)). Still required: AMD (Vulkan), plus fresh signed-installer validation on the release candidate. |
 | MD-3 | GGUF downloads, integrity, inference | ✅ | — | — | **2026-11-07:** every written file is checked against the hub's LFS SHA-256 (or Git blob id) and removed on a mismatch ([FIXED-1313](FIXED_ITEMS.md#fixed-1313--a-downloaded-gguf-was-never-checked-against-the-bytes-the-hub-publishes-md-3)). Live RT-GPU-02: a Hugging Face GGUF pinned to a revision, verified, served on the GPU and answering in Chat; it found and fixed every auto-sized turn being refused ([FIXED-1319](FIXED_ITEMS.md#fixed-1319--every-turn-to-a-local-gguf-sized-on-auto-was-refused-with-a-bare-http-400-md-3-found-on-the-owners-gpu), [run record](../architecture/WEB_APP_LIVE_TEST.md#result--2026-11-07-gpu-signing-and-settings-round)) |
 | MD-4 | Detection, readiness, selection, fallback | ✅ | — | — | Model decision service, readiness ledger and fallback sequence (FIXED items) |
-| MD-5 | Failures, rate limits, timeouts, recovery | 🟡 | P0 | M | **2026-11-07:** the matrix runs against a real local socket for both adapters (`tests/test_provider_fault_matrix.py`). It found and fixed a cut-off stream recorded as finished, and `Retry-After` is now carried ([FIXED-1312](FIXED_ITEMS.md#fixed-1312--a-stream-that-closed-early-was-recorded-as-a-finished-answer-md-5-found-this-round)). Still required: show *Rate-limited until …* and the fallback receipt (TO_BE_FIXED, *Provider fault handling*) |
+| MD-5 | Failures, rate limits, timeouts, recovery | ✅ | — | — | **2026-11-07:** the matrix runs against a real local socket for both adapters (`tests/test_provider_fault_matrix.py`). It found and fixed a cut-off stream recorded as finished, and `Retry-After` is now carried ([FIXED-1312](FIXED_ITEMS.md#fixed-1312--a-stream-that-closed-early-was-recorded-as-a-finished-answer-md-5-found-this-round)). **2026-11-08:** *Rate-limited until …* on Models, no re-check before it, and a receipt that names the fallback and why ([FIXED-1323](FIXED_ITEMS.md#fixed-1323--rate-limits-and-fallbacks-were-not-said-where-the-owner-reads-them-md-5)) |
 
 **UI / UX.**
 - Settings → Advanced → Model serving: Running models holds the engine;
@@ -207,7 +207,7 @@ configured, and runner publisher pins are empty (`runner_publisher.py`).
 | ID | Item | State | P | Effort | Work left |
 |---|---|---|---|---|---|
 | AG-1 | Plan, execute, complete multi-step tasks | 🟡 | P0 | M | T-03 with a real model, five runs on fresh state (TESTING protocol) |
-| AG-2 | Every tool call through permissions and governance | 🟡 | P0 | S | **2026-11-07:** every tool resolves to a gate or is listed with the authority it answers to ([FIXED-1310](FIXED_ITEMS.md#fixed-1310--thirty-tools-had-no-capability-gate-and-no-reviewed-reason-ag-2)). Still required: extend `test_governance_entry_paths.py` to voice-originated turns |
+| AG-2 | Every tool call through permissions and governance | ✅ | — | — | **2026-11-07:** every tool resolves to a gate or is listed with the authority it answers to ([FIXED-1310](FIXED_ITEMS.md#fixed-1310--thirty-tools-had-no-capability-gate-and-no-reviewed-reason-ag-2)). **2026-11-08:** `test_voice_turns_cannot_change_governance`: a spoken turn uses the same route and gateway, and `input_mode` is read only for the reply style, never by approvals, the tool broker or the authority |
 | AG-3 | Approve, reject, cancel, emergency stop | ✅ | — | — | Approval relay, STOP and cancel (FIXED items, live specs) |
 | AG-4 | Scheduling, background, restart recovery | 🟡 | P0 | M | BUG-355 restart scenario: kill the host mid-goal, restart, and assert the goal resumes or parks with an honest state; no duplicate effects |
 | AG-5 | Accurate reporting, no false claims | 🟡 | P0 | M | An honesty suite in which the model is told a tool succeeded when it failed (fault injection). Assert the receipt reports the failure and the final message does not claim it; use a real model for one run |
@@ -292,7 +292,7 @@ work runs (top bar), and so is the count of running items.
 | ID | Item | State | P | Effort | Work left |
 |---|---|---|---|---|---|
 | UX-1 | Quiet UI across retained pages | 🟡 | P0 | M | **2026-11-07:** QUI-G01 is a failing check (RT-BETA-10) for Chat, Build, Models, Settings › General, Privacy and About & updates, and Account and Backups. General's exception is gone: Account and Backups are sections of their own ([FIXED-1318](FIXED_ITEMS.md#fixed-1318--settings--general-was-over-its-size-budget-because-it-held-the-account-and-backups-ux-1)). Still required: close or move the open Quiet UI rows |
-| UX-2 | Composer, navigation, model selection consistent | 🟡 | P0 | S | Existing component coverage names the Chat and Build grammars; this round adds the shared five-state vocabulary and a live `RT-BETA-UX-01` route check. Still required: one explicit parity assertion across Chat, Build and Design that compares the common controls in order. |
+| UX-2 | Composer, navigation, model selection consistent | ✅ | — | — | Existing component coverage names the Chat and Build grammars; this round adds the shared five-state vocabulary and a live `RT-BETA-UX-01` route check. **2026-11-08:** the parity assertion found Build's order differing from Chat's; fixed, and checked in mocked e2e ([FIXED-1326](FIXED_ITEMS.md#fixed-1326--build-and-chat-ordered-the-shared-composer-controls-differently-ux-2)). |
 | UX-3 | Permission controls, runtime status, approvals | ✅ | — | — | QUI-P01–P09 (approvals round) |
 | UX-4 | Understandable errors and recovery actions | ✅ | — | — | Whole-route audit `tests/test_route_reason_copy.py`: every literal route refusal has copy, and `failure()` says why ([FIXED-1309](FIXED_ITEMS.md#fixed-1309--eighty-route-refusals-reached-the-owner-as-a-bare-machine-code-ux-4)) |
 | UX-5 | Responsive layouts, accessibility, desktop usability | 🟡 | P0 | M | **2026-11-07:** RT-BETA-09 finds no serious or critical axe violation on any destination at 1440, 1280 and 390 ([FIXED-1317](FIXED_ITEMS.md#fixed-1317--settings-sections-were-off-the-card-system-and-the-activity-table-could-not-be-scrolled-by-keyboard-found-this-round-ux-5)). Still required: keyboard-only T-14; NVDA and VoiceOver passes |
@@ -522,6 +522,12 @@ Anything not green at the start of week 4 is moved to *Not in beta* with the
 product refusing it, rather than delaying the date.
 
 ## Changelog
+
+- **2026-11-08** — Toward the beta: MD-5, AG-2 and UX-2 closed (FIXED-1323,
+  FIXED-1326 and the voice governance invariant). Also fixed: a local GGUF's
+  location line (FIXED-1322), the stale Build review (FIXED-1324), llama.cpp
+  auto-install racing an upstream upload (FIXED-1325), and the Windows mypy
+  `os.getuid` gap.
 
 - **2026-11-07 (second round)** — Owner decisions: Account and Backups become
   Settings sections; this machine (RTX 4080 SUPER) is the GPU test machine;

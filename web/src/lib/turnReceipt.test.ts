@@ -8,6 +8,7 @@ const base: TurnReceipt = {
   model: "claude-haiku-4-5-20251001",
   provider: "anthropic",
   local: false,
+  fallback: null,
   cost_usd: 0.0143,
   cost_basis: "priced",
   reads: { file: 2 },
@@ -16,6 +17,20 @@ const base: TurnReceipt = {
 };
 
 describe("QUI-F16 task receipt", () => {
+  it("says a fallback answered and why (MD-5)", () => {
+    const receipt: TurnReceipt = {
+      ...base,
+      model: "llama3:latest",
+      provider: "ollama",
+      fallback: { after_provider: "anthropic", reason: "provider_rate_limited" },
+    };
+    expect(receiptLine(receipt)).toMatch(/^Llama 3:latest \(fallback: Anthropic was rate-limited\) · /i);
+    expect(receiptRows(receipt)).toContainEqual({
+      label: "Fallback",
+      value: "Answered by a fallback because Anthropic was rate-limited.",
+    });
+  });
+
   it("says model, cost, reads and that nothing else left", () => {
     expect(receiptLine(base)).toBe("Haiku 4.5 · ≈ $0.0143 · 2 files read · nothing else left this computer");
   });

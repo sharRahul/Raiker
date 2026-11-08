@@ -146,6 +146,8 @@ class ModelProfileView(View):
     readiness_checked_at: str | None = None
     readiness_expires_at: str | None = None
     readiness_remediation: str = "Set up or check this model before sending."
+    #: MD-5 — ISO time a rate-limited provider may be asked again, else None.
+    readiness_rate_limited_until: str | None = None
     ready: bool = False
     # Only a provider Raiker authenticates with an API key can accrue an API
     # bill, so only those carry cost. A local runtime reports `billable=False`

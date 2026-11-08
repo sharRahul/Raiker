@@ -164,6 +164,10 @@ class NativeConversionRunner:
         link) would let them rewrite one. Each level is created owner-only and
         refused if it is a link, someone else's, or readable by others.
         """
+        if sys.platform == "win32":
+            # Conversion runs only where the boundary can mount read-only
+            # (Linux); Windows has no owner uid to check this folder against.
+            raise ConversionRefused("model_conversion_unsupported_platform")
         base = Path.home() / ".cache" / "raiker"
         base.parent.mkdir(parents=True, exist_ok=True)
         for path in (base, base / "conversion"):

@@ -290,6 +290,8 @@ class ReadinessFailure:
     reason_code: str
     summary: str
     remediation: str
+    #: MD-5 — the provider's `Retry-After`, when it gave one.
+    retry_after_seconds: float | None = None
 
 
 @dataclass(frozen=True)
@@ -482,6 +484,17 @@ def classify_provider_failure(
         return _workspace_failure(label, error)
     if isinstance(error, ProviderQuotaExhaustedError):
         return _quota_failure(label)
+    retry_after = getattr(error, "retry_after_seconds", None)
+    if isinstance(error, ProviderRateLimitError) and isinstance(retry_after, int | float) and retry_after > 0:
+        # MD-5 — the provider said when; the owner is told, and Raiker does
+        # not knock again before then (`ModelReadinessService.check`).
+        return ReadinessFailure(
+            ModelReadinessState.UNREACHABLE,
+            "provider_rate_limited",
+            f"{label} is rate-limiting this account.",
+            "Raiker will check again once the wait the provider asked for has passed.",
+            float(retry_after),
+        )
     rule = next(
         (rule for rule in _FAILURE_RULES[stage] if isinstance(error, rule.errors)),
         _UNCLASSIFIED[stage],
@@ -546,7 +559,7 @@ class ProviderCatalogueProbe:
     def _failure(
         self, key: ModelReadinessKey, failure: ReadinessFailure, *, provider: str
     ) -> ModelReadiness:
-        return self._result(
+        result = self._result(
             key,
             failure.state,
             failure.summary,
@@ -554,6 +567,9 @@ class ProviderCatalogueProbe:
             failure.remediation,
             provider=provider,
         )
+        if failure.retry_after_seconds is not None:
+            result.evidence["retry_after_seconds"] = failure.retry_after_seconds
+        return result
 
     async def check(self, key: ModelReadinessKey) -> ModelReadiness:
         from raiker.models.connections import get_model_connection
@@ -606,6 +622,19 @@ class ProviderCatalogueProbe:
             "",
             provider=profile.provider,
         )
+
+
+def rate_limited_until(readiness: ModelReadiness | None) -> datetime | None:
+    """When a rate-limited provider said it may be asked again, if it did."""
+    if readiness is None:
+        return None
+    raw = readiness.evidence.get("rate_limited_until")
+    if not isinstance(raw, str):
+        return None
+    try:
+        return datetime.fromisoformat(raw)
+    except ValueError:
+        return None
 
 
 class ModelReadinessService:
@@ -695,13 +724,24 @@ class ModelReadinessService:
         endpoint_fingerprint: str,
     ) -> ModelReadiness:
         key = self.key(owner_principal_id, profile_id, model, endpoint_fingerprint)
-        observed = await self.probe.check(key)
         now = self.clock().astimezone(UTC)
+        # MD-5 — a provider that said "retry after" is not asked again before
+        # then: the stored refusal, with its time, is the answer until it passes.
+        earlier = self.store.load_model_readiness(key)
+        until = rate_limited_until(earlier)
+        if earlier is not None and until is not None and until > now:
+            return earlier
+        observed = await self.probe.check(key)
+        evidence = dict(observed.evidence)
+        wait = evidence.pop("retry_after_seconds", None)
+        if isinstance(wait, int | float) and wait > 0:
+            evidence["rate_limited_until"] = (now + timedelta(seconds=float(wait))).isoformat()
         readiness = replace(
             observed,
             key=key,
             checked_at=now.isoformat(),
             expires_at=(now + self.ttl_for(owner_principal_id)).isoformat(),
+            evidence=evidence,
         )
         self.store.save_model_readiness(readiness)
         return readiness

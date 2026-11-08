@@ -1163,3 +1163,33 @@ test("Build discards a sandbox copy without touching the project", async ({ page
   expect((state.posted[0] as { path: string }).path).toBe("/api/command-workspaces/ws_review/discard");
   await expect(page.getByText("Sandbox copy discarded. Your project was not changed.")).toBeVisible();
 });
+
+test("UX-2 — Chat, Build and Design share one composer grammar, in one order", async ({ page }) => {
+  // The controls every composer shares appear in the same order on all three:
+  // what you bring, tools, context, how much Raiker may do, the model, then
+  // dictation and the primary action. Design has no tools, autonomy or turn
+  // model (its image model is chosen in the panel), so it shares the ends.
+  const order = async (route: string, label: string): Promise<string[]> => {
+    await page.goto(`http://127.0.0.1:8765/#/${route}`);
+    const composer = page.getByRole("group", { name: label });
+    await composer.waitFor();
+    const names = await composer.locator("button, textarea").evaluateAll((els) =>
+      els.filter((el) => (el as HTMLElement).offsetParent !== null)
+        .map((el) => el.getAttribute("aria-label") ?? el.tagName));
+    return names.map((name) =>
+      name === "TEXTAREA" ? "prompt"
+        : name.startsWith("Context for this turn") ? "context"
+          : /^How much Raiker (does|may do)/.test(name) ? "autonomy"
+            : name.startsWith("Model for this turn") ? "model"
+              : ["Send", "Run", "Generate"].includes(name) ? "primary"
+                : name);
+  };
+  const chat = await order("new-chat", "Message composer");
+  const build = await order("build", "Build composer");
+  const design = await order("design", "Image composer");
+  const grammar = ["prompt", "Add to this turn", "Tools", "context", "autonomy", "model", "Dictate", "primary"];
+  expect(chat).toEqual(grammar);
+  expect(build).toEqual(grammar);
+  expect(design).toEqual(grammar.filter((item) => design.includes(item)));
+  expect(design).toEqual(["prompt", "Dictate", "primary"]);
+});

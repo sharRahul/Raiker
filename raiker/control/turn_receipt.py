@@ -68,12 +68,19 @@ def build_turn_receipt(
     completed: list[str] = []
     model: str | None = None
     provider: str | None = None
+    fallback: dict[str, str] | None = None
     usage = {"input_tokens": 0, "output_tokens": 0, "cache_read_tokens": 0, "cache_write_tokens": 0}
 
     for event in events:
         kind = str(event.get("event_type") or "")
         payload = _payload(event)
-        if kind == "model_request_started":
+        if kind == "model_fallback_engaged":
+            # MD-5 — a turn answered by a fallback says which candidate it
+            # replaced and why, so it is never read as the owner's first choice.
+            after = str(payload.get("after_provider") or "")
+            if after:
+                fallback = {"after_provider": after, "reason": str(payload.get("after_reason") or "")}
+        elif kind == "model_request_started":
             model = str(payload.get("model") or "") or model
             provider = str(payload.get("provider") or "") or provider
         elif kind == "model_request_completed":
@@ -133,6 +140,7 @@ def build_turn_receipt(
         "model": model,
         "provider": provider,
         "local": local,
+        "fallback": fallback,
         "reads": reads,
         "changes": changes,
         "left_computer": services,

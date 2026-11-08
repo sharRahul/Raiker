@@ -72,6 +72,7 @@ export function activeComposerProfile(
     readiness_reason_code: "model_not_checked",
     readiness_summary: "Checked when you send.",
     readiness_remediation: "Raiker checks this model before the turn runs.",
+    readiness_rate_limited_until: null,
     readiness_checked_at: null,
     readiness_expires_at: null,
     context_window_tokens: null,
@@ -371,4 +372,15 @@ export function stopReadinessRevalidation(): void {
     clearInterval(revalidationTimer);
     revalidationTimer = undefined;
   }
+}
+
+/**
+ * MD-5 — "Rate-limited until 14:32" while a provider's Retry-After is ahead,
+ * in the owner's own clock; null once it has passed or when none was given.
+ */
+export function rateLimitedLabel(until: string | null | undefined, now: number = Date.now()): string | null {
+  if (!until) return null;
+  const at = Date.parse(until);
+  if (Number.isNaN(at) || at <= now) return null;
+  return `Rate-limited until ${new Intl.DateTimeFormat([], { hour: "2-digit", minute: "2-digit" }).format(at)}`;
 }

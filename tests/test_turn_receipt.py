@@ -131,3 +131,22 @@ def test_a_task_receipt_sums_its_own_conversation(tmp_path: Any, monkeypatch: An
     receipts["turn_b"]["cost_usd"] = None
     assert client.get("/api/tasks/task_brief/receipt", headers=h).json()["cost_basis"] == "unknown"
     assert client.get("/api/tasks/task_nope/receipt", headers=h).status_code == 404
+
+
+def test_a_fallback_answer_names_the_candidate_it_replaced_and_why() -> None:
+    """MD-5 — "Answered by llama3 because Anthropic was rate-limited"."""
+    from raiker.control.turn_receipt import build_turn_receipt
+
+    events = [
+        {"event_type": "model_request_started", "payload": {"provider": "anthropic", "model": "claude"}},
+        {"event_type": "model_fallback_engaged", "payload": {
+            "provider": "ollama", "model": "llama3", "fallback_rank": 1,
+            "after_provider": "anthropic", "after_reason": "provider_rate_limited",
+        }},
+        {"event_type": "model_request_started", "payload": {"provider": "ollama", "model": "llama3"}},
+    ]
+    receipt = build_turn_receipt("t", events, local_providers=frozenset({"ollama"}))
+    assert receipt["model"] == "llama3"
+    assert receipt["fallback"] == {"after_provider": "anthropic", "reason": "provider_rate_limited"}
+    plain = build_turn_receipt("t", events[:1], local_providers=frozenset())
+    assert plain["fallback"] is None

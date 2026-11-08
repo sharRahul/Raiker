@@ -466,3 +466,41 @@ def test_the_known_unreachable_set_is_derived_not_duplicated() -> None:
         "A capability recorded in §3.5 as unreachable is classified as reached: "
         f"{sorted(KNOWN_UNREACHABLE_CAPABILITIES - no_path)}"
     )
+
+
+#: AG-2 (beta plan) — voice-originated turns. A spoken or dictated turn enters
+#: through the same prompt route and Agent Gateway as a typed one; the only
+#: thing `input_mode` may change is the reply's style. These are the only
+#: modules allowed to read it, and none of them grants, routes or approves.
+INPUT_MODE_READERS = {
+    "raiker/api/routes_channels.py",  # messaging bridges stamp "typed"
+    "raiker/api/routes_prompts.py",  # validates the field onto the envelope
+    "raiker/api/schemas.py",  # declares the field
+    "raiker/contracts/models.py",  # the one normaliser
+    "raiker/gateway/agent_gateway.py",  # normalises it for the turn record
+    "raiker/runtime/orchestrator.py",  # the spoken-style system hint only
+}
+
+
+def test_voice_turns_cannot_change_governance() -> None:
+    readers = {
+        path.as_posix()
+        for path in Path("raiker").rglob("*.py")
+        if "input_mode" in path.read_text(encoding="utf-8")
+    }
+    assert readers == INPUT_MODE_READERS, (
+        "A new module reads input_mode. A voice turn must be governed exactly like a "
+        "typed one: add it here only if it changes presentation, never authority."
+    )
+    # The orchestrator's one use is the style hint, not a branch around policy.
+    orchestrator = Path("raiker/runtime/orchestrator.py").read_text(encoding="utf-8")
+    uses = [line.strip() for line in orchestrator.splitlines() if "input_mode" in line]
+    assert uses == ['if envelope.prompt.metadata.get("input_mode") == "spoken":']
+    # Approvals, the tool broker and the authority never see it.
+    for module in ("raiker/approvals", "raiker/tools", "raiker/runtime/authority", "raiker/policy"):
+        for path in Path(module).rglob("*.py"):
+            assert "input_mode" not in path.read_text(encoding="utf-8"), path.as_posix()
+    # And a spoken turn uses the same route and gateway as a typed one.
+    prompts = Path("raiker/api/routes_prompts.py").read_text(encoding="utf-8")
+    assert "normalize_input_mode(body.input_mode)" in prompts
+    assert "raiker/api/routes_prompts.py" in GATEWAY_CONSTRUCTORS

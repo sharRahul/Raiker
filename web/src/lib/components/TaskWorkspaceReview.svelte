@@ -70,6 +70,23 @@
     void load();
   });
 
+  // A copy can change while this review is not in view: a background run, or
+  // another window. Returning to the window or to this address rereads it, so
+  // the list is never the one from before the owner looked away.
+  $effect(() => {
+    const reread = () => {
+      if (document.visibilityState === "visible") void load();
+    };
+    window.addEventListener("focus", reread);
+    window.addEventListener("hashchange", reread);
+    document.addEventListener("visibilitychange", reread);
+    return () => {
+      window.removeEventListener("focus", reread);
+      window.removeEventListener("hashchange", reread);
+      document.removeEventListener("visibilitychange", reread);
+    };
+  });
+
   const REFUSALS: Record<string, string> = {
     workspace_review_stale: "The copy changed after you looked. Review the new list and apply again.",
     workspace_promotion_conflict: "A file changed in your project since the copy was made. Nothing was applied. Compare it below and choose Overwrite, or Discard the copy.",

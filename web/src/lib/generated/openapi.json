@@ -23599,6 +23599,18 @@
             "default": null,
             "title": "Readiness Expires At"
           },
+          "readiness_rate_limited_until": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Readiness Rate Limited Until"
+          },
           "readiness_reason_code": {
             "default": "model_not_checked",
             "title": "Readiness Reason Code",
@@ -35294,6 +35306,16 @@
             ],
             "title": "Cost Usd"
           },
+          "fallback": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TurnReceiptFallback"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "left_computer": {
             "items": {
               "type": "string"
@@ -35344,6 +35366,7 @@
           "model",
           "provider",
           "local",
+          "fallback",
           "cost_usd",
           "cost_basis",
           "reads",
@@ -35351,6 +35374,25 @@
           "left_computer"
         ],
         "title": "TurnReceipt",
+        "type": "object"
+      },
+      "TurnReceiptFallback": {
+        "description": "MD-5 — the candidate a fallback replaced, and the reason code it gave.",
+        "properties": {
+          "after_provider": {
+            "title": "After Provider",
+            "type": "string"
+          },
+          "reason": {
+            "title": "Reason",
+            "type": "string"
+          }
+        },
+        "required": [
+          "after_provider",
+          "reason"
+        ],
+        "title": "TurnReceiptFallback",
         "type": "object"
       },
       "TurnReceiptLine": {

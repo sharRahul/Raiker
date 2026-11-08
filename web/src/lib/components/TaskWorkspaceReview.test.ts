@@ -128,3 +128,14 @@ it("says a binary file has no line-by-line view", async () => {
   await fireEvent.click(await screen.findByRole("button", { name: /Added new\.py/ }));
   expect(await screen.findByText(/Not a text file/)).toBeInTheDocument();
 });
+
+it("rereads the copy when the owner returns to the window or the address", async () => {
+  const spy = vi.spyOn(api, "taskWorkspaces").mockResolvedValue({ workspaces: [] });
+  render(TaskWorkspaceReview, { sessionId: copy.session_id });
+  await waitFor(() => expect(spy).toHaveBeenCalledTimes(1));
+  spy.mockResolvedValue({ workspaces: [copy] });
+  window.dispatchEvent(new Event("focus"));
+  await waitFor(() => expect(spy).toHaveBeenCalledTimes(2));
+  window.dispatchEvent(new HashChangeEvent("hashchange"));
+  await waitFor(() => expect(spy).toHaveBeenCalledTimes(3));
+});

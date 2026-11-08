@@ -1503,26 +1503,6 @@ Permissions →* right after loading, before any turn. Not investigated this rou
 Check whether the permissions read races the first render or genuinely fails on
 this workspace, and whether the line should wait for a completed read.
 
-## Build's sandbox review does not reread when the same session is reopened
-
-Seen 2026-11-07. The review rereads the copies when the session changes or a
-turn ends. Returning to Build on the session already open (a changed address
-with the same `session=`) shows the list from before, so a copy made meanwhile
-(for example by a background run) appears only after the next turn. Reread on
-route entry and when the window regains focus.
-
-## Provider fault handling: remaining beta evidence (MD-5)
-
-The adapter fault matrix landed this round
-([FIXED-1312](FIXED_ITEMS.md#fixed-1312--a-stream-that-closed-early-was-recorded-as-a-finished-answer-md-5-found-this-round)).
-Still open for MD-5:
-* `retry_after_seconds` is carried on the error but not yet shown. Models should
-  read *Rate-limited until 14:32*, and the readiness ledger should wait that
-  long before re-checking.
-* The plan's turn-level receipt, *Answered by Llama 3.2 3B (local) because Claude
-  was rate-limited*, needs the orchestrator's fallback to record why the
-  first candidate was skipped, and the receipt to name it.
-
 ## Voice: fake-microphone browser evidence (VD-2)
 
 The guard that no source reads `SpeechRecognition`, and the permission-denied
@@ -1539,13 +1519,6 @@ PL-5 asks for *Supported* and *Experimental* labels on MCP catalogue entries.
 Raiker has no MCP catalogue: every server is added by the owner. Decide whether
 owner-added servers carry an *Experimental* label, or whether the plan's row
 closes at the connector catalogue.
-
-## mypy on Windows: `os.getuid` in model conversion
-
-`python -m mypy raiker apps tests --platform win32` reports
-`raiker/models/conversion.py:174: Module has no attribute "getuid"`. CI checks
-Linux, so the gate is green. Guard the call with `sys.platform != "win32"` so
-both platforms check clean.
 
 ## Windows builds are signed with a self-signed beta certificate (IN-3)
 
@@ -1570,14 +1543,6 @@ start` times out waiting for its daemon. The install is broken, not Raiker, and
 reinstalling it was outside what this session was permitted to do. Reinstall
 LM Studio, load a model, and add it through **Models › Add › On this
 computer**.
-
-## A served local GGUF is labelled *Where it runs is not confirmed*
-
-Seen 2026-11-07 in RT-GPU-02. With *Local GGUF* chosen in the composer, the
-line under the composer reads *Where it runs is not confirmed*, while the turn
-receipt says *nothing left this computer* and the slot says *Entirely on the
-GPU*. The composer should read the managed slot's loopback endpoint as on this
-computer.
 
 ## Raiker's own prompt is about 9,500 tokens before the owner types anything
 

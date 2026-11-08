@@ -1520,15 +1520,6 @@ thumbprint in `desktop/signing/identities.json`, and add the publisher and
 leaf public-key SHA-256 to `WINDOWS_PUBLISHER_PINS`. macOS stays unsigned until
 an Apple Developer ID exists.
 
-## LM Studio live check could not run on the owner machine (MD-1)
-
-2026-11-07: the installed LM Studio (`C:\Program Files\LM Studio`) exits at
-start with *Invalid file descriptor to ICU data received*, and `lms server
-start` times out waiting for its daemon. The install is broken, not Raiker, and
-reinstalling it was outside what this session was permitted to do. Reinstall
-LM Studio, load a model, and add it through **Models › Add › On this
-computer**.
-
 ## Raiker's own prompt is about 9,500 tokens before the owner types anything
 
 Measured 2026-11-07: one Chat question to a local model was 9,459 prompt
@@ -1537,7 +1528,7 @@ answers. A machine whose memory only fits an 8K or smaller context will still
 refuse every turn, now with a clear message. Trim the system prompt and tool
 list for small contexts, or refuse to plan a context below the turn floor.
 
-## AMD (Vulkan) owner-machine run (MD-2)
+## AMD (Vulkan) owner-machine run (MD-2) — moved to beta.2
 
 The NVIDIA CUDA run passed on 2026-11-07 (RT-GPU-01, RT-GPU-02). Still
 required: the same two checks on an AMD GPU with the Vulkan build.
@@ -1559,15 +1550,14 @@ done.* above the answer, and the answer itself reads *Stopped by user at a safe
 boundary.* One of the two is enough. Check also that text the model had already
 streamed before the stop is kept in the answer, as the first line says.
 
-## Hosted profiles without `max_tokens` still allow 1,024 output tokens
+## Untested hosted profiles still allow 1,024 output tokens
 
-Seen 2026-11-08 while closing FIXED-1341. Only `anthropic-hosted` (16,000) and
-the managed local slots (8,192) set an output limit. Every other profile
-(OpenAI, Gemini, DeepSeek, Groq, Mistral, xAI, Together, Fireworks, NVIDIA NIM,
-Cerebras, OpenRouter, Hugging Face, Ollama, LM Studio, generic) falls back to
-1,024, which can cut off a long file write. A turn that hits the limit now says
-so. Set each profile's limit to what its provider accepts, and test each one
-with an owner-entered key.
+2026-11-08: Anthropic, OpenAI, OpenRouter, Ollama and LM Studio were measured
+with the owner's keys and set (FIXED-1344). Gemini, DeepSeek, Groq, Mistral,
+xAI, Together, Fireworks, NVIDIA NIM, Cerebras, Hugging Face and the generic
+OpenAI-compatible profiles still fall back to 1,024 and are all *Experimental*.
+Set each one's limit to what its provider accepts once a key can test it. Check
+also that none rejects `max_tokens` the way OpenAI's reasoning models do.
 
 ## Command sandbox cannot see packages installed for the owner's account
 

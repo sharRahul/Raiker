@@ -432,7 +432,9 @@ _PROVIDER_ERROR_SENTENCES: tuple[tuple[str, str], ...] = (
         # refused a plain turn with a bare HTTP 400.
         "provider_context_exceeded",
         "this conversation is longer than the context the model was started with. "
-        "Raise the model's context in Settings › Advanced › Model serving, or start a new chat.",
+        "Raise the model's context where it is served (Settings › Advanced › Model serving "
+        "for a model Raiker serves, or the server's own settings in LM Studio or Ollama), "
+        "or start a new chat.",
     ),
     (
         "provider_rate_limited",

@@ -68,6 +68,10 @@ def _bench_reason(exc: Exception) -> str:
     return "quota_exhausted" if isinstance(exc, ProviderQuotaExhaustedError) else "rate_limited"
 
 
+#: Output tokens the execution readiness probe asks for.
+PROBE_OUTPUT_TOKENS = 16
+
+
 class ModelRouter:
     def __init__(
         self,
@@ -260,7 +264,9 @@ class ModelRouter:
 
         Catalogue membership alone does not prove billing/access is usable. This
         preflight is only called by an explicit owner readiness check and asks for
-        one output token with no tools, cache write, reasoning, or response schema.
+        a few output tokens with no tools, cache write, reasoning, or response
+        schema. Not one: OpenAI's reasoning models refuse a one-token budget with
+        a 400, which read as "cannot execute this model with the current account".
         """
         model_provider = self._factory(profile).create(profile)
         request = ModelRequest(
@@ -268,7 +274,7 @@ class ModelRouter:
             model_provider.provider,
             model_provider.model,
             [ModelMessage("user", ".")],
-            max_tokens=1,
+            max_tokens=PROBE_OUTPUT_TOKENS,
             stream=False,
         )
         try:

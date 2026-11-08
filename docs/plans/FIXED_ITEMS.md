@@ -1647,6 +1647,9 @@ file you can open. The two capture sets that remain — `screenshots/pages/` and
 | [FIXED-1340](#fixed-1340--the-model-was-told-a-masked-repository-folder-that-does-not-exist-bd-5) | Medium | Context / redaction | Fixed 2026-11-08 |
 | [FIXED-1341](#fixed-1341--a-turn-that-ran-out-of-output-tokens-said-done-bd-5) | High | Runtime / honesty | Fixed 2026-11-08 |
 | [FIXED-1342](#fixed-1342--the-llamacpp-engine-panel-kept-naming-the-previous-model-rt-gpu-03) | Medium | Models UI | Fixed 2026-11-08 |
+| [FIXED-1343](#fixed-1343--every-openai-gpt-5-model-was-refused-and-read-as-cannot-execute) | High | Models / OpenAI | Fixed 2026-11-08 |
+| [FIXED-1344](#fixed-1344--hosted-and-local-server-profiles-stopped-answers-at-1024-tokens) | Medium | Models / output limits | Fixed 2026-11-08 |
+| [FIXED-1345](#fixed-1345--the-context-advice-pointed-an-lm-studio-owner-at-raikers-own-slots) | Low | Models / copy | Fixed 2026-11-08 |
 
 ---
 
@@ -39952,3 +39955,61 @@ prop), so it sees the queued deploy and polls until the slot settles.
 
 **Evidence.** `LlamaEnginePanel.test.ts` (*rereads the engine when the page
 does*). RT-GPU-03 passed live, swapping Qwen2.5-7B for Qwen3-8B.
+
+## FIXED-1343 — Every OpenAI GPT-5 model was refused, and read as "cannot execute"
+
+**Severity: High. Area: Models / OpenAI. Status: Fixed 2026-11-08.**
+
+**Observed.** With the owner's OpenAI key, every request to `gpt-5-nano` was
+refused with HTTP 400, and the readiness check reported *OpenAI cannot execute
+gpt-5-nano with the current account*. The account was fine. OpenAI's GPT-5 and
+o-series models refuse three things Raiker sent:
+* `max_tokens`; they take `max_completion_tokens` instead.
+* Any `temperature` but the default.
+* A one-token completion. The readiness probe asked for one token, and a
+  reasoning model cannot finish in one.
+
+GPT-4.1 accepted all three, which is why the earlier hosted run passed.
+
+**Fixed.**
+* Requests to OpenAI's own API send `max_completion_tokens`, which every
+  current chat model accepts.
+* Reasoning models (`gpt-5*`, `o1`/`o3`/`o4`…) get no temperature.
+* The readiness probe asks for 16 tokens.
+* Other OpenAI-compatible servers (OpenRouter, Ollama, LM Studio, llama.cpp)
+  get the same request as before.
+
+**Evidence.** `tests/test_openai_request_shape.py`. Live, with the owner's
+key: the readiness check now reports `model_ready`, and a Chat turn that lists
+the workspace with a tool completed on `gpt-5-nano`.
+
+## FIXED-1344 — Hosted and local-server profiles stopped answers at 1,024 tokens
+
+**Severity: Medium. Area: Models / output limits. Status: Fixed 2026-11-08.**
+
+**Observed.** Measured live with the owner's keys, asking for about 4,000
+output tokens:
+* Anthropic stopped at 1,024 (`length`).
+* Ollama (`gpt-oss:20b-cloud`) stopped at 1,024.
+* OpenRouter's `openai/gpt-5-nano` returned an **empty** answer at both 1,024
+  and 8,192, because its reasoning used the whole budget.
+
+**Fixed.** The OpenAI, OpenRouter, Ollama (local and cloud) and LM Studio
+profiles allow 16,384 output tokens; Anthropic keeps 16,000. At those limits
+all four providers finished the same request (`stop`, the full 6,892
+characters). A turn that still reaches a limit says so (FIXED-1341).
+
+**Evidence.** The profile values in `raiker/config/model-profiles.json` and
+the live probe above.
+
+## FIXED-1345 — The context advice pointed an LM Studio owner at Raiker's own slots
+
+**Severity: Low. Area: Models / copy. Status: Fixed 2026-11-08.**
+
+**Observed.** An LM Studio model loaded with an 8K context refused Raiker's
+roughly 10K-token turn. The message said *Raise the model's context in Settings
+› Advanced › Model serving*, which only sizes the models Raiker serves itself.
+
+**Fixed.** The advice says where each kind of context is set: Model serving
+for a model Raiker serves, and the server's own settings in LM Studio or
+Ollama.

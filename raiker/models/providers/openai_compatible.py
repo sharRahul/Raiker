@@ -248,6 +248,10 @@ def _streamed_text_tool_calls(
     ]
 
 
+#: OpenAI models that reason before answering and accept only the default temperature.
+_OPENAI_REASONING_MODEL = re.compile(r"^(?:gpt-5|o\d)(?:$|[-.])", re.IGNORECASE)
+
+
 @dataclass
 class AsyncOpenAICompatibleProvider:
     profile_id: str
@@ -420,13 +424,21 @@ class AsyncOpenAICompatibleProvider:
 
     def _payload(self, request: ModelRequest, *, stream: bool) -> dict[str, Any]:
         messages = [self._message_dict(message) for message in request.messages]
+        model = request.model or self.model
         payload: dict[str, Any] = {
-            "model": request.model or self.model,
+            "model": model,
             "messages": messages,
             "temperature": request.temperature,
             "max_tokens": request.max_tokens,
             "stream": stream,
         }
+        if self.provider == "openai":
+            # OpenAI's own API: the GPT-5 and o-series models refuse
+            # `max_tokens` and any temperature but the default, and every
+            # current chat model accepts `max_completion_tokens`.
+            payload["max_completion_tokens"] = payload.pop("max_tokens")
+            if _OPENAI_REASONING_MODEL.match(model):
+                payload.pop("temperature")
         if request.tools:
             if not self.capabilities.supports_tool_calls:
                 raise ProviderUnsupportedCapabilityError("tool_calls_unsupported")

@@ -278,6 +278,7 @@
     },
     {
       "profile_id": "ollama-local-openai-compatible",
+      "max_tokens": 16384,
       "provider": "ollama",
       "backend": "openai_compatible",
       "model": "<model>",
@@ -300,6 +301,7 @@
     },
     {
       "profile_id": "ollama-cloud-openai-compatible",
+      "max_tokens": 16384,
       "provider": "ollama-cloud",
       "backend": "openai_compatible",
       "model": "<model>",
@@ -329,6 +331,7 @@
     },
     {
       "profile_id": "lm-studio-local-openai-compatible",
+      "max_tokens": 16384,
       "provider": "lm-studio",
       "backend": "openai_compatible",
       "model": "<model>",
@@ -435,6 +438,7 @@
     },
     {
       "profile_id": "openrouter-policy-gated",
+      "max_tokens": 16384,
       "provider": "openrouter",
       "backend": "openai_compatible",
       "model": "<model>",
@@ -566,6 +570,7 @@
     },
     {
       "profile_id": "openai-hosted",
+      "max_tokens": 16384,
       "provider": "openai",
       "backend": "openai_compatible",
       "model": "<model>",

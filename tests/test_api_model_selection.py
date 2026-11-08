@@ -22,6 +22,7 @@ from httpx2 import Response
 
 from raiker.api.app import create_app
 from raiker.api.sessions import ApiSessionStore
+from raiker.app.launcher import port_is_free
 from raiker.auth.vault_key_file import VAULT_KEY_ENV, write_vault_key
 from raiker.cli.principal_resolver import bootstrap_owner
 from raiker.models import local_presence
@@ -53,6 +54,13 @@ def _auth(token: str) -> dict[str, str]:
     return {"Authorization": f"Bearer {token}"}
 
 
+
+# These read "no server" from a closed slot port; a machine serving a model on
+# it (an owner's GPU box) answers instead.
+_NEEDS_NO_LOCAL_LLAMA_SERVER = pytest.mark.skipif(
+    not port_is_free(8080), reason="a llama.cpp server is listening on port 8080 here"
+)
+
 class TestProviderModelListing:
     def test_requires_auth(self, client: TestClient) -> None:
         resp = client.get("/api/models/raiker-local-llama-cpp/provider-models")
@@ -64,6 +72,7 @@ class TestProviderModelListing:
         )
         assert resp.status_code == 404
 
+    @_NEEDS_NO_LOCAL_LLAMA_SERVER
     def test_unreachable_local_provider_returns_empty_honestly(
         self, client: TestClient, owner_token: str
     ) -> None:
@@ -116,6 +125,7 @@ class TestProviderModelListing:
         # list that would read as "this provider serves nothing".
         assert "openai-hosted" not in body["catalogues"]
 
+    @_NEEDS_NO_LOCAL_LLAMA_SERVER
     def test_an_unreachable_provider_offers_what_it_last_published(
         self, client: TestClient, workspace: Path, owner_token: str
     ) -> None:

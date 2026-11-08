@@ -5,7 +5,7 @@ Drives a running ``raiker-web`` over loopback, as its owner, with whatever model
 the host serves for Build (the beta round serves a 7B GGUF on the owner's GPU):
 
 1. a disposable repository with one bug and the test that catches it;
-2. a project that declares ``python -m pytest -q`` as its check, the repository
+2. a project that declares ``python -m unittest discover -q`` as its check, the repository
    selected, and a session command grant for exactly that check;
 3. one Build turn asking for the fix. Every write and command the agent
    proposes is approved by the owner here, and every attempt is recorded;
@@ -32,12 +32,15 @@ import urllib.request
 from pathlib import Path
 from typing import Any
 
-CHECK = "python -m pytest -q"
+# The standard library's runner: the command sandbox reaches only a system
+# Python, and pytest is often installed for the owner's account alone.
+CHECK = "python -m unittest discover -q"
 BUGGY = "def average(values):\n    return sum(values) / (len(values) + 1)\n"
 TEST = (
-    "from stats import average\n\n\n"
-    "def test_average_of_three():\n    assert average([2, 4, 6]) == 4\n\n\n"
-    "def test_average_of_one():\n    assert average([5]) == 5\n"
+    "import unittest\n\nfrom stats import average\n\n\n"
+    "class AverageTest(unittest.TestCase):\n"
+    "    def test_average_of_three(self):\n        self.assertEqual(average([2, 4, 6]), 4)\n\n"
+    "    def test_average_of_one(self):\n        self.assertEqual(average([5]), 5)\n"
 )
 
 
@@ -87,8 +90,12 @@ def _turn_on(host: Host, capability: str, *, acknowledge: bool = False) -> None:
         host.call("POST", f"/api/capability-gates/{capability}/threat-ack", {"reason": "BD-5 live fix loop"})
     body: dict[str, Any] = {"target_state": "enabled_runtime", "reason": "BD-5 live fix loop"}
     if acknowledge:
-        body["confirmation_token"] = "confirm"
+        body["confirmation_token"] = CONFIRMATION_WORD
     host.call("POST", f"/api/capability-gates/{capability}/set", body)
+
+
+#: The word the gate's confirmation step asks the owner to type; not a secret.
+CONFIRMATION_WORD = "confirm"
 
 
 def run(args: argparse.Namespace) -> dict[str, Any]:
@@ -110,13 +117,13 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
     })
     session = str(first["session_id"])
     host.call("PUT", f"/api/sessions/{session}/command-grant", {
-        "commands": [["python", "-m", "pytest", "-q"]], "timeout_seconds": 180, "ttl_minutes": 60,
+        "commands": [CHECK.split()], "timeout_seconds": 180, "ttl_minutes": 60,
     })
     attempts: list[dict[str, Any]] = []
     answer = host.call("POST", "/api/prompts", {
         "text": (
-            "test_stats.py fails. Fix the bug in stats.py so that `python -m pytest -q` passes. "
-            "Edit the file with the write tool, then run `python -m pytest -q` with the command tool "
+            f"test_stats.py fails. Fix the bug in stats.py so that `{CHECK}` passes. "
+            f"Edit the file with the write tool, then run `{CHECK}` with the command tool "
             "and read its output. If it still fails, fix it again. Make at most three attempts, "
             "and report each attempt."
         ),

@@ -12,7 +12,7 @@ from raiker.context.models import (
     ContextItem,
     ContextSource,
 )
-from raiker.context.redaction import redact_text
+from raiker.context.redaction import carries_credential, redact_text
 from raiker.contracts.ids import new_id
 from raiker.contracts.models import normalize_prompt_surface
 from raiker.goals.store import session_memory_withheld
@@ -510,6 +510,9 @@ class ContextGatherer:
             provenance={"origin": "project_context", "project_id": project_id},
             title=f"Project context: {project['name']}",
             content="\n".join(lines),
+            # The model must use this path as named; masking an ID-shaped run
+            # folder told it a folder that does not exist (BD-5).
+            exact=(repository,) if repository else (),
             metadata={
                 "project_id": project_id,
                 "attachment_count": attachment_count,
@@ -894,6 +897,7 @@ class ContextGatherer:
         title: str,
         content: str,
         metadata: dict[str, object] | None = None,
+        exact: tuple[str, ...] = (),
     ) -> ContextItem:
         capped = content[: self.config.max_item_chars]
         if source_type == "attachment" and trust_level == "untrusted_external":
@@ -903,7 +907,13 @@ class ContextGatherer:
             # exactly the fact the label must keep.
             sensitivity, content_class = _attachment_sensitivity(capped, sensitivity)
             metadata = {**(metadata or {}), "content_class": content_class}
+        kept = [value for value in exact if value and not carries_credential(value, locator_value=True)]
+        for index, value in enumerate(kept):
+            capped = capped.replace(value, f"\x00{index}\x00")
         redacted, changed = redact_text(capped)
+        for index, value in enumerate(kept):
+            redacted = redacted.replace(f"\x00{index}\x00", value)
+            capped = capped.replace(f"\x00{index}\x00", value)
         source = ContextSource(
             source_id=new_id("ctxs_"),
             source_type=source_type,

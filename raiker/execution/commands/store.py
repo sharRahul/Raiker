@@ -8,7 +8,7 @@ from typing import Any
 from cryptography.fernet import InvalidToken
 
 from raiker.auth.app_key import app_fernet
-from raiker.context.redaction import redact_text
+from raiker.context.redaction import carries_credential, redact_text
 from raiker.contracts.ids import new_id, utc_now
 from raiker.execution.commands.models import (
     TERMINAL_COMMAND_STATES,
@@ -79,6 +79,12 @@ class CommandMaterialCipher:
         return value
 
 
+def _carries_secret(value: str, mode: dict[str, bool]) -> bool:
+    if mode.get("locator_value"):
+        return carries_credential(value, locator_value=True)
+    return redact_text(value, **mode)[1]
+
+
 class CommandStore:
     def __init__(
         self,
@@ -125,7 +131,7 @@ class CommandStore:
             *((value, {"locator_value": True}) for value in locator_values),
             (request.authority_id, {"digest_value": True}),
         )
-        if any(redact_text(value, **mode)[1] for value, mode in scans if value):
+        if any(_carries_secret(value, mode) for value, mode in scans if value):
             raise SecretMaterialRejected("command_secret_pattern_rejected")
 
     def create(self, request: CommandRequest) -> StoredCommandRun:

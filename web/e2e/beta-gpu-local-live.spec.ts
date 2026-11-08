@@ -124,6 +124,9 @@ const GPU_REPO = process.env.RAIKER_GPU_REPO ?? "Qwen/Qwen2.5-7B-Instruct-GGUF";
 const GPU_QUANT = new RegExp(process.env.RAIKER_GPU_QUANT ?? "Q4_K_M");
 const GPU_FILES = process.env.RAIKER_GPU_FILES ?? "2";
 const GPU_NAME = GPU_REPO.split("/")[1].replace(/-GGUF$/i, "").toLowerCase();
+// The slot lists a model by its GGUF metadata name ("Qwen3 8B ..."), so the
+// words match with any separator between them.
+const GPU_LABEL = new RegExp(GPU_NAME.split(/[^a-z0-9]+/).filter(Boolean).join("[^a-z0-9]*"), "i");
 
 test("RT-GPU-03 — a two-shard 7B GGUF is downloaded, verified and served on the GPU", async ({ page }) => {
   test.setTimeout(1_800_000);
@@ -144,7 +147,7 @@ test("RT-GPU-03 — a two-shard 7B GGUF is downloaded, verified and served on th
   await open(page, "settings?tab=advanced&kind=models");
   const gguf = page.getByRole("group", { name: "GGUF" });
   const slot = gguf.getByLabel("GGUF model 1");
-  const option = slot.locator("option", { hasText: GPU_NAME });
+  const option = slot.locator("option", { hasText: GPU_LABEL });
   await expect(option).toHaveCount(1, { timeout: 60_000 });
   await slot.selectOption({ label: (await option.textContent())! });
   await gguf.getByRole("button", { name: /^Serve selected/ }).click();
@@ -156,7 +159,7 @@ test("RT-GPU-03 — a two-shard 7B GGUF is downloaded, verified and served on th
   // The running-models card names the model the slot now serves; both models
   // answer to the same alias, so the readiness line alone cannot tell them apart.
   const engine = page.getByRole("region", { name: "llama.cpp engine" });
-  await expect(engine.locator("strong, h4, .slot-name, span, p", { hasText: GPU_NAME }).first()).toBeVisible({ timeout: 120_000 });
+  await expect(engine.locator("strong, h4, .slot-name, span, p", { hasText: GPU_LABEL }).first()).toBeVisible({ timeout: 120_000 });
   await expect(engine.getByText(/Entirely on the GPU/)).toBeVisible();
   await capture(page, join(OUT, "06-7b-serving.png"));
   await test.info().attach("nvidia-smi.txt", { body: gpuProcesses(), contentType: "text/plain" });

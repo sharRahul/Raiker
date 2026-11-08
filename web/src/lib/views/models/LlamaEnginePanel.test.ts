@@ -137,3 +137,14 @@ it("reports an available update", async () => {
   await fireEvent.click(await screen.findByRole("button", { name: "Check for updates" }));
   expect(await screen.findByText(/llama.cpp b7000 is available \(you have b6900\)/)).toBeInTheDocument();
 });
+
+it("rereads the engine when the page does, so a model queued beside it shows up", async () => {
+  // RT-GPU-03: a model served from the GGUF row left this panel naming the
+  // previous model, because it read the engine only once.
+  const read = vi.spyOn(api, "llamaRuntime").mockResolvedValue(overview());
+  vi.spyOn(api, "modelOperations").mockResolvedValue({ items: [] });
+  const { rerender } = render(LlamaEnginePanel, { revision: 1 });
+  await waitFor(() => expect(read).toHaveBeenCalledTimes(1));
+  await rerender({ revision: 2 });
+  await waitFor(() => expect(read).toHaveBeenCalledTimes(2));
+});

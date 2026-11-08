@@ -8,7 +8,7 @@
    * here; so are Stop and Restart for each slot. Nothing on this card reaches
    * the network until the owner presses Install or Check for updates.
    */
-  import { onDestroy, onMount } from "svelte";
+  import { onDestroy, onMount, untrack } from "svelte";
   import { api, ApiError } from "../../api";
   import type { ModelOperation } from "../../apiTypes";
   import type { LlamaRuntimeOverview, LlamaUpdateCheck, SlotHealth } from "../../generated/apiContract";
@@ -25,7 +25,17 @@
     slotTone,
   } from "../../llamaRuntime";
 
-  let { onchanged, active = true }: { onchanged?: () => void; active?: boolean } = $props();
+  let {
+    onchanged,
+    active = true,
+    revision = 0,
+  }: {
+    onchanged?: () => void;
+    active?: boolean;
+    /** Bumped when the page rereads, e.g. after a model was queued to serve in
+     *  the GGUF row beside this panel, so the slots here follow it. */
+    revision?: number;
+  } = $props();
 
   let overview = $state<LlamaRuntimeOverview | null>(null);
   let operations = $state<ModelOperation[]>([]);
@@ -152,6 +162,13 @@
   }
 
   onMount(() => void load());
+  let seenRevision = untrack(() => revision);
+  $effect(() => {
+    if (revision !== seenRevision) {
+      seenRevision = revision;
+      untrack(() => void load());
+    }
+  });
   onDestroy(() => {
     if (timer) clearTimeout(timer);
   });

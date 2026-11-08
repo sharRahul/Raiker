@@ -119,6 +119,9 @@ def _redact_spoken_credential(match: re.Match[str]) -> str:
 # Ordered (pattern, replacement) pairs. Private keys and known token shapes are matched
 # before the broad high-entropy fallback so they get specific placeholders. Each pattern is
 # deterministic and never raises on unusual input.
+#: A phone-, NHS- or SSN-shaped number: personal data, not a credential.
+ID_NUMBER = re.compile(r"\b\d{3}[-\s]?\d{3}[-\s]?\d{4}\b")
+
 _PATTERNS: tuple[tuple[re.Pattern[str], Callable[[re.Match[str]], str] | str], ...] = (
     (
         re.compile(
@@ -176,7 +179,7 @@ _PATTERNS: tuple[tuple[re.Pattern[str], Callable[[re.Match[str]], str] | str], .
         REDACTED_ACCOUNT,
     ),
     # Medical identifiers (NHS/SSN-like patterns)
-    (re.compile(r"\b\d{3}[-\s]?\d{3}[-\s]?\d{4}\b"), REDACTED_ID),
+    (ID_NUMBER, REDACTED_ID),
     # High-entropy fallback for long opaque strings (kept last so specific shapes
     # win). A callable replacement spares lowercase snake_case reason codes /
     # capability ids, which are long but carry no secret entropy.
@@ -319,3 +322,17 @@ def redact_text(
     for pattern, replacement in patterns:
         redacted = pattern.sub(replacement, redacted)
     return redacted, redacted != text
+
+
+def carries_credential(value: str, *, locator_value: bool = False) -> bool:
+    """Whether ``value`` matches a credential shape, not merely personal data.
+
+    A path may hold an ID-shaped number, such as a run folder named
+    ``build-1794142515``. Events and logs still mask it, but it is not a
+    credential: it must not stop a command running in that folder, and a model
+    must be told the folder as it is named.
+    """
+    redacted, changed = redact_text(value, locator_value=locator_value)
+    if changed and locator_value:
+        return redacted != ID_NUMBER.sub(REDACTED_ID, value)
+    return changed

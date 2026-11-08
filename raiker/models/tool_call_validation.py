@@ -39,6 +39,14 @@ _TOOL_DESCRIPTIONS = TOOL_DESCRIPTIONS
 _MCP_TOOL_RISK: tuple[str, bool] = (mcp_tool_risk_band(), False)
 
 
+def required_arguments(tool_name: str) -> tuple[str, ...]:
+    """The arguments a call to ``tool_name`` must carry, as the model is told them."""
+    named = (*_REQUIRED_ARGS.get(tool_name, ()), *_REQUIRED_LIST_ARGS.get(tool_name, ()))
+    if tool_name == "edit_file" and "old_text" not in named:
+        named = (*named, "old_text")
+    return tuple(dict.fromkeys(named))
+
+
 class ToolCallRejected(ValueError):
     """Raised when a model-proposed tool call fails validation (OWASP LLM05)."""
 

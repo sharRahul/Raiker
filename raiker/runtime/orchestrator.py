@@ -436,6 +436,55 @@ def _tool_content(payload: Any) -> str:
     return json.dumps(cleaned, ensure_ascii=False)
 
 
+#: Malformed tool calls a turn returns to the model to correct before it stops.
+MAX_CALL_CORRECTIONS = 2
+
+OUTPUT_LIMIT_BEFORE_ANSWER = (
+    "The model reached its output limit before it answered, so nothing more was done. "
+    "Raise the profile's output limit or try again."
+)
+OUTPUT_LIMIT_CUT_OFF = "The model reached its output limit, so this answer may be cut off."
+
+
+def _rejected_batch_exchange(text: str, proposals: list[ToolCallProposal]) -> list[ModelMessage]:
+    """The assistant turn that proposed ``proposals`` and one result per call.
+
+    The rejected call is told why; any call beside it is told it did not run.
+    """
+    from raiker.models.tool_call_validation import required_arguments
+
+    exchange = [ModelMessage(role="assistant", content=text, tool_calls=tuple(proposals))]
+    for proposal in proposals:
+        try:
+            validate_tool_call(proposal)
+            reason = None
+        except ToolCallRejected as own:
+            reason = own.reason
+        if reason is not None:
+            payload: dict[str, Any] = {
+                "status": "error",
+                "error": "invalid_tool_call",
+                "reason": reason,
+                "required_arguments": list(required_arguments(proposal.tool_name)),
+                "next": "Call the tool again with every required argument, by these exact names.",
+            }
+        else:
+            payload = {
+                "status": "not_run",
+                "reason": "another_call_in_this_batch_was_invalid",
+                "next": "Propose this call again if it is still needed.",
+            }
+        exchange.append(
+            ModelMessage(
+                role="tool",
+                content=_tool_content(payload),
+                tool_call_id=proposal.call_id,
+                name=proposal.tool_name,
+            )
+        )
+    return exchange
+
+
 def _queued_call_exchange(
     proposal: ToolCallProposal, *, tool_name: str, payload: dict[str, Any]
 ) -> list[ModelMessage]:
@@ -3082,6 +3131,8 @@ class RuntimeOrchestrator:
         implementation that could drift from it.
         """
         max_tool_calls = envelope.options.max_tool_calls
+        # How many malformed calls this turn has handed back to the model to fix.
+        corrections_made = 0
         started_action_ids: set[str] = set()
         status: str | None = None
         message = ""
@@ -3400,6 +3451,18 @@ class RuntimeOrchestrator:
                     messages.append(ModelMessage(role="assistant", content=response.text))
                     messages.append(ModelMessage(role="user", content=retry))
                     continue
+                if response.finish_reason == "length":
+                    # The model ran out of output tokens (a thinking model can
+                    # spend them all before it writes a word). "Done." would
+                    # claim a finished turn that never answered.
+                    if not response.text.strip():
+                        status = "failed"
+                        message = OUTPUT_LIMIT_BEFORE_ANSWER
+                        break
+                    answer_segments.append(response.text)
+                    answer_segments.append(OUTPUT_LIMIT_CUT_OFF)
+                    final_text = answer_so_far()
+                    break
                 answer_segments.append(response.text)
                 final_text = answer_so_far()
                 break
@@ -3432,6 +3495,16 @@ class RuntimeOrchestrator:
                     "model_tool_call_rejected",
                     {"tool_name": exc.tool_name, "reason": exc.reason},
                 )
+                if corrections_made < MAX_CALL_CORRECTIONS:
+                    # A malformed call goes back to the model as that call's
+                    # result, the way Claude Code and Hermes answer one, so it
+                    # can correct the arguments instead of ending the turn. Only
+                    # the bounded reason code is returned, and nothing in the
+                    # batch ran: each call is proposed again and governed anew.
+                    corrections_made += 1
+                    tool_calls_made += 1
+                    messages.extend(_rejected_batch_exchange(response.text, proposals))
+                    continue
                 self._verify_and_emit(
                     envelope,
                     rejected_tool_call={"tool_name": exc.tool_name, "reason": exc.reason},

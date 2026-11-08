@@ -1642,6 +1642,11 @@ file you can open. The two capture sets that remain — `screenshots/pages/` and
 | [FIXED-1335](#fixed-1335--build-did-not-say-where-the-repository-was-and-three-wrong-paths-shut-file-reads-bd-5) | Medium | Build / paths and containment | Fixed 2026-11-08 |
 | [FIXED-1336](#fixed-1336--approvals-stored-redacted-arguments-so-an-id-like-path-read-as-tampered-found-by-bd-5) | High | Approvals / integrity | Fixed 2026-11-08 |
 | [FIXED-1337](#fixed-1337--a-single-504-from-githubs-release-cdn-failed-the-llamacpp-install) | Medium | Models / llama.cpp | Fixed 2026-11-08 |
+| [FIXED-1338](#fixed-1338--one-malformed-tool-call-ended-the-whole-build-turn-bd-5) | Medium | Runtime / tool calling | Fixed 2026-11-08 |
+| [FIXED-1339](#fixed-1339--a-command-in-an-id-shaped-folder-was-refused-as-secret-material-bd-5) | Medium | Commands / secret scan | Fixed 2026-11-08 |
+| [FIXED-1340](#fixed-1340--the-model-was-told-a-masked-repository-folder-that-does-not-exist-bd-5) | Medium | Context / redaction | Fixed 2026-11-08 |
+| [FIXED-1341](#fixed-1341--a-turn-that-ran-out-of-output-tokens-said-done-bd-5) | High | Runtime / honesty | Fixed 2026-11-08 |
+| [FIXED-1342](#fixed-1342--the-llamacpp-engine-panel-kept-naming-the-previous-model-rt-gpu-03) | Medium | Models UI | Fixed 2026-11-08 |
 
 ---
 
@@ -39859,3 +39864,91 @@ truncated dict.
 
 **Evidence.** `test_llama_cpp_download_retry.py` (504→503→200 succeeds, 404 is
 not retried, a persistent 504 fails after four tries).
+
+## FIXED-1338 — One malformed tool call ended the whole Build turn (BD-5)
+
+**Severity: Medium. Area: Runtime / tool calling. Status: Fixed 2026-11-08.**
+
+**Observed.** With Qwen3-8B serving Build, the model listed the folder, found
+the file and read it, then called `edit_file` without `old_text`. Validation
+refused the call, and the turn ended at once with *I could not run that step
+because the requested tool call was invalid.* One more try would have fixed it.
+
+**Fixed.** As in Claude Code and Hermes Agent, a malformed call goes back to
+the model as that call's result. The result carries the bounded reason code
+(`missing_argument:old_text`) and the tool's required argument names. A call
+proposed beside it is reported as *not run*. Nothing in the batch runs, so
+each call is proposed again and governed anew. A turn gets two corrections
+(`MAX_CALL_CORRECTIONS`); the third malformed call ends it as before, and each
+one still counts against the tool-call budget.
+
+**Evidence.** `tests/test_tool_call_correction.py`. In the next BD-5 run the
+model resent `edit_file` with `path` and the edit was applied.
+
+## FIXED-1339 — A command in an ID-shaped folder was refused as secret material (BD-5)
+
+**Severity: Medium. Area: Commands / secret scan. Status: Fixed 2026-11-08.**
+
+**Observed.** The agent's `python -m unittest` in `bd5-stats-1794142515/` failed
+with `command_secret_pattern_rejected`. The command store scans a command's
+folder for secrets, and the redactor masks a 10-digit run as a phone- or
+ID-shaped number even in a path.
+
+**Fixed.** A folder or workspace path counts as secret material only when a
+*credential* shape matches it (`carries_credential`). An ID-shaped number in a
+path is personal data, not a credential: events and logs still mask it, but it
+no longer stops the command. A token in the path is still refused.
+
+**Evidence.** `tests/test_command_locator_ids.py`.
+
+## FIXED-1340 — The model was told a masked repository folder that does not exist (BD-5)
+
+**Severity: Medium. Area: Context / redaction. Status: Fixed 2026-11-08.**
+
+**Observed.** Every context item is redacted before the model reads it, so the
+project context told the model its repository was `bd5-stats-[REDACTED_ID]/`.
+The model asked for `bd5-stats-[REDACTED_ID]/stats.py`, got `not_found`, and
+the turn changed nothing.
+
+**Fixed.** The project context passes the selected repository's path through
+as named, because the workspace supplies that path and the model must use it.
+The path passes through only if it holds no credential shape. Everything else
+in the item, the owner's instructions included, is redacted as before.
+
+**Evidence.** `tests/test_command_locator_ids.py::test_the_model_is_told_the_repository_folder_as_it_is_named`
+and `…::test_a_repository_path_holding_a_credential_is_not_passed_through`.
+
+## FIXED-1341 — A turn that ran out of output tokens said "Done." (BD-5)
+
+**Severity: High. Area: Runtime / honesty. Status: Fixed 2026-11-08.**
+
+**Observed.** The managed local slots allowed 1,024 output tokens. Qwen3-8B
+thinks before it answers, spent all of them, and returned no text and no call
+(`finish_reason: length`). The turn closed as *completed* with the answer
+*Done.*, claiming work that never happened.
+
+**Fixed.**
+* A turn that hits the output limit before answering is *failed* and says so,
+  with what to change.
+* An answer cut off by the limit is kept, with a note that it may be cut off.
+* The eight managed llama.cpp and MLX slot profiles allow 8,192 output tokens,
+  well inside the 32K context the planner gives them.
+
+**Evidence.** `tests/test_tool_call_correction.py` (the output-limit and
+profile tests).
+
+## FIXED-1342 — The llama.cpp engine panel kept naming the previous model (RT-GPU-03)
+
+**Severity: Medium. Area: Models UI. Status: Fixed 2026-11-08.**
+
+**Observed.** After **Serve selected** in the GGUF row, `llama-server` was
+serving the new model within seconds, but two minutes later the engine panel
+still showed the previous one as *Serving*. The panel read the engine on mount
+and polled only while it already knew of a deploy. The deploy was queued from
+the row beside it, which refreshed the page but not the panel.
+
+**Fixed.** The panel rereads the engine whenever the page does (its `revision`
+prop), so it sees the queued deploy and polls until the slot settles.
+
+**Evidence.** `LlamaEnginePanel.test.ts` (*rereads the engine when the page
+does*). RT-GPU-03 passed live, swapping Qwen2.5-7B for Qwen3-8B.

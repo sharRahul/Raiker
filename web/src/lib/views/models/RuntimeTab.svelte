@@ -91,7 +91,7 @@
   {#if gguf.length > 0}
     <!-- The engine behind the GGUF slots: installed, sized and supervised by
          Raiker, so serving a model needs no manual setup. -->
-    <LlamaEnginePanel active={panel === "serving"} onchanged={() => void onreload()} />
+    <LlamaEnginePanel active={panel === "serving"} {revision} onchanged={() => void onreload()} />
     <LocalFrameworkRow
       active={panel === "serving"}
       provider="llama.cpp"

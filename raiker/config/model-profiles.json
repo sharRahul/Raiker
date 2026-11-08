@@ -53,7 +53,7 @@
       "embeddings_path": "/v1/embeddings",
       "timeout_seconds": 120.0,
       "temperature": 0.2,
-      "max_tokens": 1024,
+      "max_tokens": 8192,
       "prompt_cache_ttl": "5m"
     },
     {
@@ -85,7 +85,7 @@
       "embeddings_path": "/v1/embeddings",
       "timeout_seconds": 120.0,
       "temperature": 0.2,
-      "max_tokens": 1024,
+      "max_tokens": 8192,
       "prompt_cache_ttl": "5m"
     },
     {
@@ -117,7 +117,7 @@
       "embeddings_path": "/v1/embeddings",
       "timeout_seconds": 120.0,
       "temperature": 0.2,
-      "max_tokens": 1024,
+      "max_tokens": 8192,
       "prompt_cache_ttl": "5m"
     },
     {
@@ -149,7 +149,7 @@
       "embeddings_path": "/v1/embeddings",
       "timeout_seconds": 120.0,
       "temperature": 0.2,
-      "max_tokens": 1024,
+      "max_tokens": 8192,
       "prompt_cache_ttl": "5m"
     },
     {
@@ -181,7 +181,7 @@
       "chat_path": "/v1/chat/completions",
       "timeout_seconds": 120.0,
       "temperature": 0.2,
-      "max_tokens": 1024
+      "max_tokens": 8192
     },
     {
       "profile_id": "raiker-local-mlx-2",
@@ -212,7 +212,7 @@
       "chat_path": "/v1/chat/completions",
       "timeout_seconds": 120.0,
       "temperature": 0.2,
-      "max_tokens": 1024
+      "max_tokens": 8192
     },
     {
       "profile_id": "raiker-local-mlx-3",
@@ -243,7 +243,7 @@
       "chat_path": "/v1/chat/completions",
       "timeout_seconds": 120.0,
       "temperature": 0.2,
-      "max_tokens": 1024
+      "max_tokens": 8192
     },
     {
       "profile_id": "raiker-local-mlx-4",
@@ -274,7 +274,7 @@
       "chat_path": "/v1/chat/completions",
       "timeout_seconds": 120.0,
       "temperature": 0.2,
-      "max_tokens": 1024
+      "max_tokens": 8192
     },
     {
       "profile_id": "ollama-local-openai-compatible",

@@ -1558,3 +1558,24 @@ request — this turn ended at a safe boundary and kept what it had already
 done.* above the answer, and the answer itself reads *Stopped by user at a safe
 boundary.* One of the two is enough. Check also that text the model had already
 streamed before the stop is kept in the answer, as the first line says.
+
+## Hosted profiles without `max_tokens` still allow 1,024 output tokens
+
+Seen 2026-11-08 while closing FIXED-1341. Only `anthropic-hosted` (16,000) and
+the managed local slots (8,192) set an output limit. Every other profile
+(OpenAI, Gemini, DeepSeek, Groq, Mistral, xAI, Together, Fireworks, NVIDIA NIM,
+Cerebras, OpenRouter, Hugging Face, Ollama, LM Studio, generic) falls back to
+1,024, which can cut off a long file write. A turn that hits the limit now says
+so. Set each profile's limit to what its provider accepts, and test each one
+with an owner-entered key.
+
+## Command sandbox cannot see packages installed for the owner's account
+
+Seen 2026-11-08 in BD-5. The sandbox account runs the system Python
+(`C:\Python313`) but cannot read the owner's per-user site-packages
+(`%APPDATA%\Python`), so `python -m pytest` failed with *No module named
+pytest* although pytest is installed for the owner. This is by design: the
+sandbox never reads the owner's home. The check's failure gives no reason the
+owner can act on. When a check fails on a missing module that the owner's own
+interpreter has, say so, and name the fixes: install it for all users, or use
+a backend that has it.

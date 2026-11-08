@@ -291,7 +291,7 @@ work runs (top bar), and so is the count of running items.
 
 | ID | Item | State | P | Effort | Work left |
 |---|---|---|---|---|---|
-| UX-1 | Quiet UI across retained pages | 🟡 | P0 | M | **2026-11-07:** QUI-G01 is a failing check (RT-BETA-10) for Chat, Build, Models, Settings › General, Privacy and About & updates, and Account and Backups. General's exception is gone: Account and Backups are sections of their own ([FIXED-1318](FIXED_ITEMS.md#fixed-1318--settings--general-was-over-its-size-budget-because-it-held-the-account-and-backups-ux-1)). Still required: close or move the open Quiet UI rows |
+| UX-1 | Quiet UI across retained pages | ✅ | — | — | **2026-11-07:** QUI-G01 is a failing check (RT-BETA-10) for Chat, Build, Models, Settings › General, Privacy and About & updates, and Account and Backups. General's exception is gone: Account and Backups are sections of their own ([FIXED-1318](FIXED_ITEMS.md#fixed-1318--settings--general-was-over-its-size-budget-because-it-held-the-account-and-backups-ux-1)). **2026-11-08:** three open rows fixed (docked notices fold into the bell on every page, the approval's account reads as text, the routine delivery note links Permissions); the rest moved to beta.2 with known-issue entries in the beta guide |
 | UX-2 | Composer, navigation, model selection consistent | ✅ | — | — | Existing component coverage names the Chat and Build grammars; this round adds the shared five-state vocabulary and a live `RT-BETA-UX-01` route check. **2026-11-08:** the parity assertion found Build's order differing from Chat's; fixed, and checked in mocked e2e ([FIXED-1326](FIXED_ITEMS.md#fixed-1326--build-and-chat-ordered-the-shared-composer-controls-differently-ux-2)). |
 | UX-3 | Permission controls, runtime status, approvals | ✅ | — | — | QUI-P01–P09 (approvals round) |
 | UX-4 | Understandable errors and recovery actions | ✅ | — | — | Whole-route audit `tests/test_route_reason_copy.py`: every literal route refusal has copy, and `failure()` says why ([FIXED-1309](FIXED_ITEMS.md#fixed-1309--eighty-route-refusals-reached-the-owner-as-a-bare-machine-code-ux-4)) |
@@ -523,6 +523,7 @@ product refusing it, rather than delaying the date.
 
 ## Changelog
 
+- **2026-11-08** — UX-1 closed: three Quiet UI rows fixed, the rest moved to beta.2 as known issues.
 - **2026-11-08** — UX-5 keyboard-only T-14 passes live; it found a readiness promise the server did not keep (FIXED-1333).
 - **2026-11-08** — PL-4 closed by an adversarial MCP server test.
 - **2026-11-08** — SB-5: Undo Apply and crash-safe Apply (FIXED-1332).

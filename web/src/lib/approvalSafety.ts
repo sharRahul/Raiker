@@ -79,7 +79,7 @@ export function dataInvolved(args: Record<string, unknown> | null | undefined): 
 export function affectedFacts(args: Record<string, unknown> | null | undefined): ConsequenceFact[] {
   const facts = consequenceFacts(args).filter((fact) => AFFECTS.has(fact.label));
   const host = destinationHost(args);
-  if (host && !facts.some((fact) => fact.value === host)) facts.push({ label: "Host", value: host });
+  if (host && !facts.some((fact) => fact.value === host)) facts.push({ label: "Host", value: host, prose: false });
   return facts;
 }
 

@@ -22,6 +22,7 @@ import json
 import socket
 import sys
 import threading
+from collections.abc import Iterator
 from pathlib import Path
 
 import pytest
@@ -66,7 +67,7 @@ sys.stdout.flush()
 
 
 @pytest.fixture
-def listener() -> tuple[int, list[bool]]:
+def listener() -> Iterator[tuple[int, list[bool]]]:
     """A loopback listener that records whether anything reached it."""
     reached: list[bool] = []
     server = socket.socket()

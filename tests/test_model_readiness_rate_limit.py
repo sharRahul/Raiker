@@ -109,3 +109,45 @@ def test_an_invalidated_check_on_a_configured_slot_is_rechecked_not_refused(tmp_
     ready = _asyncio.run(service.require_ready_async("owner", "raiker-local-llama-cpp", "local-gguf"))
     assert ready.ready
     assert calls["n"] == 2, "the invalidated observation was looked at again, not refused"
+
+
+
+def test_a_key_or_endpoint_change_and_a_hosted_profile_still_ask_the_owner(tmp_path: Path) -> None:
+    """The re-check is limited to Raiker reloading its own managed slot."""
+    import asyncio as _asyncio
+
+    import pytest as _pytest
+
+    from raiker.models.readiness import (
+        ModelNotReady,
+        ModelReadiness,
+        ModelReadinessKey,
+        ModelReadinessService,
+        ModelReadinessState,
+    )
+
+    store = SQLiteStore(tmp_path)
+    store.save_configured_model("owner", "raiker-local-llama-cpp", "local-gguf")
+    store.save_configured_model("owner", "anthropic-hosted", "claude")
+    calls = {"n": 0}
+
+    class Probe:
+        def resolve_key(self, owner: str, profile: str, model: str) -> ModelReadinessKey:
+            return ModelReadinessKey(owner, profile, model, "e")
+
+        async def check(self, key: ModelReadinessKey) -> ModelReadiness:
+            calls["n"] += 1
+            return ModelReadiness(key=key, state=ModelReadinessState.READY, checked_at=None, expires_at=None,
+                                  summary="ok", reason_code="model_ready", remediation="", evidence={})
+
+    service = ModelReadinessService(store, probe=Probe())
+    for profile, model in (("raiker-local-llama-cpp", "local-gguf"), ("anthropic-hosted", "claude")):
+        _asyncio.run(service.check("owner", profile, model, "e"))
+    store.invalidate_model_readiness("owner", "raiker-local-llama-cpp", reason_code="readiness_invalidated")
+    store.invalidate_model_readiness("owner", "anthropic-hosted", reason_code="local_runtime_deployed")
+    before = calls["n"]
+    with _pytest.raises(ModelNotReady):
+        _asyncio.run(service.require_ready_async("owner", "raiker-local-llama-cpp", "local-gguf"))
+    with _pytest.raises(ModelNotReady):
+        _asyncio.run(service.require_ready_async("owner", "anthropic-hosted", "claude"))
+    assert calls["n"] == before, "nothing was reached on Raiker's own initiative"

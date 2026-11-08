@@ -990,7 +990,8 @@
               {#if deliverConsent}
                 <small>
                   Raiker sends each finished run's result there without asking again, while that channel is on and
-                  your permissions allow channel messages. Stop it any time from the task.
+                  channel messages are allowed in <a href="#/capabilities">Permissions</a> (off by default).
+                  Stop it any time from the task.
                 </small>
               {/if}
             </div>

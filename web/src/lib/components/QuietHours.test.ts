@@ -149,7 +149,9 @@ describe("the notice dock", () => {
     await waitFor(() => expect(screen.queryByRole("region", { name: "Notifications" })).not.toBeInTheDocument());
   });
 
-  it("stays until read on a page that is not a work surface", async () => {
+  // A docked notice left open covered page controls (a project's Save); it now
+  // folds into the bell on every page, as a macOS banner does.
+  it("folds into the bell on any page, not only a work surface", async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
     stubFetch({
       "GET /api/notifications": [notice({ title: "Shown one" })],
@@ -158,7 +160,7 @@ describe("the notice dock", () => {
     render(NotificationCenter);
     expect(await screen.findByRole("region", { name: "Notifications" })).toBeInTheDocument();
     await vi.advanceTimersByTimeAsync(6500);
-    expect(screen.getByRole("region", { name: "Notifications" })).toBeInTheDocument();
+    expect(screen.queryByRole("region", { name: "Notifications" })).toBeNull();
   });
 });
 

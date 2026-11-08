@@ -149,25 +149,46 @@ def _nothing_has_been_measured(readiness: ModelReadiness, connected: frozenset[s
     )
 
 
-def _invalidated_on_a_configured_profile(readiness: ModelReadiness, configured: frozenset[str]) -> bool:
-    """True when a setting change voided the last check on a model the owner set up.
+#: The invalidations a re-check may resolve without the owner: Raiker itself
+#: (re)started the managed slot. A changed key or endpoint, or a stopped slot,
+#: is not in this set and keeps asking the owner.
+_SLOT_RELOAD_REASONS = frozenset({"local_runtime_deployed", "local_runtime_restored"})
 
-    A restarted slot, a changed endpoint or a new key marks the observation
-    ``readiness_invalidated``. The composer then says *Checking this model — you
-    can still send*, and the honest way to keep that promise is to look, exactly
-    as for an expired observation. It is limited to profiles the owner
-    configured, so Raiker still never reaches a provider on its own initiative.
+
+def _managed_slot_reloaded(readiness: ModelReadiness, managed: frozenset[str]) -> bool:
+    """True when a managed local slot the owner served was reloaded by Raiker.
+
+    Serving a model or restoring a slot after a restart marks its observation
+    stale. The composer then says *Checking this model — you can still send*,
+    and the honest way to keep that promise is to look at the slot, on this
+    computer, exactly as for an expired observation. It covers only
+    Raiker-managed loopback slots the owner put a model into, and only those two
+    reasons, so a credential or endpoint change never resolves itself and no
+    provider is reached on Raiker's own initiative.
     """
-    # Every invalidation (`readiness_invalidated`, `local_runtime_deployed`,
-    # `local_runtime_stopped`, …) is a STALE row: a re-check answers each
-    # honestly, and a stopped slot simply fails it.
-    return readiness.state is ModelReadinessState.STALE and readiness.key.profile_id in configured
+    return (
+        readiness.state is ModelReadinessState.STALE
+        and readiness.reason_code in _SLOT_RELOAD_REASONS
+        and readiness.key.profile_id in managed
+    )
 
 
-def _deployed_profiles(store: Any, owner_principal_id: str) -> frozenset[str]:
-    """Profiles the owner put a model into: a managed slot they served, or a model they chose."""
+def _managed_slots_served(store: Any, owner_principal_id: str) -> frozenset[str]:
+    """Raiker-managed local slot profiles the owner served a model into."""
     try:
-        return frozenset(profile_id for profile_id, _model in store.list_configured_models(owner_principal_id))
+        from raiker.models.registry import ModelProfileRegistry
+
+        registry = ModelProfileRegistry.load()
+        served = {profile_id for profile_id, _model in store.list_configured_models(owner_principal_id)}
+        managed: set[str] = set()
+        for profile_id in served:
+            try:
+                profile = registry.resolve_profile_id(profile_id)
+            except Exception:  # noqa: BLE001 - an unknown profile is not a managed slot
+                continue
+            if profile.local_only and profile.raw.get("managed_slot"):
+                managed.add(profile_id)
+        return frozenset(managed)
     except Exception:  # noqa: BLE001 - an unreadable list grants nothing
         return frozenset()
 
@@ -1053,15 +1074,14 @@ class ModelReadinessService:
 
         from raiker.models.policy_state import owner_configured_providers
 
-        connected = owner_configured_providers(self.store, owner_principal_id) | _deployed_profiles(
-            self.store, owner_principal_id
-        )
+        connected = owner_configured_providers(self.store, owner_principal_id)
+        managed = _managed_slots_served(self.store, owner_principal_id)
         refreshed_primary: ModelReadiness | None = None
         for readiness in chain:
             if not (
                 _has_merely_expired(readiness)
                 or _nothing_has_been_measured(readiness, connected)
-                or _invalidated_on_a_configured_profile(readiness, connected)
+                or _managed_slot_reloaded(readiness, managed)
             ):
                 continue
             try:

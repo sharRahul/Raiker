@@ -52,6 +52,12 @@ These are open at the time of the beta and tracked in
   and `gpg --verify <file>.asc <file>`. The macOS build is not signed yet:
   open it the first time with **Control-click → Open**. The release notes say
   which platforms are signed.
+- **Small interface rough edges, carried to beta.2.** After reopening a
+  conversation, *Loading conversation…* can stay on screen once it has loaded.
+  Raiker offers to track a goal when two requests share words, not when they
+  mean the same thing; **Not now** stops a wrong offer coming back. The optional
+  *Workstations* view keeps its own colours. Diagrams in answers and the
+  companion character come later.
 - **Commands may be unavailable on your computer.**
   - On Windows, the restricted-account sandbox still has open gaps, so
     commands stay off unless every check passes.

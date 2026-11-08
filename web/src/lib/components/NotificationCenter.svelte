@@ -103,15 +103,17 @@
    * counting it; pointing at it or focusing it holds it open. Elsewhere it
    * stays until read, as before.
    */
-  const WORK_SURFACES = ["#/new-chat", "#/build", "#/design"];
   const FOLD_AFTER_MS = 6000;
-  const onWorkSurface = $derived(WORK_SURFACES.some((route) => hash.split("?")[0].startsWith(route)));
   let folded = $state<string[]>([]);
   let holding = $state(false);
-  const visible = $derived(onWorkSurface ? shown.filter((item) => !folded.includes(item.notification_id)) : shown);
+  // Every page, not only the work surfaces: a docked notice left open covered
+  // controls on the right of any page (a project's Save under its limits). Like
+  // a macOS banner it folds into the bell, which keeps counting it; approvals
+  // have their own card and never fold here.
+  const visible = $derived(shown.filter((item) => !folded.includes(item.notification_id)));
   $effect(() => {
     const newest = visible[0];
-    if (!onWorkSurface || newest === undefined || holding) return;
+    if (newest === undefined || holding) return;
     const timer = setTimeout(() => (folded = [...folded, newest.notification_id]), FOLD_AFTER_MS);
     return () => clearTimeout(timer);
   });

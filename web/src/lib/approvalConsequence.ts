@@ -27,6 +27,8 @@
 export interface ConsequenceFact {
   label: string;
   value: string;
+  /** A name the owner chose (an account), read as text rather than in the code face. */
+  prose: boolean;
 }
 
 /** The keys worth lifting, in the order a reviewer needs them. */
@@ -85,6 +87,7 @@ export function consequenceFacts(args: Record<string, unknown> | null | undefine
       facts.push({
         label: field.label,
         value: value.length > MAX_VALUE_CHARS ? `${value.slice(0, MAX_VALUE_CHARS)}…` : value,
+        prose: field.label === "Account",
       });
       break;
     }

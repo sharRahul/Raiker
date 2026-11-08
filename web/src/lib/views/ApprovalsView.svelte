@@ -889,7 +889,7 @@
       {#if consequence.length > 0}
         <dl class="consequence">
           {#each consequence as fact (fact.label)}
-            <div><dt>{fact.label}</dt><dd class="mono">{fact.value}</dd></div>
+            <div><dt>{fact.label}</dt><dd class:mono={!fact.prose}>{fact.value}</dd></div>
           {/each}
           {#if host}<div><dt>Reaches host</dt><dd class="mono">{host}</dd></div>{/if}
         </dl>
@@ -910,7 +910,7 @@
       {#if consequence.length > 0}
         <dl class="consequence">
           {#each consequence as fact (fact.label)}
-            <div><dt>{fact.label}</dt><dd class="mono">{fact.value}</dd></div>
+            <div><dt>{fact.label}</dt><dd class:mono={!fact.prose}>{fact.value}</dd></div>
           {/each}
           {#if host}<div><dt>Reaches host</dt><dd class="mono">{host}</dd></div>{/if}
         </dl>

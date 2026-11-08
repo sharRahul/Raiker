@@ -1204,6 +1204,11 @@ Raiker's side is ready to take them; something outside it is not.
 
 ## 2026-10-25 Quiet UI polish round — what is still open
 
+**Moved to beta.2 (2026-11-08, UX-1).** Every row in this section and the two
+Quiet UI sections below is carried to beta.2. The user-visible ones are listed
+as known issues in [the beta guide](../guide/beta.md#known-issues); the rest are
+test or CI hygiene with no effect on the product.
+
 The round of 2026-10-25 shipped
 [FIXED-1168](FIXED_ITEMS.md#fixed-1168--the-app-mark-was-the-eye-orb-qui-w01-qui-v03-qui-v04)
 to [FIXED-1187](FIXED_ITEMS.md#fixed-1187--the-readiness-strip-and-a-footer-line-disagreed-closed-as-not-reproducing).
@@ -1252,20 +1257,10 @@ and [03, QUI-H04](quiet-ui/03_WELCOME_HOME_AND_CHAT.md#status).
   by default, small transparent window that reacts only to *needs your
   decision* and *done*. It waits for the companion's art
   ([08](quiet-ui/08_BRAND_AND_VISUAL_SYSTEM.md#status)).
-* **Docked notices cover the right column.** Found live in RT-QUI-78: after a
-  routine runs, its notices dock over the right-hand side of the page and cover
-  controls there (a project's **Save** under *Project limits*) until they are
-  dismissed. The spec dismisses them; the page should keep its controls clear.
-* **The account on an approval is shown in monospace.** The card's *Account*
-  line draws *Work Gmail* in the code face used for paths and commands. It is a
-  name the owner chose and should read as text.
 * **Goals are noticed by shared words, not by meaning.** Two requests about the
   same aim in different words are not matched; two unrelated requests that
   share three uncommon words can be. **Not now** keeps a wrong offer from
   returning.
-* **A routine's channel delivery is refused while the channel's outbound gate
-  is off,** which is the default. The task row says *last one not sent*; the
-  form says the gate applies, but not where to turn it on.
 * **Older live specs answer native confirms.** Eight earlier live specs wait
   for the browser's `dialog` event; the in-app dialog (QUI-F10) needs them to
   press its button instead. The mocked suite and both rounds' live specs do.

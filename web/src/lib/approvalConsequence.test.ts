@@ -11,8 +11,8 @@ describe("what an approval says it would do", () => {
     expect(
       consequenceFacts({ command: "rm -rf build", cwd: "/srv/app", unrelated: { a: 1 } }),
     ).toEqual([
-      { label: "Command", value: "rm -rf build" },
-      { label: "Working directory", value: "/srv/app" },
+      { label: "Command", value: "rm -rf build", prose: false },
+      { label: "Working directory", value: "/srv/app", prose: false },
     ]);
   });
 
@@ -26,12 +26,12 @@ describe("what an approval says it would do", () => {
 
   it("takes the first key of a group and does not repeat its label", () => {
     const facts = consequenceFacts({ path: "/a", file_path: "/b" });
-    expect(facts).toEqual([{ label: "Path", value: "/a" }]);
+    expect(facts).toEqual([{ label: "Path", value: "/a", prose: false }]);
   });
 
   it("flattens a list of scalars and leaves a list of objects to the payload", () => {
     expect(consequenceFacts({ argv: ["git", "push"] })).toEqual([
-      { label: "Command", value: "git push" },
+      { label: "Command", value: "git push", prose: false },
     ]);
     expect(consequenceFacts({ files: [{ path: "/a" }] })).toEqual([]);
   });
@@ -40,6 +40,12 @@ describe("what an approval says it would do", () => {
     const [fact] = consequenceFacts({ command: "x".repeat(400) });
     expect(fact.value.length).toBe(241);
     expect(fact.value.endsWith("…")).toBe(true);
+  });
+
+  it("reads the owner's own account name as text, not code (Quiet UI)", () => {
+    expect(consequenceFacts({ account: "Work Gmail" })).toEqual([
+      { label: "Account", value: "Work Gmail", prose: true },
+    ]);
   });
 
   it("names the host a request would reach, and nothing when it cannot", () => {

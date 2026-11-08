@@ -39,6 +39,7 @@ import contextlib
 import hashlib
 import json
 import os
+import re
 import secrets
 import shutil
 import stat
@@ -369,6 +370,7 @@ def promote(
     allowed: Callable[[str], bool] | None = None,
     overwrite: frozenset[str] = frozenset(),
     journal_dir: Path | None = None,
+    owner: str = "",
 ) -> PromotionResult:
     """Apply a reviewed diff to the original project, all or nothing.
 
@@ -425,6 +427,7 @@ def promote(
                 created_targets = [rel for rel in (*diff.created, *diff.modified) if rel not in saved]
                 _write_journal(backups, {
                     "state": "applying",
+                    "owner": owner,
                     "source": str(workspace.source),
                     "saved": {rel: path.name for rel, path in saved.items()},
                     "created": created_targets,
@@ -560,12 +563,23 @@ def recover_promotions(journal_dir: Path) -> list[str]:
     return recovered
 
 
-def undo_promotion(journal_dir: Path, promotion_id: str) -> PromotionResult:
-    """Undo a finished Apply, if nothing it wrote has changed since."""
+_PROMOTION_ID = re.compile(r"prm_[0-9a-f]{24}")
+
+
+def undo_promotion(journal_dir: Path, promotion_id: str, *, owner: str = "") -> PromotionResult:
+    """Undo a finished Apply, if nothing it wrote has changed since.
+
+    Only the owner who made the Apply can undo it; any other caller, and any id
+    that is not exactly a promotion id, is told it does not exist.
+    """
+    if not _PROMOTION_ID.fullmatch(promotion_id):
+        raise WorkspaceError("workspace_promotion_unknown")
     directory = journal_dir / promotion_id
-    if not promotion_id.startswith("prm_") or not (directory / _JOURNAL).is_file():
+    if not (directory / _JOURNAL).is_file():
         raise WorkspaceError("workspace_promotion_unknown")
     journal = _read_journal(directory)
+    if str(journal.get("owner", "")) != owner:
+        raise WorkspaceError("workspace_promotion_unknown")
     if journal.get("state") != "applied":
         raise WorkspaceError("workspace_promotion_not_undoable")
     source = Path(str(journal["source"]))

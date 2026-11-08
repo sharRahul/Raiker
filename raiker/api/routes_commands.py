@@ -555,6 +555,7 @@ def promote_task_workspace(
         result = promote(
             workspace, diff, overwrite=overwrite,
             journal_dir=promotion_journal_dir(request.app.state.workspace_root),
+            owner=owner,
         )
     except WorkspaceError as exc:
         raise refusal(status.HTTP_409_CONFLICT, exc.reason_code) from exc
@@ -594,7 +595,9 @@ def undo_task_workspace_promotion(
     """
     owner = auth_data[0].principal_id
     try:
-        result = undo_promotion(promotion_journal_dir(request.app.state.workspace_root), promotion_id)
+        result = undo_promotion(
+            promotion_journal_dir(request.app.state.workspace_root), promotion_id, owner=owner
+        )
     except WorkspaceError as exc:
         code = status.HTTP_404_NOT_FOUND if exc.reason_code == "workspace_promotion_unknown" else status.HTTP_409_CONFLICT
         raise refusal(code, exc.reason_code) from exc

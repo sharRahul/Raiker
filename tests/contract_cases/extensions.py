@@ -381,7 +381,7 @@ def _task_copy_promotion_undone(ws: Path, _client: TestClient, _h: dict[str, str
 
     key = _task_copy(ws)
     copy = task_workspace_registry(ws).load(OWNER, key)
-    result = promote(copy, diff_workspace(copy), journal_dir=promotion_journal_dir(ws))
+    result = promote(copy, diff_workspace(copy), journal_dir=promotion_journal_dir(ws), owner=OWNER)
     return f"/api/command-promotions/{result.promotion_id}/undo"
 
 

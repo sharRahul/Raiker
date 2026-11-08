@@ -59,17 +59,17 @@ def test_a_finished_apply_can_be_undone_exactly(tmp_path: Path) -> None:
     workspace = create_task_workspace(project, tmp_path / "copies", "task")
     _change(workspace.root)
     journal = tmp_path / "state" / "promotions"
-    result = promote(workspace, diff_workspace(workspace), journal_dir=journal)
+    result = promote(workspace, diff_workspace(workspace), journal_dir=journal, owner="principal_owner")
     assert result.promotion_id.startswith("prm_")
     assert (project / "pkg" / "new_module.py").is_file()
     assert not (project / "remove_me.txt").exists()
 
-    undone = undo_promotion(journal, result.promotion_id)
+    undone = undo_promotion(journal, result.promotion_id, owner="principal_owner")
     assert undone.promotion_id == result.promotion_id
     assert _snapshot(project) == before
     assert not (project / "new_dir").exists(), "a folder the Apply made is removed with it"
     with pytest.raises(WorkspaceError, match="workspace_promotion_not_undoable"):
-        undo_promotion(journal, result.promotion_id)
+        undo_promotion(journal, result.promotion_id, owner="principal_owner")
 
 
 def test_undo_refuses_when_the_owner_changed_a_file_since(tmp_path: Path) -> None:
@@ -77,11 +77,11 @@ def test_undo_refuses_when_the_owner_changed_a_file_since(tmp_path: Path) -> Non
     workspace = create_task_workspace(project, tmp_path / "copies", "task")
     _change(workspace.root)
     journal = tmp_path / "state" / "promotions"
-    result = promote(workspace, diff_workspace(workspace), journal_dir=journal)
+    result = promote(workspace, diff_workspace(workspace), journal_dir=journal, owner="principal_owner")
     (project / "pkg" / "m2.py").write_text("VALUE = 'the owner edited this after Apply'\n", encoding="utf-8")
     edited = _snapshot(project)
     with pytest.raises(WorkspaceError, match="workspace_undo_conflict"):
-        undo_promotion(journal, result.promotion_id)
+        undo_promotion(journal, result.promotion_id, owner="principal_owner")
     assert _snapshot(project) == edited, "a refused undo touches nothing"
 
 
@@ -131,3 +131,19 @@ def test_a_host_killed_mid_apply_is_rolled_back_on_the_next_start(tmp_path: Path
     assert _snapshot(project) == before, "the project is exactly as it was before the Apply"
     # Recovery is idempotent: a second start finds nothing left to do.
     assert recover_promotions(journal) == []
+
+
+def test_only_the_owner_who_applied_can_undo_and_ids_cannot_climb_out(tmp_path: Path) -> None:
+    project = _project(tmp_path)
+    workspace = create_task_workspace(project, tmp_path / "copies", "task")
+    _change(workspace.root)
+    journal = tmp_path / "state" / "promotions"
+    result = promote(workspace, diff_workspace(workspace), journal_dir=journal, owner="principal_owner")
+    applied = _snapshot(project)
+    with pytest.raises(WorkspaceError, match="workspace_promotion_unknown"):
+        undo_promotion(journal, result.promotion_id, owner="principal_someone_else")
+    for crafted in ("prm_../../etc", "prm_" + "0" * 23, "../" + result.promotion_id, result.promotion_id + "/.."):
+        with pytest.raises(WorkspaceError, match="workspace_promotion_unknown"):
+            undo_promotion(journal, crafted, owner="principal_owner")
+    assert _snapshot(project) == applied, "a refused undo touches nothing"
+    undo_promotion(journal, result.promotion_id, owner="principal_owner")

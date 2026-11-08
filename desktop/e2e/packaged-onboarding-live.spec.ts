@@ -78,7 +78,11 @@ test("an owner completes first-run setup in the installed window", async () => {
     await page.screenshot({ path: join(SHOTS, "onboarding-2-ready.png") });
     await page.getByRole("button", { name: "Go to Home" }).click();
     await expect(page).toHaveURL(/#\/home/);
-    await expect(page.getByRole("heading", { name: /, Owner$/ })).toBeVisible({ timeout: 30_000 });
+    // Home's own ready signal: the name and the board have both been read (a
+    // failed first read is retried with the board every 15 s), then the
+    // greeting it produced. Run 42430871211 waited on the greeting alone.
+    await expect(page.locator("section.workbench")).toHaveAttribute("data-ready", "true", { timeout: 60_000 });
+    await expect(page.getByRole("heading", { name: /, Owner$/ })).toBeVisible({ timeout: 10_000 });
     await page.screenshot({ path: join(SHOTS, "onboarding-3-home.png") });
   } finally {
     spawnSync(hostPath(), ["quit", "--force"], { encoding: "utf-8", env });

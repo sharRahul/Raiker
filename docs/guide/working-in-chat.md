@@ -316,6 +316,7 @@ it says it is. The model sends numbers; Raiker draws them.
 | **Callout** | One *Verdict*, *Warning* or *Next step*. |
 | **Pros and cons** | Two short lists per option. |
 | **Steps** | An ordered or dated sequence, on a thin path line. |
+| **Diagram** | A flow or a structure with branches: boxes for steps, rounded boxes for a start or an end, diamonds for a question, and arrows between them, read down or to the right. The model names the boxes and arrows; **Raiker** lays them out, so an arrow back to an earlier step is dashed and drawn round the side, and an arrow that skips a step goes round the boxes it passes. At most 24 boxes. A label is only ever text. |
 
 **Every number has a unit, and numbers need a source.** A guess says *≈
 estimate* beside it. Key figures, measures and comparisons that give no source
@@ -325,9 +326,10 @@ drawn as figures that look checked.
 **Every block has a toolbar**, quiet until you point at it: **Chart · Table**
 switches a chart to the numbers behind it, **Show as text** turns any block into
 sentences, **Copy** copies that text, **CSV** downloads a table, chart, figures
-or comparison, and **PNG** saves a chart as an image. All of it happens on your
-machine; nothing is fetched and nothing leaves. A screen reader always reaches
-every number, because a chart keeps its table in the page.
+or comparison, and **PNG** saves a chart or a diagram as an image. All of it
+happens on your machine; nothing is fetched and nothing leaves. A screen reader
+always reaches every number, because a chart keeps its table in the page, and
+every box of a diagram, because it keeps a list of each step and where it leads.
 
 **Pin** keeps a block in **Work › Library**, and under the conversation's
 project when it has one; pressed again it unpins. What is kept is copied from

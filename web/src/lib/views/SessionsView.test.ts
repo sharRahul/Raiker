@@ -308,6 +308,29 @@ describe("SessionsView organisation", () => {
     );
   });
 
+  it("opens a session's record from the keyboard through its title button (QUI-G05)", async () => {
+    stubFetch({
+      ...SESSIONS_ROUTE,
+      "GET /api/sessions/sess_b": {
+        session: SESSIONS_ROUTE["GET /api/sessions"][0],
+        turns: [],
+      },
+    });
+    render(SessionsView);
+
+    const title = await screen.findByRole("button", { name: "Second chat" });
+    expect(title.tagName).toBe("BUTTON");
+    title.focus();
+    expect(document.activeElement).toBe(title);
+    // A native button turns Enter into a click; the record opens from it.
+    await fireEvent.click(title);
+    expect(await screen.findByRole("link", { name: "View audit events" })).toHaveAttribute(
+      "href",
+      "#/activity?session=sess_b",
+    );
+    expect(title).toHaveAttribute("aria-current", "true");
+  });
+
   it("cross-links a session detail to every related work surface", async () => {
     stubFetch({
       ...SESSIONS_ROUTE,

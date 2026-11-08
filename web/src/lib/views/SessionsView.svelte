@@ -324,10 +324,18 @@
                 />
               </td>
               <td onclick={() => openSession(s.session_id)}>
-                <span class="session-title">
+                <!-- QUI-G05 — the title is the row's keyboard entry: a real
+                     button, so Tab reaches it and Enter or Space opens the
+                     record. The rest of the row stays clickable for a pointer. -->
+                <button
+                  type="button"
+                  class="session-title"
+                  aria-current={detail?.session.session_id === s.session_id ? "true" : undefined}
+                  onclick={(event) => { event.stopPropagation(); void openSession(s.session_id); }}
+                >
                   {#if s.pinned}<span class="pin-mark" title="Pinned" aria-label="Pinned">★</span>{/if}
                   {s.title ?? shortId(s.session_id)}
-                </span>
+                </button>
                 <span class="title-sub">
                   <!-- REM-SESSIONS — the row opens the record, and nothing
                        else; resuming lives in Threads, which sends each thread
@@ -598,7 +606,20 @@
   }
   .session-title {
     display: block;
+    font: inherit;
     font-weight: 600;
+    color: inherit;
+    text-align: start;
+    background: none;
+    border: 0;
+    padding: 0;
+    cursor: pointer;
+  }
+  .session-title:hover { text-decoration: underline; }
+  .session-title:focus-visible {
+    outline: 3px solid var(--focus-ring);
+    outline-offset: 2px;
+    border-radius: var(--r-sm);
   }
   .pin-mark {
     color: var(--accent);

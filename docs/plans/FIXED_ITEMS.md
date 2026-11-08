@@ -1652,6 +1652,16 @@ file you can open. The two capture sets that remain — `screenshots/pages/` and
 | [FIXED-1345](#fixed-1345--the-context-advice-pointed-an-lm-studio-owner-at-raikers-own-slots) | Low | Models / copy | Fixed 2026-11-08 |
 | [FIXED-1346](#fixed-1346--gmail-calendar-and-outlook-now-sign-in-in-the-owners-browser) | Medium | Connectors / sign-in | Fixed 2026-11-08 |
 | [FIXED-1347](#fixed-1347--there-was-no-way-to-read-outlook-mail-or-calendar) | Medium | Connectors / Outlook | Fixed 2026-11-08 |
+| [FIXED-1348](#fixed-1348--a-flow-or-a-structure-could-only-be-described-in-words-qui-a08) | Medium | Chat / visual answers | Fixed 2026-11-08 |
+| [FIXED-1349](#fixed-1349--a-diagrams-arrows-went-through-boxes-and-its-block-was-a-narrow-column-found-this-round) | Low | Chat / visual answers | Fixed 2026-11-08 |
+| [FIXED-1350](#fixed-1350--a-sessions-row-could-not-be-opened-from-the-keyboard) | Low | Diagnostics › Sessions / accessibility | Fixed 2026-11-08 |
+| [FIXED-1351](#fixed-1351--a-stopped-turn-was-announced-twice) | Low | Chat, Build | Fixed 2026-11-08 |
+| [FIXED-1352](#fixed-1352--build-said-it-could-not-read-standing-permissions-before-it-had-asked) | Low | Build / composer | Fixed 2026-11-08 |
+| [FIXED-1353](#fixed-1353--settings-could-hold-a-navigation-made-the-instant-a-save-returned) | Low | Settings | Fixed 2026-11-08 |
+| [FIXED-1354](#fixed-1354--a-sandboxed-check-failed-on-a-module-the-owner-had-installed-with-no-reason-bd-5) | Low | Build / command sandbox | Fixed 2026-11-08 |
+| [FIXED-1355](#fixed-1355--home-greeted-a-nameless-owner-when-its-first-read-failed) | Low | Home / desktop onboarding test | Fixed 2026-11-08 |
+| [FIXED-1356](#fixed-1356--auto-could-plan-a-local-context-no-turn-fits-in) | Medium | Models / local runtime | Fixed 2026-11-08 |
+| [FIXED-1357](#fixed-1357--twelve-live-checks-never-waited-and-a-kept-model-could-stop-a-specs-setup-found-this-round) | Low | Live test harness | Fixed 2026-11-08 |
 
 ---
 
@@ -38354,7 +38364,7 @@ MT-04 assert neither *enable its gate* nor *could not be reached* appears.
 
 **Severity: Low. Area: Chat / visual answers. Status: Fixed 2026-10-26.**
 
-**Observed.** [04](quiet-ui/04_VISUAL_ANSWERS.md#status) left **Pin to project** open in the block toolbar because nothing could keep a block outside its turn.
+**Observed.** Quiet UI plan 04 (closed 2026-11-08) left **Pin to project** open in the block toolbar because nothing could keep a block outside its turn.
 
 **Fixed.** **Pin** in every drawn block's toolbar keeps it in the Library (migration `RAIKER-2123-library-pins`), under the conversation's project when it has one; pressed again it reads **Pinned** and unpins. The pin is copied from the stored answer and validated again on the server: prose, a refused block or a place past the end of the answer is refused (`library_pin_not_a_block`), and nothing the browser sends becomes the pinned data. Pinning the same block twice keeps one pin. A pin moves between projects or out of one from the Library.
 
@@ -40082,3 +40092,199 @@ data. It is governed like the others:
 
 **Evidence.** `tests/test_connector_browser_sign_in.py::TestOutlookReads`, and
 the governance inventory, executor, contract and threat-model index tests.
+
+## FIXED-1348 — A flow or a structure could only be described in words (QUI-A08)
+
+**Severity: Medium. Area: Chat / visual answers. Status: Fixed 2026-11-08.**
+
+**Observed.** Quiet UI 04 left diagrams *Later*: Mermaid would have been the
+first diagram library in the bundle, and the first thing in the page to read
+model text as markup. A branching flow had to be written as prose or as steps
+that cannot branch.
+
+**Fixed.** `raiker:diagram` follows the path every other block takes (fence,
+runtime validation, `ContentPart`, component) and needs no library:
+* The model sends `nodes` (id, label, `box` · `round` · `diamond`) and `edges`
+  (from, to, label), read `down` or `right`. Never a picture and never a
+  diagram language, so nothing in a label becomes markup, a link or a script.
+* `typed_parts.py` refuses rather than repairs: at most 24 nodes and 40 edges,
+  unique ids, every edge naming a real node, no self-loop, no duplicate arrow,
+  bounded labels — fourteen reason codes, each worded in the answer.
+* The runtime ranks the layers (the longest forward path that reaches a node);
+  an arrow back to a node on the current path is drawn but never lifts a
+  layer, so a retry loop does not push the diagram apart. Every surface draws
+  the same diagram, the way the runtime decides *Best* on a comparison.
+* `DiagramBlock.svelte` draws inline SVG from `diagramLayout.ts`, a pure
+  function: layers ordered by one barycentre pass, labels wrapped to three
+  lines, arrows back dashed and round the side.
+* The SVG is `aria-hidden`; an ordered list of each step and where it leads
+  is in the page. **Show as text** and **Copy** use the runtime's own sentence
+  form, exports print it, **PNG** saves the drawing, **Pin** files it in the
+  Library, and a streaming answer says *Preparing a diagram…*.
+* The model is told when to use one (a flow with branches; steps when nothing
+  branches) in one sentence of the typed-answers prompt.
+
+**Evidence.** `tests/test_visual_answers.py` (ranks, longest path, thirteen
+refusals, markup kept as text, the sentence form);
+`diagramLayout.test.ts`, `AnswerParts.test.ts`, `answerBlocks.test.ts`. Live:
+RT-DGM-01 to RT-DGM-05 in
+[WEB_APP_LIVE_TEST.md](../architecture/WEB_APP_LIVE_TEST.md#result--2026-11-08-qui-a08-diagrams-and-the-small-fixes-round-hosted-anthropic-haiku-45),
+including a diagram Haiku 4.5 chose for itself.
+
+## FIXED-1349 — A diagram's arrows went through boxes, and its block was a narrow column (found this round)
+
+**Severity: Low. Area: Chat / visual answers. Status: Fixed 2026-11-08.**
+
+**Observed.** In RT-DGM-04, Haiku 4.5 drew a pull-request flow. The first
+layout:
+* drew an arrow that skipped two steps (*CI passed? → Update code*) straight
+  through *Code review* and *Changes requested?*;
+* sent the loop back from *Update code* out through its sibling *Approve*;
+* left its answer bubble 250 px wide, where a chart's is 640;
+* set the SVG's size in an inline `style`, which Raiker's `style-src 'self'`
+  policy refused, so the browser logged a violation.
+
+**Fixed.** An arrow that skips a layer goes round the low side, and a loop back
+round the high side, outside every box in the layers it passes, each in its own
+lane. The side is the one where the source box has no sibling in the way. An
+arrow leaving and one arriving on the same side of a box meet it at different
+points. The drawing sits in a 640 px block like a chart, centred, and its size
+is in the component's stylesheet.
+
+**Evidence.** Three cases in `diagramLayout.test.ts` (round the passed boxes,
+separate lanes, the free side). The same stored answer re-drawn:
+`output/playwright/2026-11-08-qui-a08-diagrams/11-model-chosen-rerouted.png`.
+
+## FIXED-1350 — A Sessions row could not be opened from the keyboard
+
+**Severity: Low. Area: Diagnostics › Sessions / accessibility. Status: Fixed 2026-11-08.**
+
+**Observed.** A row opened its record from `onclick` on table cells that were
+not focusable and had no key handler (QUI-G05).
+
+**Fixed.** The session's title is a button: Tab reaches it, and Enter or Space
+opens the record. It carries `aria-current` while its record is open. The rest
+of the row stays clickable, and the checkbox cell still selects.
+
+**Evidence.** `SessionsView.test.ts`; live RT-FIX-02
+(`08-sessions-keyboard.png`).
+
+## FIXED-1351 — A stopped turn was announced twice
+
+**Severity: Low. Area: Chat, Build. Status: Fixed 2026-11-08.**
+
+**Observed.** KB-02: a stopped answer showed *Stopped at your request — this
+turn ended at a safe boundary…* above it, and the answer itself read *Stopped
+by user at a safe boundary.*
+
+**Fixed.** When a stopped turn's stored reply is only the gateway's or the
+runtime's stop notice, Chat and Build show no bubble for it (`stoppedAnswer`).
+What the model had streamed before the stop is kept, and so is the list of
+steps that finished, which the runtime appends after the notice.
+
+**Evidence.** `chatPresentation.test.ts`. The live case (RT-FIX-01) could not
+run: the round's Anthropic key ran out of credit (TO_BE_FIXED).
+
+## FIXED-1352 — Build said it could not read standing permissions before it had asked
+
+**Severity: Low. Area: Build / composer. Status: Fixed 2026-11-08.**
+
+**Observed.** On a fresh load Build's composer showed *Raiker could not read
+your standing permissions for this turn* before any turn: the state that meant
+*failed* was also the state before the read answered.
+
+**Fixed.** The page tracks whether its first read has answered and says nothing
+until it has; a read that fails still says so.
+
+**Evidence.** `buildModes.test.ts`; live RT-FIX-03: the line never appeared,
+and once the read answered the composer said *Every write capability is set to
+Ask* (`09-build-fresh-load.png`).
+
+## FIXED-1353 — Settings could hold a navigation made the instant a save returned
+
+**Severity: Low. Area: Settings. Status: Fixed 2026-11-08.**
+
+**Observed.** Once, in the 2026-11-07 composer round: the PUT answered 200, the
+browser navigated in the same tick, and the page stayed on Settings. The leave
+guard read *unsaved* between the server's answer and the page reading it, and
+the declined prompt kept the page.
+
+**Fixed.** Leaving while a save is out no longer asks when the request already
+carries every unsaved edit and the theme is saved: the request finishes on its
+own. An edit made after it went out still asks, and a closed tab still gets the
+browser's own prompt, because closing can cancel the request.
+
+**Evidence.** Two cases in `SettingsView.test.ts` with the PUT held open; live
+RT-FIX-04 navigated on the PUT's response and reached Chat
+(`10-settings-left-after-save.png`).
+
+## FIXED-1354 — A sandboxed check failed on a module the owner had installed, with no reason (BD-5)
+
+**Severity: Low. Area: Build / command sandbox. Status: Fixed 2026-11-08.**
+
+**Observed.** The sandbox ran the system Python, which cannot read the owner's
+per-user site-packages, so `python -m pytest` failed with *No module named
+pytest* although pytest was installed for the owner. By design, but the failure
+gave nothing to act on.
+
+**Fixed.** When a shell or process run fails on *No module named X* and X is in
+one of the owner's own per-user `site-packages` folders, its summary says so and
+names the fixes: install it for all users or in the project's environment, or
+use a backend that has it (`raiker/execution/commands/missing_module.py`). Only a
+name is looked up; nothing is mounted, copied or widened.
+
+**Evidence.** `tests/test_missing_module_note.py`.
+
+## FIXED-1355 — Home greeted a nameless owner when its first read failed
+
+**Severity: Low. Area: Home / desktop onboarding test. Status: Fixed 2026-11-08.**
+
+**Observed.** Release run 42430871211: the packaged onboarding test waited 30 s
+for the greeting *…, Owner* and did not find it; the rerun passed. Home read the
+owner's name once and swallowed a failure, so a read that failed while the host
+was still settling after setup left the greeting without a name until a reload.
+
+**Fixed.** A name read that failed is asked again with the board's 15-second
+refresh. Home marks `data-ready` once the name and the board have both been
+read, and the packaged test waits on that signal, then on the greeting.
+
+**Evidence.** `WorkbenchView.test.ts` (a failed first read, then the name and
+`data-ready`); `desktop/e2e/packaged-onboarding-live.spec.ts`. The packaged
+run itself is CI's Desktop package job.
+
+## FIXED-1356 — Auto could plan a local context no turn fits in
+
+**Severity: Medium. Area: Models / local runtime. Status: Fixed 2026-11-08.**
+
+**Observed.** Raiker's own instructions and tools measured 9,459 tokens before
+the owner typed. Auto sizing halved the context down to 2,048 tokens to fit
+memory, which started a model that refused every turn.
+
+**Fixed.** Auto stops halving at 12,288 tokens (`TURN_CONTEXT_FLOOR`). A model
+that does not fit even there is reported as not fitting, with *Raiker does not
+plan a smaller context, because a turn needs at least that much*, instead of
+*Context reduced… to fit*. A context below the floor, set by the owner or
+limited by training, says that it refuses most turns. A retry after an
+out-of-memory start never shrinks a context below the floor; one the owner
+already set below it keeps halving as before. Trimming the prompt for small
+contexts is still open (TO_BE_FIXED).
+
+**Evidence.** `tests/test_llama_cpp_planner.py`.
+
+## FIXED-1357 — Twelve live checks never waited, and a kept model could stop a spec's setup (found this round)
+
+**Severity: Low. Area: Live test harness. Status: Fixed 2026-11-08.**
+
+**Observed.** Twelve checks in eight live specs called
+`locator.isVisible({ timeout })`. Playwright ignores that timeout, so each
+answered at once instead of waiting. The same mistake cost this round two
+failed attempts. Separately, `keepModelAvailable` (behind `useAnthropic`) waited
+out its timeout when a kept model's switch was not offered (2026-11-07).
+
+**Fixed.** The twelve now wait with `waitFor({ state: "visible", timeout })`.
+`keepModelAvailable` waits up to 15 s for the switch and, when the card already
+names that model, closes the dialog instead of failing.
+
+**Evidence.** Live RT-FIX-05: keeping Haiku 4.5 on a workspace that already
+kept it completed. The switch was offered this time, so the 2026-11-07 shape
+was not reproduced; the web-access spec is still to re-run (TO_BE_FIXED).

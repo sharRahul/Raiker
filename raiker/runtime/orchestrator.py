@@ -241,9 +241,13 @@ _TYPED_ANSWERS_PROMPT = (
     '`better`; never claim a winner yourself); ```raiker:measure {"label": …, "value": …, '
     '"max": …, "unit": …, "source": …} for one value on a known scale; ```raiker:callout '
     '{"tone": "verdict"|"warning"|"action", "text": …} for one verdict, warning or next step; '
-    '```raiker:proscons {"options": [{"name": …, "pros": [...], "cons": [...]}]}; and '
+    '```raiker:proscons {"options": [{"name": …, "pros": [...], "cons": [...]}]}; '
     '```raiker:steps {"steps": [{"label": …, "when": …, "text": …}]} for an ordered or dated '
-    "sequence. Every figure needs a unit; mark guesses with \"estimate\": true; always say where "
+    "sequence; and, for a flow or structure with branches, "
+    '```raiker:diagram {"direction": "down"|"right", "nodes": [{"id": "a", "label": …, '
+    '"shape": "box"|"round"|"diamond"}], "edges": [{"from": "a", "to": "b", "label": …}]} '
+    "(at most 24 nodes; Raiker lays it out; use steps instead when nothing branches). "
+    "Every figure needs a unit; mark guesses with \"estimate\": true; always say where "
     "numbers came from in \"source\" on figures, compare and measure blocks (\"Figures you "
     "gave in this conversation\" when the user supplied them, a site and the date checked, or "
     "this workspace's own records), because numbers without a source are shown as plain text. Do not visualise fewer than "

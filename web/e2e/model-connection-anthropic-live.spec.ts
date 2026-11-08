@@ -46,7 +46,7 @@ async function setHostedModels(page: Page, on: boolean, reason: string): Promise
   if (!(await action.isVisible().catch(() => false))) return;
   await action.click();
   const dialog = page.getByRole("dialog");
-  if (await dialog.isVisible({ timeout: 5_000 }).catch(() => false)) {
+  if (await dialog.waitFor({ state: "visible", timeout: 5_000 }).then(() => true, () => false)) {
     const reasonField = dialog.getByLabel("Reason (required)");
     if (await reasonField.isVisible().catch(() => false)) await reasonField.fill(reason);
     const token = dialog.getByLabel(/Confirmation token/);

@@ -209,6 +209,36 @@ describe("WorkbenchView", () => {
     expect(screen.getByRole("link", { name: "1 decision waiting" })).toHaveAttribute("href", "#/approvals");
   });
 
+  it("asks for the owner's name again when the first read failed, then says it is ready", async () => {
+    vi.useFakeTimers();
+    let reads = 0;
+    const routeTable = routes();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+        const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
+        const key = `${(init?.method ?? "GET").toUpperCase()} ${url.split("?")[0]}`;
+        if (key === "GET /api/settings") {
+          reads += 1;
+          if (reads === 1) return { ok: false, status: 503, json: async () => ({}) } as Response;
+          return { ok: true, status: 200, json: async () => ({ status: { display_name: "Owner", username: "o" }, settings: {} }) } as Response;
+        }
+        const value = (routeTable as Record<string, unknown>)[key];
+        if (value === undefined) return { ok: false, status: 404, json: async () => ({}) } as Response;
+        return { ok: true, status: 200, json: async () => value } as Response;
+      }),
+    );
+    const { container } = render(WorkbenchView);
+    const section = container.querySelector("section.workbench")!;
+    await vi.waitFor(() => expect(reads).toBe(1));
+    expect(section).toHaveAttribute("data-ready", "false");
+
+    await vi.advanceTimersByTimeAsync(15_000);
+    await vi.waitFor(() => expect(section).toHaveAttribute("data-ready", "true"));
+    expect(screen.getByRole("heading", { name: /, Owner$/ })).toBeInTheDocument();
+    vi.useRealTimers();
+  });
+
   // QUI-H04 — one dismissible line after an update, never on a first sighting.
   it("says once that Raiker was updated, and the line can be dismissed", async () => {
     localStorage.setItem("raiker.whats-new.seen-version", "1.3.0");

@@ -173,6 +173,18 @@
   }
   // QUI-H01 — the owner's chosen name, as Chat greets them (RR-IDENTITY-01).
   let ownerName = $state("");
+  /** The owner's name has been read; until then the greeting waits for it. */
+  let nameRead = $state(false);
+
+  async function readOwnerName() {
+    try {
+      const view = await api.settings();
+      ownerName = view.status.display_name || view.status.username || "";
+      nameRead = true;
+    } catch {
+      // asked again on the next board refresh
+    }
+  }
   const greeting = $derived(homeGreeting(ownerName, tasks !== null && !hasActivity, new Date().getHours()));
   const fact = $derived(homeFact((approvals ?? []).length));
 
@@ -355,17 +367,23 @@
     void api.hostUpdate()
       .then((view) => (updatedTo = versionToAnnounce(view.installation.version)))
       .catch(() => {});
-    void api.settings()
-      .then((view) => (ownerName = view.status.display_name || view.status.username || ""))
-      .catch(() => {});
+    void readOwnerName();
     void surfaceModel("chat").then((found) => (chatModel = found));
     void load();
-    const timer = window.setInterval(() => void load(), 15_000);
+    const timer = window.setInterval(() => {
+      // A name read that failed (the host still settling just after setup)
+      // is asked again with the board, rather than greeting a nameless owner
+      // until the page is reloaded.
+      if (!nameRead) void readOwnerName();
+      void load();
+    }, 15_000);
     return () => window.clearInterval(timer);
   });
 </script>
 
-<section class="workbench" aria-labelledby="workbench-title">
+<!-- `data-ready` is Home's own signal that the greeting has its name and the
+     board its first answer: what a test waits for instead of guessing. -->
+<section class="workbench" aria-labelledby="workbench-title" data-ready={nameRead && tasks !== null ? "true" : "false"}>
   <!-- REM-HOME-03 — the next action, before the commentary.
        Home opened with a greeting, a sentence restating counts the boards
        below state exactly, and a platform-state strip, so an owner met three

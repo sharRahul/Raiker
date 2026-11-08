@@ -96,6 +96,11 @@ describe("what Auto amounts to under the owner's standing permissions", () => {
     expect(standingPostureNote("edit", all("ask"))).toBeNull();
   });
 
+  it("says nothing until the first read has answered", () => {
+    expect(standingPostureNote("auto", null, true)).toBeNull();
+    expect(standingPostureNote("auto", null)).toBe("Raiker could not read your standing permissions for this turn.");
+  });
+
   it("tells the owner when every write still asks", () => {
     // The old chip would have silently set all four to `auto` here. The new one
     // reports the truth instead of manufacturing it.

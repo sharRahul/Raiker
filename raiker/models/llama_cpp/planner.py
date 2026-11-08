@@ -45,7 +45,17 @@ MIB = 1024**2
 #: llama-server with HTTP 400 on a 16 GB GPU that had room for four times that.
 #: The planner still halves this until the plan fits memory.
 AUTO_CONTEXT_TARGET = 32_768
+#: The smallest context an owner may choose for a retry to shrink to.
 AUTO_CONTEXT_FLOOR = 2048
+#: The smallest context *auto* plans (TO_BE_FIXED, *Raiker's own prompt is
+#: about 9,500 tokens*). A plain Chat turn measured 9,459 prompt tokens, so a
+#: context below this refuses every turn: auto stops halving here and reports
+#: that the model does not fit, rather than starting a model no turn can use.
+TURN_CONTEXT_FLOOR = 12_288
+TURN_CONTEXT_NOTE = (
+    "Raiker's own instructions and tools take about 9,500 tokens, so a context below "
+    f"{TURN_CONTEXT_FLOOR:,} tokens refuses most turns."
+)
 MIN_CONTEXT = 512
 MAX_CONTEXT = 1_048_576
 MAX_GPU_LAYERS = 1000
@@ -410,9 +420,9 @@ def plan_launch(shape: ModelShape, budget: MemoryBudget, settings: RuntimeSettin
         value = max(target, MIN_CONTEXT)
         while True:
             candidates.append(value)
-            if value <= AUTO_CONTEXT_FLOOR or value // 2 < MIN_CONTEXT:
+            if value <= TURN_CONTEXT_FLOOR or value // 2 < MIN_CONTEXT:
                 break
-            value = max(AUTO_CONTEXT_FLOOR, value // 2)
+            value = max(TURN_CONTEXT_FLOOR, value // 2)
     chosen: tuple[int, tuple[int, int, int, int, int | None, int | None, int], str] | None = None
     for context in candidates:
         evaluated = _evaluate(shape, budget, settings, context)
@@ -427,7 +437,15 @@ def plan_launch(shape: ModelShape, budget: MemoryBudget, settings: RuntimeSettin
     context, evaluated, verdict = chosen
     offload, kv_bytes, gpu_bytes, system_bytes, gpu_budget, system_budget, system_weights = evaluated
     if settings.context_size is None and context < candidates[0]:
-        notes.append(f"Context reduced to {context:,} tokens to fit in memory.")
+        if verdict == "insufficient_memory":
+            notes.append(
+                f"Even at {context:,} tokens this model does not fit; Raiker does not plan a "
+                "smaller context, because a turn needs at least that much."
+            )
+        else:
+            notes.append(f"Context reduced to {context:,} tokens to fit in memory.")
+    if context < TURN_CONTEXT_FLOOR:
+        notes.append(TURN_CONTEXT_NOTE)
     if budget.backend != "cpu" and offload == 0:
         notes.append(
             "The GPU's free memory could not be measured; the model runs on the processor."
@@ -488,6 +506,10 @@ def reduced_for_retry(settings: RuntimeSettings, plan: LaunchPlan) -> RuntimeSet
     if plan.gpu_layers > 0:
         fewer = (plan.gpu_layers * 3) // 4 if plan.gpu_layers > 4 else 0
         return replace(settings, gpu_layers=fewer)
-    if plan.context_size > AUTO_CONTEXT_FLOOR:
+    if plan.context_size > TURN_CONTEXT_FLOOR:
+        return replace(settings, gpu_layers=0, context_size=max(TURN_CONTEXT_FLOOR, plan.context_size // 2))
+    if AUTO_CONTEXT_FLOOR < plan.context_size < TURN_CONTEXT_FLOOR:
+        # The owner already chose a context below a turn's floor; a retry
+        # keeps honouring that choice rather than refusing to start.
         return replace(settings, gpu_layers=0, context_size=max(AUTO_CONTEXT_FLOOR, plan.context_size // 2))
     return None

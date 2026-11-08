@@ -62,6 +62,10 @@ describe("currency units", () => {
 });
 
 describe("holdBackBlocks — a streaming answer's raiker: fences", () => {
+  it("names a diagram while it streams (QUI-A08)", () => {
+    expect(holdBackBlocks('Flow:\n```raiker:diagram\n{"nodes": [')).toBe("Flow:\n*Preparing a diagram…*");
+  });
+
   it("replaces a finished block with the line naming it, and keeps the prose", () => {
     const text = 'Here are the numbers.\n```raiker:figures\n{"items": []}\n```\nThat is all.';
     expect(holdBackBlocks(text)).toBe("Here are the numbers.\n*Preparing key figures…*\nThat is all.");

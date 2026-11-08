@@ -340,7 +340,7 @@ test("a proposal the host did not survive reads as outcome unknown; the next one
     execSync(RESTART, { stdio: "inherit", timeout: 120_000 });
     // The browser session outlives the host process; sign in only if asked.
     await page.goto(`${BASE}/#/home`);
-    const asked = await page.getByLabel("Username").isVisible({ timeout: 10_000 }).catch(() => false);
+    const asked = await page.getByLabel("Username").waitFor({ state: "visible", timeout: 10_000 }).then(() => true, () => false);
     if (asked) await signInAsOwner(page, BASE);
     await openDesign(page);
     await page.getByRole("tab", { name: "Agent" }).click();

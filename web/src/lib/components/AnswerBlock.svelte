@@ -64,6 +64,7 @@
     callout: "Callout",
     proscons: "Pros and cons",
     steps: "Steps",
+    diagram: "Diagram",
   };
 
   let view = $state<"chart" | "table">("chart");
@@ -72,6 +73,8 @@
   let root = $state<HTMLElement>();
 
   const isChart = $derived(part.type === "chart");
+  /** A drawing the owner can keep as an image: a chart, or a diagram (QUI-A08). */
+  const isDrawing = $derived(isChart || part.type === "diagram");
   const grid = $derived(blockGrid(part));
   const text = $derived(blockText(part));
   const label = $derived(
@@ -100,7 +103,7 @@
   }
 
   async function png() {
-    const svg = root?.querySelector<SVGSVGElement>("figure.data-chart svg");
+    const svg = root?.querySelector<SVGSVGElement>("figure.data-chart svg, figure.diagram svg");
     if (!svg) {
       say("Switch to Chart to save it as an image");
       return;
@@ -109,7 +112,7 @@
       const surface = getComputedStyle(document.documentElement).getPropertyValue("--surface").trim() || "white";
       downloadBlob(await chartPng(svg, surface), blockFilename(part, "png"));
     } catch {
-      say("Could not make an image of this chart");
+      say(isChart ? "Could not make an image of this chart" : "Could not make an image of this diagram");
     }
   }
 </script>
@@ -128,7 +131,7 @@
     <button type="button" class="tool icon" aria-label="Copy" title="Copy" onclick={copy}>
       <Icon name="copy" size="sm" />
     </button>
-    {#if isChart && !asText && view === "chart"}
+    {#if isDrawing && !asText && view === "chart"}
       <button type="button" class="tool" title="Save as PNG image" onclick={png}>PNG</button>
     {/if}
     {#if grid !== null}

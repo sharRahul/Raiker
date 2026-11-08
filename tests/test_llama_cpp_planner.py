@@ -7,7 +7,9 @@ from pathlib import Path
 import pytest
 
 from raiker.models.llama_cpp.planner import (
-    AUTO_CONTEXT_FLOOR,
+    AUTO_CONTEXT_TARGET,
+    TURN_CONTEXT_FLOOR,
+    TURN_CONTEXT_NOTE,
     MemoryBudget,
     ModelShape,
     RuntimeSettings,
@@ -82,10 +84,28 @@ def test_explicit_layers_that_overflow_the_gpu_are_insufficient() -> None:
 
 
 def test_auto_context_shrinks_to_fit_but_not_below_the_floor() -> None:
-    # 8 GB laptop, CPU only, 4.7 GB model: 8K context does not fit; smaller does.
-    plan = plan_launch(_shape(), _budget(backend="cpu", gpu_gib=None, ram_gib=6.2, total_gib=8), RuntimeSettings())
-    assert AUTO_CONTEXT_FLOOR <= plan.context_size < 8192
+    # 16 GB machine, CPU only, 4.7 GB model, 10 GB free: 32K context does not
+    # fit; 16K does.
+    plan = plan_launch(_shape(), _budget(backend="cpu", gpu_gib=None, ram_gib=10, total_gib=16), RuntimeSettings())
+    assert plan.verdict != "insufficient_memory"
+    assert TURN_CONTEXT_FLOOR <= plan.context_size < AUTO_CONTEXT_TARGET
     assert any("Context reduced" in note for note in plan.notes)
+
+
+def test_auto_never_plans_a_context_no_turn_fits_in() -> None:
+    # Raiker's own prompt is about 9,500 tokens: below 12,288 every turn is
+    # refused, so auto reports the model does not fit instead of starting it.
+    plan = plan_launch(_shape(), _budget(backend="cpu", gpu_gib=None, ram_gib=6.2, total_gib=8), RuntimeSettings())
+    assert plan.context_size == TURN_CONTEXT_FLOOR
+    assert plan.verdict == "insufficient_memory" and not plan.allowed
+    assert any("does not plan a smaller context" in note for note in plan.notes)
+    assert not any("Context reduced" in note for note in plan.notes)
+
+
+def test_a_context_below_the_turn_floor_says_so() -> None:
+    owner = plan_launch(_shape(), _budget(), RuntimeSettings(context_size=4096))
+    assert owner.context_size == 4096 and TURN_CONTEXT_NOTE in owner.notes
+    assert TURN_CONTEXT_NOTE not in plan_launch(_shape(), _budget(), RuntimeSettings()).notes
 
 
 def test_auto_context_never_exceeds_trained_context() -> None:

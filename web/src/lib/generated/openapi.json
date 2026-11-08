@@ -8102,7 +8102,8 @@
               "measure",
               "callout",
               "proscons",
-              "steps"
+              "steps",
+              "diagram"
             ],
             "title": "Type",
             "type": "string"
@@ -8141,7 +8142,8 @@
               "measure",
               "callout",
               "proscons",
-              "steps"
+              "steps",
+              "diagram"
             ],
             "title": "Type",
             "type": "string"

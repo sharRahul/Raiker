@@ -175,7 +175,7 @@ def _coerce_arguments(raw: Any) -> dict[str, Any]:
 
 #: Typed answer blocks Raiker renders itself: never a tool call.
 _ANSWER_BLOCKS = frozenset(
-    {"table", "chart", "figures", "compare", "measure", "callout", "proscons", "steps"}
+    {"table", "chart", "figures", "compare", "measure", "callout", "proscons", "steps", "diagram"}
 )
 _FENCED_CALL = re.compile(r"```raiker:([a-z][a-z0-9_]*)(.*?)```", re.DOTALL)
 _KEY_VALUE = re.compile(r'([a-z_][a-z0-9_]*)=("(?:[^"\\]|\\.)*"|\S+)')

@@ -10,8 +10,8 @@ Permissions, Connections, Models, Settings and help-panel plans in
 [01](01_LAYOUT_SYSTEM_AND_PAGES.md#status) (2026-10-21; L11 to L13 open), and
 the approvals round of [02](02_PERMISSIONS_AND_APPROVALS.md#status)
 (2026-10-22; Allow with limits and its dependants open), the visual answers
-of [04](04_VISUAL_ANSWERS.md#status) (2026-10-23; diagrams and Pin to project
-open), and the features and improvements of 06 in two rounds (2026-10-24 and
+of 04 (2026-10-23, Pin 2026-10-26, diagrams 2026-11-08; 04 is closed and its
+open notes are in [TO_BE_FIXED](../TO_BE_FIXED.md#quiet-ui-visual-answers--open-items-document-closed-2026-11-08)), and the features and improvements of 06 in two rounds (2026-10-24 and
 2026-10-26; 06 is closed and its one remaining item, the desktop companion, is
 in [TO_BE_FIXED](../TO_BE_FIXED.md#quiet-ui-features-and-improvements--open-items-document-closed-2026-10-26)), and on 2026-10-25 the brand of
 [08](08_BRAND_AND_VISUAL_SYSTEM.md#status) (open ring, palette, Inter; the
@@ -67,7 +67,7 @@ companion. It never appears as travel vocabulary in navigation or status
 | [01 Layout system and pages](01_LAYOUT_SYSTEM_AND_PAGES.md) | The page audit, five page layouts, screen sizes, a new layout for every long page, size budgets | QUI-L01 – L14 |
 | [02 Permissions and approvals](02_PERMISSIONS_AND_APPROVALS.md) | How permissions are set, asked and audited; the approval card; connection detail | QUI-P01 – P09 |
 | [03 Welcome, Home and Chat](03_WELCOME_HOME_AND_CHAT.md) | First run as a setup conversation, Home, the anatomy of a chat turn | QUI-W01 – W06, QUI-H01 – H05, QUI-C01 – C12 |
-| [04 Visual answers](04_VISUAL_ANSWERS.md) | Charts, comparisons, key figures and other answer blocks | QUI-A01 – A08 |
+| 04 Visual answers (closed 2026-11-08) | Charts, comparisons, key figures, diagrams and other answer blocks. Shipped as [FIXED-1136](../FIXED_ITEMS.md#fixed-1136--a-turn-could-not-say-these-are-the-headline-numbers-qui-a04) to [FIXED-1149](../FIXED_ITEMS.md#fixed-1149--a-chart-in-a-transcript-bubble-was-too-small-to-read-and-its-legend-had-no-colours-04-screenshot-review), [FIXED-1255](../FIXED_ITEMS.md#fixed-1255--an-answer-block-could-not-be-pinned-to-a-project-04-pin-to-project) and [FIXED-1348](../FIXED_ITEMS.md#fixed-1348--a-flow-or-a-structure-could-only-be-described-in-words-qui-a08); the rest is in [TO_BE_FIXED](../TO_BE_FIXED.md#quiet-ui-visual-answers--open-items-document-closed-2026-11-08) | QUI-A01 – A08 |
 | [05 Raiker Browser](05_RAIKER_BROWSER.md) | A built-in browser in the desktop app, using the Chromium Electron already ships | QUI-B01 – B04 |
 | 06 Features and improvements (closed 2026-10-26) | Features taken from the reference products, and product gaps. Shipped as [FIXED-1150](../FIXED_ITEMS.md#fixed-1150--nothing-outside-chat-said-that-work-was-running-qui-f04) to [FIXED-1167](../FIXED_ITEMS.md#fixed-1167--two-long-transcript-tests-ran-at-their-time-limit-quality-found-this-round) and [FIXED-1252](../FIXED_ITEMS.md#fixed-1252--the-same-aim-across-conversations-was-never-offered-as-a-goal-qui-f03) to [FIXED-1263](../FIXED_ITEMS.md#fixed-1263--key-figures-read-1200-where-1200-was-meant-found-this-round); the rest is in [TO_BE_FIXED](../TO_BE_FIXED.md#quiet-ui-features-and-improvements--open-items-document-closed-2026-10-26) | QUI-F01 – F23 |
 | [07 Quick fixes and quality](07_QUICK_FIXES_AND_QUALITY.md) | Small fixes visible today, and the checks that keep quality from slipping | QUI-Q01 – Q08, QUI-G01 – G07 |
@@ -112,7 +112,7 @@ modes and "Off" approval mode, Muse's feed, up-front data requests and
 4. Guide to help panel; Observability to Diagnostics and Recovery (01).
 5. Size budgets in CI (07, QUI-G01).
 6. Welcome, Home and Chat; the approval card; clarifying-question cards (03, 02).
-7. Visual answers: key figures, comparison, horizontal bar, callout first (04). Shipped 2026-10-23.
+7. Visual answers: key figures, comparison, horizontal bar, callout first (04). Shipped 2026-10-23; diagrams 2026-11-08, and 04 closed.
 8. Live work line, Quick Entry, goals noticed in conversation (06). Shipped 2026-10-24; goals noticed 2026-10-26.
 9. Task receipt, data label in the composer, Library, Make this repeatable (06). Shipped 2026-10-24; the Library 2026-10-26.
 10. Brand: tokens, mark, companion (08). Tokens and the mark shipped 2026-10-25; the companion waits for its art.

@@ -1,16 +1,27 @@
 from __future__ import annotations
 
 import shlex
+from collections.abc import Mapping
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from raiker.execution.code_placement import HOST_NETWORK_CODE_CAPABILITY
+from raiker.execution.commands.missing_module import missing_module_note
 from raiker.execution.commands.service import CommandService, CommandServiceError
 from raiker.runtime.executors.base import ExecutionResult
 
 if TYPE_CHECKING:
     from raiker.runtime.authority.models import Principal
     from raiker.runtime.authority.router import GovernedAction
+
+
+def _with_module_note(summary: str, result: Mapping[str, Any]) -> str:
+    """A failed run's summary, plus why when it could not import a module the owner has (BD-5)."""
+    if result.get("returncode") == 0:
+        return summary
+    output = f"{result.get('stderr') or ''}\n{result.get('stdout') or ''}"
+    note = missing_module_note(output)
+    return f"{summary} {note}" if note else summary
 
 
 class ShellExecutor:
@@ -89,7 +100,10 @@ class ShellExecutor:
             capability=self.capability,
             action_id=action.action_id,
             reason_code=None if result["returncode"] == 0 else f"exit_code:{result['returncode']}",
-            summary=f"Shell command exit {result['returncode']} ({result['stdout_bytes']}b out, {result['stderr_bytes']}b err).",
+            summary=_with_module_note(
+                f"Shell command exit {result['returncode']} ({result['stdout_bytes']}b out, {result['stderr_bytes']}b err).",
+                result,
+            ),
             artifacts={
                 "returncode": result["returncode"],
                 "stdout_bytes": result["stdout_bytes"],
@@ -163,7 +177,10 @@ class ProcessExecutor:
             capability=self.capability,
             action_id=action.action_id,
             reason_code=None if result["returncode"] == 0 else f"exit_code:{result['returncode']}",
-            summary=f"Process exit {result['returncode']} ({result['stdout_bytes']}b out, {result['stderr_bytes']}b err).",
+            summary=_with_module_note(
+                f"Process exit {result['returncode']} ({result['stdout_bytes']}b out, {result['stderr_bytes']}b err).",
+                result,
+            ),
             artifacts={
                 "returncode": result["returncode"],
                 "stdout_bytes": result["stdout_bytes"],

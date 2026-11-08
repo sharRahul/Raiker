@@ -9,7 +9,7 @@ import { resolve } from "node:path";
 
 afterEach(() => vi.unstubAllGlobals());
 
-function stubApi(options: { failPut?: boolean; stored?: Record<string, unknown> } = {}) {
+function stubApi(options: { failPut?: boolean; stored?: Record<string, unknown>; holdPut?: Promise<void> } = {}) {
   const putBodies: unknown[] = [];
   const mock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
@@ -17,6 +17,7 @@ function stubApi(options: { failPut?: boolean; stored?: Record<string, unknown> 
     const method = (init?.method ?? "GET").toUpperCase();
     if (path === "/api/settings" && method === "PUT") {
       putBodies.push(JSON.parse(String(init?.body)));
+      if (options.holdPut) await options.holdPut;
       if (options.failPut) {
         return { ok: false, status: 500, json: async () => ({ detail: {} }) } as Response;
       }
@@ -577,6 +578,43 @@ describe("unsaved changes when leaving Settings", () => {
 
     confirmSpy.mockReturnValue(true);
     expect(mayLeave("#/chat")).toBe(true);
+  });
+
+  it("lets the owner leave while a save that carries every edit is out (TO_BE_FIXED race)", async () => {
+    let release = () => {};
+    const holdPut = new Promise<void>((resolve) => (release = resolve));
+    const { putBodies } = stubApi({ holdPut });
+    const { mayLeave } = await import("../leaveGuard");
+    const confirmSpy = vi.fn(() => false);
+    vi.stubGlobal("confirm", confirmSpy);
+    render(SettingsView, { props: { principal: "alice" } });
+    await editSomething();
+    await fireEvent.click(screen.getByRole("button", { name: /save changes/i }));
+    await waitFor(() => expect(putBodies.length).toBe(1));
+
+    // The answer has not been read yet; the request already holds the edit.
+    expect(mayLeave("#/chat")).toBe(true);
+    expect(confirmSpy).not.toHaveBeenCalled();
+    release();
+    await waitFor(() => expect(screen.getByText(/all changes saved/i)).toBeInTheDocument());
+  });
+
+  it("still asks when an edit was made after the save went out", async () => {
+    let release = () => {};
+    const holdPut = new Promise<void>((resolve) => (release = resolve));
+    const { putBodies } = stubApi({ holdPut });
+    const { mayLeave } = await import("../leaveGuard");
+    const confirmSpy = vi.fn(() => false);
+    vi.stubGlobal("confirm", confirmSpy);
+    render(SettingsView, { props: { principal: "alice" } });
+    await editSomething();
+    await fireEvent.click(screen.getByRole("button", { name: /save changes/i }));
+    await waitFor(() => expect(putBodies.length).toBe(1));
+    await fireEvent.click(screen.getByLabelText(/unread notices inside Raiker/i));
+
+    expect(mayLeave("#/chat")).toBe(false);
+    expect(confirmSpy).toHaveBeenCalled();
+    release();
   });
 
   it("does not ask once the edit is discarded", async () => {

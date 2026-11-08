@@ -1635,7 +1635,7 @@ export type ContainmentCapability = {
 
 /** One declared piece of a turn's answer. */
 export type ContentPart = {
-  type: "text" | "table" | "chart" | "refused" | "figures" | "compare" | "measure" | "callout" | "proscons" | "steps";
+  type: "text" | "table" | "chart" | "refused" | "figures" | "compare" | "measure" | "callout" | "proscons" | "steps" | "diagram";
   text: string;
   data: Record<string, unknown>;
   reason_code: string;
@@ -1643,7 +1643,7 @@ export type ContentPart = {
 
 /** One declared piece of a turn's answer, as ``raiker.runtime.typed_parts`` serialises it. */
 export type ContentPartView = {
-  type: "text" | "table" | "chart" | "refused" | "figures" | "compare" | "measure" | "callout" | "proscons" | "steps";
+  type: "text" | "table" | "chart" | "refused" | "figures" | "compare" | "measure" | "callout" | "proscons" | "steps" | "diagram";
   text: string;
   data: Record<string, unknown>;
   reason_code: string;

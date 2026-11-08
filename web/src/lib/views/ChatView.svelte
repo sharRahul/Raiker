@@ -115,7 +115,7 @@
   import { rememberSessionInRoute } from "../sessionRoute";
   import { evidenceLink, forgetTurnInRoute, revealTurn } from "../turnAnchor";
   import { hasSteps, planFromEvent } from "../agentPlan";
-  import { collectReasoning, hasRunningTool, toolActivity, turnOutcome, workingLine, type ToolCallRow } from "../chatPresentation";
+  import { collectReasoning, hasRunningTool, stoppedAnswer, toolActivity, turnOutcome, workingLine, type ToolCallRow } from "../chatPresentation";
   import { turnFailureMessage } from "../turnFailure";
   import { retryConfirmation, retryConsequence } from "../conversationCommands";
   import {
@@ -2383,7 +2383,7 @@
     {/if}
     {#each shownTurns as turn, shownIndex (turn.id)}
       {@const turnIndex = firstShown + shownIndex}
-      {@const answer = answerText(turn)}
+      {@const answer = stoppedAnswer(turn.response?.status, answerText(turn))}
       {@const toolRows = toolActivity(turn.events)}
       <!-- BUG-215 — the stream first, because a turn that is running has the
            freshest working; the stored text when there is no stream to read,

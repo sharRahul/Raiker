@@ -105,7 +105,7 @@ async function openHosted(page: Page): Promise<void> {
     await page.goto(`${BASE}/#/models?tab=hosted`);
     await page.waitForLoadState("networkidle").catch(() => undefined);
     await dismissFirstRun(page);
-    if (await hosted.isVisible({ timeout: 15_000 }).catch(() => false)) return;
+    if (await hosted.waitFor({ state: "visible", timeout: 15_000 }).then(() => true, () => false)) return;
   }
   await expect(hosted).toBeVisible({ timeout: 60_000 });
 }

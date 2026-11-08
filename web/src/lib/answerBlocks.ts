@@ -18,7 +18,8 @@ export type BlockType =
   | "measure"
   | "callout"
   | "proscons"
-  | "steps";
+  | "steps"
+  | "diagram";
 
 export const BLOCK_TYPES: ReadonlySet<string> = new Set<BlockType>([
   "table",
@@ -29,6 +30,7 @@ export const BLOCK_TYPES: ReadonlySet<string> = new Set<BlockType>([
   "callout",
   "proscons",
   "steps",
+  "diagram",
 ]);
 
 export type Series = { name: string; values: number[] };
@@ -42,6 +44,8 @@ export type CompareRow = {
 };
 export type ProsConsOption = { name: string; pros: string[]; cons: string[] };
 export type Step = { label: string; when: string; text: string };
+export type { DiagramEdge, DiagramNode } from "./diagramLayout";
+import type { DiagramEdge, DiagramNode } from "./diagramLayout";
 
 /** Units written before the number, the way a price is read: £999, not 999 £. */
 export const PREFIX_UNITS: ReadonlySet<string> = new Set(["£", "$", "€", "¥", "₹", "US$", "A$", "C$"]);
@@ -140,6 +144,21 @@ export function blockText(part: ContentPart): string {
             `${index + 1}. ${step.label}${step.when ? ` (${step.when})` : ""}${step.text ? ` — ${step.text}` : ""}`,
         ),
       ].join("\n");
+    case "diagram": {
+      // The runtime's own `diagram_text`: each step in layer order, then where it leads.
+      const nodes = [...(d.nodes as DiagramNode[])].sort((a, b) => a.rank - b.rank);
+      const edges = d.edges as DiagramEdge[];
+      const labels = new Map(nodes.map((node) => [node.id, node.label]));
+      return [
+        ...head,
+        ...nodes.map((node) => {
+          const leads = edges
+            .filter((edge) => edge.from === node.id)
+            .map((edge) => `${labels.get(edge.to)}${edge.label ? ` (${edge.label})` : ""}`);
+          return `- ${node.label}${leads.length ? ` → ${leads.join("; ")}` : ""}`;
+        }),
+      ].join("\n");
+    }
     default: {
       const grid = blockGrid(part);
       if (grid === null) return part.text ?? "";
@@ -235,6 +254,7 @@ const BLOCK_NAMES: Record<BlockType, string> = {
   callout: "a callout",
   proscons: "pros and cons",
   steps: "the steps",
+  diagram: "a diagram",
 };
 
 /**

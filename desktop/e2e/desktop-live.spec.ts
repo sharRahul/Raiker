@@ -57,7 +57,7 @@ async function signIn(page: Page): Promise<void> {
 /** The first-run wizard, answered with the round's real provider. */
 async function finishSetup(page: Page): Promise<void> {
   const title = page.locator("#setup-title");
-  if (!(await title.isVisible({ timeout: 10_000 }).catch(() => false))) return;
+  if (!(await title.waitFor({ state: "visible", timeout: 10_000 }).then(() => true, () => false))) return;
   await expect(title).not.toHaveText(/Preparing/, { timeout: 30_000 });
   if (/Meet Raiker/.test((await title.textContent()) ?? "")) {
     await page.getByRole("button", { name: "Continue" }).click();

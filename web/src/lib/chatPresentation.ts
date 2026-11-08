@@ -248,6 +248,32 @@ export interface TurnOutcome {
 }
 
 /**
+ * The reply a stopped turn stores when it had written nothing yet: the
+ * gateway's and the runtime's own notice (`STOPPED_NOTICE` in
+ * `conversation_history.py`). The page already says the turn was stopped in
+ * its own line, so a bubble holding only this would say it twice.
+ */
+const STOP_NOTICES = new Set([
+  "Stopped by user at a safe boundary.",
+  "Stopped at your request, at a safe boundary.",
+]);
+
+/**
+ * The answer a stopped turn shows: what it had written, with the stored stop
+ * notice taken off. Anything the model streamed before the stop is kept, and
+ * the steps that finished (which the runtime appends after the notice) stay.
+ */
+export function stoppedAnswer(status: string | null | undefined, answer: string): string {
+  if (status !== "stopped") return answer;
+  const trimmed = answer.trim();
+  if (STOP_NOTICES.has(trimmed)) return "";
+  for (const notice of STOP_NOTICES) {
+    if (trimmed.startsWith(`${notice}\n`)) return trimmed.slice(notice.length).trim();
+  }
+  return answer;
+}
+
+/**
  * QUI-C03 — one line under a settled turn that did something, saying how it
  * ended.
  *

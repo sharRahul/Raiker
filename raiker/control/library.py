@@ -40,6 +40,7 @@ _BLOCK_NAMES = {
     "callout": "Callout",
     "proscons": "Pros and cons",
     "steps": "Steps",
+    "diagram": "Diagram",
 }
 
 _DOCUMENT_NAMES = {
@@ -96,6 +97,8 @@ def block_title(part_type: str, data: dict[str, Any]) -> str:
         names = [str(option.get("name", "")) for option in data.get("options") or [] if isinstance(option, dict)]
     elif part_type == "steps":
         names = [str(step.get("label", "")) for step in data.get("steps") or [] if isinstance(step, dict)]
+    elif part_type == "diagram":
+        names = [str(node.get("label", "")) for node in data.get("nodes") or [] if isinstance(node, dict)]
     elif part_type == "callout":
         text = " ".join(str(data.get("text") or "").split())
         names = [text[:80] + ("…" if len(text) > 80 else "")] if text else []

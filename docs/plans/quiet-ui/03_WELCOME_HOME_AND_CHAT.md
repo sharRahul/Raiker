@@ -22,7 +22,7 @@ live cases RT-QUI-10 to RT-QUI-13 and RT-QUI-16). Both in
 | QUI-C01 | **Done**: editable title, project chip, search in conversation, Context toggle. |
 | QUI-C02 | Already true before this round; unchanged. |
 | QUI-C03 | **Done**: the status line, follow-ups queued from the prompt and Stop safely in Send's place (2026-11-07, [execution states](#2026-11-07--composer-execution-states)), the outcome line, and the task receipt at the end of each turn (2026-10-24, [QUI-F16, FIXED-1153](../FIXED_ITEMS.md#fixed-1153--a-tasks-end-did-not-say-what-it-used-read-changed-or-sent-qui-f16); per task in Tasks, [FIXED-1261](../FIXED_ITEMS.md#fixed-1261--a-background-task-had-no-receipt-qui-f16-found-this-round)). |
-| QUI-C04 | **Partly done.** Done: the placeholder, the data label and the profile chip (QUI-P02, 2026-10-22); answer style is in Settings › General until *More* exists ([04](04_VISUAL_ANSWERS.md#status), 2026-10-23). Open: *More* (schedule, research depth). |
+| QUI-C04 | **Partly done.** Done: the placeholder, the data label and the profile chip (QUI-P02, 2026-10-22); answer style is in Settings › General until *More* exists (04, closed; [FIXED-1145](../FIXED_ITEMS.md#fixed-1145--there-was-no-way-to-ask-for-fewer-or-more-visuals-04-answer-style), 2026-10-23). Open: *More* (schedule, research depth). |
 | QUI-C05 | **Done.** |
 | QUI-C06 | **Done.** |
 | QUI-C07 | **Done.** Tabs: Context (files in use), Plan, Sources, Activity. Memories in use are not listed yet: a turn's recall reports a count, not the records. |
@@ -133,7 +133,7 @@ switch in the top bar and keep the draft.
 | Result | Bordered card with one action (Open draft, View diff, Open image) |
 | Approval | Raiker Safety card ([02, QUI-P05](02_PERMISSIONS_AND_APPROVALS.md#qui-p05--the-approval-card-raiker-safety)) |
 | Question | Clarifying-question card ([QUI-F02, FIXED-1151](../FIXED_ITEMS.md#fixed-1151--a-question-asked-mid-task-was-offered-as-an-approval-in-chat-build-and-the-floating-card-qui-f02)) |
-| Visual answer | Answer blocks ([04](04_VISUAL_ANSWERS.md)) |
+| Visual answer | Answer blocks ([Chat guide](../../guide/working-in-chat.md#tables-charts-and-other-answer-blocks)) |
 
 ### QUI-C03 — A turn, step by step
 

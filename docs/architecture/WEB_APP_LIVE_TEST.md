@@ -15,6 +15,36 @@ the model provider → the audit event log. It also exercises the two features i
 PR #106: the **user-owned fallback sequence** and **prompt caching + normalised
 cache-hit metrics**.
 
+## Result — 2026-11-08 (QUI-A08 diagrams and the small-fixes round, hosted Anthropic Haiku 4.5)
+
+Diagrams, the last item of the Quiet UI plan's visual answers, after which 04
+was closed
+([FIXED-1348](../plans/FIXED_ITEMS.md#fixed-1348--a-flow-or-a-structure-could-only-be-described-in-words-qui-a08)
+to [FIXED-1357](../plans/FIXED_ITEMS.md#fixed-1357--twelve-live-checks-never-waited-and-a-kept-model-could-stop-a-specs-setup-found-this-round)).
+One fresh workspace (`scripts/reset_live_workspace.py`) served by
+`raiker-web --port 8765` at 1440×900, Linux. Anthropic was connected through
+**Add model**, with the key and workspace ID typed from the run's environment;
+neither appears in a spec, command, document, screenshot or the server log.
+Spec: `web/e2e/qui-a08-diagrams-and-fixes-live.spec.ts`. **9 of 10 passed; one
+blocked**: after four model turns Anthropic answered *the account has no credit
+or quota left* (`provider_quota_exhausted`), and the composer said so.
+
+| Case | Check | Result |
+|---|---|---|
+| RT-DGM-01 | Anthropic connects through **Add model → An account I have** with its workspace ID; Haiku 4.5 kept and made the default | ✅ |
+| RT-DGM-02 | A declared sign-in flow is drawn: 5 boxes, 6 arrows, 2 dashed loops back round the side, 2 diamonds; the SVG is `aria-hidden` and the list reads *Open Raiker: leads to Password right?*; **PNG** downloads `signing-in-on-another-device.png`, there is no **CSV**; **Show as text** reads *Password right? → Ask for the two-step code (yes); Open Raiker (no)*; dark theme; **Pin** becomes **Unpin** | ✅ |
+| RT-DGM-03 | A diagram whose arrow names a missing box: *Not rendered. An arrow pointed at a box the diagram did not have.* `diagram_edge_unknown_node` | ✅ |
+| RT-DGM-04 | Asked for a pull request's path to merge, Haiku 4.5 chose a diagram itself (8 boxes, a skip and a loop) | ✅ after a fix found in this round ([FIXED-1349](../plans/FIXED_ITEMS.md#fixed-1349--a-diagrams-arrows-went-through-boxes-and-its-block-was-a-narrow-column-found-this-round)): arrows crossed boxes, the block was a narrow column, and an inline style broke the page's CSP |
+| RT-DGM-05 | Work › Library lists the pinned *Signing in on another device* as *Diagram* and draws it | ✅ |
+| RT-FIX-01 | A stopped answer says it was stopped once | ⛔ blocked: no credit left on the key. Covered by `chatPresentation.test.ts` |
+| RT-FIX-02 | Sessions: focus the title, press Enter, the record opens and the title is `aria-current` | ✅ |
+| RT-FIX-03 | Build on a fresh load never shows *could not read your standing permissions*; after the read it says *Every write capability is set to Ask* | ✅ |
+| RT-FIX-04 | Settings: change Answer style, Save, navigate on the PUT's response, with every dialog declined: Chat opens | ✅ |
+| RT-FIX-05 | Keeping Haiku 4.5 again on a workspace that already keeps it completes | ✅ (the 2026-11-07 shape, a switch not offered, was not reproduced) |
+| Suites | ruff, mypy (1,275 files); the affected Python tests; the web unit suite (298 files, 2,839 tests), `svelte-check`, ESLint, design tokens, build; desktop lint and type-check | ✅ — five shell and process tests need Bubblewrap, which this container lacks (`native_sandbox_not_enforced`); CI installs it |
+| Visual review | Every capture inspected at original resolution (`output/playwright/2026-11-08-qui-a08-diagrams/`). The rerouted model-chosen diagram crosses no box (`11-model-chosen-rerouted.png`) | ✅ |
+| Not covered | RT-FIX-01 and a fresh rerun of RT-DGM-02 to RT-DGM-04 on the final layout, which need model turns; the web-access spec's setup on a workspace that already keeps Haiku | — |
+
 ## Result — 2026-10-26 (BUG-358 and BUG-347: remote access with two-step sign-in)
 
 The owner's decisions
@@ -294,7 +324,7 @@ shortcut) are proved by `desktop/e2e/shell.spec.ts` under Xvfb: **12/12**.
 
 ## Result — 2026-10-23 (Quiet UI visual answers, hosted Anthropic Haiku 4.5)
 
-The visual answers of the [Quiet UI plan](../plans/quiet-ui/04_VISUAL_ANSWERS.md#status)
+The visual answers of the Quiet UI plan (04, closed 2026-11-08)
 ([FIXED-1136](../plans/FIXED_ITEMS.md#fixed-1136--a-turn-could-not-say-these-are-the-headline-numbers-qui-a04)
 to [FIXED-1149](../plans/FIXED_ITEMS.md#fixed-1149--a-chart-in-a-transcript-bubble-was-too-small-to-read-and-its-legend-had-no-colours-04-screenshot-review)).
 Fresh workspaces served by `raiker-web` at 1440×900. Anthropic was connected
@@ -318,7 +348,7 @@ RT-QUI-37 and RT-QUI-43 let the model choose.
 | RT-QUI-42 | **Export conversation → Markdown** carries the comparison as a table with *18 — Best*, and no `raiker:compare` fence in Raiker's section | ✅ |
 | RT-QUI-43 | On *Mostly text*, a question with three comparable weights is answered in prose with no block | ✅ after a fix found in this round (FIXED-1145): Haiku drew a comparison until the style sentence said it overrides the general guidance |
 | Suites | Python suite (3 workers), `tests/test_visual_answers.py`; web unit suite, `svelte-check`, ESLint, design tokens, build; ruff, mypy | ✅ |
-| Visual review | Inspected at original resolution; FIXED-1149 was found from the images. Still seen: the Plan card covers the *Completed · N steps* line ([TO_BE_FIXED](../plans/TO_BE_FIXED.md#2026-10-23-quiet-ui-visual-answers-round--what-is-still-open)). | ✅ |
+| Visual review | Inspected at original resolution; FIXED-1149 was found from the images. Still seen: the Plan card covers the *Completed · N steps* line ([TO_BE_FIXED](../plans/TO_BE_FIXED.md#quiet-ui-visual-answers--open-items-document-closed-2026-11-08)). | ✅ |
 
 ## Result — 2026-10-22 (Quiet UI permissions and approvals, hosted Anthropic Haiku 4.5)
 
@@ -1796,9 +1826,9 @@ on the way are not passing evidence:
   loaded and skipped the save. It now asserts the stored value first.
 * **Navigating away the instant Save returns.** One run stayed on Settings
   when it navigated in the same tick as the save's answer. The helper now waits
-  for *All changes saved.*, as a person would. Whether the unsaved-changes
-  guard can hold that instant is recorded in
-  [TO_BE_FIXED](../plans/TO_BE_FIXED.md#settings-may-hold-a-navigation-made-the-instant-a-save-returns).
+  for *All changes saved.*, as a person would. The unsaved-changes guard did
+  hold that instant; it no longer does
+  ([FIXED-1353](../plans/FIXED_ITEMS.md#fixed-1353--settings-could-hold-a-navigation-made-the-instant-a-save-returned)).
 
 The 16 captures are under
 `output/playwright/2026-11-07-composer-control-deck/` (ignored by Git). I

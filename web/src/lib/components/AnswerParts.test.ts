@@ -212,6 +212,53 @@ describe("measure, callout, pros and cons, steps (QUI-A06, A07)", () => {
   });
 });
 
+describe("a diagram (QUI-A08)", () => {
+  const DIAGRAM = part({
+    type: "diagram",
+    data: {
+      caption: "Sign-in",
+      direction: "down",
+      nodes: [
+        { id: "start", label: "Start", shape: "round", rank: 0 },
+        { id: "ok", label: "Password right?", shape: "diamond", rank: 1 },
+        { id: "code", label: "<b>Ask</b> for the code", shape: "box", rank: 2 },
+      ],
+      edges: [
+        { from: "start", to: "ok", label: "" },
+        { from: "ok", to: "code", label: "yes" },
+        { from: "ok", to: "start", label: "no" },
+      ],
+    },
+  });
+
+  it("draws boxes and arrows, keeps a list for screen readers and offers PNG but no CSV", () => {
+    const { container } = render(AnswerParts, { text: "", parts: [DIAGRAM] });
+    const svg = container.querySelector("figure.diagram svg");
+    expect(svg).toHaveAttribute("aria-hidden", "true");
+    expect(container.querySelectorAll("g.node")).toHaveLength(3);
+    expect(container.querySelectorAll("path.edge")).toHaveLength(3);
+    expect(container.querySelectorAll("path.edge.back")).toHaveLength(1);
+    expect(container.querySelector("polygon.shape")).not.toBeNull();
+    const list = container.querySelector("ol.sr-only")!;
+    expect(list.textContent).toContain("Password right?: leads to <b>Ask</b> for the code (yes); Start (no)");
+    // A label is text, never markup.
+    expect(container.querySelector("figure.diagram b")).toBeNull();
+    expect(screen.getByRole("button", { name: "PNG" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "CSV" })).toBeNull();
+  });
+
+  it("shows the same steps as text", async () => {
+    render(AnswerParts, { text: "", parts: [DIAGRAM] });
+    await fireEvent.click(screen.getByRole("button", { name: "Show as text" }));
+    expect(screen.getByText(/Password right\? → <b>Ask<\/b> for the code \(yes\); Start \(no\)/)).toBeInTheDocument();
+  });
+
+  it("names a refused diagram's reason", () => {
+    render(AnswerParts, { text: "", parts: [part({ type: "refused", reason_code: "diagram_edge_unknown_node" })] });
+    expect(screen.getByText("An arrow pointed at a box the diagram did not have.")).toBeInTheDocument();
+  });
+});
+
 describe("the new chart kinds (QUI-A01 to A03)", () => {
   it("keeps every number in a table for a screen reader", () => {
     render(AnswerParts, {

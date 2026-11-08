@@ -111,7 +111,7 @@ async function proveModelReady(page: Page): Promise<boolean> {
       { timeout: 60_000 },
     )
     .not.toMatch(/Not selected/);
-  if (!(await setUp.isVisible({ timeout: 15_000 }).catch(() => false))) {
+  if (!(await setUp.waitFor({ state: "visible", timeout: 15_000 }).then(() => true, () => false))) {
     // No strip means the model is already proven, which is the state this helper
     // exists to reach.
     return await send.isEnabled().catch(() => true);
@@ -120,7 +120,7 @@ async function proveModelReady(page: Page): Promise<boolean> {
   // check — the shortest real path from a blocked composer to a proven model.
   await setUp.click();
   const check = page.getByRole("button", { name: "Check again" });
-  if (!(await check.isVisible({ timeout: 30_000 }).catch(() => false))) return false;
+  if (!(await check.waitFor({ state: "visible", timeout: 30_000 }).then(() => true, () => false))) return false;
   await check.click();
   await expect(page.getByText(/Check complete|Check failed|no model to check/)).toBeVisible({
     timeout: 180_000,
@@ -177,7 +177,7 @@ test("the first-run wizard answers the model question on its own screen", async 
   // against a host that has already completed it is a state, not a failure — say
   // so rather than timing out on a screen that has done its job.
   const stage = page.getByRole("heading", { name: "Choose where Raiker thinks" });
-  const shown = await stage.isVisible({ timeout: 60_000 }).catch(() => false);
+  const shown = await stage.waitFor({ state: "visible", timeout: 60_000 }).then(() => true, () => false);
   test.skip(!shown, "this host has already completed first-run setup; use a fresh workspace");
 
   // ── Every provider gets a row ──────────────────────────────────────────

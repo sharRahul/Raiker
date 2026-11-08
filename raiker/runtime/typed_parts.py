@@ -72,16 +72,18 @@ PART_CALLOUT: Final = "callout"
 PART_PROSCONS: Final = "proscons"
 #: QUI-A07 — an ordered or dated sequence.
 PART_STEPS: Final = "steps"
+#: QUI-A08 — a flow or a structure: boxes and the arrows between them.
+PART_DIAGRAM: Final = "diagram"
 
 #: Every declared block an owner sees as something other than prose.
 BLOCK_TYPES = frozenset({
     PART_TABLE, PART_CHART, PART_FIGURES, PART_COMPARE, PART_MEASURE,
-    PART_CALLOUT, PART_PROSCONS, PART_STEPS,
+    PART_CALLOUT, PART_PROSCONS, PART_STEPS, PART_DIAGRAM,
 })
 PART_TYPES = frozenset({PART_TEXT, PART_REFUSED, *BLOCK_TYPES})
 PartType = Literal[
     "text", "table", "chart", "refused", "figures", "compare", "measure",
-    "callout", "proscons", "steps",
+    "callout", "proscons", "steps", "diagram",
 ]
 
 
@@ -122,6 +124,10 @@ MAX_TEXT_CHARS = 500
 MAX_OPTIONS = 4
 MAX_LIST_ITEMS = 8
 MAX_STEPS = 12
+MAX_DIAGRAM_NODES = 24
+MAX_DIAGRAM_EDGES = 40
+MAX_NODE_LABEL_CHARS = 60
+MAX_EDGE_LABEL_CHARS = 40
 
 #: A model sometimes opens the JSON on the fence line itself
 #: (```` ```raiker:figures { ````), or writes all of it there; ``head`` keeps
@@ -558,6 +564,128 @@ def _validate_steps(payload: Any) -> tuple[dict[str, Any] | None, str]:
     return {"caption": caption, "steps": clean}, ""
 
 
+#: QUI-A08 — how a diagram reads: top to bottom (a flow), or left to right (a
+#: pipeline or a structure).
+DIAGRAM_DIRECTIONS = ("down", "right")
+#: A step, a start or end, and a question. Three shapes are enough to tell a
+#: flow apart; more would be decoration a reader has to learn.
+DIAGRAM_SHAPES = ("box", "round", "diamond")
+_NODE_ID = re.compile(r"^[A-Za-z0-9_-]{1,32}$")
+
+
+def _diagram_ranks(ids: list[str], edges: list[dict[str, str]]) -> list[int]:
+    """Each node's layer: the longest forward path that reaches it.
+
+    The runtime decides the layers so every surface draws the same diagram, the
+    way it decides *best* on a comparison. A cycle (a retry, a loop back) is
+    kept as an edge but does not lift a layer: edges that point back to a node
+    already on the current depth-first path are left out of the ranking, so the
+    loop is drawn as an arrow going back rather than pushing the diagram apart.
+    """
+    index = {node_id: position for position, node_id in enumerate(ids)}
+    outgoing: list[list[int]] = [[] for _ in ids]
+    for edge in edges:
+        outgoing[index[edge["from"]]].append(index[edge["to"]])
+    state = [0] * len(ids)  # 0 unseen, 1 on the path, 2 done
+    forward: list[list[int]] = [[] for _ in ids]
+    order: list[int] = []
+    for root in range(len(ids)):
+        if state[root]:
+            continue
+        stack: list[tuple[int, int]] = [(root, 0)]
+        state[root] = 1
+        while stack:
+            node, cursor = stack[-1]
+            if cursor < len(outgoing[node]):
+                stack[-1] = (node, cursor + 1)
+                target = outgoing[node][cursor]
+                if state[target] == 1:
+                    continue  # a back edge: drawn, never ranked
+                forward[node].append(target)
+                if state[target] == 0:
+                    state[target] = 1
+                    stack.append((target, 0))
+                continue
+            state[node] = 2
+            order.append(node)
+            stack.pop()
+    ranks = [0] * len(ids)
+    for node in reversed(order):  # a topological order of the forward edges
+        for target in forward[node]:
+            ranks[target] = max(ranks[target], ranks[node] + 1)
+    return ranks
+
+
+def _validate_diagram(payload: Any) -> tuple[dict[str, Any] | None, str]:
+    """QUI-A08. Nodes and the arrows between them; Raiker lays them out.
+
+    The model sends structure, never a picture or a diagram language: there is
+    no Mermaid or Graphviz text to interpret, so nothing in a label can become
+    markup, a link or a script. Every node an edge names must exist, ids are
+    unique, and a node pointing at itself is refused rather than drawn as a
+    loop nobody can follow.
+    """
+    if not isinstance(payload, dict):
+        return None, "diagram_not_an_object"
+    direction = payload.get("direction", "down")
+    if direction not in DIAGRAM_DIRECTIONS:
+        return None, "diagram_direction_invalid"
+    nodes = payload.get("nodes")
+    if not isinstance(nodes, list) or not nodes:
+        return None, "diagram_nodes_missing"
+    if len(nodes) > MAX_DIAGRAM_NODES:
+        return None, "diagram_too_many_nodes"
+    clean_nodes: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    for node in nodes:
+        if not isinstance(node, dict):
+            return None, "diagram_node_not_an_object"
+        node_id = node.get("id")
+        if not isinstance(node_id, str) or not _NODE_ID.match(node_id):
+            return None, "diagram_node_id_invalid"
+        if node_id in seen:
+            return None, "diagram_node_id_duplicate"
+        seen.add(node_id)
+        label = _short(node.get("label", node_id), MAX_NODE_LABEL_CHARS, required=True)
+        if label is None:
+            return None, "diagram_node_label_invalid"
+        shape = node.get("shape", "box")
+        if shape not in DIAGRAM_SHAPES:
+            return None, "diagram_shape_invalid"
+        clean_nodes.append({"id": node_id, "label": label, "shape": shape})
+    edges = payload.get("edges", [])
+    if not isinstance(edges, list):
+        return None, "diagram_edges_invalid"
+    if len(edges) > MAX_DIAGRAM_EDGES:
+        return None, "diagram_too_many_edges"
+    clean_edges: list[dict[str, str]] = []
+    pairs: set[tuple[str, str]] = set()
+    for edge in edges:
+        if not isinstance(edge, dict):
+            return None, "diagram_edge_not_an_object"
+        source, target = edge.get("from"), edge.get("to")
+        if not isinstance(source, str) or not isinstance(target, str):
+            return None, "diagram_edge_unknown_node"
+        if source not in seen or target not in seen:
+            return None, "diagram_edge_unknown_node"
+        if source == target:
+            return None, "diagram_edge_self_loop"
+        if (source, target) in pairs:
+            return None, "diagram_edge_duplicate"
+        pairs.add((source, target))
+        label = _short(edge.get("label"), MAX_EDGE_LABEL_CHARS)
+        if label is None:
+            return None, "diagram_edge_label_invalid"
+        clean_edges.append({"from": source, "to": target, "label": label})
+    caption = _short(payload.get("caption"), MAX_CAPTION_CHARS)
+    if caption is None:
+        return None, "diagram_caption_invalid"
+    ranks = _diagram_ranks([node["id"] for node in clean_nodes], clean_edges)
+    for node, rank in zip(clean_nodes, ranks, strict=True):
+        node["rank"] = rank
+    return {"caption": caption, "direction": direction, "nodes": clean_nodes, "edges": clean_edges}, ""
+
+
 _VALIDATORS = {
     PART_TABLE: _validate_table,
     PART_CHART: _validate_chart,
@@ -567,6 +695,7 @@ _VALIDATORS = {
     PART_CALLOUT: _validate_callout,
     PART_PROSCONS: _validate_proscons,
     PART_STEPS: _validate_steps,
+    PART_DIAGRAM: _validate_diagram,
 }
 
 #: Blocks whose numbers are claims about the world. Without a stated source
@@ -640,7 +769,29 @@ def as_text(part: ContentPart) -> str:
             detail = f" — {step['text']}" if step.get("text") else ""
             lines.append(f"{number}. {step['label']}{when}{detail}")
         return "\n".join(lines)
+    if part.type == PART_DIAGRAM:
+        return diagram_text(data)
     return part.text
+
+
+def diagram_text(data: dict[str, Any]) -> str:
+    """A diagram as sentences: each step, then where it leads.
+
+    Nodes are read in layer order, so a flow reads from its start. A node with
+    no arrows is still listed: a reader of the text sees every box the drawing
+    has.
+    """
+    labels = {node["id"]: node["label"] for node in data["nodes"]}
+    lines = [f"**{data['caption']}**", ""] if data.get("caption") else []
+    ordered = sorted(data["nodes"], key=lambda node: node.get("rank", 0))
+    for node in ordered:
+        leads = [
+            f"{labels[edge['to']]}" + (f" ({edge['label']})" if edge.get("label") else "")
+            for edge in data["edges"]
+            if edge["from"] == node["id"]
+        ]
+        lines.append(f"- {node['label']}" + (f" → {'; '.join(leads)}" if leads else ""))
+    return "\n".join(lines)
 
 
 #: Said under an unsourced block shown as text, so the owner knows why.

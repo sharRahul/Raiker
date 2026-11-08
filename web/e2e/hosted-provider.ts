@@ -18,6 +18,7 @@
  * Keeping both here means the next change to either surface is one edit rather
  * than eighteen, and a spec that cannot connect fails saying so.
  */
+import { modelName } from "../src/lib/modelPresentation";
 import { expect, test, type Locator, type Page } from "@playwright/test";
 import { HOME_GREETING } from "./home";
 
@@ -516,7 +517,24 @@ export async function keepModelAvailable(
   card: Locator,
   model: string,
 ): Promise<void> {
-  await keepOffered(await openModelDialog(page, card), model);
+  // Found 2026-11-07: on a workspace where an earlier spec had already kept
+  // this model, its switch was not offered, so `keepOffered` waited out its
+  // timeout and the spec's serial cases never ran. A model the card already
+  // names is kept: say so and close the dialog instead of failing on setup.
+  const dialog = await openModelDialog(page, card);
+  const box = dialog.locator(`input[type="checkbox"][value="${model}"]`);
+  const offered = await box
+    .waitFor({ state: "attached", timeout: 15_000 })
+    .then(() => true)
+    .catch(() => false);
+  // The card names the model it answers with by display name ("Haiku 4.5").
+  const kept = card.locator("code").filter({ hasText: modelName(model) });
+  if (!offered && (await kept.count()) > 0) {
+    await dialog.getByRole("button", { name: "Done" }).click();
+    await expect(dialog).toBeHidden({ timeout: 30_000 });
+    return;
+  }
+  await keepOffered(dialog, model);
 }
 
 /** Connect a provider, pin an exact model, and leave it ready to answer a turn. */
@@ -582,7 +600,7 @@ export async function setThinkingEffort(
   const trigger = composer.getByRole("button", { name: /^Model for this turn:/ });
   await trigger.click();
   const effortRow = page.getByRole("button", { name: /^Effort/ });
-  if (!(await effortRow.isVisible({ timeout: 5_000 }).catch(() => false))) {
+  if (!(await effortRow.waitFor({ state: "visible", timeout: 5_000 }).then(() => true, () => false))) {
     await page.keyboard.press("Escape");
     return false;
   }
@@ -614,7 +632,7 @@ export async function pickAnyThinkingLevel(
   const trigger = composer.getByRole("button", { name: /^Model for this turn:/ });
   await trigger.click();
   const effortRow = page.getByRole("button", { name: /^Effort/ });
-  if (!(await effortRow.isVisible({ timeout: 5_000 }).catch(() => false))) {
+  if (!(await effortRow.waitFor({ state: "visible", timeout: 5_000 }).then(() => true, () => false))) {
     await page.keyboard.press("Escape");
     return null;
   }

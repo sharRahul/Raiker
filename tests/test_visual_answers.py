@@ -22,6 +22,7 @@ from raiker.runtime.typed_parts import (
     PART_CALLOUT,
     PART_CHART,
     PART_COMPARE,
+    PART_DIAGRAM,
     PART_FIGURES,
     PART_MEASURE,
     PART_PROSCONS,
@@ -184,6 +185,78 @@ def test_pros_and_cons_and_steps_validate() -> None:
     assert _one("steps", {"steps": [{"label": str(n)} for n in range(13)]}).reason_code == "steps_too_many"
 
 
+# ── Diagrams (QUI-A08) ─────────────────────────────────────────────────────
+
+FLOW = {
+    "caption": "Sign-in",
+    "nodes": [
+        {"id": "start", "label": "Start", "shape": "round"},
+        {"id": "ok", "label": "Password right?", "shape": "diamond"},
+        {"id": "code", "label": "Ask for the code"},
+        {"id": "in", "label": "Signed in", "shape": "round"},
+    ],
+    "edges": [
+        {"from": "start", "to": "ok"},
+        {"from": "ok", "to": "code", "label": "yes"},
+        {"from": "ok", "to": "start", "label": "no"},
+        {"from": "code", "to": "in"},
+    ],
+}
+
+
+def test_a_diagram_is_ranked_by_the_runtime_and_a_loop_does_not_lift_a_layer() -> None:
+    part = _one("diagram", FLOW)
+    assert part.type == PART_DIAGRAM
+    assert part.data["direction"] == "down"
+    assert [(n["id"], n["rank"]) for n in part.data["nodes"]] == [("start", 0), ("ok", 1), ("code", 2), ("in", 3)]
+    assert part.data["edges"][0] == {"from": "start", "to": "ok", "label": ""}
+
+
+def test_a_diagram_ranks_by_the_longest_path_whatever_order_it_was_written_in() -> None:
+    part = _one("diagram", {
+        "nodes": [{"id": "d", "label": "D"}, {"id": "b", "label": "B"}, {"id": "a", "label": "A"}, {"id": "c", "label": "C"}],
+        "edges": [{"from": "a", "to": "b"}, {"from": "b", "to": "c"}, {"from": "a", "to": "c"}, {"from": "c", "to": "d"}],
+    })
+    assert {n["id"]: n["rank"] for n in part.data["nodes"]} == {"a": 0, "b": 1, "c": 2, "d": 3}
+
+
+@pytest.mark.parametrize(("change", "reason"), [
+    ({"nodes": []}, "diagram_nodes_missing"),
+    ({"nodes": [{"id": f"n{i}", "label": "x"} for i in range(25)], "edges": []}, "diagram_too_many_nodes"),
+    ({"nodes": [{"id": "a b", "label": "x"}], "edges": []}, "diagram_node_id_invalid"),
+    ({"nodes": [{"id": "a", "label": "x"}, {"id": "a", "label": "y"}], "edges": []}, "diagram_node_id_duplicate"),
+    ({"nodes": [{"id": "a", "label": ""}], "edges": []}, "diagram_node_label_invalid"),
+    ({"nodes": [{"id": "a", "label": "x", "shape": "star"}], "edges": []}, "diagram_shape_invalid"),
+    ({"direction": "up"}, "diagram_direction_invalid"),
+    ({"edges": [{"from": "start", "to": "nowhere"}]}, "diagram_edge_unknown_node"),
+    ({"edges": [{"from": ["start"], "to": "ok"}]}, "diagram_edge_unknown_node"),
+    ({"edges": [{"from": "ok", "to": "ok"}]}, "diagram_edge_self_loop"),
+    ({"edges": [{"from": "start", "to": "ok"}, {"from": "start", "to": "ok"}]}, "diagram_edge_duplicate"),
+    ({"edges": [{"from": "start", "to": "ok", "label": "x" * 41}]}, "diagram_edge_label_invalid"),
+    ({"edges": "start->ok"}, "diagram_edges_invalid"),
+])
+def test_a_diagram_is_refused_with_a_reason_rather_than_repaired(change: dict, reason: str) -> None:
+    assert _one("diagram", {**FLOW, **change}).reason_code == reason
+
+
+def test_a_diagram_label_is_text_and_never_markup() -> None:
+    part = _one("diagram", {"nodes": [{"id": "a", "label": "<script>x</script>"}]})
+    assert part.data["nodes"][0]["label"] == "<script>x</script>"
+    assert "<script>" in as_text(part)  # the renderer escapes it; nothing here interprets it
+
+
+def test_a_diagram_reads_as_each_step_and_where_it_leads() -> None:
+    text = as_text(_one("diagram", FLOW))
+    assert text.splitlines() == [
+        "**Sign-in**",
+        "",
+        "- Start → Password right?",
+        "- Password right? → Ask for the code (yes); Start (no)",
+        "- Ask for the code → Signed in",
+        "- Signed in",
+    ]
+
+
 # ── New chart kinds (QUI-A01 to A03) ────────────────────────────────────────
 
 
@@ -271,7 +344,7 @@ def test_markdown_export_renders_new_blocks() -> None:
 
 def test_the_model_is_told_the_whole_vocabulary_and_its_rules() -> None:
     for word in ("raiker:figures", "raiker:compare", "raiker:measure", "raiker:callout",
-                 "raiker:proscons", "raiker:steps", "hbar", "scatter", "stacked",
+                 "raiker:proscons", "raiker:steps", "raiker:diagram", "hbar", "scatter", "stacked",
                  "at most three blocks", "source"):
         assert word in _TYPED_ANSWERS_PROMPT
 

@@ -151,7 +151,7 @@ test("a real turn through Ollama answers with the owner's name", async ({ page }
   await page.goto(`${BASE}/#/new-chat`);
   const chosen = page.getByRole("button", { name: `Model for this turn: ${label}` }).first();
   test.skip(
-    !(await chosen.isVisible({ timeout: 30_000 }).catch(() => false)),
+    !(await chosen.waitFor({ state: "visible", timeout: 30_000 }).then(() => true, () => false)),
     `the composer is not on ${label}; run bug-340-ollama-cloud-location-live first`,
   );
   const composer = page.getByLabel("Prompt");

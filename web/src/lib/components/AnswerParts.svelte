@@ -27,6 +27,7 @@
   import Comparison from "./Comparison.svelte";
   import DataChart from "./DataChart.svelte";
   import DataTable from "./DataTable.svelte";
+  import DiagramBlock from "./DiagramBlock.svelte";
   import KeyFigures from "./KeyFigures.svelte";
   import Markdown from "./Markdown.svelte";
   import MeasureBlock from "./MeasureBlock.svelte";
@@ -38,6 +39,8 @@
     blockCount,
     holdBackBlocks,
     type CompareRow,
+    type DiagramEdge,
+    type DiagramNode,
     type Figure,
     type ProsConsOption,
     type Step,
@@ -123,6 +126,19 @@
     callout_tone_invalid: "A callout is a verdict, a warning or a next step; this asked for something else.",
     proscons_option_empty: "An option had neither pros nor cons.",
     steps_too_many: "A sequence shows at most twelve steps.",
+    diagram_not_json: "This diagram was not valid JSON, so Raiker did not draw it.",
+    diagram_nodes_missing: "This diagram had no boxes to draw.",
+    diagram_too_many_nodes: "A diagram shows at most 24 boxes.",
+    diagram_too_many_edges: "A diagram shows at most 40 arrows.",
+    diagram_node_id_invalid: "A box in this diagram had no usable id.",
+    diagram_node_id_duplicate: "Two boxes in this diagram had the same id, so Raiker did not guess which an arrow meant.",
+    diagram_node_label_invalid: "A box in this diagram had no usable label.",
+    diagram_shape_invalid: "A box is a step, a start or end, or a question; this asked for another shape.",
+    diagram_direction_invalid: "A diagram reads down or to the right; this asked for another direction.",
+    diagram_edge_unknown_node: "An arrow pointed at a box the diagram did not have.",
+    diagram_edge_self_loop: "An arrow pointed a box at itself, which Raiker does not draw.",
+    diagram_edge_duplicate: "The same arrow was declared twice.",
+    diagram_edge_label_invalid: "An arrow's label was not usable.",
     chart_labels_missing: "This chart had no labels to plot against.",
     chart_too_many_points: "This chart declared more points than Raiker will draw.",
     chart_label_invalid: "One of this chart's labels was not usable.",
@@ -199,6 +215,13 @@
             <ProsCons caption={String(d.caption ?? "")} options={d.options as ProsConsOption[]} />
           {:else if part.type === "steps"}
             <StepsBlock caption={String(d.caption ?? "")} steps={d.steps as Step[]} />
+          {:else if part.type === "diagram"}
+            <DiagramBlock
+              caption={String(d.caption ?? "")}
+              direction={d.direction === "right" ? "right" : "down"}
+              nodes={d.nodes as DiagramNode[]}
+              edges={d.edges as DiagramEdge[]}
+            />
           {/if}
         {/snippet}
       </AnswerBlock>

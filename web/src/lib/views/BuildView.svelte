@@ -158,7 +158,7 @@
   import { composerMenu } from "../composerCapabilities";
   import { readReadiness, refreshReadCapabilities } from "../readCapabilities.svelte";
   import { collectText, groupPhases, summarizeEvent } from "../turnPhases";
-  import { collectReasoning, hasRunningTool, toolActivity, workingLine, type ToolCallRow } from "../chatPresentation";
+  import { collectReasoning, hasRunningTool, stoppedAnswer, toolActivity, workingLine, type ToolCallRow } from "../chatPresentation";
   import { reportForegroundWork } from "../liveWork.svelte";
   import { announceResponseReady } from "../desktopNotice";
   import { delivery } from "../deliveryPolicy.svelte";
@@ -462,7 +462,9 @@
   // The owner's standing write permissions, read only so the composer can say
   // what Auto will actually amount to. Never written from this page.
   let standingModes = $state<Record<string, string> | null>(null);
-  const standingNote = $derived(standingPostureNote(mode, standingModes));
+  /** True until the first standing-permissions read answers, either way. */
+  let standingPending = $state(true);
+  const standingNote = $derived(standingPostureNote(mode, standingModes, standingPending));
 
   // ── Repository ───────────────────────────────────────────────────────
   let repos = $state<CodeReposView | null>(null);
@@ -1153,6 +1155,8 @@
     } catch {
       standingModes = null;
       composerGates = [];
+    } finally {
+      standingPending = false;
     }
   }
 
@@ -2217,7 +2221,7 @@
       {/if}
 
       {#each turns as turn (turn.id)}
-        {@const answer = answerText(turn)}
+        {@const answer = stoppedAnswer(turn.response?.status, answerText(turn))}
         {@const toolRows = toolActivity(turn.events)}
         {@const reasoning = collectReasoning(turn.events) || (turn.retainedReasoning ?? "")}
         {@const turnSourceList = sourcesForTurn(sources.turnSources, turn.response?.turn_id)}

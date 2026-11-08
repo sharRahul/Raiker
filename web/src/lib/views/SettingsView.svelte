@@ -205,6 +205,22 @@
    */
   let revision: string | null = null;
   let conflict = $state(false);
+  /**
+   * What the save in flight is sending, or `null`. Leaving while it is out
+   * loses nothing the request does not carry: the request finishes on its own
+   * (TO_BE_FIXED, *Settings may hold a navigation made the instant a save
+   * returns* — the page asked "Leave without saving?" between the server's
+   * answer and the page reading it, and a declined prompt kept it on Settings).
+   */
+  let inFlight: Record<string, unknown> | null = null;
+
+  /** Every unsaved server key is already in the request that is out, and the theme is saved. */
+  function coveredBySave(): boolean {
+    if (inFlight === null || themeDirty) return false;
+    const sent = inFlight;
+    const keys = new Set([...Object.keys(settings), ...Object.keys(sent)]);
+    return [...keys].every((key) => JSON.stringify(settings[key]) === JSON.stringify(sent[key]));
+  }
 
   async function push() {
     if (saveState === "saving") return;
@@ -224,6 +240,7 @@
     for (const key of Object.keys(serverSettings)) if (!(key in snapshot)) base[key] = serverSettings[key];
     saveState = "saving";
     conflict = false;
+    inFlight = snapshot;
     try {
       const answer = await api.putSettings(snapshot, revision, base);
       // FIXED-455's rule: an answer without the document is read as "what was sent".
@@ -285,6 +302,8 @@
         (kept
           ? " The rejected changes were rolled back; what you changed while it was saving is still unsaved."
           : " Your change was rolled back.");
+    } finally {
+      inFlight = null;
     }
   }
 
@@ -331,9 +350,10 @@
   onMount(() => {
     void load();
     const unguard = registerLeaveGuard((nextHash) => {
-      if (!unsaved || !leavingSettings(nextHash)) return true;
+      if (!unsaved || !leavingSettings(nextHash) || coveredBySave()) return true;
       return window.confirm(UNSAVED_PROMPT);
     });
+    // A closed tab can cancel the request, so the browser still asks then.
     const unguardUnload = guardUnload(() => unsaved);
     return () => {
       unguard();

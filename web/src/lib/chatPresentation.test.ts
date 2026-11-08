@@ -4,6 +4,7 @@ import {
   collectReasoning,
   familyIcon,
   hasRunningTool,
+  stoppedAnswer,
   toolActivity,
   turnOutcome,
   workingLine,
@@ -279,5 +280,23 @@ describe("reasonWords", () => {
     );
     expect(reasonWords("web_host_not_public:10.0.0.5")).toBe("it points inside your own network");
     expect(reasonWords("denied_by_turn_posture")).toBe("denied_by_turn_posture");
+  });
+});
+
+describe("a stopped turn says it was stopped once", () => {
+  it("drops a bubble that holds only the stored stop notice", () => {
+    expect(stoppedAnswer("stopped", "Stopped by user at a safe boundary.")).toBe("");
+    expect(stoppedAnswer("stopped", "Stopped at your request, at a safe boundary.")).toBe("");
+  });
+
+  it("keeps what the model had written, and the steps that finished", () => {
+    expect(stoppedAnswer("stopped", "Here is the first half")).toBe("Here is the first half");
+    expect(
+      stoppedAnswer("stopped", "Stopped at your request, at a safe boundary.\n\nSteps already done before the stop: Read notes.md."),
+    ).toBe("Steps already done before the stop: Read notes.md.");
+  });
+
+  it("leaves every other turn's answer alone", () => {
+    expect(stoppedAnswer("completed", "Stopped by user at a safe boundary.")).toBe("Stopped by user at a safe boundary.");
   });
 });

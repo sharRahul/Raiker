@@ -363,9 +363,9 @@ test("BUG-82 — the advisor model carries a readiness chip and a repair sentenc
   for (let attempt = 0; attempt < 5; attempt += 1) {
     await page.goto(`${BASE}/#/models?tab=routing`);
     const routing = page.getByRole("tab", { name: "Routing" });
-    if (await routing.isVisible({ timeout: 15_000 }).catch(() => false)) {
+    if (await routing.waitFor({ state: "visible", timeout: 15_000 }).then(() => true, () => false)) {
       if ((await routing.getAttribute("aria-selected")) !== "true") await routing.click();
-      if (await advisor.isVisible({ timeout: 10_000 }).catch(() => false)) break;
+      if (await advisor.waitFor({ state: "visible", timeout: 10_000 }).then(() => true, () => false)) break;
     }
     await page.waitForTimeout(20_000);
   }

@@ -1269,16 +1269,16 @@ and [03, QUI-H04](quiet-ui/03_WELCOME_HOME_AND_CHAT.md#status).
   failed once in a full local shard under load and passes alone and in its
   file. Not reproduced in CI.
 
-## 2026-10-23 Quiet UI visual answers round — what is still open
+## Quiet UI visual answers — open items (document closed 2026-11-08)
 
-The visual answers of [04](quiet-ui/04_VISUAL_ANSWERS.md#status) shipped
+The visual answers of Quiet UI plan 04 shipped
 [FIXED-1136](FIXED_ITEMS.md#fixed-1136--a-turn-could-not-say-these-are-the-headline-numbers-qui-a04)
-to [FIXED-1149](FIXED_ITEMS.md#fixed-1149--a-chart-in-a-transcript-bubble-was-too-small-to-read-and-its-legend-had-no-colours-04-screenshot-review).
-These parts of the same document are not done:
+to [FIXED-1149](FIXED_ITEMS.md#fixed-1149--a-chart-in-a-transcript-bubble-was-too-small-to-read-and-its-legend-had-no-colours-04-screenshot-review),
+Pin in [FIXED-1255](FIXED_ITEMS.md#fixed-1255--an-answer-block-could-not-be-pinned-to-a-project-04-pin-to-project)
+and diagrams (QUI-A08, without a diagram library) in
+[FIXED-1348](FIXED_ITEMS.md#fixed-1348--a-flow-or-a-structure-could-only-be-described-in-words-qui-a08),
+and the document was deleted. Still open from it:
 
-* **QUI-A08 — diagrams.** Planned as *Later*. Mermaid would be the first
-  diagram library in the bundle, and the built UI makes no external requests,
-  so it has to ship inside the app.
 * **The three-block limit and the answer style are guidance to the model.**
   Found live: on *Visual where it helps*, Haiku 4.5 once split key figures into
   three blocks (five blocks in one answer) before the instruction said to keep
@@ -1290,6 +1290,10 @@ These parts of the same document are not done:
   streams, then the corrected one streams after it, and the final response
   replaces both. Not seen live (this round used a hosted model, which is not
   retried).
+* **Diagrams on the final layout, live.** The round's key ran out of credit
+  before RT-DGM-02 to RT-DGM-04 could be re-run on the rerouted layout; the
+  same stored answers were re-drawn and inspected instead. Five model-driven
+  runs on fresh state are still owed.
 
 ## Decision statements added 2026-10-05
 
@@ -1426,16 +1430,6 @@ lost. Native Windows/macOS rendering, screen readers and the five-person study
 remain open, as do the other QUI-G06 views (Goals, Messaging, Skills, Design,
 Rewind and the GitHub repository connector).
 
-## Sessions rows open only by pointer
-
-Found during the 2026-11-06 Sessions recovery round. A Sessions row opens its
-record from `onclick` on table cells (`SessionsView.svelte`); the cells are not
-focusable and have no keyboard handler, so the record cannot be opened from the
-keyboard. QUI-G05 expects every destination to be walkable by keyboard. Fix:
-make the session title a button (or link) that opens the record, and keep the
-checkbox cell for selection. Not changed in this round because it alters the
-row's control structure and its existing tests.
-
 ## Composer agent personas for `@`
 
 **Decided 2026-11-07, not built.** The owner chose that `@` in the composer
@@ -1465,18 +1459,13 @@ spec's first test times out and its serial cases never run. This is a harness
 problem, not a product one, and the same family as
 [BUG-248](#bug-248--twenty-seven-live-specs-still-sign-in-inside-a-test-body).
 Its steer case was rewritten for the composer execution states. The same flow
-is covered live by `composer-execution-states-live.spec.ts` RT-EXEC-01. Fix:
-make `useAnthropic` accept an already-kept model, then re-run the spec.
-
-## Settings may hold a navigation made the instant a save returns
-
-Observed once in the 2026-11-07 composer live round. The browser saved a
-Personalisation choice (PUT answered 200) and navigated to Chat in the same
-tick; the page stayed on Settings showing *All changes saved.* A person cannot
-navigate that fast, and waiting for the saved line avoided it in every later
-run. Not reproduced deliberately, so not yet a confirmed defect. Check whether
-the leave guard in `SettingsView.svelte` reads `dirty` before the save's
-recompute runs, and if so settle it before the response promise resolves.
+is covered live by `composer-execution-states-live.spec.ts` RT-EXEC-01.
+2026-11-08: `keepModelAvailable` now closes the dialog when the card already
+names the model
+([FIXED-1357](FIXED_ITEMS.md#fixed-1357--twelve-live-checks-never-waited-and-a-kept-model-could-stop-a-specs-setup-found-this-round)).
+Keeping an already-kept Haiku completed live, but its switch was offered, so
+the failing shape was not reproduced. Still to do: re-run the web-access spec
+on such a workspace (it needs a funded key).
 
 ## Dark theme: gold primary actions share a hue with attention notices
 
@@ -1489,14 +1478,6 @@ The owner's brief keeps semantic colours for status. Decide whether dark
 attention moves to a distinct amber, or stays as it is because its text and
 shape already distinguish it. Light primary actions also remain blue until the
 owner decides whether gold applies there too.
-
-## Build reports unreadable standing permissions on a fresh load
-
-Seen in the 2026-11-07 captures on the round's disposable host. Build's composer
-showed *Raiker could not read your standing permissions for this turn. Change in
-Permissions →* right after loading, before any turn. Not investigated this round.
-Check whether the permissions read races the first render or genuinely fails on
-this workspace, and whether the line should wait for a completed read.
 
 ## MCP servers have no catalogue to label (PL-5)
 
@@ -1524,31 +1505,24 @@ an Apple Developer ID exists.
 
 Measured 2026-11-07: one Chat question to a local model was 9,459 prompt
 tokens. FIXED-1319 sized auto contexts at up to 32,768 so a GPU-served model
-answers. A machine whose memory only fits an 8K or smaller context will still
-refuse every turn, now with a clear message. Trim the system prompt and tool
-list for small contexts, or refuse to plan a context below the turn floor.
+answers, and auto no longer plans a context below 12,288 tokens
+([FIXED-1356](FIXED_ITEMS.md#fixed-1356--auto-could-plan-a-local-context-no-turn-fits-in)):
+a machine that cannot fit that is told the model does not fit. Still open:
+trim the system prompt and tool list for small contexts, so such a machine can
+use a local model at all.
 
 ## AMD (Vulkan) owner-machine run (MD-2) — moved to beta.2
 
 The NVIDIA CUDA run passed on 2026-11-07 (RT-GPU-01, RT-GPU-02). Still
 required: the same two checks on an AMD GPU with the Vulkan build.
 
-## Packaged onboarding test once missed the Home greeting on Linux x86-64
+## A stopped turn — live check owed
 
-Release run 42430871211, first attempt: `packaged-onboarding-live.spec.ts`
-waited 30 s for the heading `…, Owner` after onboarding and did not find it.
-Signing, install and smoke had passed. The rerun passed, and the same test
-passed on the other targets. Read the attempt's trace (artifact
-`desktop-linux-x86_64`) for what Home showed instead, and wait on the
-product's own ready signal rather than the greeting.
-
-## A stopped turn is announced twice
-
-Seen 2026-11-08 in KB-02. Stopping a long answer shows *Stopped at your
-request — this turn ended at a safe boundary and kept what it had already
-done.* above the answer, and the answer itself reads *Stopped by user at a safe
-boundary.* One of the two is enough. Check also that text the model had already
-streamed before the stop is kept in the answer, as the first line says.
+The doubled announcement is fixed
+([FIXED-1351](FIXED_ITEMS.md#fixed-1351--a-stopped-turn-was-announced-twice)).
+Its live case, RT-FIX-01 in `qui-a08-diagrams-and-fixes-live.spec.ts`, was
+blocked on 2026-11-08 when the round's Anthropic key ran out of credit. Run it
+with a funded key, and check there that text streamed before the stop is kept.
 
 ## Untested hosted profiles still allow 1,024 output tokens
 
@@ -1558,17 +1532,6 @@ xAI, Together, Fireworks, NVIDIA NIM, Cerebras, Hugging Face and the generic
 OpenAI-compatible profiles still fall back to 1,024 and are all *Experimental*.
 Set each one's limit to what its provider accepts once a key can test it. Check
 also that none rejects `max_tokens` the way OpenAI's reasoning models do.
-
-## Command sandbox cannot see packages installed for the owner's account
-
-Seen 2026-11-08 in BD-5. The sandbox account runs the system Python
-(`C:\Python313`) but cannot read the owner's per-user site-packages
-(`%APPDATA%\Python`), so `python -m pytest` failed with *No module named
-pytest* although pytest is installed for the owner. This is by design: the
-sandbox never reads the owner's home. The check's failure gives no reason the
-owner can act on. When a check fails on a missing module that the owner's own
-interpreter has, say so, and name the fixes: install it for all users, or use
-a backend that has it.
 
 ## Live browser sign-in needs the owner's registered clients (PL-1, PL-3)
 

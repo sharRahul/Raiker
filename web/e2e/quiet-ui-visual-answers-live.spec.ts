@@ -1,5 +1,5 @@
 /**
- * Quiet UI — visual answers (docs/plans/quiet-ui/04_VISUAL_ANSWERS.md), against
+ * Quiet UI — visual answers (Quiet UI plan 04, closed 2026-11-08), against
  * a running host and a real hosted model.
  *
  * Prerequisites:

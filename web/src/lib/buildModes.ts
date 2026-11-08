@@ -140,8 +140,13 @@ export function turnCapabilityModes(id: BuildMode): Record<string, string> {
 export function standingPostureNote(
   id: BuildMode,
   modes: Record<string, string> | null,
+  /**
+   * The read has not answered yet. Nothing is said until it does: a fresh
+   * page showed *could not read* before its first read had even returned.
+   */
+  pending = false,
 ): string | null {
-  if (id !== "auto") return null;
+  if (id !== "auto" || pending) return null;
   if (modes === null) return "Raiker could not read your standing permissions for this turn.";
   const observed = BUILD_WRITE_CAPABILITIES.map((capability) => modes[capability]).filter(
     (mode): mode is string => mode !== undefined,

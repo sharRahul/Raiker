@@ -2105,12 +2105,26 @@ pinned in `desktop/signing/identities.json`:
 | Rust-built test executable signed with the beta certificate (`Set-AuthenticodeSignature`, DigiCert timestamp) | `PASS … Authenticode by the pinned publisher (self-signed; Windows does not trust the publisher, timestamped)` |
 | The same file with one byte changed | `refused: … changed after it was signed (HashMismatch)` |
 | A Microsoft-signed system executable | `refused: … signed by CN=Microsoft Windows …, not the pinned publisher` |
-| AppImage stand-in with a detached signature, WSL Ubuntu `gpg` | `PASS … detached signature by 6B31334382D46C56AFE125CA25F9767FF2DDACF1` |
+| AppImage stand-in with a detached signature, WSL Ubuntu `gpg` | `PASS … detached signature by 6B31334382D46C56AFE125CA25F9767FF2DDACF1 (the first Linux key; replaced the same night, see below)` |
 | The same file with one byte appended | `refused: … changed after it was signed (BADSIG)` |
 | The release key held in the secret | `PASS release key: derives the pinned public key c4bac6bdc405b7b4...` |
 
-The release workflow's signed candidate run (`signing: require-except-macos`)
-is recorded in the plan once it has run on the pushed commit.
+**Signed candidate runs** (`signing: require-except-macos`, beta, not
+published):
+
+* [42426602964](https://github.com/sharRahul/Raiker/actions/runs/42426602964):
+  electron-builder signed the app, host, runner, MSI and setup; the verifier
+  passed the built setup, MSI and `Raiker.exe` against the pin. Two failures:
+  the installed `Raiker.exe` read as unsigned from a `pwsh` step (PowerShell
+  7's `PSModulePath` leaked into the 5.1 child, now dropped), and Linux
+  signing failed with *Bad passphrase*, because the first key's passphrase
+  file ended in CRLF and the secret did not carry the ``.
+* [42428724031](https://github.com/sharRahul/Raiker/actions/runs/42428724031):
+  **Windows x86-64 passed end to end**, signed, verified before install and
+  installed. Linux still *Bad passphrase*. The Linux key was replaced with one
+  whose passphrase has no line ending (new fingerprint
+  `248BC52909AAAAFDFA77EF0D0BFFAD3B8A2024C1`); the first key was never in a
+  release.
 
 The captures are under `output/playwright/2026-11-07-beta-round/` (11-*) and
 `output/playwright/2026-11-07-gpu-round/` (ignored by Git). I reviewed each at

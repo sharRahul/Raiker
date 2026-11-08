@@ -9,7 +9,7 @@
   },
   "linux": {
     "key_file": "raiker-linux-signing-key.asc",
-    "fingerprint": "6B31334382D46C56AFE125CA25F9767FF2DDACF1",
+    "fingerprint": "248BC52909AAAAFDFA77EF0D0BFFAD3B8A2024C1",
     "not_after": "2029-11-06"
   },
   "release": {

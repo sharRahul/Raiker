@@ -379,7 +379,7 @@ jobs:
 
           Linux downloads also carry a detached GPG signature (`.asc`). Check one
           with the published key (fingerprint
-          `6B31 3343 82D4 6C56 AFE1  25CA 25F9 767F F2DD ACF1`):
+          `248B C529 09AA AAFD FA77  EF0D 0BFF AD3B 8A20 24C1`):
 
               gpg --import raiker-linux-signing-key.asc
               gpg --verify <file>.AppImage.asc <file>.AppImage

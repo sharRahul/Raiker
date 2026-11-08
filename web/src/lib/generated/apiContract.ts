@@ -6607,11 +6607,19 @@ export type TaskWorkspacePromoted = {
   created: string[];
   modified: string[];
   deleted: string[];
+  promotion_id: string;
 };
 
 export type TaskWorkspaceRejection = {
   path: string;
   reason: string;
+};
+
+export type TaskWorkspaceUndone = {
+  ok: boolean;
+  promotion_id: string;
+  removed: string[];
+  restored: string[];
 };
 
 /** A session's disposable copy and what its commands changed in it. */
@@ -7456,6 +7464,8 @@ export const contract = {
     request<CommandEgressView>("/api/command-egress"),
   putCommandEgress: (body: CommandEgressRequest) =>
     call<CommandEgressView>("PUT", "/api/command-egress", { body }),
+  undoTaskWorkspacePromotion: (promotionId: string) =>
+    call<TaskWorkspaceUndone>("POST", `/api/command-promotions/${encodeURIComponent(promotionId)}/undo`),
   listCommands: (query: { session_id?: string } = {}) =>
     request<CommandRunList>(withQuery("/api/command-runs", query)),
   getCommand: (runId: string) =>

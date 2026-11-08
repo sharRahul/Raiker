@@ -23,7 +23,7 @@ const copy = {
 it("lists the session's sandbox changes and applies exactly what was shown", async () => {
   vi.spyOn(api, "taskWorkspaces").mockResolvedValue({ workspaces: [copy, { ...copy, workspace_id: "b".repeat(32), session_id: "other" }] });
   const promote = vi.spyOn(api, "promoteTaskWorkspace").mockResolvedValue({
-    ok: true, workspace_id: copy.workspace_id, created: ["new.py"], modified: ["main.py"], deleted: ["old.txt"],
+    ok: true, workspace_id: copy.workspace_id, created: ["new.py"], modified: ["main.py"], deleted: ["old.txt"], promotion_id: "",
   });
   vi.stubGlobal("confirm", () => true);
   render(TaskWorkspaceReview, { sessionId: "sess_build" });
@@ -43,7 +43,7 @@ it("lists the session's sandbox changes and applies exactly what was shown", asy
 it("holds Apply until each conflicting file is chosen for overwrite (BD-4)", async () => {
   vi.spyOn(api, "taskWorkspaces").mockResolvedValue({ workspaces: [{ ...copy, conflicts: ["main.py"] }] });
   const promote = vi.spyOn(api, "promoteTaskWorkspace").mockResolvedValue({
-    ok: true, workspace_id: copy.workspace_id, created: ["new.py"], modified: ["main.py"], deleted: ["old.txt"],
+    ok: true, workspace_id: copy.workspace_id, created: ["new.py"], modified: ["main.py"], deleted: ["old.txt"], promotion_id: "",
   });
   const confirm = vi.fn<(message?: string) => boolean>(() => true);
   vi.stubGlobal("confirm", confirm);
@@ -138,4 +138,22 @@ it("rereads the copy when the owner returns to the window or the address", async
   await waitFor(() => expect(spy).toHaveBeenCalledTimes(2));
   window.dispatchEvent(new HashChangeEvent("hashchange"));
   await waitFor(() => expect(spy).toHaveBeenCalledTimes(3));
+});
+
+it("offers to undo an Apply and says when later edits stop it (SB-5)", async () => {
+  vi.spyOn(api, "taskWorkspaces").mockResolvedValue({ workspaces: [copy] });
+  vi.spyOn(api, "promoteTaskWorkspace").mockResolvedValue({
+    ok: true, workspace_id: copy.workspace_id, created: [], modified: copy.modified, deleted: [], promotion_id: "prm_1",
+  });
+  const undo = vi.spyOn(api, "undoTaskWorkspacePromotion").mockRejectedValue(
+    new ApiError(409, "workspace_undo_conflict", "conflict"),
+  );
+  vi.stubGlobal("confirm", () => true);
+  render(TaskWorkspaceReview, { sessionId: copy.session_id });
+  await fireEvent.click(await screen.findByRole("button", { name: "Apply to project" }));
+  const button = await screen.findByRole("button", { name: "Undo Apply" });
+  await fireEvent.click(button);
+  await waitFor(() => expect(undo).toHaveBeenCalledWith("prm_1"));
+  expect(await screen.findByText(/has changed since, so nothing was undone/)).toBeTruthy();
+  expect(screen.queryByRole("button", { name: "Undo Apply" })).toBeNull();
 });

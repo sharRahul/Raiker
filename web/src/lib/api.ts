@@ -752,6 +752,8 @@ export const api = {
     reviewed: { created: string[]; modified: string[]; deleted: string[]; overwrite?: string[] },
   ) => contract.promoteTaskWorkspace(workspaceId, { overwrite: [], ...reviewed }),
   discardTaskWorkspace: (workspaceId: string) => contract.discardTaskWorkspace(workspaceId),
+  // SB-5 — put the project back as it was before an Apply.
+  undoTaskWorkspacePromotion: (promotionId: string) => contract.undoTaskWorkspacePromotion(promotionId),
   // Allow-listed downloads for sandboxed commands (off until the owner turns it on).
   commandEgress: () => contract.getCommandEgress(),
   setCommandEgress: (enabled: boolean, domains: string[]) =>

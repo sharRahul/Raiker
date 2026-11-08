@@ -34377,6 +34377,10 @@
             "title": "Ok",
             "type": "boolean"
           },
+          "promotion_id": {
+            "title": "Promotion Id",
+            "type": "string"
+          },
           "workspace_id": {
             "title": "Workspace Id",
             "type": "string"
@@ -34387,7 +34391,8 @@
           "workspace_id",
           "created",
           "modified",
-          "deleted"
+          "deleted",
+          "promotion_id"
         ],
         "title": "TaskWorkspacePromoted",
         "type": "object"
@@ -34408,6 +34413,40 @@
           "reason"
         ],
         "title": "TaskWorkspaceRejection",
+        "type": "object"
+      },
+      "TaskWorkspaceUndone": {
+        "properties": {
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          },
+          "promotion_id": {
+            "title": "Promotion Id",
+            "type": "string"
+          },
+          "removed": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Removed",
+            "type": "array"
+          },
+          "restored": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Restored",
+            "type": "array"
+          }
+        },
+        "required": [
+          "ok",
+          "promotion_id",
+          "removed",
+          "restored"
+        ],
+        "title": "TaskWorkspaceUndone",
         "type": "object"
       },
       "TaskWorkspaceView": {
@@ -42038,6 +42077,46 @@
           }
         },
         "summary": "Put Command Egress"
+      }
+    },
+    "/api/command-promotions/{promotion_id}/undo": {
+      "post": {
+        "description": "SB-5 — put the project back as it was before an Apply.\n\nRefused, touching nothing, when any file the Apply wrote has changed since:\nundoing then would destroy the owner's later work.",
+        "operationId": "undo_task_workspace_promotion_api_command_promotions__promotion_id__undo_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "promotion_id",
+            "required": true,
+            "schema": {
+              "title": "Promotion Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskWorkspaceUndone"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Undo Task Workspace Promotion"
       }
     },
     "/api/command-runs": {

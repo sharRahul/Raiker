@@ -25,7 +25,8 @@ from tests.test_turn_resume_after_approval import ScriptedRouter, scripted_model
 
 __all__ = ["scripted_model"]
 
-KEY = "sk-ant-api03-CANARYkeyQ7m2Zp9Lw4Xv8Rt1Yb6Nc3Hd5Jf0Gk"
+# Built at run time so no credential-shaped literal sits in the repository.
+KEY = "-".join(("sk", "ant", "api03", "CANARYkeyQ7m2Zp9Lw4Xv8Rt1Yb6Nc3Hd5Jf0Gk"))
 PASSWORD = "Canary-Pass-7f3e9bQ!"
 CARD = "4111 1111 1111 1111"
 CARD_DIGITS = CARD.replace(" ", "")

@@ -781,8 +781,9 @@ def _provider_in(profile: ExecutionProfile, provider: str) -> bool:
 def failed_step_reason(summary: str | None) -> str:
     """AG-4 — why a step's task failed, as a code the goal page can say.
 
-    Found by the restart drill (2026-11-08): a step whose host died mid-run read
-    only *failed*, while its task said exactly why. The step now carries it.
+    A step whose run did not finish carries its task's reason, so the goal page
+    says the host stopped it (and that it was not run again) rather than only
+    *failed*.
     """
     from raiker.tasks.scheduler import INTERRUPTED_BY_RESTART, LEASE_LAPSED
 

@@ -19,9 +19,10 @@
  * RT-BETA-09  axe: no serious or critical violation on any destination at 1440, 1280, 390
  * RT-BETA-10  QUI-G01 size budgets hold for Chat, Build, Models and Settings
  * RT-BETA-11  Account and Backups are Settings sections of their own
+ * RT-BETA-12  Build review: an Apply can be undone (SB-5)
  */
 import { execFileSync } from "node:child_process";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Page } from "@playwright/test";
@@ -165,6 +166,31 @@ test("RT-BETA-07 — Build review: isolated copy, conflict, Overwrite, Apply", a
   expect(readFileSync(join(project, "main.py"), "utf8")).toBe("print('v2 from the copy')\n");
   expect(readFileSync(join(project, "new.py"), "utf8")).toBe("x = 1\n");
   await capture(page, join(SHOTS, "07b-applied.png"));
+});
+
+test("RT-BETA-12 — Build review: an Apply can be undone, back to exactly how it was (SB-5)", async ({ page }) => {
+  test.skip(!WORKSPACE, "set RAIKER_LIVE_WORKSPACE to the host's workspace");
+  test.setTimeout(180_000);
+  const { owner, session } = await buildSession(page);
+  plantCopy(owner, session, "changes");
+  const project = join(WORKSPACE, "beta-demo");
+  await open(page, `build?session=${session}`);
+  const review = page.getByRole("region", { name: "Sandbox changes" });
+  await review.getByRole("button", { name: "Apply to project" }).click();
+  await page.getByRole("alertdialog").or(page.getByRole("dialog")).last().getByRole("button", { name: "Apply" }).click();
+  await expect(page.getByText("Applied to beta-demo.")).toBeVisible();
+  expect(readFileSync(join(project, "main.py"), "utf8")).toBe("print('v2 from the copy')\n");
+  await capture(page, join(SHOTS, "12a-applied-undo-offered.png"));
+
+  await page.getByRole("button", { name: "Undo Apply" }).click();
+  const confirm = page.getByRole("alertdialog").or(page.getByRole("dialog")).last();
+  await expect(confirm).toContainText("files it added are removed");
+  await confirm.getByRole("button", { name: "Undo Apply" }).click();
+  await expect(page.getByText("Undone. beta-demo is as it was before the Apply.")).toBeVisible();
+  expect(readFileSync(join(project, "main.py"), "utf8")).toBe("print('v1')\n");
+  expect(readFileSync(join(project, "old.txt"), "utf8")).toBe("old\n");
+  expect(existsSync(join(project, "new.py"))).toBe(false);
+  await capture(page, join(SHOTS, "12b-undone.png"));
 });
 
 test("RT-BETA-08 — Build review: Discard leaves the project unchanged", async ({ page }) => {

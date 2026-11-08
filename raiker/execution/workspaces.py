@@ -113,6 +113,8 @@ class PromotionResult:
     created: tuple[str, ...]
     modified: tuple[str, ...]
     deleted: tuple[str, ...]
+    #: SB-5 — the journal this Apply can be undone from, when one was kept.
+    promotion_id: str = ""
 
 
 def _is_link_like(entry: os.DirEntry[str]) -> bool:
@@ -366,6 +368,7 @@ def promote(
     *,
     allowed: Callable[[str], bool] | None = None,
     overwrite: frozenset[str] = frozenset(),
+    journal_dir: Path | None = None,
 ) -> PromotionResult:
     """Apply a reviewed diff to the original project, all or nothing.
 
@@ -375,6 +378,12 @@ def promote(
     replace after seeing both versions; any other conflict refuses the whole
     promotion, as before. An overwritten original is backed up like any other,
     so a failure part-way restores the owner's version too.
+
+    SB-5 — with ``journal_dir``, the originals and a journal are written to
+    durable storage *before* the project is touched. A host killed part-way
+    leaves the journal in ``applying``, and :func:`recover_promotions` rolls
+    the project back on the next start; a finished Apply stays ``applied`` and
+    can be undone with :func:`undo_promotion` while its files are unchanged.
     """
     paths = [*diff.created, *diff.modified, *diff.deleted]
     for relative in paths:
@@ -391,7 +400,14 @@ def promote(
             ):
                 # Overwrite replaces a file the owner changed, never a folder or link.
                 raise WorkspaceError("workspace_promotion_conflict", relative)
-        backups = Path(tempfile.mkdtemp(prefix=".promote-backup-", dir=workspace.root.parent))
+        promotion_id = ""
+        if journal_dir is not None:
+            journal_dir.mkdir(parents=True, exist_ok=True)
+            promotion_id = f"prm_{secrets.token_hex(12)}"
+            backups = journal_dir / promotion_id
+            backups.mkdir()
+        else:
+            backups = Path(tempfile.mkdtemp(prefix=".promote-backup-", dir=workspace.root.parent))
         saved: dict[str, Path] = {}
         written: list[Path] = []
         made_directories: list[Path] = []
@@ -403,6 +419,18 @@ def promote(
                     backup = backups / str(index)
                     shutil.copyfile(targets[relative], backup)
                     saved[relative] = backup
+            if journal_dir is not None:
+                # Durable before the first write to the project: if the host
+                # dies from here on, the next start knows exactly what to undo.
+                created_targets = [rel for rel in (*diff.created, *diff.modified) if rel not in saved]
+                _write_journal(backups, {
+                    "state": "applying",
+                    "source": str(workspace.source),
+                    "saved": {rel: path.name for rel, path in saved.items()},
+                    "created": created_targets,
+                    "paths": paths,
+                    "at": time.time(),
+                })
             for relative in (*diff.created, *diff.modified):
                 target = targets[relative]
                 for parent in reversed(target.parents):
@@ -417,6 +445,14 @@ def promote(
             for relative in diff.deleted:
                 with contextlib.suppress(FileNotFoundError):
                     targets[relative].unlink()
+            if journal_dir is not None:
+                journal = _read_journal(backups)
+                journal["state"] = "applied"
+                journal["made_directories"] = [str(d) for d in made_directories]
+                journal["after"] = {
+                    rel: (_hash_file(targets[rel]) if targets[rel].is_file() else None) for rel in paths
+                }
+                _write_journal(backups, journal)
         except BaseException:
             for relative, backup in saved.items():
                 # Copied back, not renamed: the backup may be on another volume.
@@ -432,10 +468,131 @@ def promote(
                 staged = targets[relative].with_name(f".{targets[relative].name}.raiker-promote")
                 with contextlib.suppress(OSError):
                     staged.unlink()
+            if journal_dir is not None:
+                shutil.rmtree(backups, ignore_errors=True)
             raise
         finally:
-            shutil.rmtree(backups, ignore_errors=True)
-    return PromotionResult(diff.created, diff.modified, diff.deleted)
+            if journal_dir is None:
+                shutil.rmtree(backups, ignore_errors=True)
+    if journal_dir is not None:
+        _prune_journals(journal_dir)
+    return PromotionResult(diff.created, diff.modified, diff.deleted, promotion_id)
+
+
+# ── SB-5 — durable promotion journals: crash recovery and undo ─────────
+
+def promotion_journal_dir(workspace_root: str | Path) -> Path:
+    """Where Apply journals live: Raiker's own state, never inside a project."""
+    return Path(workspace_root) / ".raiker" / "promotions"
+
+
+#: How many finished Applies are kept for undo, newest first.
+PROMOTIONS_KEPT = 20
+_JOURNAL = "journal.json"
+
+
+def _write_journal(directory: Path, journal: dict[str, object]) -> None:
+    staged = directory / f".{_JOURNAL}.tmp"
+    with staged.open("w", encoding="utf-8") as handle:
+        json.dump(journal, handle)
+        handle.flush()
+        os.fsync(handle.fileno())
+    os.replace(staged, directory / _JOURNAL)
+
+
+def _read_journal(directory: Path) -> dict[str, object]:
+    return dict(json.loads((directory / _JOURNAL).read_text(encoding="utf-8")))
+
+
+def _strings(value: object) -> list[str]:
+    """A journal list field, as strings."""
+    return [str(item) for item in value] if isinstance(value, list) else []
+
+
+def _mapping(value: object) -> dict[str, object]:
+    """A journal object field."""
+    return {str(key): item for key, item in value.items()} if isinstance(value, dict) else {}
+
+
+def _restore(directory: Path, journal: dict[str, object]) -> None:
+    """Put the project back as it was before the Apply in *directory*."""
+    source = Path(str(journal["source"]))
+    saved = _mapping(journal.get("saved"))
+    for relative, name in saved.items():
+        target = _target(source, str(relative))
+        target.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(directory / str(name), target)
+    for relative in _strings(journal.get("created")):
+        target = _target(source, str(relative))
+        with contextlib.suppress(FileNotFoundError):
+            target.unlink()
+        staged = target.with_name(f".{target.name}.raiker-promote")
+        with contextlib.suppress(FileNotFoundError):
+            staged.unlink()
+    for relative in _strings(journal.get("paths")):
+        target = _target(source, str(relative))
+        with contextlib.suppress(FileNotFoundError):
+            target.with_name(f".{target.name}.raiker-promote").unlink()
+    for directory_path in reversed(_strings(journal.get("made_directories"))):
+        with contextlib.suppress(OSError):
+            Path(str(directory_path)).rmdir()
+
+
+def recover_promotions(journal_dir: Path) -> list[str]:
+    """Roll back every Apply a host stopped in the middle of. Returns their ids."""
+    recovered: list[str] = []
+    if not journal_dir.is_dir():
+        return recovered
+    for directory in sorted(journal_dir.iterdir()):
+        if not (directory / _JOURNAL).is_file():
+            # Died while backing up, before the journal: nothing was written to
+            # the project yet, so the partial backups are simply removed.
+            if directory.is_dir() and directory.name.startswith("prm_"):
+                shutil.rmtree(directory, ignore_errors=True)
+            continue
+        journal = _read_journal(directory)
+        if journal.get("state") != "applying":
+            continue
+        _restore(directory, journal)
+        journal["state"] = "rolled_back"
+        _write_journal(directory, journal)
+        recovered.append(directory.name)
+    return recovered
+
+
+def undo_promotion(journal_dir: Path, promotion_id: str) -> PromotionResult:
+    """Undo a finished Apply, if nothing it wrote has changed since."""
+    directory = journal_dir / promotion_id
+    if not promotion_id.startswith("prm_") or not (directory / _JOURNAL).is_file():
+        raise WorkspaceError("workspace_promotion_unknown")
+    journal = _read_journal(directory)
+    if journal.get("state") != "applied":
+        raise WorkspaceError("workspace_promotion_not_undoable")
+    source = Path(str(journal["source"]))
+    after = _mapping(journal.get("after"))
+    for relative, digest in after.items():
+        target = _target(source, str(relative))
+        now = _hash_file(target) if target.is_file() else None
+        if now != digest:
+            # The owner (or something else) changed it after the Apply: undoing
+            # would destroy that work, so nothing is touched.
+            raise WorkspaceError("workspace_undo_conflict", str(relative))
+    _restore(directory, journal)
+    journal["state"] = "undone"
+    _write_journal(directory, journal)
+    created = tuple(_strings(journal.get("created")))
+    restored = tuple(sorted(_mapping(journal.get("saved"))))
+    return PromotionResult(created=created, modified=restored, deleted=(), promotion_id=promotion_id)
+
+
+def _prune_journals(journal_dir: Path) -> None:
+    finished = [
+        directory for directory in journal_dir.iterdir()
+        if (directory / _JOURNAL).is_file() and _read_journal(directory).get("state") != "applying"
+    ]
+    finished.sort(key=lambda directory: (directory / _JOURNAL).stat().st_mtime, reverse=True)
+    for stale in finished[PROMOTIONS_KEPT:]:
+        shutil.rmtree(stale, ignore_errors=True)
 
 
 def discard(workspace: TaskWorkspace) -> None:

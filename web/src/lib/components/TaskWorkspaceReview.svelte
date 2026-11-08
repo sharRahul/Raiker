@@ -19,6 +19,8 @@
   let workspaces = $state<TaskWorkspaceView[]>([]);
   let busy = $state(false);
   let notice = $state<{ kind: "ok" | "error"; text: string } | null>(null);
+  // SB-5 — the Apply just made, which the owner can undo while its files are unchanged.
+  let lastApply = $state<{ promotionId: string; source: string } | null>(null);
   // The file whose diff is open, keyed by copy and path, and what it read.
   let open = $state<string | null>(null);
   let shown = $state<TaskWorkspaceFileDiff | null>(null);
@@ -139,19 +141,52 @@
     busy = true;
     notice = null;
     try {
-      await api.promoteTaskWorkspace(item.workspace_id, {
+      const applied = await api.promoteTaskWorkspace(item.workspace_id, {
         created: item.created,
         modified: item.modified,
         deleted: item.deleted,
         overwrite: replaced,
       });
       notice = { kind: "ok", text: `Applied to ${item.source}.` };
+      // Gone at once: an applied copy must never offer Apply again, even for
+      // the moment before the list is reread.
+      workspaces = workspaces.filter((entry) => entry.workspace_id !== item.workspace_id);
+      lastApply = applied.promotion_id ? { promotionId: applied.promotion_id, source: item.source } : null;
     } catch (e) {
       const reason = e instanceof ApiError ? (e.reasonCode ?? "") : "";
       notice = { kind: "error", text: REFUSALS[reason] ?? "The changes could not be applied. Your project is unchanged." };
     } finally {
       busy = false;
       await load();
+    }
+  }
+
+  async function undoApply() {
+    if (lastApply === null) return;
+    const { promotionId, source } = lastApply;
+    const ok = await askConfirm({
+      title: `Undo the Apply to ${source}?`,
+      body: "Files it changed go back to how they were, and files it added are removed. If you have edited any of them since, nothing is changed.",
+      confirmLabel: "Undo Apply",
+    });
+    if (!ok) return;
+    busy = true;
+    try {
+      await api.undoTaskWorkspacePromotion(promotionId);
+      notice = { kind: "ok", text: `Undone. ${source} is as it was before the Apply.` };
+      lastApply = null;
+    } catch (e) {
+      const reason = e instanceof ApiError ? (e.reasonCode ?? "") : "";
+      notice = {
+        kind: "error",
+        text:
+          reason === "workspace_undo_conflict"
+            ? "A file the Apply wrote has changed since, so nothing was undone. Your later edits are kept."
+            : "The Apply could not be undone. Your project is unchanged.",
+      };
+      if (reason === "workspace_undo_conflict" || reason === "workspace_promotion_not_undoable") lastApply = null;
+    } finally {
+      busy = false;
     }
   }
 
@@ -162,6 +197,7 @@
     try {
       await api.discardTaskWorkspace(item.workspace_id);
       notice = { kind: "ok", text: "Sandbox copy discarded. Your project was not changed." };
+      workspaces = workspaces.filter((entry) => entry.workspace_id !== item.workspace_id);
     } catch (e) {
       const reason = e instanceof ApiError ? (e.reasonCode ?? "") : "";
       notice = { kind: "error", text: REFUSALS[reason] ?? "The copy could not be discarded." };
@@ -172,7 +208,14 @@
   }
 </script>
 
-{#if notice}<p class="notice {notice.kind === 'ok' ? 'notice-ok' : 'notice-danger'}" role="status">{notice.text}</p>{/if}
+{#if notice}
+  <p class="notice {notice.kind === 'ok' ? 'notice-ok' : 'notice-danger'}" role="status">
+    {notice.text}
+    {#if lastApply && notice.kind === "ok"}
+      <button type="button" class="btn btn-ghost btn-sm undo" onclick={undoApply} disabled={busy}>Undo Apply</button>
+    {/if}
+  </p>
+{/if}
 {#each mine as item (item.workspace_id)}
   <section class="task-workspace" aria-label="Sandbox changes">
     <header>
@@ -241,6 +284,8 @@
 {/each}
 
 <style>
+  .notice { display: flex; align-items: center; gap: var(--space-3); flex-wrap: wrap; }
+  .notice .undo { margin-left: auto; }
   .task-workspace { display:grid; gap:var(--space-2); margin:var(--space-2) 0; padding:var(--space-3); border:1px solid var(--border); border-radius:var(--r-md); background:var(--surface); }
   header { display:flex; flex-wrap:wrap; align-items:baseline; justify-content:space-between; gap:var(--space-2); }
   header span { color:var(--text-3); font-size:var(--text-xs); }

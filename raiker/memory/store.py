@@ -77,9 +77,8 @@ def _mirror_text(text: str) -> str:
     """MM-3 — the readable mirror never holds a credential or a card number.
 
     The memory's text lives in the encrypted store; this file beside it is not
-    encrypted. Found by the canary drill (2026-11-08): a password and a card an
-    owner kept in a memory sat here in plain text. Credential, key and card
-    shapes are masked in the mirror only; the store keeps the owner's words.
+    encrypted, so credential, key and card shapes are masked in the mirror only
+    and the store keeps the owner's words.
     """
     from raiker.context.redaction import redact_text
 

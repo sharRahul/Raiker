@@ -36,6 +36,7 @@ from raiker.api.wire.commands import (
     TaskWorkspaceFileDiff,
     TaskWorkspaceList,
     TaskWorkspacePromoted,
+    TaskWorkspaceUndone,
     TaskWorkspaceView,
 )
 from raiker.execution.commands.models import (
@@ -52,6 +53,8 @@ from raiker.execution.workspaces import (
     diff_workspace,
     promote,
     promotion_conflicts,
+    promotion_journal_dir,
+    undo_promotion,
 )
 from raiker.runtime.authority.models import Principal
 
@@ -549,7 +552,10 @@ def promote_task_workspace(
         if not overwrite <= set(promotion_conflicts(workspace, diff)):
             # An overwrite the owner did not see as a conflict is not consent.
             raise WorkspaceError("workspace_review_stale")
-        result = promote(workspace, diff, overwrite=overwrite)
+        result = promote(
+            workspace, diff, overwrite=overwrite,
+            journal_dir=promotion_journal_dir(request.app.state.workspace_root),
+        )
     except WorkspaceError as exc:
         raise refusal(status.HTTP_409_CONFLICT, exc.reason_code) from exc
     registry.release(owner, workspace_id)
@@ -570,8 +576,39 @@ def promote_task_workspace(
         "created": list(result.created),
         "modified": list(result.modified),
         "deleted": list(result.deleted),
+        "promotion_id": result.promotion_id,
     }
     return serialize_dto(promoted)
+
+
+@router.post("/api/command-promotions/{promotion_id}/undo")
+def undo_task_workspace_promotion(
+    promotion_id: str,
+    request: Request,
+    auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+) -> dict[str, Any]:
+    """SB-5 — put the project back as it was before an Apply.
+
+    Refused, touching nothing, when any file the Apply wrote has changed since:
+    undoing then would destroy the owner's later work.
+    """
+    owner = auth_data[0].principal_id
+    try:
+        result = undo_promotion(promotion_journal_dir(request.app.state.workspace_root), promotion_id)
+    except WorkspaceError as exc:
+        code = status.HTTP_404_NOT_FOUND if exc.reason_code == "workspace_promotion_unknown" else status.HTTP_409_CONFLICT
+        raise refusal(code, exc.reason_code) from exc
+    _audit_workspace(
+        request, owner, "", "task_workspace_promotion_undone",
+        {"promotion_id": promotion_id, "removed": list(result.created), "restored": list(result.modified)},
+    )
+    undone: TaskWorkspaceUndone = {
+        "ok": True,
+        "promotion_id": promotion_id,
+        "removed": list(result.created),
+        "restored": list(result.modified),
+    }
+    return serialize_dto(undone)
 
 
 @router.post("/api/command-workspaces/{workspace_id}/discard")

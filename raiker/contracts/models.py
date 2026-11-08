@@ -365,6 +365,7 @@ EVENT_TYPES = {
     # A session's disposable task copy was applied to the project after owner
     # review, or thrown away. Paths and counts only — never file content.
     "task_workspace_promoted",
+    "task_workspace_promotion_undone",
     "task_workspace_discarded",
     "command_egress_changed",
     # Windows: which boundary sandboxed commands use (account or WSL2).

@@ -375,6 +375,16 @@ def _task_copy_promoted(ws: Path, _client: TestClient, _h: dict[str, str]) -> Ca
     }
 
 
+def _task_copy_promotion_undone(ws: Path, _client: TestClient, _h: dict[str, str]) -> Call:
+    from raiker.execution.commands.backends.native import task_workspace_registry
+    from raiker.execution.workspaces import diff_workspace, promote, promotion_journal_dir
+
+    key = _task_copy(ws)
+    copy = task_workspace_registry(ws).load(OWNER, key)
+    result = promote(copy, diff_workspace(copy), journal_dir=promotion_journal_dir(ws))
+    return f"/api/command-promotions/{result.promotion_id}/undo"
+
+
 def _task_copy_discarded(ws: Path, _client: TestClient, _h: dict[str, str]) -> Call:
     return f"/api/command-workspaces/{_task_copy(ws)}/discard"
 
@@ -758,6 +768,7 @@ CASES: Cases = {
     ("GET", "/api/command-workspaces/{workspace_id}/diff"): _task_copy_diff,
     ("POST", "/api/command-workspaces/{workspace_id}/promote"): _task_copy_promoted,
     ("POST", "/api/command-workspaces/{workspace_id}/discard"): _task_copy_discarded,
+    ("POST", "/api/command-promotions/{promotion_id}/undo"): _task_copy_promotion_undone,
     ("GET", "/api/credential-deltas"): _deltas,
     ("POST", "/api/credential-deltas/{run_id}/discard"): _delta_discarded,
     ("GET", "/api/code/map"): _after_selection("/api/code/map"),

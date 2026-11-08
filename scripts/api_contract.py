@@ -225,6 +225,7 @@ VERIFIED: frozenset[tuple[str, str]] = frozenset(
         ("GET", "/api/command-workspaces/{workspace_id}/diff"),
         ("POST", "/api/command-workspaces/{workspace_id}/discard"),
         ("POST", "/api/command-workspaces/{workspace_id}/promote"),
+        ("POST", "/api/command-promotions/{promotion_id}/undo"),
         ("GET", "/api/command-runs/{run_id}"),
         ("GET", "/api/command-runs/{run_id}/output"),
         ("GET", "/api/command-runs/{run_id}/receipt"),

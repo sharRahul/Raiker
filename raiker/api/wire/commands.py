@@ -171,6 +171,17 @@ class TaskWorkspacePromoted(TypedDict):
     created: list[str]
     modified: list[str]
     deleted: list[str]
+    #: SB-5 — undo this Apply with POST /api/command-promotions/{id}/undo.
+    promotion_id: str
+
+
+class TaskWorkspaceUndone(TypedDict):
+    ok: bool
+    promotion_id: str
+    #: Files the Apply had created, now removed.
+    removed: list[str]
+    #: Files put back to what they were before the Apply.
+    restored: list[str]
 
 
 class TaskWorkspaceDiscarded(TypedDict):

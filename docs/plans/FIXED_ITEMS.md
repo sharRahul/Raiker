@@ -1636,6 +1636,7 @@ file you can open. The two capture sets that remain — `screenshots/pages/` and
 | [FIXED-1329](#fixed-1329--a-full-disk-reached-the-owner-as-a-bare-500-mm-4-found-by-the-drill) | Medium | Storage / recovery | Fixed 2026-11-08 |
 | [FIXED-1330](#fixed-1330--a-memorys-readable-mirror-held-passwords-and-card-numbers-in-plain-text-mm-3-found-by-the-drill) | High | Memory / privacy | Fixed 2026-11-08 |
 | [FIXED-1331](#fixed-1331--a-goal-step-the-host-died-in-read-only-failed-ag-4-found-by-the-restart-drill) | Medium | Goals / recovery | Fixed 2026-11-08 |
+| [FIXED-1332](#fixed-1332--an-apply-could-not-be-undone-and-a-crash-part-way-left-the-project-half-written-sb-5) | High | Build / sandbox promotion | Fixed 2026-11-08 |
 
 ---
 
@@ -39725,3 +39726,32 @@ while it ran; not run again on its own*.
 `failed · interrupted_by_restart`, goal `failed`, tasks before and after
 identical, model calls 1 and 1. It now runs in CI beside the Build restart
 fault (`Build faults (host killed mid-check)`).
+
+## FIXED-1332 — An Apply could not be undone, and a crash part-way left the project half-written (SB-5)
+
+**Severity: High. Area: Build / sandbox promotion. Status: Fixed 2026-11-08.**
+
+**Observed.** Apply backed the originals up to a temporary folder and restored
+them only from an in-process `except`. A host killed part-way (power cut,
+`SIGKILL`) ran neither, so the project was left with some files from the copy
+and some not, and the backups were orphaned. A finished Apply deleted its
+backups, so it could not be undone either.
+
+**Fixed (the Claude Code checkpoint model, owner's delegated decision).**
+* Apply writes the originals and a journal (`state: applying`) to Raiker's own
+  state, fsynced, **before** it touches the project.
+* The next host start rolls back any journal still `applying`, byte for byte,
+  and removes folders the Apply made.
+* A finished Apply is kept (`applied`, the last 20) with each written file's
+  hash. **Undo Apply** in Build's review puts the project back, and refuses,
+  touching nothing, if any of those files changed since, so later work is
+  never destroyed. `POST /api/command-promotions/{id}/undo`.
+* An applied or discarded copy leaves the review at once, so it never offers
+  **Apply** a second time.
+
+**Evidence.** `test_promotion_journal.py`: undo restores the project exactly;
+undo refuses after an owner edit and changes nothing; a child process that
+exits hard (`os._exit`) after its third file write is rolled back exactly by
+recovery, and a second recovery finds nothing to do. Live RT-BETA-12: Apply,
+**Undo Apply**, and `main.py`, `old.txt` and the absent `new.py` are as before
+(captures `12a`, `12b`). RT-BETA-07 and -08 still pass.

@@ -94,7 +94,7 @@ incomplete*). What exists:
 | SB-2 | macOS Seatbelt enforcement, containment, limits | 🟡 | P0 | M | Native-runner checks passed on `macos-15` and `macos-15-intel` for `9c532624`. Preserve this evidence on the release commit and add fresh-installer, toolchain and adversarial tests. |
 | SB-3 | Linux Bubblewrap and WSL2 enforcement | 🟡 | P0 | S | WSL2 was measured on Windows 11 and its static runner is packaged. Re-run on the release commit and document the systemd user-manager requirement for aggregate limits. |
 | SB-4 | Commands, plugins, hooks and local MCP use the sandbox or fail closed | 🟡 | P0 | S | **Inventory test landed** (`tests/test_process_spawn_inventory.py`): every process-spawning module in `raiker/` is listed with a reviewed category (sandbox, Raiker-owned program, host lifecycle, read-only facts, owner-approved host operation); a new spawn site or any shell use fails CI. Remaining: one live check per hook type that a hook command is refused on a host without an enforced boundary |
-| SB-5 | Disposable workspaces, reviewed promotion, rollback, crash recovery | 🟡 | P0 | M | Rollback of a promoted Apply; crash in the middle of Apply (kill test); pinned-handle link check (residual race documented today) |
+| SB-5 | Disposable workspaces, reviewed promotion, rollback, crash recovery | 🟡 | P0 | M | **2026-11-08:** Undo Apply and a journalled Apply that a hard kill part-way rolls back on the next start ([FIXED-1332](FIXED_ITEMS.md#fixed-1332--an-apply-could-not-be-undone-and-a-crash-part-way-left-the-project-half-written-sb-5)). Still required: the pinned-handle link check (residual race documented today) |
 | SB-6 | No protected-file writes, no limit escape, no direct host execution | 🟡 | P0 | M | Adversarial suite per platform (below), run in CI where hosted runners allow it and recorded from owner machines where they do not |
 
 **Adversarial suite (SB-6), one test per attack:** write `.git/config`,
@@ -523,6 +523,7 @@ product refusing it, rather than delaying the date.
 
 ## Changelog
 
+- **2026-11-08** — SB-5: Undo Apply and crash-safe Apply (FIXED-1332).
 - **2026-11-08** — AG-4 closed by a host-restart drill in CI (FIXED-1331).
 - **2026-11-08** — AG-5, MM-3 and MM-4 closed (FIXED-1328 to FIXED-1330); a 7B GGUF in two shards downloads, verifies and serves on the owner's GPU (RT-GPU-03).
 - **2026-11-08** — VD-2 closed by a fake-microphone live run (FIXED-1327).

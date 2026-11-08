@@ -58,6 +58,10 @@ export const STEP_REASONS: Record<string, string> = {
   goal_stopped: "the goal was stopped",
   task_missing: "its task no longer exists",
   dispatch_interrupted: "Raiker stopped while starting it",
+  // AG-4 — a step whose run did not finish says why, and that it was not re-run.
+  interrupted_by_restart: "Raiker stopped while it ran; not run again on its own",
+  run_lease_lapsed: "It stopped reporting progress; not run again on its own",
+  step_task_failed: "Its task did not finish",
   dispatching: "starting",
 };
 

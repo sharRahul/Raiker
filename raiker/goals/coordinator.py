@@ -526,6 +526,8 @@ class GoalCoordinator:
                     continue
                 task = self.store.load_task(str(step["task_id"]))
                 state, reason = step_from_task(task.status if task is not None else None)
+                if state == "failed" and not reason and task is not None:
+                    reason = failed_step_reason(task.summary)
                 if (state, reason) != (step["state"], step["reason"]):
                     connection.execute(
                         "UPDATE goal_steps SET state = ?, reason = ?, updated_at = ? WHERE goal_id = ? AND step_id = ?",
@@ -774,3 +776,18 @@ def _provider_in(profile: ExecutionProfile, provider: str) -> bool:
     placements = {p.local_only for p in ModelProfileRegistry.load().profiles if p.provider == provider}
     local = placements == {True}
     return profile.allows(provider=provider, local=local)
+
+
+def failed_step_reason(summary: str | None) -> str:
+    """AG-4 — why a step's task failed, as a code the goal page can say.
+
+    Found by the restart drill (2026-11-08): a step whose host died mid-run read
+    only *failed*, while its task said exactly why. The step now carries it.
+    """
+    from raiker.tasks.scheduler import INTERRUPTED_BY_RESTART, LEASE_LAPSED
+
+    if summary == INTERRUPTED_BY_RESTART:
+        return "interrupted_by_restart"
+    if summary == LEASE_LAPSED:
+        return "run_lease_lapsed"
+    return "step_task_failed"

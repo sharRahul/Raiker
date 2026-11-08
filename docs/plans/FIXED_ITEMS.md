@@ -1635,6 +1635,7 @@ file you can open. The two capture sets that remain — `screenshots/pages/` and
 | [FIXED-1328](#fixed-1328--an-answer-could-claim-an-action-that-failed-ag-5) | High | Runtime / honesty | Fixed 2026-11-08 |
 | [FIXED-1329](#fixed-1329--a-full-disk-reached-the-owner-as-a-bare-500-mm-4-found-by-the-drill) | Medium | Storage / recovery | Fixed 2026-11-08 |
 | [FIXED-1330](#fixed-1330--a-memorys-readable-mirror-held-passwords-and-card-numbers-in-plain-text-mm-3-found-by-the-drill) | High | Memory / privacy | Fixed 2026-11-08 |
+| [FIXED-1331](#fixed-1331--a-goal-step-the-host-died-in-read-only-failed-ag-4-found-by-the-restart-drill) | Medium | Goals / recovery | Fixed 2026-11-08 |
 
 ---
 
@@ -39703,3 +39704,24 @@ password and a card in a memory, and all three in an attached document; a chat
 turn that recalls the memory and reads the file, a task, and the support
 export. The model requests, every readable file under the workspace, the
 export and the answer contain none of them. It runs in **Data safety drills**.
+
+## FIXED-1331 — A goal step the host died in read only *failed* (AG-4, found by the restart drill)
+
+**Severity: Medium. Area: Goals / recovery. Status: Fixed 2026-11-08.**
+
+**Observed.** `scripts/goal_restart_fault.py` runs a real `raiker-web` with the
+model scripted to take a minute, starts a one-step goal, kills the host
+(`TerminateProcess`/`SIGKILL`) while the step's model call is in flight, and
+starts a new host on the same workspace. The behaviour was already safe: the
+step settled as failed, the goal as failed (not completed), one task, and the
+model was not called again. But the step's `reason` was empty, so the goal page
+said *failed* while its task said exactly why.
+
+**Fixed.** A failed step carries its task's reason: `interrupted_by_restart`,
+`run_lease_lapsed` or `step_task_failed`. The Goals page says *Raiker stopped
+while it ran; not run again on its own*.
+
+**Evidence.** The drill passes on this machine (Windows 11): step
+`failed · interrupted_by_restart`, goal `failed`, tasks before and after
+identical, model calls 1 and 1. It now runs in CI beside the Build restart
+fault (`Build faults (host killed mid-check)`).

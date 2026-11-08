@@ -871,7 +871,7 @@ remain:
 |---|---|---|
 | Outcome intake | **Work → Goals** form; from Chat, **Make this a goal** and goals noticed in conversation fill it in ([FIXED-1252](FIXED_ITEMS.md#fixed-1252--the-same-aim-across-conversations-was-never-offered-as-a-goal-qui-f03)) | Starting a goal from a Build turn; asking only for materially missing facts |
 | Criteria validators | *Met when its steps finish* (a record the steps finished) and *You confirm it* | A Build step's `completed_verified` outcome, a destination read-back or another independent validator as evidence |
-| Leases and recovery | Each step is a task with the task's own claim generation and lease; an interrupted dispatch fails after two minutes rather than re-filing | A goal-level lease for concurrent coordinators across hosts, and the host-restart live scenario the register names |
+| Leases and recovery | Each step is a task with the task's own claim generation and lease; an interrupted dispatch fails after two minutes rather than re-filing; the host-restart scenario runs in CI (FIXED-1331, 2026-11-08) | A goal-level lease for concurrent coordinators across hosts |
 | Pause | Files nothing new and parks unclaimed steps; a running step finishes its current turn | A pause that reaches a running step's next safe boundary without stopping it |
 
 **Proposed fix.** One slice per row, each with its own live evidence: a

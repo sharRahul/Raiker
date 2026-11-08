@@ -503,7 +503,7 @@ jobs:
     # exit), and the host and the check both die (never verified). No credential.
     name: Build faults (host killed mid-check)
     runs-on: ubuntu-24.04
-    timeout-minutes: 20
+    timeout-minutes: 30
     steps:
       - name: Checkout
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.0.0 (Node 24)
@@ -521,11 +521,19 @@ jobs:
         run: python scripts/build_native_runner.py
       - name: Kill the host mid-check and read the outcome
         run: python scripts/build_restart_fault.py --report build-restart-fault.json
+      # AG-4 — the same fault in the middle of a goal's step: the step must
+      # settle as failed with its reason, the goal must not read completed, and
+      # nothing may be filed or run twice (`scripts/goal_restart_fault.py`).
+      - name: Kill the host mid-goal-step and read the goal
+        if: always()
+        run: python scripts/goal_restart_fault.py --report goal-restart-fault.json
       - name: Keep the report
         if: always()
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0 (Node 24)
         with:
           name: build-restart-fault
-          path: build-restart-fault.json
+          path: |
+            build-restart-fault.json
+            goal-restart-fault.json
           if-no-files-found: warn
           retention-days: 14

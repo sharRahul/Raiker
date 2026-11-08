@@ -78,6 +78,7 @@ def serve(workspace: Path, port: int) -> int:
     """Run ``raiker-web`` on *workspace* with a scripted provider and model readiness held ready."""
     if str(ROOT) not in sys.path:
         sys.path.insert(0, str(ROOT))
+    import asyncio
     from collections.abc import AsyncIterator
     from datetime import UTC, datetime, timedelta
 
@@ -86,19 +87,24 @@ def serve(workspace: Path, port: int) -> int:
     from raiker.models.readiness import ModelReadiness, ModelReadinessService, ModelReadinessState
     from raiker.models.router import ModelRouter
 
-    def respond() -> ModelResponse:
+    def respond() -> tuple[ModelResponse, float]:
         item = _next_response(workspace)
         calls = [
             ToolCallProposal(call_id=call["call_id"], tool_name=call["tool_name"], arguments=call["arguments"])
             for call in item.get("tool_calls", [])
         ]
-        return ModelResponse(text=str(item.get("text", "")), tool_calls=calls)
+        return ModelResponse(text=str(item.get("text", "")), tool_calls=calls), float(item.get("sleep_seconds", 0))
 
     async def achat(self: Any, *args: Any, **kwargs: Any) -> ModelResponse:
-        return respond()
+        response, delay = respond()
+        # A scripted answer may take time, so a scenario can kill the host
+        # while a model call is still in flight (`goal_restart_fault.py`).
+        await asyncio.sleep(delay)
+        return response
 
     async def astream(self: Any, *args: Any, **kwargs: Any) -> AsyncIterator[Any]:
-        response = respond()
+        response, delay = respond()
+        await asyncio.sleep(delay)
         if response.text:
             yield ModelStreamEvent(event_type="text_delta", text_delta=response.text)
         for call in response.tool_calls:

@@ -209,7 +209,7 @@ configured, and runner publisher pins are empty (`runner_publisher.py`).
 | AG-1 | Plan, execute, complete multi-step tasks | 🟡 | P0 | M | T-03 with a real model, five runs on fresh state (TESTING protocol) |
 | AG-2 | Every tool call through permissions and governance | ✅ | — | — | **2026-11-07:** every tool resolves to a gate or is listed with the authority it answers to ([FIXED-1310](FIXED_ITEMS.md#fixed-1310--thirty-tools-had-no-capability-gate-and-no-reviewed-reason-ag-2)). **2026-11-08:** `test_voice_turns_cannot_change_governance`: a spoken turn uses the same route and gateway, and `input_mode` is read only for the reply style, never by approvals, the tool broker or the authority |
 | AG-3 | Approve, reject, cancel, emergency stop | ✅ | — | — | Approval relay, STOP and cancel (FIXED items, live specs) |
-| AG-4 | Scheduling, background, restart recovery | 🟡 | P0 | M | BUG-355 restart scenario: kill the host mid-goal, restart, and assert the goal resumes or parks with an honest state; no duplicate effects |
+| AG-4 | Scheduling, background, restart recovery | ✅ | — | — | **2026-11-08:** `scripts/goal_restart_fault.py` kills the host mid-step and restarts it: the step settles as failed with the reason, the goal never reads completed, nothing is filed or run twice; in CI ([FIXED-1331](FIXED_ITEMS.md#fixed-1331--a-goal-step-the-host-died-in-read-only-failed-ag-4-found-by-the-restart-drill)) |
 | AG-5 | Accurate reporting, no false claims | ✅ | — | — | **2026-11-08:** a refused or failed action is closed in the answer by the runtime's own **Not done** line, whatever the model claims ([FIXED-1328](FIXED_ITEMS.md#fixed-1328--an-answer-could-claim-an-action-that-failed-ag-5)); a 7B model now serves on the owner's GPU (RT-GPU-03) for the real-model run |
 
 **UI / UX.** The goal page shows a *receipt list* per step (done / failed /
@@ -523,6 +523,7 @@ product refusing it, rather than delaying the date.
 
 ## Changelog
 
+- **2026-11-08** — AG-4 closed by a host-restart drill in CI (FIXED-1331).
 - **2026-11-08** — AG-5, MM-3 and MM-4 closed (FIXED-1328 to FIXED-1330); a 7B GGUF in two shards downloads, verifies and serves on the owner's GPU (RT-GPU-03).
 - **2026-11-08** — VD-2 closed by a fake-microphone live run (FIXED-1327).
 - **2026-11-08** — Toward the beta: MD-5, AG-2 and UX-2 closed (FIXED-1323,

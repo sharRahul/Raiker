@@ -2118,13 +2118,24 @@ published):
   the installed `Raiker.exe` read as unsigned from a `pwsh` step (PowerShell
   7's `PSModulePath` leaked into the 5.1 child, now dropped), and Linux
   signing failed with *Bad passphrase*, because the first key's passphrase
-  file ended in CRLF and the secret did not carry the ``.
+  file ended in CRLF and the secret did not carry the `
+`.
 * [42428724031](https://github.com/sharRahul/Raiker/actions/runs/42428724031):
   **Windows x86-64 passed end to end**, signed, verified before install and
   installed. Linux still *Bad passphrase*. The Linux key was replaced with one
   whose passphrase has no line ending (new fingerprint
   `248BC52909AAAAFDFA77EF0D0BFFAD3B8A2024C1`); the first key was never in a
   release.
+* [42430871211](https://github.com/sharRahul/Raiker/actions/runs/42430871211) on `570b23ab`: **passed**. Windows
+  x86-64 signed, verified before install and on the installed program; Windows
+  on Arm installed the x86-64 package and verified it under emulation; Linux
+  `.deb`, `.rpm` and `.AppImage` on x86-64 and ARM64 each verified against the
+  pinned key (`detached signature by 248BC529…24C1`); macOS built unsigned as
+  chosen; the channel index, manifests, SBOM and provenance were signed with
+  the pinned release key and verified the way an installed Raiker verifies
+  them. One rerun: linux-x86_64's packaged-onboarding window test timed out
+  waiting for the Home greeting on the first attempt, after signing and
+  verification had passed; it passed on rerun (TO_BE_FIXED).
 
 The captures are under `output/playwright/2026-11-07-beta-round/` (11-*) and
 `output/playwright/2026-11-07-gpu-round/` (ignored by Git). I reviewed each at

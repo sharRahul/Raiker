@@ -1591,3 +1591,12 @@ list for small contexts, or refuse to plan a context below the turn floor.
 
 The NVIDIA CUDA run passed on 2026-11-07 (RT-GPU-01, RT-GPU-02). Still
 required: the same two checks on an AMD GPU with the Vulkan build.
+
+## Packaged onboarding test once missed the Home greeting on Linux x86-64
+
+Release run 42430871211, first attempt: `packaged-onboarding-live.spec.ts`
+waited 30 s for the heading `…, Owner` after onboarding and did not find it.
+Signing, install and smoke had passed. The rerun passed, and the same test
+passed on the other targets. Read the attempt's trace (artifact
+`desktop-linux-x86_64`) for what Home showed instead, and wait on the
+product's own ready signal rather than the greeting.

@@ -39516,4 +39516,9 @@ key rather than any certificate in the environment.
 (per-OS signing, the verification steps, beta-only publishing),
 `test_desktop_release.py::test_a_self_signed_build_says_so_and_an_unsigned_one_cannot`,
 `Updates.test.ts`, and the Linux verifier run under WSL Ubuntu with real `gpg`:
-a signed AppImage passes, and a changed byte reads `BADSIG`.
+a signed AppImage passes, and a changed byte reads `BADSIG`. Release run
+[42430871211](https://github.com/sharRahul/Raiker/actions/runs/42430871211) (`signing: require-except-macos`, beta, not published)
+passed end to end. The two runs before it found that a `pwsh` step hid the
+signature cmdlet from PowerShell 5.1, and that a CRLF passphrase file broke the
+first Linux key; both are fixed, and the first key was replaced before it
+signed anything.

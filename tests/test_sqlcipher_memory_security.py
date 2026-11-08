@@ -15,6 +15,7 @@ import os
 import subprocess
 import sys
 import threading
+from collections.abc import Iterator
 from pathlib import Path
 from typing import Any
 
@@ -44,9 +45,14 @@ def _failed_probe() -> MemorySecurityProbeResult:
 
 
 @pytest.fixture(autouse=True)
-def _default_memory_security_auto(monkeypatch: pytest.MonkeyPatch) -> None:
+def _default_memory_security_auto(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
     monkeypatch.delenv("RAIKER_SQLCIPHER_MEMORY_SECURITY", raising=False)
     resolve_memory_security(refresh=True)
+    yield
+    # A decision made from a faked probe must not outlive its test: the next
+    # store would lock pages on a host where locking ends the process.
+    close_cached_connections()
+    sqlite_module._MEMORY_SECURITY = None
 
 
 def test_the_ceiling_is_an_absolute_connection_count_not_a_thread_multiple(
@@ -267,6 +273,11 @@ def test_a_refused_lock_fails_closed_by_name_when_the_owner_demanded_it(
     # only the workspace's: without this the real scratch probe opens, and
     # the refusal reads as a damaged file (FIXED-812).
     monkeypatch.setattr("raiker.storage.sqlite._scratch_store_opens", lambda: False)
+    # The probe above is faked as supported, so seeding from the template must
+    # not open a real database with locked pages: on a host whose SQLCipher
+    # genuinely cannot lock them, that open ends the process (a stack overflow
+    # on Windows), where the real probe reports `host_crash` instead.
+    monkeypatch.setattr("raiker.storage.stores.migration_runner._template_enabled", lambda: False)
     with pytest.raises(StoreUnavailableError) as raised:
         SQLiteStore(tmp_path)
     assert raised.value.reason == "store_memory_lock_unavailable"

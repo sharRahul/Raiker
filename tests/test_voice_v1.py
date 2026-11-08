@@ -314,7 +314,7 @@ def test_engines_register_their_memory_and_stop_when_idle(tmp_path: Path, monkey
     engines = VoiceEngines(tmp_path, ledger=ledger, spawner=spawner, clock=lambda: now[0])
     engine = engines.ensure_whisper(Path("/opt/whisper-server"), Path("/m/ggml-small.bin"), threads=4,
                                     device="cpu", ram=500, vram=0, gpu=None)
-    assert started[0][:3] == ["/opt/whisper-server", "-m", "/m/ggml-small.bin"]
+    assert started[0][:3] == [str(Path("/opt/whisper-server")), "-m", str(Path("/m/ggml-small.bin"))]
     assert "--no-gpu" in started[0] and started[0][started[0].index("--host") + 1] == "127.0.0.1"
     assert ledger.committed() == (500, {})
     # Reused, not started twice.

@@ -371,7 +371,7 @@ The composer microphone has three states (*Set up voice*, *Dictate*,
 | PL-1 | Install, configure, remove supported integrations | 🟡 | P0 | M | A **supported list** for beta: GitHub, email (IMAP/SMTP), calendar (CalDAV), web search, local MCP stdio. Each gets one live install → use → revoke → remove run |
 | PL-2 | Grants, revocation, audit | ✅ | — | — | Governance suite |
 | PL-3 | OAuth and credential storage | 🟡 | P0 | S | Vault encryption and expiry checks are tested; a provider 401 marks the local credential `reauth_required` so it is not retried. Still required: expired-token and owner-revoked-token live checks for GitHub on the release candidate. Provider-specific OAuth revoke endpoints are not claimed until Raiker has registered clients. |
-| PL-4 | Plugins and MCP cannot bypass the sandbox | 🟡 | P0 | S | Covered by SB-4/SB-6; add an MCP server that tries network, a home read and a spawn outside its folder |
+| PL-4 | Plugins and MCP cannot bypass the sandbox | ✅ | — | — | **2026-11-08:** `tests/test_mcp_adversarial_server.py` starts a hostile local MCP server the way Raiker does; its loopback (fixed port) and internet connections, home and project reads, write outside its folder and a child process's write all fail on this Windows 11 host's enforced boundary, and a host without one refuses to start it. The Windows dynamic-port loopback range stays the documented limit (TO_BE_FIXED, *Network mediation*) |
 | PL-5 | Supported vs experimental | 🟡 | P0 | S | Every connector has a `support_level` and is **Experimental** by default; the Add list shows the label and an experimental install asks once more (2026-11-07, FIXED-1315, RT-BETA-04). Still required: live evidence to promote the supported beta list; MCP has no catalogue to label (TO_BE_FIXED, *MCP servers have no catalogue to label*) |
 
 **UI / UX.** The Extensions page has two sections, *Supported* and
@@ -523,6 +523,7 @@ product refusing it, rather than delaying the date.
 
 ## Changelog
 
+- **2026-11-08** — PL-4 closed by an adversarial MCP server test.
 - **2026-11-08** — SB-5: Undo Apply and crash-safe Apply (FIXED-1332).
 - **2026-11-08** — AG-4 closed by a host-restart drill in CI (FIXED-1331).
 - **2026-11-08** — AG-5, MM-3 and MM-4 closed (FIXED-1328 to FIXED-1330); a 7B GGUF in two shards downloads, verifies and serves on the owner's GPU (RT-GPU-03).

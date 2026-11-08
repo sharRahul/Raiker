@@ -26,8 +26,8 @@ owner-machine canary, destructive recovery, or network recording below.
 | Evidence | Status | Required release record |
 | --- | --- | --- |
 | Automated boundary/recovery suite | Passing on PR #247 head `80af4407e307206d5d620673fc32b33ee3d34ef8` | Link the successful `Data safety drills` run after the commit is merged; re-run on the exact release commit. |
-| Credential/privacy canary | Pending | Put distinct fake key, password, and card markers in a connector, memory, and file. Exercise a turn, task, and support export. Attach redacted model-request, event/log, and export searches that find none of the markers. |
-| Destructive recovery drill | Pending | On a disposable release candidate, truncate the database, flip a page byte, remove the key file, and exhaust disk space during a write. Record the newest verified backup offered and prove no empty workspace was silently created. |
+| Credential/privacy canary | Automated (2026-11-08): `tests/test_privacy_canary_drill.py` in Data safety drills | Put distinct fake key, password, and card markers in a connector, memory, and file. Exercise a turn, task, and support export. Attach redacted model-request, event/log, and export searches that find none of the markers. |
+| Destructive recovery drill | Automated (2026-11-08): `tests/test_destructive_recovery_drill.py` in Data safety drills | On a disposable release candidate, truncate the database, flip a page byte, remove the key file, and exhaust disk space during a write. Record the newest verified backup offered and prove no empty workspace was silently created. |
 | Local-only egress audit | Pending owner-machine recording | Record at least 30 minutes of metadata-only connection observations while using all enabled local-profile features. Attach the approved verifier report and the capture hash. |
 
 ## Local-only egress audit procedure

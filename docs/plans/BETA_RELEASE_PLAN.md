@@ -210,7 +210,7 @@ configured, and runner publisher pins are empty (`runner_publisher.py`).
 | AG-2 | Every tool call through permissions and governance | ✅ | — | — | **2026-11-07:** every tool resolves to a gate or is listed with the authority it answers to ([FIXED-1310](FIXED_ITEMS.md#fixed-1310--thirty-tools-had-no-capability-gate-and-no-reviewed-reason-ag-2)). **2026-11-08:** `test_voice_turns_cannot_change_governance`: a spoken turn uses the same route and gateway, and `input_mode` is read only for the reply style, never by approvals, the tool broker or the authority |
 | AG-3 | Approve, reject, cancel, emergency stop | ✅ | — | — | Approval relay, STOP and cancel (FIXED items, live specs) |
 | AG-4 | Scheduling, background, restart recovery | 🟡 | P0 | M | BUG-355 restart scenario: kill the host mid-goal, restart, and assert the goal resumes or parks with an honest state; no duplicate effects |
-| AG-5 | Accurate reporting, no false claims | 🟡 | P0 | M | An honesty suite in which the model is told a tool succeeded when it failed (fault injection). Assert the receipt reports the failure and the final message does not claim it; use a real model for one run |
+| AG-5 | Accurate reporting, no false claims | ✅ | — | — | **2026-11-08:** a refused or failed action is closed in the answer by the runtime's own **Not done** line, whatever the model claims ([FIXED-1328](FIXED_ITEMS.md#fixed-1328--an-answer-could-claim-an-action-that-failed-ag-5)); a 7B model now serves on the owner's GPU (RT-GPU-03) for the real-model run |
 
 **UI / UX.** The goal page shows a *receipt list* per step (done / failed /
 skipped, each with evidence), and a final summary that is assembled from those
@@ -261,8 +261,8 @@ work runs (top bar), and so is the count of running items.
 |---|---|---|---|---|---|
 | MM-1 | Encrypted storage and configuration | ✅ | — | — | `tests/test_sqlcipher_memory_security.py`, `tests/test_memory_sqlcipher.py` (CI) |
 | MM-2 | Persist, retrieve, correct, delete | ✅ | — | — | T-04 scenario; memory governance tests |
-| MM-3 | No credential or private-data leaks to models or logs | 🟡 | P0 | M | `Data safety drills` now provides required automated transport/key/recovery regressions. Still required: plant distinct fake key, password and card canaries in a connector, memory and file; exercise a turn, task and support export; attach redacted searches of every model request, log, event and export. See [data-safety evidence](DATA_SAFETY_EVIDENCE.md). |
-| MM-4 | Backup, migration, corruption recovery | 🟡 | P0 | M | Automated backup and lock-screen recovery checks are required in `Data safety drills`. Still required: on a disposable candidate truncate the database, flip page bytes, remove the key file and exhaust disk mid-write; record that recovery offers the newest verified backup and never silently starts empty. |
+| MM-3 | No credential or private-data leaks to models or logs | ✅ | — | — | `Data safety drills` now provides required automated transport/key/recovery regressions. **2026-11-08:** the canary drill runs in Data safety drills; it found the memory mirror holding secrets in plain text ([FIXED-1330](FIXED_ITEMS.md#fixed-1330--a-memorys-readable-mirror-held-passwords-and-card-numbers-in-plain-text-mm-3-found-by-the-drill)). See [data-safety evidence](DATA_SAFETY_EVIDENCE.md). |
+| MM-4 | Backup, migration, corruption recovery | ✅ | — | — | Automated backup and lock-screen recovery checks are required in `Data safety drills`. **2026-11-08:** the destructive drill (truncate, flipped pages, missing key, full disk) runs in Data safety drills; it found a full disk answering a bare 500 ([FIXED-1329](FIXED_ITEMS.md#fixed-1329--a-full-disk-reached-the-owner-as-a-bare-500-mm-4-found-by-the-drill)) |
 | MM-5 | No unexpected cloud transmission | 🟡 | P0 | M | `scripts/verify_egress_audit.py` rejects a capture shorter than 30 minutes or with an unapproved host. Still required: owner-machine local-profile recording while all features are used, then attach its redacted verifier report and capture hash. |
 | MM-6 | Key rotation (BUG-354) | 🔴 | P2 | M | After beta; documented as a known limitation |
 
@@ -523,6 +523,7 @@ product refusing it, rather than delaying the date.
 
 ## Changelog
 
+- **2026-11-08** — AG-5, MM-3 and MM-4 closed (FIXED-1328 to FIXED-1330); a 7B GGUF in two shards downloads, verifies and serves on the owner's GPU (RT-GPU-03).
 - **2026-11-08** — VD-2 closed by a fake-microphone live run (FIXED-1327).
 - **2026-11-08** — Toward the beta: MD-5, AG-2 and UX-2 closed (FIXED-1323,
   FIXED-1326 and the voice governance invariant). Also fixed: a local GGUF's

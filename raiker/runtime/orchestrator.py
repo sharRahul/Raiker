@@ -64,6 +64,7 @@ from raiker.models.tool_projection import (
     TOOL_SEARCH,
     project_specs,
 )
+from raiker.models.tool_registry import READ_SHAPED_TOOL_NAMES
 from raiker.runtime.classifier import SimpleClassifier
 from raiker.runtime.conversation_compaction import (
     ContextBudgetPlanner,
@@ -2830,6 +2831,7 @@ class RuntimeOrchestrator:
                 pending_calls=pending_calls,
                 queue_total=queue_total,
                 identity=identity,
+                resolved_call=resolved_call,
             ):
                 yield event
         finally:
@@ -3019,6 +3021,7 @@ class RuntimeOrchestrator:
         pending_calls: list[ToolCallProposal] | None = None,
         queue_total: int = 1,
         identity: TrustedTurnIdentity | None = None,
+        resolved_call: Mapping[str, str] | None = None,
     ) -> AsyncIterator[StreamEvent]:
         """Run the loop while the turn is listed as live (GEP-02).
 
@@ -3041,6 +3044,7 @@ class RuntimeOrchestrator:
                 pending_calls=pending_calls,
                 queue_total=queue_total,
                 identity=identity,
+                resolved_call=resolved_call,
             ):
                 yield event
 
@@ -3055,6 +3059,7 @@ class RuntimeOrchestrator:
         pending_calls: list[ToolCallProposal] | None = None,
         queue_total: int = 1,
         identity: TrustedTurnIdentity | None = None,
+        resolved_call: Mapping[str, str] | None = None,
     ) -> AsyncIterator[StreamEvent]:
         """The model → tool → model loop, shared by a fresh turn and a resumed one.
 
@@ -3096,8 +3101,30 @@ class RuntimeOrchestrator:
         # label only (never their output), so a stopped turn's stored reply says
         # what was already done and *Continue from last step* can pick it up.
         finished_steps: list[str] = []
+        # AG-5 — an action that failed or was refused this turn and never
+        # succeeded later. The model is told the truth in the tool result, but
+        # a model can still write "Done, I sent it"; the runtime's own record
+        # closes the answer with what did not happen, so the reply never
+        # stands alone as the only account of an action that failed.
+        not_done: dict[str, tuple[str, str]] = {}
+        # A resumed turn starts from the decision that resumed it: a refused or
+        # failed approval is an action that did not happen in this turn.
+        if resolved_call:
+            resumed_tool = str(resolved_call.get("tool_name", ""))
+            resumed_status = str(resolved_call.get("status", ""))
+            if resumed_tool and resumed_tool not in READ_SHAPED_TOOL_NAMES and resumed_status in {
+                "failed", "denied",
+            }:
+                not_done[resumed_tool] = (tool_row(resumed_tool, {}).label, resumed_status)
 
         def note_finished(action: ToolAction, result: ToolResult) -> None:
+            if action.tool_name not in READ_SHAPED_TOOL_NAMES:
+                if result.status in {"failed", "denied"}:
+                    row = tool_row(action.tool_name, dict(action.arguments))
+                    label = f"{row.label} · {row.action}" if row.action else row.label
+                    not_done[action.tool_name] = (label, result.status)
+                elif result.status == "success":
+                    not_done.pop(action.tool_name, None)
             if result.status != "success":
                 return
             row = tool_row(action.tool_name, dict(action.arguments))
@@ -3682,6 +3709,13 @@ class RuntimeOrchestrator:
             else:
                 status = "completed"
                 message = final_text or "Done."
+            if not_done:
+                message = f"{message}\n\n{not_done_note(not_done)}"
+                self._event(
+                    envelope,
+                    "unfinished_actions_reported",
+                    {"actions": [{"tool_name": name, "status": outcome} for name, (_l, outcome) in not_done.items()]},
+                )
 
         self._record_turn_reasoning(envelope, turn_reasoning)
         self._event(
@@ -3724,3 +3758,16 @@ class RuntimeOrchestrator:
         except RuntimeError:
             return asyncio.run(self.ahandle(envelope, identity=identity))
         raise RuntimeError("handle cannot be called from a running event loop; use ahandle")
+
+
+def not_done_note(not_done: Mapping[str, tuple[str, str]]) -> str:
+    """AG-5 — the runtime's own line about actions that did not happen.
+
+    Written from the tool results Raiker recorded, never from the model's
+    text, so it stays true whatever the answer above it says.
+    """
+    parts = [
+        f"{label} was refused" if outcome == "denied" else f"{label} failed"
+        for label, outcome in not_done.values()
+    ]
+    return "**Not done:** " + "; ".join(parts) + ". Raiker's record shows it did not complete."

@@ -73,6 +73,19 @@ def _entry_path(memory_dir: Path, memory_id: str) -> Path:
     return memory_dir / f"{memory_id}.md"
 
 
+def _mirror_text(text: str) -> str:
+    """MM-3 — the readable mirror never holds a credential or a card number.
+
+    The memory's text lives in the encrypted store; this file beside it is not
+    encrypted. Found by the canary drill (2026-11-08): a password and a card an
+    owner kept in a memory sat here in plain text. Credential, key and card
+    shapes are masked in the mirror only; the store keeps the owner's words.
+    """
+    from raiker.context.redaction import redact_text
+
+    return redact_text(text)[0]
+
+
 def _encode_frontmatter(entry: MemoryEntry) -> str:
     meta: dict[str, object] = {
         "memory_id": entry.memory_id,
@@ -166,7 +179,7 @@ def write_memory(
         created_by=governance.created_by,
         owner_principal_id=owner,
     )
-    content = _encode_frontmatter(entry) + "\n" + text
+    content = _encode_frontmatter(entry) + "\n" + _mirror_text(text)
     _entry_path(mem_dir, memory_id).write_text(content, encoding="utf-8")
     if store is not None:
         store.insert_approved_memory(entry)
@@ -336,7 +349,7 @@ def set_memory_archived(
         return None
     updated = replace(entry, archived_at=utc_now() if archived else None, updated_at=utc_now())
     _entry_path(_memory_dir(workspace_root), memory_id).write_text(
-        _encode_frontmatter(updated) + "\n" + updated.text, encoding="utf-8"
+        _encode_frontmatter(updated) + "\n" + _mirror_text(updated.text), encoding="utf-8"
     )
     if store is not None:
         store.set_approved_memory_archived(memory_id, archived_at=updated.archived_at, updated_at=updated.updated_at, owner_principal_id=owner_principal_id)
@@ -528,7 +541,7 @@ def update_memory(
         updated_at=utc_now(),
     )
     _entry_path(_memory_dir(workspace_root), memory_id).write_text(
-        _encode_frontmatter(updated) + "\n" + updated.text, encoding="utf-8"
+        _encode_frontmatter(updated) + "\n" + _mirror_text(updated.text), encoding="utf-8"
     )
     if store is not None:
         store.update_approved_memory(updated)

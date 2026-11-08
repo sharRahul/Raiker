@@ -273,6 +273,7 @@ const PREFIX_CODES: Record<string, ReasonCopy> = {
   routine_delivery_not_found: { plain: "This delivery no longer exists.", remediation: "Reopen the routine to see its deliveries." },
   credential_delta_decision_required: { plain: "No decision was chosen for the credential change.", remediation: "Choose Allow or Deny." },
   credential_delta_not_found: { plain: "This credential change was already decided.", remediation: "Nothing more is needed." },
+  storage_full: { plain: "The disk Raiker writes to is full, so nothing from that request was saved.", remediation: "Free some disk space, then try again. Everything saved before is intact." },
   workspace_path_unchanged: { plain: "That file is the same in the copy and in your project.", remediation: "Choose a file listed as changed." },
   audit_export_empty: { plain: "There is nothing to export for that range.", remediation: "Choose a wider range." },
   audit_export_file_missing: { plain: "The export file is no longer on disk.", remediation: "Export again." },

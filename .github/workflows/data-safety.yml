@@ -20,6 +20,8 @@ on:
       - "tests/test_lock_screen_recovery.py"
       - "tests/test_workspace_backups.py"
       - "tests/test_verify_egress_audit.py"
+      - "tests/test_privacy_canary_drill.py"
+      - "tests/test_destructive_recovery_drill.py"
       - "scripts/verify_egress_audit.py"
       - ".github/workflows/data-safety.yml"
   push:
@@ -52,4 +54,6 @@ jobs:
             tests/test_store_key_guard.py \
             tests/test_lock_screen_recovery.py \
             tests/test_workspace_backups.py \
-            tests/test_verify_egress_audit.py
+            tests/test_verify_egress_audit.py \
+            tests/test_privacy_canary_drill.py \
+            tests/test_destructive_recovery_drill.py

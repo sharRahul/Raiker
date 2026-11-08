@@ -126,6 +126,8 @@ EVENT_TYPES = {
     "turn_suspended_for_approval",
     "turn_suspension_failed",
     "turn_resumed_after_approval",
+    # AG-5 — the runtime appended what did not happen to the answer.
+    "unfinished_actions_reported",
     "retrieval_augmentation",
     "plan_created",
     "plan_skipped",

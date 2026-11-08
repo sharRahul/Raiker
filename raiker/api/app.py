@@ -16,6 +16,7 @@ from typing import Any
 from fastapi import FastAPI, Request, status
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
+from sqlcipher3 import dbapi2 as sqlite3  # type: ignore[import-untyped]
 from starlette.routing import Mount
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
@@ -627,6 +628,25 @@ def create_app(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             content={"ok": False, "reason_code": exc.reason, "detail": exc.detail},
         )
+
+    # MM-4, found by the destructive drill (2026-11-08) — a disk that fills
+    # mid-write reached the owner as a bare 500. SQLite rolls the statement
+    # back, so nothing half-written is kept; the owner is told the one thing
+    # that fixes it.
+    @app.exception_handler(sqlite3.OperationalError)
+    async def _storage_operational(  # pyright: ignore[reportUnusedFunction]
+        _request: Request, exc: sqlite3.OperationalError
+    ) -> JSONResponse:
+        if "disk is full" in str(exc).lower() or "disk i/o error" in str(exc).lower():
+            return JSONResponse(
+                status_code=status.HTTP_507_INSUFFICIENT_STORAGE,
+                content={
+                    "ok": False,
+                    "reason_code": "storage_full",
+                    "detail": "The disk Raiker writes to is full. Nothing was saved from this request; free some space and try again.",
+                },
+            )
+        raise exc
 
     app.add_middleware(RedactionMiddleware)
     # Transport hardening for single-user internet exposure. Added after

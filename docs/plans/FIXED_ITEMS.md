@@ -1632,6 +1632,9 @@ file you can open. The two capture sets that remain — `screenshots/pages/` and
 | [FIXED-1325](#fixed-1325--automatic-llamacpp-install-picked-a-release-still-uploading-found-in-ci) | Medium | Models / llama.cpp | Fixed 2026-11-08 |
 | [FIXED-1326](#fixed-1326--build-and-chat-ordered-the-shared-composer-controls-differently-ux-2) | Low | Web / composer | Fixed 2026-11-08 |
 | [FIXED-1327](#fixed-1327--the-microphone-could-fail-in-four-ways-the-owner-was-told-about-wrongly-or-not-at-all-vd-2) | Medium | Voice / dictation | Fixed 2026-11-08 |
+| [FIXED-1328](#fixed-1328--an-answer-could-claim-an-action-that-failed-ag-5) | High | Runtime / honesty | Fixed 2026-11-08 |
+| [FIXED-1329](#fixed-1329--a-full-disk-reached-the-owner-as-a-bare-500-mm-4-found-by-the-drill) | Medium | Storage / recovery | Fixed 2026-11-08 |
+| [FIXED-1330](#fixed-1330--a-memorys-readable-mirror-held-passwords-and-card-numbers-in-plain-text-mm-3-found-by-the-drill) | High | Memory / privacy | Fixed 2026-11-08 |
 
 ---
 
@@ -39642,3 +39645,61 @@ live `voice-fake-microphone-live.spec.ts`, **6/6**: runtime set up, permission
 denied, cancel releases every track and sends nothing, device lost, the
 6-minute limit under Playwright's clock, and `SpeechRecognition` never
 touched. Captures are in `output/playwright/2026-11-08-voice/`.
+
+## FIXED-1328 — An answer could claim an action that failed (AG-5)
+
+**Severity: High. Area: Runtime / honesty. Status: Fixed 2026-11-08.**
+
+**Observed.** The model is told the truth in each tool result, but nothing
+stopped it answering *Done — I created notes.txt* after the owner refused the
+write. The receipt was right (no change), while the answer, the part the owner
+reads first, was wrong.
+
+**Fixed.** The turn loop keeps, from the runtime's own tool results, every
+action that failed or was refused and never later succeeded, including the call
+an approval decision closed before a resumed turn. The answer ends with a line
+written from that record, never from the model's text:
+*Not done: File · write was refused. Raiker's record shows it did not complete.*
+The event `unfinished_actions_reported` records it.
+
+**Evidence.** `test_honesty_under_fault.py`: the owner refuses a Build write,
+the scripted model claims success, the answer keeps the claim and ends with
+the **Not done** line, and the receipt lists no change.
+
+## FIXED-1329 — A full disk reached the owner as a bare 500 (MM-4, found by the drill)
+
+**Severity: Medium. Area: Storage / recovery. Status: Fixed 2026-11-08.**
+
+**Observed.** The destructive drill filled the database with SQLite's own
+disk-full limit (`PRAGMA max_page_count`). The write failed with
+`database or disk is full` and escaped as an unhandled exception: HTTP 500,
+no reason.
+
+**Fixed.** A disk-full or disk I/O error answers HTTP 507 with `storage_full`
+and *The disk Raiker writes to is full. Nothing was saved from this request;
+free some space and try again.* SQLite rolls the statement back, and the drill
+proves nothing half-written is kept.
+
+**Evidence.** `test_destructive_recovery_drill.py` (four scenarios: truncated
+database, a byte flipped on every page past the header, the key file removed,
+a full disk mid-write). Each either keeps the owner's data or refuses by name
+and offers the newest verified backup, and none creates an empty workspace.
+It now runs in the required **Data safety drills** workflow.
+
+## FIXED-1330 — A memory's readable mirror held passwords and card numbers in plain text (MM-3, found by the drill)
+
+**Severity: High. Area: Memory / privacy. Status: Fixed 2026-11-08.**
+
+**Observed.** The canary drill planted a password and a card number in a
+memory. The model request had them masked, but `.raiker/memory/mem_*.md`, the
+readable copy kept beside the SQLCipher store, held both in plain text,
+outside the encryption the owner relies on.
+
+**Fixed.** The mirror masks credential, key and card shapes; the encrypted
+store keeps the owner's words. The mirror is read only when no store is open.
+
+**Evidence.** `test_privacy_canary_drill.py`: a key in a model connection, a
+password and a card in a memory, and all three in an attached document; a chat
+turn that recalls the memory and reads the file, a task, and the support
+export. The model requests, every readable file under the workspace, the
+export and the answer contain none of them. It runs in **Data safety drills**.

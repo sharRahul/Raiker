@@ -117,3 +117,40 @@ test("RT-GPU-02 — a Hugging Face GGUF is verified, served on the GPU, and answ
   await capture(page, join(OUT, "04-chat-answer.png"));
   await test.info().attach("nvidia-smi.txt", { body: onGpu, contentType: "text/plain" });
 });
+
+test("RT-GPU-03 — a two-shard 7B GGUF is downloaded, verified and served on the GPU", async ({ page }) => {
+  test.setTimeout(1_800_000);
+  await open(page, "models?tab=huggingface");
+  const dialog = page.getByRole("dialog");
+  await dialog.getByRole("searchbox").or(dialog.getByRole("textbox").first()).first().fill("Qwen2.5-7B-Instruct-GGUF");
+  await page.keyboard.press("Enter");
+  await dialog.getByText("Qwen/Qwen2.5-7B-Instruct-GGUF", { exact: true }).first().click();
+  await dialog.getByRole("button", { name: /Q4_K_M/ }).first().click({ timeout: 60_000 });
+  await expect(dialog.getByText(/Pinned to [0-9a-f]{12}/)).toBeVisible();
+  // Two shards, each checked against the hub's LFS SHA-256 (FIXED-1313).
+  await expect(dialog.getByText(/2 selected files/)).toBeVisible();
+  await capture(page, join(OUT, "05-7b-review.png"));
+  await dialog.getByRole("button", { name: "Confirm download" }).click();
+  await expect(page.getByText("GGUF downloaded and indexed in your local library.")).toBeVisible({ timeout: 1_500_000 });
+  await page.keyboard.press("Escape");
+
+  await open(page, "settings?tab=advanced&kind=models");
+  const gguf = page.getByRole("group", { name: "GGUF" });
+  const slot = gguf.getByLabel("GGUF model 1");
+  const option = slot.locator("option", { hasText: /qwen2\.5-7b-instruct/i });
+  await expect(option).toHaveCount(1, { timeout: 60_000 });
+  await slot.selectOption({ label: (await option.textContent())! });
+  await gguf.getByRole("button", { name: /^Serve selected/ }).click();
+  await expect(async () => {
+    await gguf.getByRole("button", { name: "Test" }).click();
+    await expect(gguf.getByRole("button", { name: "Test" })).toBeEnabled({ timeout: 180_000 });
+    await expect(gguf).not.toContainText(/not reachable|could not/i, { timeout: 5_000 });
+  }).toPass({ timeout: 600_000, intervals: [10_000] });
+  // The running-models card names the model the slot now serves; both models
+  // answer to the same alias, so the readiness line alone cannot tell them apart.
+  const engine = page.getByRole("region", { name: "llama.cpp engine" });
+  await expect(engine.getByText(/qwen2\.5-7b-instruct-q4_k_m/)).toBeVisible({ timeout: 120_000 });
+  await expect(engine.getByText(/Entirely on the GPU/)).toBeVisible();
+  await capture(page, join(OUT, "06-7b-serving.png"));
+  await test.info().attach("nvidia-smi.txt", { body: gpuProcesses(), contentType: "text/plain" });
+});

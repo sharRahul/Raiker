@@ -59,6 +59,7 @@ UNGATED: dict[str, str] = {
     "github_read": CONNECTOR_GRANT,
     "gmail_read": CONNECTOR_GRANT,
     "gcal_read": CONNECTOR_GRANT,
+    "outlook_read": CONNECTOR_GRANT,
     "slack_read": CONNECTOR_GRANT,
     "run_command": COMMAND_GRANT,
     "background_run": COMMAND_GRANT,

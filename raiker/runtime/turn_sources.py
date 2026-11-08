@@ -501,6 +501,12 @@ def source_from_tool_result(
             locator=_text(output.get("event_id") or output.get("calendar_id"), 200),
             tool_name=tool_name, passage=passage,
         )
+    if tool_name == "outlook_read":
+        return SourceDraft(
+            kind=kind, title=_text(output.get("title")) or "Outlook",
+            locator=_text(output.get("item_id") or output.get("resource"), 200),
+            tool_name=tool_name, passage=passage,
+        )
     if tool_name == "slack_read":
         channel = _text(args.get("channel"), 200)
         return SourceDraft(

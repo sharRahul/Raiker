@@ -4,6 +4,7 @@
     {"id":"github","name":"GitHub","category":"Development","description":"Issues, pull requests, and repositories.","auth":"oauth2","host":"api.github.com"},
     {"id":"gmail","name":"Gmail","category":"Productivity","description":"Messages and email workflows.","auth":"oauth2","host":"gmail.googleapis.com"},
     {"id":"gcal","name":"Google Calendar","category":"Productivity","description":"Calendars and event scheduling.","auth":"oauth2","host":"www.googleapis.com"},
+    {"id":"outlook","name":"Outlook","category":"Productivity","description":"Mail and calendar in Outlook and Microsoft 365, read-only.","auth":"oauth2","host":"graph.microsoft.com"},
     {"id":"slack","name":"Slack","category":"Communication","description":"Channels, messages, and collaboration.","auth":"oauth2","host":"slack.com"},
     {"id":"huggingface","name":"Hugging Face","category":"Development","description":"Models, datasets, and inference.","auth":"api_key","host":"huggingface.co"},
     {"id":"nvidia","name":"NVIDIA","category":"Development","description":"NIM models and accelerated AI services.","auth":"api_key","host":"integrate.api.nvidia.com"},

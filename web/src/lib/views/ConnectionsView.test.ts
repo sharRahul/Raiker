@@ -339,9 +339,11 @@ describe("Connections recovery", () => {
       "PUT /api/connector-store/gmail/credentials": failed,
     }));
     await fireEvent.click(screen.getByRole("button", { name: "Add Gmail" }));
+    // Gmail signs in at Google in the browser; a pasted token is the fallback.
+    expect(await screen.findByRole("button", { name: "Sign in with Google" })).toBeInTheDocument();
     const input = await screen.findByLabelText("OAuth access token");
     await fireEvent.input(input, { target: { value: "private-test-entry" } });
-    await fireEvent.click(screen.getByRole("button", { name: "Connect" }));
+    await fireEvent.click(screen.getByRole("button", { name: "Connect with this token" }));
     expect(await screen.findByRole("alert")).toHaveTextContent("saved sign-in is unconfirmed");
     expect(input).toHaveValue("private-test-entry");
     expect(input).toHaveAttribute("type", "password");

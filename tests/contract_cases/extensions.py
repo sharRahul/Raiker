@@ -681,6 +681,32 @@ def _approval_response(ws: Path, _client: TestClient, _h: dict[str, str]) -> Cal
     )
 
 
+_GOOGLE_CLIENT = {"client_id": "123-desktop.apps.googleusercontent.com", "client_secret": "GOCSPX-contract"}
+
+
+def _google_client(_ws: Path, client: TestClient, h: dict[str, str]) -> Call:
+    return "/api/connector-oauth/clients/google", _GOOGLE_CLIENT
+
+
+def _sign_in_started(_ws: Path, client: TestClient, h: dict[str, str]) -> Call:
+    saved = client.put("/api/connector-oauth/clients/google", json=_GOOGLE_CLIENT, headers=h)
+    assert saved.status_code == 200, saved.text
+    return "/api/connector-oauth/gmail/start"
+
+
+def _loopback_host(monkeypatch: Any) -> None:
+    """The test client's host is not the loopback address the start requires."""
+    monkeypatch.setattr(
+        "raiker.runtime.connector_oauth.loopback_redirect",
+        lambda _base, _host="127.0.0.1": "http://127.0.0.1:8765/api/connector-oauth/callback",
+    )
+
+
+def _vault_and_loopback(monkeypatch: Any) -> None:
+    _vault_key(monkeypatch)
+    _loopback_host(monkeypatch)
+
+
 CASES: Cases = {
     ("GET", "/api/skills"): _skills,
     ("POST", "/api/skills"): plain("/api/skills", _upload_body()),
@@ -696,6 +722,9 @@ CASES: Cases = {
     ("PUT", "/api/skills/{skill_id}/command"): _on_skill("/command", {"command_trigger": "tidy"}),
     ("DELETE", "/api/skills/{skill_id}"): _skill_deleted,
     ("GET", "/api/connector-store"): patched(_store_view, _vault_key),
+    ("GET", "/api/connector-oauth/clients"): plain("/api/connector-oauth/clients"),
+    ("PUT", "/api/connector-oauth/clients/{provider}"): patched(_google_client, _vault_key),
+    ("POST", "/api/connector-oauth/{connector_id}/start"): patched(_sign_in_started, _vault_and_loopback),
     ("POST", "/api/approvals/{approval_id}/undo-send"): _held_send,
     ("GET", "/api/connector-store/{connector_id}/accounts"): _accounts,
     ("POST", "/api/connector-store/{connector_id}/accounts"): _add_account,

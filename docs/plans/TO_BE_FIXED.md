@@ -1569,3 +1569,21 @@ sandbox never reads the owner's home. The check's failure gives no reason the
 owner can act on. When a check fails on a missing module that the owner's own
 interpreter has, say so, and name the fixes: install it for all users, or use
 a backend that has it.
+
+## Live browser sign-in needs the owner's registered clients (PL-1, PL-3)
+
+The sign-in is built and tested against a fake token server (FIXED-1346). A
+live run per provider needs a client registered to the owner's account, once:
+
+* **Google:** a Google Cloud project with the Gmail and Calendar APIs, an
+  External consent screen with the owner as a test user, and a *Desktop app*
+  OAuth client.
+* **Microsoft:** an Entra app for personal and work accounts, the *Mobile and
+  desktop* redirect `http://localhost/api/connector-oauth/callback`, and Graph
+  `Mail.Read` and `Calendars.Read`.
+* **GitHub:** the App created from **Create my GitHub App on GitHub**, with
+  Device Flow enabled and installed on the repositories Raiker may use.
+
+Then, for each: sign in from Connections, enable the connector's gate with
+*allow*, read in Chat, revoke at the provider, and confirm that the next read
+fails closed as `connector_reauth_required`.

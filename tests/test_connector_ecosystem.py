@@ -90,7 +90,7 @@ def setup_connector(client: TestClient, auth: dict[str, str], method: str) -> No
 
 def test_catalog_contains_every_named_integration() -> None:
     catalog = ConnectorCatalog().list()
-    assert len(catalog) == 26
+    assert len(catalog) == 27
     ids = {item.connector_id for item in catalog}
     assert {"github", "google-drive", "booking", "uber", "ubereats", "olx-india"} <= ids
     assert {item.support_level for item in catalog} == {"experimental"}
@@ -203,7 +203,7 @@ def test_store_install_auth_enable_and_uninstall(client: TestClient) -> None:
     auth = headers(client)
     listing = client.get("/api/connector-store", headers=auth)
     assert listing.status_code == 200
-    assert listing.json()["count"] == 26
+    assert listing.json()["count"] == 27
     setup_connector(client, auth, "get")
     connected = next(
         item for item in client.get("/api/connector-store", headers=auth).json()["connectors"]

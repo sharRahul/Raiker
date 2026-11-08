@@ -248,7 +248,7 @@ def _action_phrase(tool_name: str, args: dict[str, Any]) -> str:  # noqa: PLR091
             _clean(args.get("repo")),
             _clean(args.get("resource")) or _clean(args.get("operation")),
         )[:_MAX_PHRASE]
-    if tool_name in {"gmail_read", "gcal_read", "slack_read"}:
+    if tool_name in {"gmail_read", "gcal_read", "outlook_read", "slack_read"}:
         # The resource names *what kind* of record was read. The message id,
         # calendar id and channel stay in the event: a calendar id is usually an
         # address, and an address in a transcript is a disclosure the row does

@@ -56,6 +56,7 @@ from raiker.tools.connector_tools import (
     gcal_read,
     github_read,
     gmail_read,
+    outlook_read,
     slack_read,
 )
 from raiker.tools.conversation_tools import conversation_search
@@ -371,6 +372,14 @@ class ToolBroker:
                 str(args.get("resource", "")),
                 str(args.get("calendar_id", "")),
                 str(args.get("event_id", "")),
+                store=self.store,
+                principal_id=self.principal_id,
+            ),
+            "outlook_read": lambda args: outlook_read(
+                self.workspace_root,
+                str(args.get("resource", "")),
+                str(args.get("item_id", "")),
+                args.get("count"),
                 store=self.store,
                 principal_id=self.principal_id,
             ),

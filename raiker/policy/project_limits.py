@@ -37,6 +37,7 @@ MAX_ENTRIES = 20
 _CONNECTION_TOOLS = {
     "gmail_read": "gmail",
     "gcal_read": "gcal",
+    "outlook_read": "outlook",
     "slack_read": "slack",
     "github_read": "github",
     "github_write": "github",

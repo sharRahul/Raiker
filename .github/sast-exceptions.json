@@ -880,6 +880,54 @@
       "owner": "Raiker maintainers",
       "reason": "The owner's free-text confirmation phrase a capability change records as intent, passed by a live-round harness; not a credential",
       "expires": "2027-04-13"
+    },
+    {
+      "path": "raiker/runtime/connectors.py",
+      "rule": "S105",
+      "fingerprint": "5b9a618d9c585b4c",
+      "owner": "Raiker maintainers",
+      "reason": "A constant naming an environment variable, a redaction marker or a status label, not a credential",
+      "expires": "2027-05-08"
+    },
+    {
+      "path": "raiker/runtime/connector_oauth.py",
+      "rule": "S106",
+      "fingerprint": "3d84098d52ec891a",
+      "owner": "Raiker maintainers",
+      "reason": "A provider's public OAuth token endpoint, its host or the name of an environment variable, not a credential",
+      "expires": "2027-05-08"
+    },
+    {
+      "path": "raiker/runtime/connector_oauth.py",
+      "rule": "S106",
+      "fingerprint": "45342e5536db4db8",
+      "owner": "Raiker maintainers",
+      "reason": "A provider's public OAuth token endpoint, its host or the name of an environment variable, not a credential",
+      "expires": "2027-05-08"
+    },
+    {
+      "path": "raiker/runtime/connector_oauth.py",
+      "rule": "S106",
+      "fingerprint": "cd05158d7207f566",
+      "owner": "Raiker maintainers",
+      "reason": "A provider's public OAuth token endpoint, its host or the name of an environment variable, not a credential",
+      "expires": "2027-05-08"
+    },
+    {
+      "path": "raiker/runtime/connector_oauth.py",
+      "rule": "S106",
+      "fingerprint": "f2575818b5c8a892",
+      "owner": "Raiker maintainers",
+      "reason": "A provider's public OAuth token endpoint, its host or the name of an environment variable, not a credential",
+      "expires": "2027-05-08"
+    },
+    {
+      "path": "raiker/runtime/connector_oauth.py",
+      "rule": "S106",
+      "fingerprint": "d7bad65f6f21b649",
+      "owner": "Raiker maintainers",
+      "reason": "A provider's public OAuth token endpoint, its host or the name of an environment variable, not a credential",
+      "expires": "2027-05-08"
     }
   ]
 }

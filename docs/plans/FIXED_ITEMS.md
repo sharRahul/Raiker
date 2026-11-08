@@ -1650,6 +1650,8 @@ file you can open. The two capture sets that remain — `screenshots/pages/` and
 | [FIXED-1343](#fixed-1343--every-openai-gpt-5-model-was-refused-and-read-as-cannot-execute) | High | Models / OpenAI | Fixed 2026-11-08 |
 | [FIXED-1344](#fixed-1344--hosted-and-local-server-profiles-stopped-answers-at-1024-tokens) | Medium | Models / output limits | Fixed 2026-11-08 |
 | [FIXED-1345](#fixed-1345--the-context-advice-pointed-an-lm-studio-owner-at-raikers-own-slots) | Low | Models / copy | Fixed 2026-11-08 |
+| [FIXED-1346](#fixed-1346--gmail-calendar-and-outlook-now-sign-in-in-the-owners-browser) | Medium | Connectors / sign-in | Fixed 2026-11-08 |
+| [FIXED-1347](#fixed-1347--there-was-no-way-to-read-outlook-mail-or-calendar) | Medium | Connectors / Outlook | Fixed 2026-11-08 |
 
 ---
 
@@ -40013,3 +40015,70 @@ roughly 10K-token turn. The message said *Raise the model's context in Settings
 **Fixed.** The advice says where each kind of context is set: Model serving
 for a model Raiker serves, and the server's own settings in LM Studio or
 Ollama.
+
+## FIXED-1346 — Gmail, Calendar and Outlook now sign in in the owner's browser
+
+**Severity: Medium. Area: Connectors / sign-in. Status: Fixed 2026-11-08.**
+
+**Observed.** Connecting Gmail or Google Calendar asked for a pasted OAuth
+access token, which expires within an hour. The reads themselves accepted only
+`RAIKER_GMAIL_TOKEN` / `RAIKER_GCAL_TOKEN` and a host on
+`RAIKER_CONNECTOR_EGRESS_ALLOWLIST`, both set in the server's environment. An
+owner could not connect an account from the app at all. The owner asked that
+Connect open the browser for them to sign in.
+
+**Fixed.** The sign-in is the one desktop apps use (RFC 8252,
+`raiker/runtime/connector_oauth.py`):
+* **Sign in with Google** or **Sign in with Microsoft** opens the provider's
+  own page in the system browser.
+* **PKCE S256** and a single-use `state` bind the answer to the owner's own
+  attempt, which expires after ten minutes.
+* The redirect is only to the loopback address.
+* The tokens are kept in the encrypted vault and renewed when they expire.
+  Microsoft's public client has no secret.
+* Only read scopes are requested.
+* A signed-in account reaches its own service's host and no other. The gate
+  and the decision mode still decide whether a read runs.
+* The owner's own client registration is entered once, in the same panel. A
+  pasted token remains under **Paste a token instead**.
+
+Advanced › **Create my GitHub App on GitHub** pre-fills GitHub's registration
+form with exactly the permissions in GITHUB_CONNECTION_SPEC §8.
+
+**Evidence.** `tests/test_connector_browser_sign_in.py` (18 tests), covering:
+* PKCE pairing, single use, expiry, a forged state and a declined consent;
+* loopback-only redirects and a missing client;
+* refresh with and without a secret;
+* that a sign-in reaches one host only;
+* that the callback needs no session.
+
+`BrowserSignIn.test.ts` and `githubAppLink.test.ts` cover the panel and the
+link. Live in the app: the Outlook detail shows the registration steps
+(`output/playwright/connector-sign-in/01-outlook-register-client.png`), and the
+GitHub link carries the four permissions
+(`02-github-app-link.png`). A full sign-in needs the owner's registered clients
+(TO_BE_FIXED).
+
+## FIXED-1347 — There was no way to read Outlook mail or calendar
+
+**Severity: Medium. Area: Connectors / Outlook. Status: Fixed 2026-11-08.**
+
+**Observed.** Raiker had read connectors for Gmail and Google Calendar only.
+
+**Fixed.** `outlook_read` reads, through Microsoft Graph:
+* the newest inbox messages (`messages`);
+* the next events (`events`);
+* one message or event by id.
+
+It uses a fixed field selection, at most ten items and Graph's own short
+preview, never full bodies or attachments, and returns everything as untrusted
+data. It is governed like the others:
+* its own `connector_outlook_runtime` gate, default Ask, Tier 5, which needs a
+  threat acknowledgement and a human confirmation;
+* a real executor and metadata-only events;
+* model-supplied ids validated before a URL is built on the one Graph host.
+
+[Threat model](../threat-models/connectors-outlook.md).
+
+**Evidence.** `tests/test_connector_browser_sign_in.py::TestOutlookReads`, and
+the governance inventory, executor, contract and threat-model index tests.

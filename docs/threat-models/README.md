@@ -90,6 +90,7 @@ Raiker reaches the internet": [Web read](web-fetch.md).
 | `connector_github_runtime` | [GitHub connector (reads and approval-gated writes)](connectors-github.md) |
 | `connector_gmail_runtime` | [Gmail read-only connector](connectors-gmail.md) |
 | `connector_gcal_runtime` | [Google Calendar read-only connector](connectors-gcal.md) |
+| `connector_outlook_runtime` | [Outlook read-only connector](connectors-outlook.md) |
 | `connector_slack_runtime` | [Slack read-only connector](connectors-slack.md) |
 
 ## Local personal-data stores (Tier 6)

@@ -94,6 +94,30 @@ def gcal_read(
     return service.read(resource, calendar_id, event_id)
 
 
+def outlook_read(
+    workspace_root: str | Path,
+    resource: str,
+    item_id: str = "",
+    count: int | str | None = None,
+    *,
+    store: SQLiteStore | None = None,
+    principal_id: str | None = None,
+) -> dict[str, Any]:
+    """Governed Outlook mail/calendar read, brokered as ``outlook_read``.
+
+    Enforced inside :class:`OutlookConnectorService`: the
+    ``connector_outlook_runtime`` gate, the decision mode (default ``ask``
+    withholds), a signed-in owner account, and Microsoft Graph's one host.
+    """
+    from raiker.runtime.connectors import OutlookConnectorService
+    from raiker.storage.sqlite import SQLiteStore
+
+    service = OutlookConnectorService(
+        workspace_root, store or SQLiteStore(workspace_root), principal_id=principal_id
+    )
+    return service.read(resource, item_id, count)
+
+
 def slack_read(
     workspace_root: str | Path,
     resource: str,

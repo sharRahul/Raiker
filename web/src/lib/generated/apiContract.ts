@@ -1572,6 +1572,13 @@ export type ConnectorOperation = {
   compensation?: ConnectorCompensation;
 };
 
+/** Where the owner's browser goes to sign in; Raiker never sees the password. */
+export type ConnectorSignInStarted = {
+  ok: boolean;
+  connector_id: string;
+  authorize_url: string;
+};
+
 export type ConnectorStoreView = {
   connectors: StoreConnector[];
   count: number;
@@ -4717,6 +4724,22 @@ export type NotificationView = {
   last_repeated_at: string | null;
 };
 
+export type OAuthClientRequest = {
+  client_id: string;
+  client_secret?: string | null;
+};
+
+export type OAuthClientSaved = {
+  ok: boolean;
+  provider: string;
+};
+
+/** Which providers have a registered sign-in client (never the client itself). */
+export type OAuthClientsView = {
+  google: boolean;
+  microsoft: boolean;
+};
+
 /** MEM-04 — one eidetic observation, as the owner reads it. */
 export type ObservationView = {
   observation_id: string;
@@ -7494,6 +7517,12 @@ export const contract = {
     call<TaskWorkspacePromoted>("POST", `/api/command-workspaces/${encodeURIComponent(workspaceId)}/promote`, { body }),
   getConnections: () =>
     request<ConnectionsView>("/api/connections"),
+  connectorOauthClients: () =>
+    request<OAuthClientsView>("/api/connector-oauth/clients"),
+  saveConnectorOauthClient: (provider: string, body: OAuthClientRequest) =>
+    call<OAuthClientSaved>("PUT", `/api/connector-oauth/clients/${encodeURIComponent(provider)}`, { body }),
+  startConnectorSignIn: (connectorId: string) =>
+    call<ConnectorSignInStarted>("POST", `/api/connector-oauth/${encodeURIComponent(connectorId)}/start`),
   connectorStore: () =>
     request<ConnectorStoreView>("/api/connector-store"),
   uninstallConnector: (connectorId: string) =>

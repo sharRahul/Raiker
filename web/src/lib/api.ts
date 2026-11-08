@@ -455,6 +455,10 @@ export const api = {
     values: Record<string, string>,
     expiresAt?: string,
   ) => contract.setConnectorCredentials(connectorId, { values, expires_at: expiresAt || null }),
+  startConnectorSignIn: (connectorId: string) => contract.startConnectorSignIn(connectorId),
+  connectorOauthClients: () => contract.connectorOauthClients(),
+  saveConnectorOauthClient: (provider: "google" | "microsoft", clientId: string, clientSecret?: string) =>
+    contract.saveConnectorOauthClient(provider, { client_id: clientId, client_secret: clientSecret || null }),
   setConnectorEnabled: (connectorId: string, enabled: boolean) =>
     contract.setConnectorEnabled(connectorId, { enabled }),
   registerConnectorManifest: (

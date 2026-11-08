@@ -22,6 +22,7 @@
   import ConnectorAccounts from "../components/ConnectorAccounts.svelte";
   import GuideLink from "../components/GuideLink.svelte";
   import GitHubConnection from "./settings/GitHubConnection.svelte";
+  import BrowserSignIn from "../components/BrowserSignIn.svelte";
   import { api } from "../api";
   import { askConfirm } from "../confirm.svelte";
   import { connectionFailure } from "../connectionRecovery";
@@ -116,6 +117,13 @@
         note: connector.support_level === "supported" ? "Supported" : "Experimental",
       })),
   ]);
+
+  /** Connectors that sign in at the provider, in the owner's own browser. */
+  const BROWSER_SIGN_IN: Record<string, "google" | "microsoft"> = {
+    gmail: "google",
+    gcal: "google",
+    outlook: "microsoft",
+  };
 
   function connectorById(id: string | null): StoreConnector | null {
     return (view?.connectors ?? []).find((connector) => connector.connector_id === id) ?? null;
@@ -379,6 +387,18 @@
             </p>
           {/if}
 
+          {#if connector.auth_status !== "connected" && BROWSER_SIGN_IN[connector.connector_id]}
+            <section aria-labelledby="sign-in-title">
+              <h3 id="sign-in-title">Sign in</h3>
+              <BrowserSignIn
+                connectorId={connector.connector_id}
+                name={connector.display_name}
+                provider={BROWSER_SIGN_IN[connector.connector_id]}
+                onconnected={() => void load()}
+              />
+            </section>
+          {/if}
+
           <!-- QUI-F07 — each account named by the owner, each with its own
                credential; a write names the account it uses. -->
           <ConnectorAccounts {connector} onchanged={load} />
@@ -481,6 +501,24 @@
               <button class="btn btn-ghost" onclick={() => openMcp(connector)} disabled={busy}>
                 Connect through an MCP server instead
               </button>
+            </div>
+          {:else if connector.auth_status !== "connected" && BROWSER_SIGN_IN[connector.connector_id]}
+            <BrowserSignIn
+              connectorId={connector.connector_id}
+              name={connector.display_name}
+              provider={BROWSER_SIGN_IN[connector.connector_id]}
+              onconnected={() => void load()}
+            />
+            <details class="paste-token">
+              <summary>Paste a token instead</summary>
+              <label class="field-label" for="add-credential-token">OAuth access token</label>
+              <input id="add-credential-token" class="input credential" type="password" bind:value={secret} autocomplete="off" />
+              <div class="step-actions">
+                <button class="btn" onclick={() => authenticate(connector)} disabled={busy || !secret}>Connect with this token</button>
+              </div>
+            </details>
+            <div class="step-actions">
+              <button class="btn btn-ghost" onclick={() => finishAdding(connector)}>Later</button>
             </div>
           {:else if connector.auth_status !== "connected"}
             <label class="field-label" for="add-credential">

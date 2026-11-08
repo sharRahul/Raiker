@@ -377,6 +377,68 @@ class GcalConnectorExecutor:
         )
 
 
+class OutlookConnectorExecutor:
+    """Real executor for ``connector_outlook_runtime`` — one governed Outlook read.
+
+    Reached only through ``route_action``; artifacts are metadata only.
+    """
+
+    capability = "connector_outlook_runtime"
+
+    def __init__(
+        self,
+        workspace_root: str | Path,
+        store: SQLiteStore,
+        fetch_fn: Any | None = None,
+    ) -> None:
+        self._workspace_root = Path(workspace_root).resolve()
+        self._store = store
+        self._fetch_fn = fetch_fn
+
+    def execute(self, action: GovernedAction, principal: Principal) -> ExecutionResult:
+        from raiker.runtime.connectors import OutlookConnectorService
+
+        operation = str(action.arguments.get("operation", "read")).strip()
+        if operation != "read":
+            return self._fail(action.action_id, f"unknown_operation:{operation or 'missing'}")
+        service = OutlookConnectorService(
+            self._workspace_root, self._store, fetch_fn=self._fetch_fn,
+            principal_id=principal.principal_id if principal is not None else action.principal_id,
+        )
+        outcome = service.read(
+            str(action.arguments.get("resource", "")),
+            str(action.arguments.get("item_id", "")),
+            action.arguments.get("count"),
+            authority=current_routed_authority(action.action_id),
+        )
+        if outcome.get("status") != "success":
+            error = outcome.get("error", {})
+            return self._fail(action.action_id, str(error.get("type", "connector_failed")))
+        return ExecutionResult(
+            ok=True,
+            capability=self.capability,
+            action_id=action.action_id,
+            summary="Outlook read completed; content withheld from artifacts (metadata only).",
+            artifacts={
+                "resource": outcome.get("resource"),
+                "item_id": outcome.get("item_id"),
+                "title": outcome.get("title"),
+                "content_length": outcome.get("content_length"),
+                "content_redacted": True,
+            },
+        )
+
+    def _fail(self, action_id: str, reason_code: str) -> ExecutionResult:
+        return ExecutionResult(
+            ok=False,
+            capability=self.capability,
+            action_id=action_id,
+            reason_code=reason_code,
+            summary="Outlook connector runtime failed closed.",
+            artifacts={},
+        )
+
+
 class SlackConnectorExecutor:
     """Real executor for ``connector_slack_runtime`` — one governed Slack read.
 

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { githubAppRegistrationUrl } from "../../githubAppLink";
   /**
    * ADD-27 GH-19 — Settings → Connections → GitHub.
    *
@@ -657,10 +658,25 @@
     </details>
 
     <details class="card advanced">
-      <summary>Advanced (self-hosted): a custom GitHub App</summary>
+      <summary>Advanced: your own GitHub App</summary>
+      <div class="register-app">
+        <p class="lead">
+          Create the App on GitHub in one step. The link fills in GitHub's own form with only what
+          Raiker needs: read issues, push a branch you approve, and open pull requests. Check it and
+          click <strong>Create GitHub App</strong>.
+        </p>
+        <a class="btn btn-primary" href={githubAppRegistrationUrl(window.location.origin)} target="_blank" rel="noopener noreferrer">
+          Create my GitHub App on GitHub
+        </a>
+        <ol class="register-steps">
+          <li>On the App's page, turn on <strong>Enable Device Flow</strong> and save. Raiker signs in with it.</li>
+          <li>Copy its <strong>Client ID</strong> and <strong>App ID</strong> into the fields below, then Save.</li>
+          <li>Click <strong>Install App</strong> on GitHub and choose the repositories Raiker may use.</li>
+        </ol>
+      </div>
       <p class="lead">
-        Your own GitHub App, for a self-hosted Raiker. Its private key stays where you keep it —
-        give a file path readable only by you. Raiker records where it is, not what it is.
+        Signing in needs only the Client ID. A private key is optional, for acting as the App
+        itself; give a file path readable only by you. Raiker records where it is, not what it is.
       </p>
       {#each connection.apps.filter((app) => app.app_ref === "byo") as app (app.app_ref)}
         <p class="state">

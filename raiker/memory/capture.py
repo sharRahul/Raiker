@@ -67,6 +67,7 @@ SOURCE_TYPES: Mapping[str, str] = {
     "github_read": "connector",
     "gmail_read": "connector",
     "gcal_read": "connector",
+    "outlook_read": "connector",
     "slack_read": "connector",
     "connector_read": "connector",
     "conversation_search": "conversation",

@@ -564,6 +564,8 @@ class ModelService:
         from raiker.runtime.executors.sandbox import connector_egress_allowlist
 
         allowlist = connector_egress_allowlist()
+        from raiker.runtime.connector_oauth import signed_in
+
         connectors: list[ConnectorView] = []
         gh_gate = self.control.get_capability_gate("connector_github_runtime", acting_principal_id)
         connectors.append(
@@ -596,9 +598,14 @@ class ModelService:
                 ),
                 decision_mode=gmail_gate.decision_mode if gmail_gate is not None else "ask",
                 credential_env=GMAIL_TOKEN_ENV,
-                credential_configured=bool(os.environ.get(GMAIL_TOKEN_ENV, "").strip()),
+                credential_configured=(
+                    signed_in(self.store, acting_principal_id, "gmail")
+                    or bool(os.environ.get(GMAIL_TOKEN_ENV, "").strip())
+                ),
                 egress_host=GMAIL_HOST,
-                egress_allowed=GMAIL_HOST in allowlist,
+                egress_allowed=(
+                    signed_in(self.store, acting_principal_id, "gmail") or GMAIL_HOST in allowlist
+                ),
                 actions=("read_message", "read_thread"),
                 kind="read_only",
             )
@@ -615,9 +622,14 @@ class ModelService:
                 ),
                 decision_mode=gcal_gate.decision_mode if gcal_gate is not None else "ask",
                 credential_env=GCAL_TOKEN_ENV,
-                credential_configured=bool(os.environ.get(GCAL_TOKEN_ENV, "").strip()),
+                credential_configured=(
+                    signed_in(self.store, acting_principal_id, "gcal")
+                    or bool(os.environ.get(GCAL_TOKEN_ENV, "").strip())
+                ),
                 egress_host=GCAL_HOST,
-                egress_allowed=GCAL_HOST in allowlist,
+                egress_allowed=(
+                    signed_in(self.store, acting_principal_id, "gcal") or GCAL_HOST in allowlist
+                ),
                 actions=("read_event", "read_calendar"),
                 kind="read_only",
             )

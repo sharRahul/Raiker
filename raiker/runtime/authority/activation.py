@@ -214,6 +214,11 @@ def _build_registry() -> dict[str, ActivationRequirement]:
     r["connector_gcal_runtime"] = _req(
         "connector_gcal_runtime", "5", threat_ack=True, human_confirm=True,
         notes="Default-ask Calendar event/calendar read; env-only owner token, owner egress allowlist.")
+    # Outlook read-only connector (Microsoft Graph). See
+    # docs/threat-models/connectors-outlook.md.
+    r["connector_outlook_runtime"] = _req(
+        "connector_outlook_runtime", "5", threat_ack=True, human_confirm=True,
+        notes="Default-ask Outlook mail/calendar read; signed-in owner account, Graph host only.")
     # Slack read-only connector (Task 4). See
     # docs/threat-models/connectors-slack.md.
     r["connector_slack_runtime"] = _req(

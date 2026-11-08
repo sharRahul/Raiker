@@ -402,6 +402,15 @@ _AUTHORITY: tuple[CapabilityAuthority, ...] = (
         "connector egress allowlist. Reads only.",
     ),
     _row(
+        "connector_outlook_runtime",
+        SIDE_EFFECT_EXTERNAL,
+        "The owner's mailbox and calendar would be read with their own account, "
+        "which discloses who writes to them, where they are and who they meet.",
+        "An owner-enabled gate, default-Ask decision mode, an account the owner "
+        "signed in to in their own browser (or `RAIKER_OUTLOOK_TOKEN`), and "
+        "`graph.microsoft.com` only. Reads only.",
+    ),
+    _row(
         "connector_slack_runtime",
         SIDE_EFFECT_EXTERNAL,
         "A workspace's channel history would be read with the owner's token, "

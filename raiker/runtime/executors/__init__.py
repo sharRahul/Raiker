@@ -15,6 +15,7 @@ from raiker.runtime.executors.connectors import (
     GcalConnectorExecutor,
     GithubConnectorExecutor,
     GmailConnectorExecutor,
+    OutlookConnectorExecutor,
     SlackConnectorExecutor,
 )
 from raiker.runtime.executors.mcp import McpBuilderExecutor, McpConnectorExecutor
@@ -94,7 +95,7 @@ __all__ = [
     "RemoteExecutionExecutor", "CloudExecutionExecutor",
     "HostedModelRuntimeExecutor", "PrivateNetworkModelRuntimeExecutor",
     "AdvisorModelRuntimeExecutor", "GithubConnectorExecutor", "GmailConnectorExecutor",
-    "GcalConnectorExecutor", "SlackConnectorExecutor", "ScheduledRoutinesExecutor",
+    "GcalConnectorExecutor", "OutlookConnectorExecutor", "SlackConnectorExecutor", "ScheduledRoutinesExecutor",
     "EmailRuntimeExecutor", "CalendarRuntimeExecutor", "ReminderRuntimeExecutor",
     "FinanceRuntimeExecutor", "InvestmentRuntimeExecutor", "MedicalRuntimeExecutor",
     "PregnancyBabyRuntimeExecutor", "CctvRuntimeExecutor", "HomeSecurityRuntimeExecutor",
@@ -235,6 +236,7 @@ REAL_EXECUTOR_CAPABILITIES: frozenset[str] = frozenset({
     # host `www.googleapis.com`); `slack_read` reads a channel's info/history (env
     # `RAIKER_SLACK_TOKEN`, host `slack.com`). Default-ask withholds; reads only.
     "connector_gcal_runtime",
+    "connector_outlook_runtime",
     "connector_slack_runtime",
     # Tier 4 — local manifest validation + brokered read-only plugin tool
     # invocation + revocation off-switch + bounded subprocess code runtime for an
@@ -320,6 +322,7 @@ def build_default_executor_registry(
     registry.register("connector_github_runtime", GithubConnectorExecutor(ws, store))
     registry.register("connector_gmail_runtime", GmailConnectorExecutor(ws, store))
     registry.register("connector_gcal_runtime", GcalConnectorExecutor(ws, store))
+    registry.register("connector_outlook_runtime", OutlookConnectorExecutor(ws, store))
     registry.register("connector_slack_runtime", SlackConnectorExecutor(ws, store))
     registry.register("plugin_install", PluginInstallExecutor(ws, store))
     registry.register("plugin_execution_cap", PluginExecutionCapExecutor(ws, store))

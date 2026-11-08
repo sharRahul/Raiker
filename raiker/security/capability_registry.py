@@ -46,7 +46,7 @@ __all__ = [
 UNTRUSTED_CONTENT_TOOLS = frozenset(
     {
         "web_fetch", "web_search", "web_extract", "weather_lookup",
-        "github_read", "gmail_read", "gcal_read",
+        "github_read", "gmail_read", "gcal_read", "outlook_read",
         "slack_read", "connector_read", "spawn_subagent",
     }
 )
@@ -58,6 +58,7 @@ _CONNECTOR_SUBJECTS: dict[str, str] = {
     "github_read": "github",
     "gmail_read": "gmail",
     "gcal_read": "google_calendar",
+    "outlook_read": "outlook",
     "slack_read": "slack",
     "web_fetch": "web",
     "web_search": "web",

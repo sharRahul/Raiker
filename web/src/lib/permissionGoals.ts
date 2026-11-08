@@ -38,6 +38,7 @@ export const PERMISSION_GOALS: readonly PermissionGoal[] = [
       "email_runtime",
       "external_channel_runtime",
       "connector_gmail_runtime",
+      "connector_outlook_runtime",
       "connector_slack_runtime",
     ],
   },

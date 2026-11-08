@@ -369,9 +369,9 @@ The composer microphone has three states (*Set up voice*, *Dictate*,
 
 | ID | Item | State | P | Effort | Work left |
 |---|---|---|---|---|---|
-| PL-1 | Install, configure, remove supported integrations | 🟡 | P0 | M | A **supported list** for beta: GitHub, email (IMAP/SMTP), calendar (CalDAV), web search, local MCP stdio. Each gets one live install → use → revoke → remove run |
+| PL-1 | Install, configure, remove supported integrations | 🟡 | P0 | M | A **supported list** for beta: GitHub, email (IMAP/SMTP), calendar (CalDAV), web search, local MCP stdio. Each gets one live install → use → revoke → remove run. **2026-11-08:** Gmail, Google Calendar and Outlook connect by browser sign-in; Outlook is a new governed read connector ([FIXED-1347](FIXED_ITEMS.md#fixed-1347--there-was-no-way-to-read-outlook-mail-or-calendar)); GitHub's own App is one click from Advanced |
 | PL-2 | Grants, revocation, audit | ✅ | — | — | Governance suite |
-| PL-3 | OAuth and credential storage | 🟡 | P0 | S | Vault encryption and expiry checks are tested; a provider 401 marks the local credential `reauth_required` so it is not retried. Still required: expired-token and owner-revoked-token live checks for GitHub on the release candidate. Provider-specific OAuth revoke endpoints are not claimed until Raiker has registered clients. |
+| PL-3 | OAuth and credential storage | 🟡 | P0 | S | Vault encryption and expiry checks are tested; a provider 401 marks the local credential `reauth_required` so it is not retried. Still required: expired-token and owner-revoked-token live checks for GitHub on the release candidate. Provider-specific OAuth revoke endpoints are not claimed until Raiker has registered clients. **2026-11-08:** Gmail, Google Calendar and Outlook sign in in the owner's browser with PKCE, a single-use state, a loopback-only redirect and vault-kept tokens that renew themselves ([FIXED-1346](FIXED_ITEMS.md#fixed-1346--gmail-calendar-and-outlook-now-sign-in-in-the-owners-browser)). Still required: one live sign-in per provider with the owner's registered clients |
 | PL-4 | Plugins and MCP cannot bypass the sandbox | ✅ | — | — | **2026-11-08:** `tests/test_mcp_adversarial_server.py` starts a hostile local MCP server the way Raiker does; its loopback (fixed port) and internet connections, home and project reads, write outside its folder and a child process's write all fail on this Windows 11 host's enforced boundary, and a host without one refuses to start it. The Windows dynamic-port loopback range stays the documented limit (TO_BE_FIXED, *Network mediation*) |
 | PL-5 | Supported vs experimental | 🟡 | P0 | S | Every connector has a `support_level` and is **Experimental** by default; the Add list shows the label and an experimental install asks once more (2026-11-07, FIXED-1315, RT-BETA-04). Still required: live evidence to promote the supported beta list; MCP has no catalogue to label (TO_BE_FIXED, *MCP servers have no catalogue to label*) |
 
@@ -524,6 +524,7 @@ product refusing it, rather than delaying the date.
 
 ## Changelog
 
+- **2026-11-08** — Connectors: browser sign-in for Gmail, Google Calendar and Outlook (FIXED-1346), a governed Outlook read connector (FIXED-1347), and a one-click GitHub App registration link.
 - **2026-11-08** — MD-1: Anthropic, OpenAI, OpenRouter, Ollama and LM Studio each completed a live tool-using Chat turn with the owner's keys, entered through the UI. GPT-5 was unusable before FIXED-1343; output limits were measured and set (FIXED-1344).
 - **2026-11-08** — Owner moved signing (a real certificate and an Apple Developer ID), fresh-VM installs, macOS hardware and the AMD GPU run to beta.2: IN-3, IN-5 and SB-2 are now ⏭, and so is the AMD half of MD-2.
 - **2026-11-08** — BD-5 closed: Qwen3-8B on the owner's GPU fixed a failing test with the check verified, three runs out of three. The runs found eight defects, all fixed (FIXED-1334 to FIXED-1342).

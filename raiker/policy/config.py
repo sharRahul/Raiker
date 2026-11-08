@@ -77,7 +77,7 @@ class StaticPolicyConfig:
             "remote_execution_cap", "cloud_execution_cap",
             "hosted_model_runtime", "private_network_model_runtime", "advisor_model_runtime",
             "connector_github_runtime", "connector_gmail_runtime",
-            "connector_gcal_runtime", "connector_slack_runtime",
+            "connector_gcal_runtime", "connector_outlook_runtime", "connector_slack_runtime",
             # A manifest-driven connector write (POST/PUT/PATCH/DELETE). The
             # broker stores an immutable intent and the approval resolution
             # path executes the exact approved operation once.

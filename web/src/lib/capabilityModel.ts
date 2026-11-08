@@ -1005,6 +1005,11 @@ const CAPABILITY_COPY: Record<string, CapabilityCopy> = {
     description:
       "Read one Google Calendar event or calendar, with the credential you connected. Reads only — it creates, moves and cancels nothing — and what it brings back is treated as untrusted data rather than as instructions to the agent.",
   },
+  connector_outlook_runtime: {
+    label: "Outlook connector",
+    description:
+      "Read your newest Outlook messages, your upcoming events, or one of either, with the account you signed in to. Reads only — it sends, moves and deletes nothing — and what it brings back is treated as untrusted data rather than as instructions to the agent.",
+  },
   connector_slack_runtime: {
     label: "Slack connector",
     description:

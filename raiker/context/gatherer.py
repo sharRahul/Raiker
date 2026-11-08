@@ -52,6 +52,7 @@ CAPABILITY_GATE_TOOLS: dict[str, tuple[str, ...]] = {
     "connector_github_runtime": ("github_read",),
     "connector_gmail_runtime": ("gmail_read",),
     "connector_gcal_runtime": ("gcal_read",),
+    "connector_outlook_runtime": ("outlook_read",),
     "connector_slack_runtime": ("slack_read",),
     "advisor_model_runtime": ("consult_advisor",),
     "mcp_connector_runtime": ("mcp__<server>__<tool>",),

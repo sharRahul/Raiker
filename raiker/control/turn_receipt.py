@@ -39,6 +39,7 @@ _SERVICE_BY_FAMILY: dict[str, str] = {"web": "the web"}
 _SERVICE_BY_TOOL: dict[str, str] = {
     "gmail_read": "Gmail",
     "gcal_read": "Google Calendar",
+    "outlook_read": "Outlook",
     "slack_read": "Slack",
     "github_read": "GitHub",
     "github_write": "GitHub",

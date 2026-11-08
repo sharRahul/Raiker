@@ -35,12 +35,45 @@ readiness and account sign-in. Adding a service keeps its dialog open for
 sign-in and **Done**.
 
 Reference connectors with real, governed read paths: **GitHub**, **Gmail**,
-**Google Calendar**, **Slack**. Each needs, at minimum:
+**Google Calendar**, **Outlook**, **Slack**. Each needs, at minimum:
 
 1. its capability gate on (`connector_github_runtime`, etc.);
 2. a decision mode above the default `ask`;
-3. an owner credential in the server environment (`RAIKER_GITHUB_TOKEN`, …);
-4. its host on `RAIKER_CONNECTOR_EGRESS_ALLOWLIST`.
+3. an account: signed in from **Connect** (Gmail, Google Calendar, Outlook), or
+   an owner credential in the server environment (`RAIKER_GITHUB_TOKEN`, …);
+4. its host reachable: a signed-in account reaches its own service's host and
+   no other; anything else needs the host on `RAIKER_CONNECTOR_EGRESS_ALLOWLIST`.
+
+### Signing in with your browser
+
+**Gmail**, **Google Calendar** and **Outlook** connect with **Sign in with
+Google** or **Sign in with Microsoft**. The provider's own sign-in page opens in
+your browser; Raiker never sees your password. After you approve, the provider
+sends the browser back to Raiker on this computer, and the connection turns
+*connected*. Raiker asks only for read access, and keeps the tokens encrypted
+in its vault, renewing them when they expire. Sign-in works when Raiker is
+opened on this computer (`127.0.0.1`). On a host without a browser, use
+**Paste a token instead**.
+
+The first time, the sign-in needs an app registered to your own account, once
+per provider. The panel shows the steps:
+
+* **Google:** in Google Cloud Console, enable the Gmail API and the Google
+  Calendar API, set the consent screen to *External* with yourself as a test
+  user, and create an OAuth client of type **Desktop app**. Paste its client ID
+  and secret.
+* **Microsoft:** in the Microsoft Entra admin center, register an app for
+  personal and work accounts, add the **Mobile and desktop** platform with the
+  redirect URI `http://localhost/api/connector-oauth/callback`, and add the
+  Microsoft Graph permissions `Mail.Read` and `Calendars.Read`. Paste its
+  application (client) ID.
+
+**GitHub** signs in with a GitHub App. **Advanced: your own GitHub App** has
+**Create my GitHub App on GitHub**, which fills in GitHub's own registration
+form with only what Raiker needs: Contents write, Pull requests write, Issues
+read and Metadata read, with webhooks off. Click **Create GitHub App**, turn on
+**Enable Device Flow** on the App's page, then paste its Client ID and App ID
+into Raiker and install the App on the repositories Raiker may use.
 
 Miss any one and the read fails closed with a named reason —
 `connector_gate_disabled`, `connector_withheld_ask`, `connector_not_configured`,

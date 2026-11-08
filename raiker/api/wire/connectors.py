@@ -123,3 +123,23 @@ class ConnectorActionCompleted(ConnectorInvocation):
     """A read, carried out."""
 
     status: Literal["completed"]
+
+
+class ConnectorSignInStarted(TypedDict):
+    """Where the owner's browser goes to sign in; Raiker never sees the password."""
+
+    ok: bool
+    connector_id: str
+    authorize_url: str
+
+
+class OAuthClientsView(TypedDict):
+    """Which providers have a registered sign-in client (never the client itself)."""
+
+    google: bool
+    microsoft: bool
+
+
+class OAuthClientSaved(TypedDict):
+    ok: bool
+    provider: str

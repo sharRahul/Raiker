@@ -174,6 +174,7 @@ class TestSourceDerivation:
             "github_read": ({"repo": "o/r", "number": "1"}, {"title": "Issue", "content": "body"}),
             "gmail_read": ({}, {"subject": "Renewal", "message_id": "m1", "content": "text"}),
             "gcal_read": ({}, {"title": "Standup", "event_id": "e1", "content": "text"}),
+            "outlook_read": ({}, {"title": "Invoice", "item_id": "AAMk1", "content": "text"}),
             "slack_read": ({"channel": "#eng"}, {"content": "text"}),
             "connector_read": ({"connector_id": "c", "operation_id": "o"}, {"content": "text"}),
             "web_fetch": ({"url": "https://e.test"}, {"final_url": "https://e.test", "content": "body"}),

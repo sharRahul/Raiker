@@ -167,6 +167,7 @@ _ENTRIES: tuple[CapabilityEntry, ...] = (
     _own("advisor_model_runtime", ENTRY_LOCAL_ADMISSION),
     _own("connector_gmail_runtime", ENTRY_LOCAL_ADMISSION),
     _own("connector_gcal_runtime", ENTRY_LOCAL_ADMISSION),
+    _own("connector_outlook_runtime", ENTRY_LOCAL_ADMISSION),
     _own("connector_slack_runtime", ENTRY_LOCAL_ADMISSION),
     _own("vector_embedding_runtime", ENTRY_LOCAL_ADMISSION),
     _own("hosted_model_runtime", ENTRY_LOCAL_ADMISSION),

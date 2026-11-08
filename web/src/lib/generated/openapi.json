@@ -7792,6 +7792,30 @@
         "title": "ConnectorOperation",
         "type": "object"
       },
+      "ConnectorSignInStarted": {
+        "description": "Where the owner's browser goes to sign in; Raiker never sees the password.",
+        "properties": {
+          "authorize_url": {
+            "title": "Authorize Url",
+            "type": "string"
+          },
+          "connector_id": {
+            "title": "Connector Id",
+            "type": "string"
+          },
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "ok",
+          "connector_id",
+          "authorize_url"
+        ],
+        "title": "ConnectorSignInStarted",
+        "type": "object"
+      },
       "ConnectorStoreView": {
         "properties": {
           "connectors": {
@@ -24773,6 +24797,68 @@
           "created_at"
         ],
         "title": "NotificationView",
+        "type": "object"
+      },
+      "OAuthClientRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "client_id": {
+            "title": "Client Id",
+            "type": "string"
+          },
+          "client_secret": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Client Secret"
+          }
+        },
+        "required": [
+          "client_id"
+        ],
+        "title": "OAuthClientRequest",
+        "type": "object"
+      },
+      "OAuthClientSaved": {
+        "properties": {
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          },
+          "provider": {
+            "title": "Provider",
+            "type": "string"
+          }
+        },
+        "required": [
+          "ok",
+          "provider"
+        ],
+        "title": "OAuthClientSaved",
+        "type": "object"
+      },
+      "OAuthClientsView": {
+        "description": "Which providers have a registered sign-in client (never the client itself).",
+        "properties": {
+          "google": {
+            "title": "Google",
+            "type": "boolean"
+          },
+          "microsoft": {
+            "title": "Microsoft",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "google",
+          "microsoft"
+        ],
+        "title": "OAuthClientsView",
         "type": "object"
       },
       "ObservationView": {
@@ -42622,6 +42708,183 @@
           }
         },
         "summary": "Get Connections"
+      }
+    },
+    "/api/connector-oauth/callback": {
+      "get": {
+        "description": "Where the provider sends the browser back.\n\nNo Raiker session comes with it: the owner's system browser is not the app.\nThe single-use ``state`` from the owner's own start is what admits it.",
+        "operationId": "connector_sign_in_callback_api_connector_oauth_callback_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "state",
+            "required": false,
+            "schema": {
+              "default": "",
+              "title": "State",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "code",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Code"
+            }
+          },
+          {
+            "in": "query",
+            "name": "error",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Error"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Connector Sign In Callback"
+      }
+    },
+    "/api/connector-oauth/clients": {
+      "get": {
+        "operationId": "connector_oauth_clients_api_connector_oauth_clients_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OAuthClientsView"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Connector Oauth Clients"
+      }
+    },
+    "/api/connector-oauth/clients/{provider}": {
+      "put": {
+        "operationId": "save_connector_oauth_client_api_connector_oauth_clients__provider__put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "provider",
+            "required": true,
+            "schema": {
+              "title": "Provider",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OAuthClientRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OAuthClientSaved"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Save Connector Oauth Client"
+      }
+    },
+    "/api/connector-oauth/{connector_id}/start": {
+      "post": {
+        "operationId": "start_connector_sign_in_api_connector_oauth__connector_id__start_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "connector_id",
+            "required": true,
+            "schema": {
+              "title": "Connector Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConnectorSignInStarted"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Start Connector Sign In"
       }
     },
     "/api/connector-store": {

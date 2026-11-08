@@ -295,7 +295,7 @@ work runs (top bar), and so is the count of running items.
 | UX-2 | Composer, navigation, model selection consistent | ✅ | — | — | Existing component coverage names the Chat and Build grammars; this round adds the shared five-state vocabulary and a live `RT-BETA-UX-01` route check. **2026-11-08:** the parity assertion found Build's order differing from Chat's; fixed, and checked in mocked e2e ([FIXED-1326](FIXED_ITEMS.md#fixed-1326--build-and-chat-ordered-the-shared-composer-controls-differently-ux-2)). |
 | UX-3 | Permission controls, runtime status, approvals | ✅ | — | — | QUI-P01–P09 (approvals round) |
 | UX-4 | Understandable errors and recovery actions | ✅ | — | — | Whole-route audit `tests/test_route_reason_copy.py`: every literal route refusal has copy, and `failure()` says why ([FIXED-1309](FIXED_ITEMS.md#fixed-1309--eighty-route-refusals-reached-the-owner-as-a-bare-machine-code-ux-4)) |
-| UX-5 | Responsive layouts, accessibility, desktop usability | 🟡 | P0 | M | **2026-11-07:** RT-BETA-09 finds no serious or critical axe violation on any destination at 1440, 1280 and 390 ([FIXED-1317](FIXED_ITEMS.md#fixed-1317--settings-sections-were-off-the-card-system-and-the-activity-table-could-not-be-scrolled-by-keyboard-found-this-round-ux-5)). Still required: keyboard-only T-14; NVDA and VoiceOver passes |
+| UX-5 | Responsive layouts, accessibility, desktop usability | 🟡 | P0 | M | **2026-11-07:** RT-BETA-09 finds no serious or critical axe violation on any destination at 1440, 1280 and 390 ([FIXED-1317](FIXED_ITEMS.md#fixed-1317--settings-sections-were-off-the-card-system-and-the-activity-table-could-not-be-scrolled-by-keyboard-found-this-round-ux-5)). **2026-11-08:** keyboard-only T-14 passes live (`keyboard-only-live.spec.ts`, 5/5: start, stop, find with Ctrl+K, back up, reach Approvals; every stop named with visible focus), finding FIXED-1333. Still required: NVDA and VoiceOver passes by a person |
 
 **2026-11-06 shared UI refinement.** The owner's settings cog, simpler Models
 and shared Apple/macOS design pass are implemented. The running-host review
@@ -523,6 +523,7 @@ product refusing it, rather than delaying the date.
 
 ## Changelog
 
+- **2026-11-08** — UX-5 keyboard-only T-14 passes live; it found a readiness promise the server did not keep (FIXED-1333).
 - **2026-11-08** — PL-4 closed by an adversarial MCP server test.
 - **2026-11-08** — SB-5: Undo Apply and crash-safe Apply (FIXED-1332).
 - **2026-11-08** — AG-4 closed by a host-restart drill in CI (FIXED-1331).

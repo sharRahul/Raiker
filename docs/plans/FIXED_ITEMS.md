@@ -1637,6 +1637,7 @@ file you can open. The two capture sets that remain — `screenshots/pages/` and
 | [FIXED-1330](#fixed-1330--a-memorys-readable-mirror-held-passwords-and-card-numbers-in-plain-text-mm-3-found-by-the-drill) | High | Memory / privacy | Fixed 2026-11-08 |
 | [FIXED-1331](#fixed-1331--a-goal-step-the-host-died-in-read-only-failed-ag-4-found-by-the-restart-drill) | Medium | Goals / recovery | Fixed 2026-11-08 |
 | [FIXED-1332](#fixed-1332--an-apply-could-not-be-undone-and-a-crash-part-way-left-the-project-half-written-sb-5) | High | Build / sandbox promotion | Fixed 2026-11-08 |
+| [FIXED-1333](#fixed-1333--the-composer-promised-a-check-the-server-never-ran-after-a-local-slot-restarted-found-by-the-keyboard-round) | Medium | Models / readiness | Fixed 2026-11-08 |
 
 ---
 
@@ -39755,3 +39756,23 @@ exits hard (`os._exit`) after its third file write is rolled back exactly by
 recovery, and a second recovery finds nothing to do. Live RT-BETA-12: Apply,
 **Undo Apply**, and `main.py`, `old.txt` and the absent `new.py` are as before
 (captures `12a`, `12b`). RT-BETA-07 and -08 still pass.
+
+## FIXED-1333 — The composer promised a check the server never ran after a local slot restarted (found by the keyboard round)
+
+**Severity: Medium. Area: Models / readiness. Status: Fixed 2026-11-08.**
+
+**Observed.** After the host restarted and re-served the GGUF slot, the
+composer said *Checking this model — you can still send*, and the turn was
+then refused with *This model connection must be checked again*. Serving,
+restarting or stopping a slot marks its observation stale with its own reason
+(`local_runtime_deployed`, …), and only an expired observation or a connected
+provider's never-checked model was re-checked on send. A managed slot has no
+saved connection, so it was never looked at.
+
+**Fixed.** On send, a stale observation on a profile the owner configured (a
+saved connection, or a model they served or chose) is re-checked against the
+runtime, and only a failed check refuses the turn. Raiker still never reaches
+a provider the owner did not set up.
+
+**Evidence.** `test_model_readiness_rate_limit.py::test_an_invalidated_check_on_a_configured_slot_is_rechecked_not_refused`,
+and live KB-01: the first turn after a restart answered.

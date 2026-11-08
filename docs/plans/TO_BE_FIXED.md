@@ -1555,3 +1555,11 @@ Signing, install and smoke had passed. The rerun passed, and the same test
 passed on the other targets. Read the attempt's trace (artifact
 `desktop-linux-x86_64`) for what Home showed instead, and wait on the
 product's own ready signal rather than the greeting.
+
+## A stopped turn is announced twice
+
+Seen 2026-11-08 in KB-02. Stopping a long answer shows *Stopped at your
+request — this turn ended at a safe boundary and kept what it had already
+done.* above the answer, and the answer itself reads *Stopped by user at a safe
+boundary.* One of the two is enough. Check also that text the model had already
+streamed before the stop is kept in the answer, as the first line says.

@@ -149,6 +149,29 @@ def _nothing_has_been_measured(readiness: ModelReadiness, connected: frozenset[s
     )
 
 
+def _invalidated_on_a_configured_profile(readiness: ModelReadiness, configured: frozenset[str]) -> bool:
+    """True when a setting change voided the last check on a model the owner set up.
+
+    A restarted slot, a changed endpoint or a new key marks the observation
+    ``readiness_invalidated``. The composer then says *Checking this model — you
+    can still send*, and the honest way to keep that promise is to look, exactly
+    as for an expired observation. It is limited to profiles the owner
+    configured, so Raiker still never reaches a provider on its own initiative.
+    """
+    # Every invalidation (`readiness_invalidated`, `local_runtime_deployed`,
+    # `local_runtime_stopped`, …) is a STALE row: a re-check answers each
+    # honestly, and a stopped slot simply fails it.
+    return readiness.state is ModelReadinessState.STALE and readiness.key.profile_id in configured
+
+
+def _deployed_profiles(store: Any, owner_principal_id: str) -> frozenset[str]:
+    """Profiles the owner put a model into: a managed slot they served, or a model they chose."""
+    try:
+        return frozenset(profile_id for profile_id, _model in store.list_configured_models(owner_principal_id))
+    except Exception:  # noqa: BLE001 - an unreadable list grants nothing
+        return frozenset()
+
+
 class ModelNotReady(RuntimeError):
     def __init__(self, readiness: ModelReadiness) -> None:
         super().__init__("model_not_ready")
@@ -1030,12 +1053,15 @@ class ModelReadinessService:
 
         from raiker.models.policy_state import owner_configured_providers
 
-        connected = owner_configured_providers(self.store, owner_principal_id)
+        connected = owner_configured_providers(self.store, owner_principal_id) | _deployed_profiles(
+            self.store, owner_principal_id
+        )
         refreshed_primary: ModelReadiness | None = None
         for readiness in chain:
             if not (
                 _has_merely_expired(readiness)
                 or _nothing_has_been_measured(readiness, connected)
+                or _invalidated_on_a_configured_profile(readiness, connected)
             ):
                 continue
             try:

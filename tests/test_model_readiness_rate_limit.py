@@ -77,3 +77,35 @@ def test_the_ledger_records_the_time_and_does_not_ask_again_before_it(tmp_path: 
     clock[0] = NOW + timedelta(minutes=11)
     asyncio.run(service.check("owner", "anthropic-hosted", "m", "e"))
     assert probe.calls == 2
+
+
+def test_an_invalidated_check_on_a_configured_slot_is_rechecked_not_refused(tmp_path: Path) -> None:
+    """KB-01 (keyboard round) — after a slot restart the composer promised a check the server never ran."""
+    import asyncio as _asyncio
+
+    from raiker.models.readiness import (
+        ModelReadiness,
+        ModelReadinessKey,
+        ModelReadinessService,
+        ModelReadinessState,
+    )
+
+    store = SQLiteStore(tmp_path)
+    store.save_configured_model("owner", "raiker-local-llama-cpp", "local-gguf")
+    calls = {"n": 0}
+
+    class Probe:
+        def resolve_key(self, owner: str, profile: str, model: str) -> ModelReadinessKey:
+            return ModelReadinessKey(owner, profile, model, "loopback")
+
+        async def check(self, key: ModelReadinessKey) -> ModelReadiness:
+            calls["n"] += 1
+            return ModelReadiness(key=key, state=ModelReadinessState.READY, checked_at=None, expires_at=None,
+                                  summary="ok", reason_code="model_ready", remediation="", evidence={})
+
+    service = ModelReadinessService(store, probe=Probe())
+    _asyncio.run(service.check("owner", "raiker-local-llama-cpp", "local-gguf", "loopback"))
+    store.invalidate_model_readiness("owner", "raiker-local-llama-cpp", reason_code="local_runtime_deployed")
+    ready = _asyncio.run(service.require_ready_async("owner", "raiker-local-llama-cpp", "local-gguf"))
+    assert ready.ready
+    assert calls["n"] == 2, "the invalidated observation was looked at again, not refused"

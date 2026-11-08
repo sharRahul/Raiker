@@ -15,6 +15,24 @@ the model provider → the audit event log. It also exercises the two features i
 PR #106: the **user-owned fallback sequence** and **prompt caching + normalised
 cache-hit metrics**.
 
+## Result — 2026-11-08 (Dark attention amber and MCP provenance)
+
+The owner's two decisions of 2026-11-08
+([FIXED-1358](../plans/FIXED_ITEMS.md#fixed-1358--dark-attention-notices-shared-the-gold-of-a-primary-action),
+[FIXED-1359](../plans/FIXED_ITEMS.md#fixed-1359--an-mcp-server-did-not-say-whether-raiker-had-reviewed-it-pl-5)).
+A fresh workspace served by `raiker-web --port 8765` at 1440×900, Linux; no
+model or key. Spec: `web/e2e/attention-amber-and-mcp-provenance-live.spec.ts`,
+**3/3**. Each theme is chosen through the system setting and the page reloaded
+before a capture: an earlier capture taken while the theme was switching showed
+washed-out buttons that a page loaded in dark does not have.
+
+| Case | Check | Result |
+|---|---|---|
+| RT-AMB-01 | In dark, `--warn` computes to `#EE9A4D` and `--action` to `#E0B64A`; Home's attention cues (the backup prompt, the health check) are amber beside the gold Send | ✅ |
+| RT-AMB-02 | In light, `--warn` stays `#8A6411` and the primary action is not gold | ✅ |
+| RT-MCP-PL5-01 | The MCP builder is turned on in Permissions and a sample generated; its row reads **Raiker sample** with *Shipped with Raiker* as its tooltip, and no server is labelled *Experimental*; the same in dark | ✅ |
+| Suites | `appCss.test.ts`, `mcpProvenance.test.ts`, `McpView.test.ts`, the web unit suite, `svelte-check`, ESLint, design tokens | ✅ |
+
 ## Result — 2026-11-08 (QUI-A08 diagrams and the small-fixes round, hosted Anthropic Haiku 4.5)
 
 Diagrams, the last item of the Quiet UI plan's visual answers, after which 04

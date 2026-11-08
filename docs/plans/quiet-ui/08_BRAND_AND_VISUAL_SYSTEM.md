@@ -32,7 +32,7 @@ live cases RT-QUI-57 and RT-QUI-70).
 | Secondary text | `#686761` | `#C1C7D0` (was `#B7B4AC`); muted `#A0A7B2` (was `#8C8A84`) | Metadata, descriptions, placeholders |
 | Primary action | `#2F6F8F` | gold `#E0B64A` with `#101216` text (`--action`, 2026-11-07) | Primary actions and key highlights |
 | Interactive accent | `#2F6F8F` | `#78B7D5` | Secondary interaction, selection, focus |
-| Attention | `#B8871B` fill / **`#8A6411` text** | `#E0B64A` | Decisions required |
+| Attention | `#B8871B` fill / **`#8A6411` text** | amber `#EE9A4D` (2026-11-08; gold is the primary action) | Decisions required |
 | Success | `#2F7D5C` | `#62B68D` | Verified completion |
 | Risk | `#B5453C` | `#E47B70` | Destructive and error |
 
@@ -218,7 +218,8 @@ otherwise.
 | Primary text | `#F4F1EA` | `#F2F4F7` | `--text-1` |
 | Secondary text | `#B7B4AC` | `#C1C7D0` | `--text-2` |
 | Muted text | `#8C8A84` (`--text-3` aliased secondary) | `#A0A7B2` | `--text-3` |
-| Primary actions | blue | gold `#E0B64A`, `#101216` text | `--action` |
+| Primary actions | blue (kept 2026-11-08: the light gold fails as text) | gold `#E0B64A`, `#101216` text | `--action` |
+| Attention | `#8A6411` text, `#B8871B` fill | amber `#EE9A4D`, 6.2:1 on `--raised` (2026-11-08) | `--warn` |
 | Selected navigation | blue at 13 % | blue at 20 % | `--nav-selected` |
 
 The 15-item checklist:

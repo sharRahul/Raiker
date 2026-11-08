@@ -151,6 +151,23 @@ describe("McpView", () => {
     expect(await screen.findByText(/is started with GEO_KEY from now on/)).toBeInTheDocument();
   });
 
+  it("says on each row where the server came from (PL-5)", async () => {
+    stubFetch({
+      "GET /api/mcp/servers": [
+        server(),
+        server({ server_id: "mcp_own", name: "my-notes", source: "owner", source_plugin: null }),
+      ],
+      "GET /api/capability-gates": ENABLED_GATES,
+      ...monitorRoutes(),
+    });
+    const { container } = render(McpView);
+    await waitFor(() => expect(screen.getByText("my-notes")).toBeInTheDocument());
+    const labels = [...container.querySelectorAll(".provenance")];
+    expect(labels.map((label) => label.textContent)).toEqual(["Raiker sample", "Added by you"]);
+    expect(labels[1]).toHaveAttribute("title", "Raiker has not reviewed this server. Use servers you trust.");
+    expect(screen.queryByText("Experimental")).toBeNull();
+  });
+
   it("lists servers with status and discovered tools", async () => {
     stubFetch({
       "GET /api/mcp/servers": [server()],

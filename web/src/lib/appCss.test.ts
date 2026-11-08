@@ -34,7 +34,7 @@ describe("subtle semantic palette", () => {
         // QUI-V01 — the Quiet UI palette (08_BRAND_AND_VISUAL_SYSTEM.md).
     expect(light).toMatchObject({ "--bg": "#F7F6F2", "--surface": "#FFFFFF", "--text-1": "#1C1C1A", "--text-2": "#686761", "--accent": "#2F6F8F", "--warn": "#8A6411", "--brand": "#B8871B", "--ok": "#2F7D5C", "--danger": "#B5453C" });
     // 2026-11-07 owner-chosen dark ladder (08, QUI-V01 dark revision).
-    expect(dark).toMatchObject({ "--bg": "#101216", "--surface": "#1C2027", "--raised": "#272D36", "--border": "#343B46", "--text-1": "#F2F4F7", "--text-2": "#C1C7D0", "--text-3": "#A0A7B2", "--accent": "#78B7D5", "--action": "#E0B64A", "--warn": "#E0B64A", "--ok": "#62B68D", "--danger": "#E47B70" });
+    expect(dark).toMatchObject({ "--bg": "#101216", "--surface": "#1C2027", "--raised": "#272D36", "--border": "#343B46", "--text-1": "#F2F4F7", "--text-2": "#C1C7D0", "--text-3": "#A0A7B2", "--accent": "#78B7D5", "--action": "#E0B64A", "--warn": "#EE9A4D", "--ok": "#62B68D", "--danger": "#E47B70" });
   });
 
   it("keeps normal muted and semantic state text at AA contrast", () => {
@@ -50,6 +50,24 @@ describe("subtle semantic palette", () => {
     }
     // The light attention fill fails as text (2.98:1); it is for fills only.
     expect(contrast("#B8871B", "#F7F6F2")).toBeLessThan(3);
+  });
+
+  it("keeps dark attention a hue of its own, apart from the gold action and the red danger", () => {
+    const dark = themeTokens(":root[data-theme=\"dark\"]");
+    const hue = (hex: string) => {
+      const [r, g, b] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255);
+      const max = Math.max(r, g, b);
+      const min = Math.min(r, g, b);
+      const d = max - min;
+      const h = max === r ? ((g - b) / d) % 6 : max === g ? (b - r) / d + 2 : (r - g) / d + 4;
+      return (h * 60 + 360) % 360;
+    };
+    expect(dark["--warn"]).not.toBe(dark["--action"]);
+    expect(Math.abs(hue(dark["--warn"]) - hue(dark["--action"]))).toBeGreaterThanOrEqual(10);
+    expect(Math.abs(hue(dark["--warn"]) - hue(dark["--danger"]))).toBeGreaterThanOrEqual(15);
+    for (const step of ["--bg", "--surface", "--raised"] as const) {
+      expect(contrast(dark["--warn"], dark[step])).toBeGreaterThanOrEqual(4.5);
+    }
   });
 
   it("keeps the 2026-11-07 dark ladder ordered and every text role at AA on every step", () => {

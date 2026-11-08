@@ -433,9 +433,12 @@
   --ok-soft: #16291F;
   --ok-border: #2B5441;
 
-  --warn: #E0B64A;
-  --warn-soft: rgba(224, 182, 74, 0.13);
-  --warn-border: rgba(224, 182, 74, 0.36);
+  /* Attention is its own orange-amber, not the gold of a primary action
+     (owner's decision 2026-11-08): a notice and a button no longer share
+     one "look here" hue. 6.2:1 on --raised, 8.4:1 on --bg. */
+  --warn: #EE9A4D;
+  --warn-soft: rgba(238, 154, 77, 0.13);
+  --warn-border: rgba(238, 154, 77, 0.38);
 
   --danger: #E47B70;
   --danger-strong: #F0A39A;
@@ -533,9 +536,12 @@
     --ok-soft: #16291F;
     --ok-border: #2B5441;
 
-    --warn: #E0B64A;
-    --warn-soft: rgba(224, 182, 74, 0.13);
-    --warn-border: rgba(224, 182, 74, 0.36);
+    /* Attention is its own orange-amber, not the gold of a primary action
+       (owner's decision 2026-11-08): a notice and a button no longer share
+       one "look here" hue. 6.2:1 on --raised, 8.4:1 on --bg. */
+    --warn: #EE9A4D;
+    --warn-soft: rgba(238, 154, 77, 0.13);
+    --warn-border: rgba(238, 154, 77, 0.38);
 
     --danger: #E47B70;
     --danger-strong: #F0A39A;

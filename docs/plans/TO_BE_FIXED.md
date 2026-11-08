@@ -1467,25 +1467,6 @@ Keeping an already-kept Haiku completed live, but its switch was offered, so
 the failing shape was not reproduced. Still to do: re-run the web-access spec
 on such a workspace (it needs a funded key).
 
-## Dark theme: gold primary actions share a hue with attention notices
-
-Observed in the 2026-11-07 dark-ladder review. Gold is now the dark primary
-action (`--action` `#E0B64A`), and the dark attention colour (`--warn`, for
-example *No model is chosen*) is the same `#E0B64A`. They read differently: an
-action is a solid gold button with dark text, while a notice is a translucent
-tint with a dot and words. They still compete for the same "look here" signal.
-The owner's brief keeps semantic colours for status. Decide whether dark
-attention moves to a distinct amber, or stays as it is because its text and
-shape already distinguish it. Light primary actions also remain blue until the
-owner decides whether gold applies there too.
-
-## MCP servers have no catalogue to label (PL-5)
-
-PL-5 asks for *Supported* and *Experimental* labels on MCP catalogue entries.
-Raiker has no MCP catalogue: every server is added by the owner. Decide whether
-owner-added servers carry an *Experimental* label, or whether the plan's row
-closes at the connector catalogue.
-
 ## Windows builds are signed with a self-signed beta certificate (IN-3)
 
 Owner's decision, 2026-11-07: sign Windows with an OpenSSL self-signed

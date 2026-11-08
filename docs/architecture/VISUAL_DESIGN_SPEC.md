@@ -233,7 +233,7 @@ restated here so this document is complete:
   | Main text | `#1C1C1A` | `#F4F1EA` |
   | Secondary text | `#686761` | `#B7B4AC` |
   | Primary action, focus, the app mark | `#2F6F8F` | `#78B7D5` |
-  | Attention: fill / text | `#B8871B` / `#8A6411` | `#E0B64A` |
+  | Attention: fill / text | `#B8871B` / `#8A6411` | `#EE9A4D` (apart from the gold action, 2026-11-08) |
   | Success | `#2F7D5C` | `#62B68D` |
   | Risk | `#B5453C` | `#E47B70` |
 

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { mcpProvenance } from "../mcpProvenance";
   import { askConfirm } from "../confirm.svelte";
   import { formatTimestamp } from "../format";
   import { onMount } from "svelte";
@@ -522,7 +523,7 @@
     <p class="offers-lead">
       A plugin can describe a server it works with. Nothing here is connected or reachable —
       adding one runs the ordinary governed create path, so it goes through the trust gate
-      rather than around it.
+      rather than around it. Raiker has not reviewed these servers.
     </p>
     <ul class="offer-list">
       {#each offers as offer (offer.plugin_id + "/" + offer.name)}
@@ -599,6 +600,9 @@
               <button class="btn btn-sm" onclick={() => (renamingId = null)}>Cancel</button>
             {:else}
               <span class="name">{s.name}</span>
+              {@const origin = mcpProvenance(s.source, s.source_plugin)}
+              <span class="pill provenance" title={origin.detail}>{origin.label}</span>
+              <span class="sr-only">{origin.detail}</span>
               <span class="status" class:connected={s.status === "connected" && s.monitor_state === "active"} class:danger={s.status === "error" || s.monitor_state !== "active"}>
                 <i></i>{statusLabel(s)}
               </span>
@@ -879,6 +883,8 @@
   .top { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); flex-wrap: wrap; }
   .name-block { display: flex; align-items: center; gap: 0.7rem; flex-wrap: wrap; min-width: 0; max-width: 100%; }
   .name { font-weight: 700; font-size: var(--text-base); }
+  /* PL-5 — who the server came from; quiet, because it is a fact, not a warning. */
+  .provenance { font-size: var(--text-xs); font-weight: 600; color: var(--text-2); background: var(--neutral-soft); border: 1px solid var(--neutral-border); border-radius: var(--r-pill); padding: 0.05rem 0.5rem; }
   .status { display: flex; align-items: center; gap: 0.4rem; color: var(--text-3); font-size: var(--text-xs); font-weight: 600; }
   .status i { width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
   /* A persistent normal state is neutral. Success colour is spent on

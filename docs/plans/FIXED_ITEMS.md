@@ -1662,6 +1662,8 @@ file you can open. The two capture sets that remain — `screenshots/pages/` and
 | [FIXED-1355](#fixed-1355--home-greeted-a-nameless-owner-when-its-first-read-failed) | Low | Home / desktop onboarding test | Fixed 2026-11-08 |
 | [FIXED-1356](#fixed-1356--auto-could-plan-a-local-context-no-turn-fits-in) | Medium | Models / local runtime | Fixed 2026-11-08 |
 | [FIXED-1357](#fixed-1357--twelve-live-checks-never-waited-and-a-kept-model-could-stop-a-specs-setup-found-this-round) | Low | Live test harness | Fixed 2026-11-08 |
+| [FIXED-1358](#fixed-1358--dark-attention-notices-shared-the-gold-of-a-primary-action) | Low | Brand / dark theme | Fixed 2026-11-08 |
+| [FIXED-1359](#fixed-1359--an-mcp-server-did-not-say-whether-raiker-had-reviewed-it-pl-5) | Low | Connections › MCP servers | Fixed 2026-11-08 |
 
 ---
 
@@ -40288,3 +40290,59 @@ names that model, closes the dialog instead of failing.
 **Evidence.** Live RT-FIX-05: keeping Haiku 4.5 on a workspace that already
 kept it completed. The switch was offered this time, so the 2026-11-07 shape
 was not reproduced; the web-access spec is still to re-run (TO_BE_FIXED).
+
+## FIXED-1358 — Dark attention notices shared the gold of a primary action
+
+**Severity: Low. Area: Brand / dark theme. Status: Fixed 2026-11-08.**
+
+**Observed.** Since 2026-11-07 gold `#E0B64A` was both the dark primary action
+(`--action`) and the dark attention colour (`--warn`, for example *No model is
+chosen*). Their shapes differed, but a notice and a button competed for one
+"look here" hue.
+
+**Fixed.** The owner chose a different amber. Dark attention is `#EE9A4D`
+(hue 29°): 14° from the gold action and 23° from the salmon danger, and 6.2:1
+on `--raised`, 7.3:1 on `--surface` and 8.4:1 on `--bg`. Its soft fill and
+border follow it. This is the separation Apple's palette draws between yellow
+and orange, and GitHub's dark theme between *attention* and *severe*.
+
+Light primary actions stay blue. The light gold `#B8871B` reaches only 2.98:1 as
+text, so a gold button with readable text would fail AA. Claude and ChatGPT
+also keep an accent or neutral primary in light mode.
+
+**Evidence.** `appCss.test.ts` pins `#EE9A4D` and checks it keeps 10° from the
+action, 15° from danger and AA on every dark surface. Live RT-AMB-01 and
+RT-AMB-02 (`output/playwright/2026-11-08-amber-and-mcp-provenance/`).
+
+## FIXED-1359 — An MCP server did not say whether Raiker had reviewed it (PL-5)
+
+**Severity: Low. Area: Connections › MCP servers. Status: Fixed 2026-11-08.**
+
+**Observed.** PL-5 asks for *Supported* and *Experimental* labels, and
+Raiker's connector catalogue has them. MCP servers have no catalogue: each is
+Raiker's own sample, offered by a plugin, or added by the owner. Whether they
+should carry *Experimental* was left to the owner, who asked that the reference
+products decide.
+
+**Decided from the references.**
+* Claude's connector directory has three tiers: *Verified*, *Community*, and
+  *Custom*. A custom connector is one you add yourself, not reviewed by
+  Anthropic.
+* ChatGPT warns that custom MCP servers introduce risk when OpenAI has not
+  reviewed them.
+* Hermes Agent takes MCP servers from its configuration and labels none.
+* Muse has no owner-added servers.
+
+So an MCP server says where it came from, never a verdict Raiker did not make.
+*Experimental* in Raiker means one of its own connections not yet verified, and
+applying it to an owner's server would claim a judgement.
+
+**Fixed.** Each server's row carries **Raiker sample**, **From a plugin** or
+**Added by you** (`mcpProvenance.ts`). The latter two say *Raiker has not
+reviewed this server*, the label in its tooltip and as text for screen readers,
+and the plugin offers say the same. No extra confirmation was added. A server's
+tools already wait for the owner to accept each declaration, and every call
+goes through Permissions, which is the consent ChatGPT's warning stands in for.
+
+**Evidence.** `mcpProvenance.test.ts`, `McpView.test.ts`; live RT-MCP-PL5-01
+(`03-mcp-provenance-light.png`, `04-mcp-provenance-dark.png`).

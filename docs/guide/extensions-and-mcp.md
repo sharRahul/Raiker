@@ -147,7 +147,12 @@ tool, shown as *It says: “…”* because it is the server's text, not Raiker'
 then its **risk** (*Runs code on this machine*, *Reaches your own network* or
 *Sends data to a remote service*), its **source** (*Sample Raiker generated*,
 *Offered by the plugin …* or *Added by you*) and **last use** with how its recent
-sessions ended.
+sessions ended. The source is also a label beside the server's name: **Raiker
+sample**, **From a plugin** or **Added by you**. Raiker reviews only its own
+sample; a server from a plugin or added by you says *Raiker has not reviewed
+this server*, so use servers you trust. The connection catalogue's *Supported*
+and *Experimental* are Raiker's verdicts on its own connections and are never
+given to an MCP server.
 
 **What it can reach** is open on a server until it has been tested, because
 **Test** is the step that lets it run, and an offer shows the same as **What

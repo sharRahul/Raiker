@@ -306,6 +306,9 @@
     min-width: 0;
     justify-content: flex-end;
   }
+  /* A narrow bar keeps its controls on one line, except to give a dictation
+     message the line under them. */
+  .bar-right:has(> :global(.voice-error), > :global(.voice-notice)) { flex-wrap: wrap; }
   .shortcut-hint {
     color: var(--text-3);
     font-size: var(--text-xs);

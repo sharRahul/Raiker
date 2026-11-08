@@ -1631,6 +1631,7 @@ file you can open. The two capture sets that remain — `screenshots/pages/` and
 | [FIXED-1324](#fixed-1324--builds-sandbox-review-kept-a-stale-list-when-the-owner-came-back-to-it) | Low | Build / sandbox review | Fixed 2026-11-08 |
 | [FIXED-1325](#fixed-1325--automatic-llamacpp-install-picked-a-release-still-uploading-found-in-ci) | Medium | Models / llama.cpp | Fixed 2026-11-08 |
 | [FIXED-1326](#fixed-1326--build-and-chat-ordered-the-shared-composer-controls-differently-ux-2) | Low | Web / composer | Fixed 2026-11-08 |
+| [FIXED-1327](#fixed-1327--the-microphone-could-fail-in-four-ways-the-owner-was-told-about-wrongly-or-not-at-all-vd-2) | Medium | Voice / dictation | Fixed 2026-11-08 |
 
 ---
 
@@ -39607,3 +39608,37 @@ primary action, because its image model is chosen in the panel.
 
 **Evidence.** `composer.spec.ts` (*UX-2 — Chat, Build and Design share one
 composer grammar, in one order*), `visualRubric.test.ts`.
+
+## FIXED-1327 — The microphone could fail in four ways the owner was told about wrongly, or not at all (VD-2)
+
+**Severity: Medium. Area: Voice / dictation. Status: Fixed 2026-11-08.**
+
+**Observed (VD-2 live run with Chromium's fake microphone).**
+* A browser that cannot capture audio (`NotSupportedError`), and a clip with
+  no decodable audio (`EncodingError`), both read *The speech runtime on this
+  machine could not be reached*, which sent the owner to a runtime that was
+  fine.
+* A microphone unplugged or revoked mid-recording was not noticed: the control
+  sat on *Listening…*.
+* The 6-minute limit was enforced only by the host, after the page had
+  recorded minutes it would then throw away.
+* A dictation message squeezed between the microphone and Send, or pushed
+  Send onto its own line.
+
+**Fixed (owner's delegated decision: follow the ChatGPT and Claude dictation
+convention).**
+* `NotSupportedError` or `NotReadableError` says *This browser cannot record
+  from a microphone here*; an undecodable clip says no speech was recognised.
+* A track that ends mid-recording releases the microphone and says *The
+  microphone stopped while recording … Nothing was sent; your draft was
+  restored.*
+* The page stops at six minutes itself, says *Stopped at the 6-minute limit.
+  What you said so far is being transcribed.* as a status (not an alert), and
+  transcribes what it has.
+* The message takes its own line under the microphone and Send.
+
+**Evidence.** `voice.test.ts` (limit, device loss, unsupported capture), and
+live `voice-fake-microphone-live.spec.ts`, **6/6**: runtime set up, permission
+denied, cancel releases every track and sends nothing, device lost, the
+6-minute limit under Playwright's clock, and `SpeechRecognition` never
+touched. Captures are in `output/playwright/2026-11-08-voice/`.

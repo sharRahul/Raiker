@@ -31,6 +31,12 @@ export interface RecognitionHandlers {
   end(): void;
   error(code: string): void;
   /**
+   * VD-2 — something the owner should know that is not a failure: the
+   * recording reached its limit and was stopped for them. Optional; a control
+   * without it simply transcribes as usual.
+   */
+  notice?(code: "recording-limit"): void;
+  /**
    * Optional, because only the on-device runtime has a second phase to report
    * (BUG-256). The browser streams words as they are heard; a local runtime
    * hears the whole clip and then transcribes it, and a control that still says
@@ -498,10 +504,21 @@ export function encodeWav(samples: Float32Array, rate: number): Blob {
 export const TRANSCRIPTION_SAMPLE_RATE = 16_000;
 
 /** What the on-device adapter needs from the page, so it can be tested without one. */
+/**
+ * VD-2 — the longest recording the page keeps. The host refuses a longer clip
+ * (`speech_audio_too_large`), so the page stops at the same point and
+ * transcribes what it has, instead of recording minutes it will then throw away.
+ */
+export const MAX_RECORDING_MS = 6 * 60 * 1000;
+
 export interface LocalTranscriptionPorts {
   supported(): boolean;
-  /** Opens the microphone. Rejects when the owner refuses or none is present. */
-  record(): Promise<LocalRecording>;
+  /**
+   * Opens the microphone. Rejects when the owner refuses or none is present.
+   * `onLost` is called if the microphone goes away while recording: unplugged,
+   * or its permission revoked in the browser.
+   */
+  record(onLost?: () => void): Promise<LocalRecording>;
   /** Converts a recorded clip into the WAV the runtime reads. */
   toWav(clip: Blob): Promise<Blob>;
   /** Hands the clip to the host, which hands it to the owner's runtime. */
@@ -520,6 +537,12 @@ function localErrorCode(error: unknown): string {
   const name = (error as { name?: string })?.name ?? "";
   if (name === "NotAllowedError" || name === "SecurityError") return "not-allowed";
   if (name === "NotFoundError" || name === "OverconstrainedError") return "audio-capture";
+  // Found 2026-11-08 (VD-2): a browser that cannot capture audio at all says
+  // NotSupportedError, which used to read as "the speech runtime could not
+  // be reached" and sent the owner to a runtime that was fine.
+  if (name === "NotSupportedError" || name === "NotReadableError") return "capture-unsupported";
+  // A clip the page cannot decode holds no usable audio: nothing was heard.
+  if (name === "EncodingError") return "no-speech";
   const reason = (error as { reasonCode?: string | null })?.reasonCode;
   if (typeof reason === "string" && reason) return reason;
   return "network";
@@ -527,18 +550,25 @@ function localErrorCode(error: unknown): string {
 
 export function createLocalTranscriptionAdapter(
   ports: LocalTranscriptionPorts,
+  limitMs: number = MAX_RECORDING_MS,
 ): VoiceRecognitionAdapter {
   let recording: LocalRecording | null = null;
   let handlers: RecognitionHandlers | null = null;
   let language: SpeechLanguage = "auto";
   let generation = 0;
+  let limitTimer: ReturnType<typeof setTimeout> | null = null;
 
+  const clearLimit = () => {
+    if (limitTimer !== null) clearTimeout(limitTimer);
+    limitTimer = null;
+  };
   const finish = () => {
+    clearLimit();
     recording = null;
     handlers = null;
   };
 
-  return {
+  const adapter: VoiceRecognitionAdapter = {
     supported: () => ports.supported(),
     start(chosenLanguage, chosenHandlers) {
       const turn = ++generation;
@@ -547,12 +577,27 @@ export function createLocalTranscriptionAdapter(
       chosenHandlers.phase?.("listening");
       void (async () => {
         try {
-          const opened = await ports.record();
+          const opened = await ports.record(() => {
+            // VD-2 — the microphone went away mid-recording. Nothing usable
+            // is coming; release it and say so rather than wait for ever.
+            if (turn !== generation) return;
+            const report = handlers;
+            generation += 1;
+            recording?.cancel();
+            finish();
+            report?.error("microphone-lost");
+          });
           if (turn !== generation) {
             opened.cancel();
             return;
           }
           recording = opened;
+          clearLimit();
+          limitTimer = setTimeout(() => {
+            if (turn !== generation || recording === null) return;
+            handlers?.notice?.("recording-limit");
+            adapter.stop();
+          }, limitMs);
         } catch (error) {
           if (turn !== generation) return;
           const report = handlers;
@@ -562,6 +607,7 @@ export function createLocalTranscriptionAdapter(
       })();
     },
     stop() {
+      clearLimit();
       const active = recording;
       const report = handlers;
       const turn = generation;
@@ -599,6 +645,7 @@ export function createLocalTranscriptionAdapter(
       finish();
     },
   };
+  return adapter;
 }
 
 /** The real page's implementation of those ports. */
@@ -614,8 +661,13 @@ export function browserTranscriptionPorts(
         navigator.mediaDevices?.getUserMedia !== undefined
       );
     },
-    async record() {
+    async record(onLost) {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      // A track ends on its own when the device is unplugged or the site's
+      // microphone permission is revoked; our own `stop()` does not fire it.
+      for (const track of stream.getTracks()) {
+        track.addEventListener?.("ended", () => onLost?.(), { once: true });
+      }
       const chunks: Blob[] = [];
       const recorder = new MediaRecorder(stream);
       recorder.ondataavailable = (event) => {

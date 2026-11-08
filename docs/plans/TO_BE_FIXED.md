@@ -1503,16 +1503,6 @@ Permissions →* right after loading, before any turn. Not investigated this rou
 Check whether the permissions read races the first render or genuinely fails on
 this workspace, and whether the line should wait for a completed read.
 
-## Voice: fake-microphone browser evidence (VD-2)
-
-The guard that no source reads `SpeechRecognition`, and the permission-denied
-copy, landed this round
-([FIXED-1314](FIXED_ITEMS.md#fixed-1314--the-page-still-carried-a-browser-speech-recognition-adapter-vd-2)).
-Still required: a Playwright run with Chromium's fake microphone for permission
-denied, revoked mid-recording, and cancel. The 6-minute limit is enforced only
-by the host. Decide whether the page should stop the recording itself at six
-minutes and say so.
-
 ## MCP servers have no catalogue to label (PL-5)
 
 PL-5 asks for *Supported* and *Experimental* labels on MCP catalogue entries.

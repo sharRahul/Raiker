@@ -100,6 +100,8 @@
   let listening = $state(false);
   let phase = $state<RecognitionPhase>("listening");
   let errorMessage = $state("");
+  // VD-2 — information, not a failure: shown as a status, not an alert.
+  let noticeMessage = $state("");
   let snapshotDraft = "";
   let snapshotStart = 0;
   let snapshotEnd = 0;
@@ -197,6 +199,7 @@
     const turn = ++generation;
     localResultReceived = false;
     errorMessage = "";
+    noticeMessage = "";
     snapshotDraft = draft;
     lastRendered = draft;
     hasRenderedTranscript = false;
@@ -242,10 +245,18 @@
             if (turn !== generation) return;
             phase = next;
           },
+          notice(code) {
+            if (turn !== generation) return;
+            if (code === "recording-limit") {
+              noticeMessage = "Stopped at the 6-minute limit. What you said so far is being transcribed.";
+            }
+          },
           error(code) {
             if (turn !== generation) return;
             generation += 1;
-            const restore = code === "not-allowed" || code === "audio-capture" || code === "no-speech";
+            const restore =
+              code === "not-allowed" || code === "audio-capture" || code === "no-speech" || code === "microphone-lost" ||
+              code === "capture-unsupported";
             errorMessage = errorFor(code);
             coordinator.release(ownerId);
             if (restore) {
@@ -266,6 +277,12 @@
   function errorFor(code: string) {
     if (code === "not-allowed") return "Allow microphone access for Raiker in your browser, then try again.";
     if (code === "audio-capture") return "No usable microphone was found. Check your device and try again.";
+    if (code === "capture-unsupported") {
+      return "This browser cannot record from a microphone here. Try another browser, or keep typing.";
+    }
+    if (code === "microphone-lost") {
+      return "The microphone stopped while recording: it was unplugged or its permission was turned off. Nothing was sent; your draft was restored.";
+    }
     if (code === "no-speech") return "No speech was recognized. Your original draft was restored.";
     // The reason codes the host returns for the on-device runtime. Each names
     // the thing the owner would have to change, rather than "transcription
@@ -394,6 +411,9 @@
   {/if}
 </div>
 
+{#if noticeMessage && !errorMessage}
+  <p class="voice-notice" role="status">{noticeMessage}</p>
+{/if}
 {#if errorMessage}
   <p class="voice-error" role="alert">{errorMessage}</p>
 {/if}
@@ -421,7 +441,11 @@
   }
   .voice-info p + p { bottom: calc(100% + 4.8rem); }
   .voice-error { margin: 0.25rem 0 0; color: var(--danger); font-size: var(--text-2xs); line-height: 1.35; }
+  .voice-notice { margin: 0.25rem 0 0; color: var(--text-2); font-size: var(--text-2xs); line-height: 1.35; }
+  /* A dictation message takes its own line under the microphone and the send
+     action, so it never pushes Send away from the microphone (2026-11-08). */
+  .voice-error, .voice-notice { order: 99; flex-basis: 100%; text-align: right; }
   @keyframes voice-pulse { 50% { opacity: 0.35; transform: scale(0.82); } }
   @media (prefers-reduced-motion: reduce) { .live-dot { animation: none; } }
-  @media print { .voice-control, .voice-error { display: none; } }
+  @media print { .voice-control, .voice-error, .voice-notice { display: none; } }
 </style>

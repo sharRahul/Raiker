@@ -323,6 +323,58 @@ describe("on-device transcription", () => {
     return { base, cancel, finishRecording: (clip: Blob) => stopRecording?.(clip) };
   }
 
+  it("stops at the recording limit, says so, and transcribes what it has (VD-2)", async () => {
+    vi.useFakeTimers();
+    try {
+      const transcribe = vi.fn(async () => "six minutes of words");
+      const adapter = createLocalTranscriptionAdapter(
+        { supported: () => true, record: async () => ({ stop: async () => new Blob(["a"]), cancel: vi.fn() }), toWav: async (c) => c, transcribe },
+        1000,
+      );
+      const notice = vi.fn();
+      const final = vi.fn();
+      adapter.start("auto", { interim: vi.fn(), final, end: vi.fn(), error: vi.fn(), notice });
+      await vi.advanceTimersByTimeAsync(999);
+      expect(notice).not.toHaveBeenCalled();
+      await vi.advanceTimersByTimeAsync(1);
+      expect(notice).toHaveBeenCalledWith("recording-limit");
+      await vi.waitFor(() => expect(final).toHaveBeenCalledWith("six minutes of words"));
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("says a browser that cannot capture audio cannot, not that the runtime is down", async () => {
+    const error = vi.fn();
+    const adapter = createLocalTranscriptionAdapter({
+      supported: () => true,
+      record: async () => { throw new DOMException("Not supported", "NotSupportedError"); },
+      toWav: async (c) => c,
+      transcribe: async () => "",
+    });
+    adapter.start("auto", { interim: vi.fn(), final: vi.fn(), end: vi.fn(), error });
+    await vi.waitFor(() => expect(error).toHaveBeenCalledWith("capture-unsupported"));
+  });
+
+  it("releases the microphone and reports it when the device goes away (VD-2)", async () => {
+    let lose: (() => void) | undefined;
+    const cancel = vi.fn();
+    const transcribe = vi.fn(async () => "never");
+    const adapter = createLocalTranscriptionAdapter({
+      supported: () => true,
+      record: async (onLost) => { lose = onLost; return { stop: async () => new Blob(["a"]), cancel }; },
+      toWav: async (c) => c,
+      transcribe,
+    });
+    const error = vi.fn();
+    adapter.start("auto", { interim: vi.fn(), final: vi.fn(), end: vi.fn(), error });
+    await vi.waitFor(() => expect(lose).toBeDefined());
+    lose!();
+    expect(error).toHaveBeenCalledWith("microphone-lost");
+    expect(cancel).toHaveBeenCalled();
+    expect(transcribe).not.toHaveBeenCalled();
+  });
+
   it("hands the recording to the runtime and reports the transcript once", async () => {
     const { base, finishRecording } = ports();
     const adapter = createLocalTranscriptionAdapter(base);

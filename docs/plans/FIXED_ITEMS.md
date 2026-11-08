@@ -1638,6 +1638,10 @@ file you can open. The two capture sets that remain — `screenshots/pages/` and
 | [FIXED-1331](#fixed-1331--a-goal-step-the-host-died-in-read-only-failed-ag-4-found-by-the-restart-drill) | Medium | Goals / recovery | Fixed 2026-11-08 |
 | [FIXED-1332](#fixed-1332--an-apply-could-not-be-undone-and-a-crash-part-way-left-the-project-half-written-sb-5) | High | Build / sandbox promotion | Fixed 2026-11-08 |
 | [FIXED-1333](#fixed-1333--the-composer-promised-a-check-the-server-never-ran-after-a-local-slot-restarted-found-by-the-keyboard-round) | Medium | Models / readiness | Fixed 2026-11-08 |
+| [FIXED-1334](#fixed-1334--a-small-local-model-wrote-build-tool-calls-as-raiker-fences-and-nothing-ran-bd-5) | Medium | Models / local tool calling | Fixed 2026-11-08 |
+| [FIXED-1335](#fixed-1335--build-did-not-say-where-the-repository-was-and-three-wrong-paths-shut-file-reads-bd-5) | Medium | Build / paths and containment | Fixed 2026-11-08 |
+| [FIXED-1336](#fixed-1336--approvals-stored-redacted-arguments-so-an-id-like-path-read-as-tampered-found-by-bd-5) | High | Approvals / integrity | Fixed 2026-11-08 |
+| [FIXED-1337](#fixed-1337--a-single-504-from-githubs-release-cdn-failed-the-llamacpp-install) | Medium | Models / llama.cpp | Fixed 2026-11-08 |
 
 ---
 
@@ -39776,3 +39780,82 @@ a provider the owner did not set up.
 
 **Evidence.** `test_model_readiness_rate_limit.py::test_an_invalidated_check_on_a_configured_slot_is_rechecked_not_refused`,
 and live KB-01: the first turn after a restart answered.
+
+## FIXED-1334 — A small local model wrote Build tool calls as `raiker:` fences, and nothing ran (BD-5)
+
+**Severity: Medium. Area: Models / local tool calling. Status: Fixed 2026-11-08.**
+
+**Observed.** BD-5 on the owner's GPU, Qwen2.5-7B-Instruct: the Build turn
+answered with a `raiker:read_file path=test_stats.py` fence instead of
+calling the tool. Every turn carried the typed-answer instructions (the `raiker:table` and
+`raiker:chart` fences), and the model copied that shape for its tools. The outcome said, correctly, *no change*.
+
+**Fixed.**
+* Build turns no longer carry the typed-answer fences; Chat and Design keep
+  them (`_TYPED_ANSWERS_PROMPT`).
+* The text tool-call fallback reads a `raiker:<tool> key=value` fence as the
+  call it meant, answer blocks excepted; the tool name is still
+  validated against the turn's tools and every call is governed as a native
+  one.
+* A streamed answer now gets the same fallback when it ends, not only a
+  non-streamed one.
+
+**Evidence.** `test_fenced_tool_calls.py`, `test_typed_content_parts.py`,
+`test_visual_answers.py`; the next BD-5 run made real `read_file` and
+`edit_file` calls.
+
+## FIXED-1335 — Build did not say where the repository was, and three wrong paths shut file reads (BD-5)
+
+**Severity: Medium. Area: Build / paths and containment. Status: Fixed 2026-11-08.**
+
+**Observed.** File tool paths are relative to the workspace, but nothing told
+the model the repository was a folder in it. It asked for `stats.py`, got
+`not_found` three times, and the circuit breaker contained `read_file`, so the
+turn ended *denied: capability_contained*.
+
+**Fixed.** The project context says *The selected repository is the folder
+`<repo>/` in the workspace … its file stats.py is `<repo>/stats.py`*. A missing
+file (`not_found`, `binary_file`, `memory_not_found`) is a wrong guess to
+correct and no longer moves the breaker; refusals such as `outside_workspace`
+still do.
+
+**Evidence.** `test_honesty_under_fault.py::test_a_missing_file_is_a_wrong_guess_not_a_failing_capability`,
+the project-context tests, and the next BD-5 run, which used
+`<repo>/stats.py`.
+
+## FIXED-1336 — Approvals stored redacted arguments, so an ID-like path read as tampered (found by BD-5)
+
+**Severity: High. Area: Approvals / integrity. Status: Fixed 2026-11-08.**
+
+**Observed.** Approving a Build edit to `bd5-stats-1778230000/stats.py` failed
+with `approval_payload_tampered`. The broker stored the action's arguments in
+their event-safe form, which masked the 10-digit run as a phone-like ID, while
+the approval's payload hash covered the real arguments. An approved action
+executes from that stored row, so had the hash not refused it, it would have
+written to `bd5-stats-[REDACTED_ID]/stats.py`; an email recipient would have
+become `[REDACTED_EMAIL]`.
+
+**Fixed.** The stored action is the immutable intent an approval executes, so
+it keeps the exact arguments (the store is SQLCipher-encrypted). Events and
+logs keep the sanitized form, and tools whose policy is to keep only lengths
+still store only lengths.
+
+**Evidence.** `test_approval_exact_arguments.py`, and the broker, approval and
+relay suites.
+
+## FIXED-1337 — A single 504 from GitHub's release CDN failed the llama.cpp install
+
+**Severity: Medium. Area: Models / llama.cpp. Status: Fixed 2026-11-08.**
+
+**Observed.** At 09:36 UTC GitHub answered release downloads with 504 Gateway
+Time-out (the llama.cpp CUDA archive here, and Electron in CI). The installer
+tried once and reported `llama_cpp_download_failed`, so every live install job
+failed, and so would an owner pressing **Install** at that moment.
+
+**Fixed.** A 5xx or a dropped connection is retried up to four times with
+growing waits; a 404, an oversize body or a digest mismatch never is. The live
+test now names the operation's `error_code` and `error_detail` instead of a
+truncated dict.
+
+**Evidence.** `test_llama_cpp_download_retry.py` (504→503→200 succeeds, 404 is
+not retried, a persistent 504 fails after four tries).

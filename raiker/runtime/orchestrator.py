@@ -211,6 +211,13 @@ _SYSTEM_PROMPT = (
     "More tools exist than are listed here: `tool_search` returns any of them by name or by what "
     "they do, and they stay available for the rest of this turn. Asking for one grants nothing, "
     "so ask rather than assume a capability is missing. "
+)
+
+#: BUG-288 / QUI-A — the typed answer channel, sent on Chat and Design turns.
+#: Build answers about a repository; a small local model shown these
+#: ```raiker:``` fences on a Build turn wrote its tool calls in the same shape
+#: instead of calling the tools (BD-5, 2026-11-08).
+_TYPED_ANSWERS_PROMPT = (
     # BUG-288 — the typed answer channel. A mechanism a model is not told about
     # is a mechanism it does not use, and the whole point of the channel is that
     # the turn *declares* the shape rather than writing prose that happens to
@@ -399,8 +406,8 @@ def _system_messages(surface: str, answer_style: str = "auto") -> list[str]:
     if surface == "build":
         return [_SYSTEM_PROMPT, _BUILD_PROCESS_PROMPT, *style]
     if surface == "design":
-        return [_SYSTEM_PROMPT, _DESIGN_RESEARCH_PROMPT, *style]
-    return [_SYSTEM_PROMPT, *style]
+        return [_SYSTEM_PROMPT, _TYPED_ANSWERS_PROMPT, _DESIGN_RESEARCH_PROMPT, *style]
+    return [_SYSTEM_PROMPT, _TYPED_ANSWERS_PROMPT, *style]
 
 
 def _queued_call_message(proposal: ToolCallProposal) -> ModelMessage:
@@ -2916,6 +2923,14 @@ class RuntimeOrchestrator:
         family: tuple[str, str, str] | None,
     ) -> None:
         """Move the breaker and hand the monitor its redacted telemetry."""
+        reason = str((result.error or {}).get("type", "") or "")
+        if result.status != "success" and reason in _AGENT_INPUT_MISSES:
+            # The agent asked for something that is not there. That is a wrong
+            # guess to correct, not a failing capability: counting it contained
+            # a whole Build turn's file reads after three mistyped paths (BD-5).
+            if family is not None:
+                self._observe_capability(owner, action, result)
+            return
         with contextlib.suppress(Exception):
             breaker.record(
                 owner,
@@ -3758,6 +3773,12 @@ class RuntimeOrchestrator:
         except RuntimeError:
             return asyncio.run(self.ahandle(envelope, identity=identity))
         raise RuntimeError("handle cannot be called from a running event loop; use ahandle")
+
+
+#: Tool failures that describe the request, not the capability: they never
+#: move the circuit breaker. Refusals (outside the workspace, protected paths)
+#: are not here, because repeating those is what the breaker is for.
+_AGENT_INPUT_MISSES = frozenset({"not_found", "binary_file", "memory_not_found"})
 
 
 def not_done_note(not_done: Mapping[str, tuple[str, str]]) -> str:

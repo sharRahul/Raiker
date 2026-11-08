@@ -123,13 +123,47 @@ def download_asset(
     if asset.size <= 0 or asset.size > MAX_ASSET_BYTES:
         raise InstallError("llama_cpp_asset_size_invalid")
     _check_host(asset.url)
-    expected = asset.digest.split(":", 1)[1]
+    last: InstallError | None = None
+    for attempt in range(DOWNLOAD_ATTEMPTS):
+        if attempt:
+            # GitHub's release CDN answers a large archive with 502/503/504 now
+            # and then (2026-11-08: a 504 for the CUDA build failed every live
+            # install). A few waits fix that; a 404 or a bad digest never retries.
+            time.sleep(min(2 ** attempt, 30))
+        try:
+            return _download_once(asset, destination, client=client, progress=progress, cancelled=cancelled)
+        except _TransientDownload as transient:
+            last = InstallError("llama_cpp_download_failed")
+            last.__cause__ = transient
+    assert last is not None
+    raise last
+
+
+#: How many times a transient server or network failure is tried before failing.
+DOWNLOAD_ATTEMPTS = 4
+
+
+class _TransientDownload(Exception):
+    """A 5xx or a dropped connection: worth another try."""
+
+
+def _download_once(
+    asset: ReleaseAsset,
+    destination: Path,
+    *,
+    client: httpx.Client,
+    progress: Callable[[int], None] | None,
+    cancelled: CancelFn | None,
+) -> Path:
+    expected = (asset.digest or "").split(":", 1)[1]
     hasher = hashlib.sha256()
     received = 0
     try:
         with client.stream("GET", asset.url, headers={"User-Agent": "Raiker"}) as response:
             for hop in [*response.history, response]:
                 _check_host(str(hop.url))
+            if response.status_code >= 500:
+                raise _TransientDownload(f"http_{response.status_code}")
             if response.status_code != 200:
                 raise InstallError("llama_cpp_download_failed")
             with destination.open("wb") as handle:
@@ -143,6 +177,9 @@ def download_asset(
                         progress(len(chunk))
                     if cancelled is not None:
                         cancelled()
+    except (httpx.TransportError, httpx.RemoteProtocolError) as exc:
+        destination.unlink(missing_ok=True)
+        raise _TransientDownload(type(exc).__name__) from exc
     except httpx.HTTPError as exc:
         raise InstallError("llama_cpp_download_failed") from exc
     if received != asset.size:

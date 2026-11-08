@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import http.client
 import json
+import re
 from collections.abc import Sequence
 from dataclasses import dataclass, field
 from typing import Any
@@ -172,9 +173,42 @@ def _coerce_arguments(raw: Any) -> dict[str, Any]:
     return {}
 
 
+#: Typed answer blocks Raiker renders itself: never a tool call.
+_ANSWER_BLOCKS = frozenset(
+    {"table", "chart", "figures", "compare", "measure", "callout", "proscons", "steps"}
+)
+_FENCED_CALL = re.compile(r"```raiker:([a-z][a-z0-9_]*)(.*?)```", re.DOTALL)
+_KEY_VALUE = re.compile(r'([a-z_][a-z0-9_]*)=("(?:[^"\\]|\\.)*"|\S+)')
+
+
+def _parse_fenced_tool_calls(text: str) -> list[ToolCallProposal]:
+    """BD-5 — a small model's ``raiker:<tool> key=value`` fence, read as the call it meant.
+
+    A local 7B model shown Raiker's typed-answer fences wrote tool calls in the
+    same shape instead of calling the tool. The fence is only a proposal: the
+    tool name is validated against the turn's tools and every argument is
+    governed exactly like a native call. Answer blocks are never read as calls.
+    """
+    calls: list[ToolCallProposal] = []
+    for name, rest in _FENCED_CALL.findall(text):
+        if name in _ANSWER_BLOCKS:
+            continue
+        arguments: dict[str, object] = {}
+        for key, raw in _KEY_VALUE.findall(rest):
+            value: object = raw[1:-1].encode().decode("unicode_escape") if raw.startswith('"') else raw
+            if isinstance(value, str) and value.lstrip("-").isdigit():
+                value = int(value)
+            arguments[key] = value
+        calls.append(ToolCallProposal(call_id=new_call_id(), tool_name=name, arguments=arguments))
+    return calls
+
+
 def _parse_text_json_tool_calls(text: str) -> list[ToolCallProposal]:
     """Defensive parse of a ``{"tool": ..., "arguments": {...}}`` block from plain text."""
 
+    fenced = _parse_fenced_tool_calls(text)
+    if fenced:
+        return fenced
     snippet = text.strip()
     start = snippet.find("{")
     end = snippet.rfind("}")

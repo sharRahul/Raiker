@@ -2100,10 +2100,21 @@ class ToolBroker:
             requires_approval=action.requires_approval,
             proposed_by=verified.claims.principal_id,
         )
+        # The stored action is the immutable intent an approval executes and
+        # its payload hash covers, so it keeps the exact arguments (the store is
+        # encrypted at rest). Redacting it there made an approval for a path or
+        # address that merely looked like an ID or a phone number read as
+        # tampered, and would have run with the masked value. Events and logs
+        # still carry the sanitized form (`_sanitized_action_payload`); tools
+        # whose policy is to keep only lengths still store only lengths.
         sanitized_action = ToolAction(
             action_id=action.action_id,
             tool_name=action.tool_name,
-            arguments=self._event_safe_arguments(action),
+            arguments=(
+                self._event_safe_arguments(action)
+                if _drops_argument_values(action.tool_name)
+                else dict(action.arguments)
+            ),
             risk_level=action.risk_level,
             requires_approval=action.requires_approval,
             proposed_by=action.proposed_by,

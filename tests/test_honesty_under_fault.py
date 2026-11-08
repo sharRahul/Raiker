@@ -80,3 +80,21 @@ def test_the_note_names_each_action_and_how_it_ended() -> None:
         "**Not done:** Email · send failed; File · write was refused. "
         "Raiker's record shows it did not complete."
     )
+
+
+def test_a_missing_file_is_a_wrong_guess_not_a_failing_capability() -> None:
+    """BD-5 — three mistyped paths contained a Build turn's file reads."""
+    from types import SimpleNamespace
+
+    from raiker.runtime.orchestrator import RuntimeOrchestrator
+
+    recorded: list[bool] = []
+    breaker = SimpleNamespace(record=lambda *_a, ok, **_k: recorded.append(ok))
+    orchestrator = RuntimeOrchestrator.__new__(RuntimeOrchestrator)
+    miss = SimpleNamespace(status="failed", error={"type": "not_found"})
+    fault = SimpleNamespace(status="failed", error={"type": "outside_workspace"})
+    action = SimpleNamespace(tool_name="read_file")
+    orchestrator._record_tool_outcome(breaker, "owner", action, miss, None)  # type: ignore[arg-type]
+    assert recorded == []
+    orchestrator._record_tool_outcome(breaker, "owner", action, fault, None)  # type: ignore[arg-type]
+    assert recorded == [False]

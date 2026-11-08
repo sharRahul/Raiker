@@ -212,10 +212,14 @@ def test_an_ordinary_response_carries_exactly_one_text_part() -> None:
 def test_the_model_is_told_the_channel_exists() -> None:
     """A mechanism a model is not told about is one it does not use — the same
     reason `tool_search` and `update_plan` are named in the prompt."""
-    from raiker.runtime.orchestrator import _SYSTEM_PROMPT
+    from raiker.runtime.orchestrator import _TYPED_ANSWERS_PROMPT, _system_messages
 
-    assert "raiker:table" in _SYSTEM_PROMPT
-    assert "raiker:chart" in _SYSTEM_PROMPT
+    assert "raiker:table" in _TYPED_ANSWERS_PROMPT
+    assert "raiker:chart" in _TYPED_ANSWERS_PROMPT
+    assert _TYPED_ANSWERS_PROMPT in _system_messages("chat")
+    # Build answers about a repository: a small model shown these fences wrote
+    # its tool calls in the same shape instead of calling the tools (BD-5).
+    assert _TYPED_ANSWERS_PROMPT not in _system_messages("build")
 
 
 def test_a_surface_that_renders_parts_takes_the_typed_route_for_a_refusal() -> None:

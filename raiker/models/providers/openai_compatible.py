@@ -233,6 +233,21 @@ def _tool_call_events(raw_calls: dict[int, dict[str, str]]) -> list[ModelStreamE
     return events
 
 
+def _streamed_text_tool_calls(
+    mode: str, native: dict[int, dict[str, str]], streamed: list[str]
+) -> list[ModelStreamEvent]:
+    """Tool calls a model wrote as text, read only when it made no native call."""
+    if native or mode not in {"text_json", "native_or_text_json", "native_or_json_schema"}:
+        return []
+    return [
+        ModelStreamEvent(
+            event_type="tool_call_delta",
+            tool_call_delta={"call_id": call.call_id, "tool_name": call.tool_name, "arguments": call.arguments},
+        )
+        for call in _parse_text_json_tool_calls("".join(streamed))
+    ]
+
+
 @dataclass
 class AsyncOpenAICompatibleProvider:
     profile_id: str
@@ -497,6 +512,9 @@ class AsyncOpenAICompatibleProvider:
             raise ProviderUnsupportedCapabilityError("streaming_unsupported")
         tool_calls: dict[int, dict[str, str]] = {}
         finish_emitted = False
+        # BD-5 — the streamed answer, kept so a model that wrote its tool call
+        # as text (JSON, or a ```raiker:<tool>``` fence) is read once it ends.
+        streamed: list[str] = []
         try:
             async with self._http.stream(
                 "POST",
@@ -512,7 +530,12 @@ class AsyncOpenAICompatibleProvider:
                         if not finish_emitted:
                             for event in _tool_call_events(tool_calls):
                                 yield event
-                            yield ModelStreamEvent(event_type="finish", finish_reason="stop")
+                            fallback = _streamed_text_tool_calls(self.tool_call_mode, tool_calls, streamed)
+                            for event in fallback:
+                                yield event
+                            yield ModelStreamEvent(
+                                event_type="finish", finish_reason="tool_calls" if fallback else "stop"
+                            )
                         return
                     try:
                         decoded = json.loads(data)
@@ -544,6 +567,7 @@ class AsyncOpenAICompatibleProvider:
                     if isinstance(direct_refusal, str) and direct_refusal and direct_refusal not in text:
                         text = f"{text}{direct_refusal}"
                     if text:
+                        streamed.append(text)
                         yield ModelStreamEvent(event_type="text_delta", text_delta=text)
                     # BUG-207 slice B, mirrored. An OpenAI-compatible server that
                     # streams reasoning puts it beside the content under one of
@@ -580,8 +604,11 @@ class AsyncOpenAICompatibleProvider:
                     if isinstance(raw_finish, str):
                         for event in _tool_call_events(tool_calls):
                             yield event
+                        fallback = _streamed_text_tool_calls(self.tool_call_mode, tool_calls, streamed)
+                        for event in fallback:
+                            yield event
                         finish = _finish_reason(
-                            raw_finish, has_tools=bool(tool_calls), refused=refused
+                            raw_finish, has_tools=bool(tool_calls) or bool(fallback), refused=refused
                         )
                         yield ModelStreamEvent(event_type="finish", finish_reason=finish)
                         finish_emitted = True

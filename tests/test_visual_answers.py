@@ -17,7 +17,7 @@ import pytest
 
 from raiker.contracts.models import ContractValidationError, PromptOptions
 from raiker.models.contracts import ModelResponse
-from raiker.runtime.orchestrator import _SYSTEM_PROMPT, _system_messages
+from raiker.runtime.orchestrator import _SYSTEM_PROMPT, _TYPED_ANSWERS_PROMPT, _system_messages
 from raiker.runtime.typed_parts import (
     PART_CALLOUT,
     PART_CHART,
@@ -273,11 +273,11 @@ def test_the_model_is_told_the_whole_vocabulary_and_its_rules() -> None:
     for word in ("raiker:figures", "raiker:compare", "raiker:measure", "raiker:callout",
                  "raiker:proscons", "raiker:steps", "hbar", "scatter", "stacked",
                  "at most three blocks", "source"):
-        assert word in _SYSTEM_PROMPT
+        assert word in _TYPED_ANSWERS_PROMPT
 
 
 def test_answer_style_adds_one_sentence_and_auto_adds_none() -> None:
-    assert _system_messages("chat", "auto") == [_SYSTEM_PROMPT]
+    assert _system_messages("chat", "auto") == [_SYSTEM_PROMPT, _TYPED_ANSWERS_PROMPT]
     assert "mostly text" in _system_messages("chat", "text")[-1]
     assert "visual where it helps" in _system_messages("build", "visual")[-1]
     with pytest.raises(ContractValidationError):

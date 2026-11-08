@@ -462,6 +462,18 @@ class ContextGatherer:
             lines.extend(["Project instructions:", instructions])
         raw_checks = project.get("checks") or []
         checks = [str(item) for item in raw_checks] if isinstance(raw_checks, (list, tuple)) else []
+        from raiker.tools.git import selected_repository_subpath
+
+        repository = selected_repository_subpath(store, owner_principal_id)
+        if repository:
+            # BD-5 — where the repository is, said as a path. Tool paths are
+            # relative to the workspace, and a model that assumed the repository
+            # was the working folder asked for `stats.py`, failed to find it
+            # three times, and had its file reads contained.
+            lines.append(
+                f"The selected repository is the folder {repository}/ in the workspace. File tool "
+                f"paths are relative to the workspace, so its file stats.py is {repository}/stats.py."
+            )
         if checks:
             # BR-D01 — the owner's checks. The turn is recorded as verified only
             # when each ran, exactly as written, after the last change and passed.
@@ -472,9 +484,7 @@ class ContextGatherer:
             lines.extend(f"- {check}" for check in checks)
             # The folder a check counts in (BR-D01 wrong-path): the selected
             # repository's, never the workspace root by accident.
-            from raiker.tools.git import selected_repository_subpath
-
-            subpath = selected_repository_subpath(store, owner_principal_id)
+            subpath = repository
             if subpath:
                 lines.append(
                     f"Run the checks with cwd set to {subpath}, the selected repository's "

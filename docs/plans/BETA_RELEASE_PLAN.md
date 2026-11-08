@@ -234,7 +234,7 @@ work runs (top bar), and so is the count of running items.
 | BD-2 | Works in disposable copies | ✅ | — | — | Per-session task tree (TO_BE_FIXED sandbox table) |
 | BD-3 | Diffs, review, Apply, Discard | ✅ | — | — | Live RT-BETA-07/08 with captures ([run record](../architecture/WEB_APP_LIVE_TEST.md#result--2026-11-07-beta-release-plan-round), [FIXED-1311](FIXED_ITEMS.md#fixed-1311--a-build-apply-that-met-the-owners-own-edit-had-no-way-forward-bd-4)) |
 | BD-4 | Git safety, protected files, conflicts | ✅ | — | — | Apply refuses a conflict unless the owner chooses **Overwrite** after seeing both versions; the original is backed up and the choice audited ([FIXED-1311](FIXED_ITEMS.md#fixed-1311--a-build-apply-that-met-the-owners-own-edit-had-no-way-forward-bd-4)) |
-| BD-5 | Diagnose failures, iterate, report | 🟡 | P1 | M | A scripted failing test that the agent must fix within three iterations; the report lists each attempt |
+| BD-5 | Diagnose failures, iterate, report | 🟡 | P1 | M | A scripted failing test that the agent must fix within three iterations; the report lists each attempt. **2026-11-08:** `scripts/live_build_fix_loop.py` drives it on a live host. Four runs with Qwen2.5-7B on the owner's GPU found and fixed FIXED-1334 to FIXED-1336; the model then answered in prose without calling tools, and Raiker reported *no change* truthfully. Still required: a run with a model that drives tools reliably (a hosted model, or a stronger local one) |
 
 **UI / UX.**
 - The Changes pane groups files by *new / modified / deleted*, with a per-file
@@ -523,6 +523,7 @@ product refusing it, rather than delaying the date.
 
 ## Changelog
 
+- **2026-11-08** — BD-5 live runs on the owner's GPU found four defects, all fixed (FIXED-1334 to FIXED-1337); BD-5 itself needs a model that drives tools.
 - **2026-11-08** — SB-3, SB-4, CI-3 and CI-5 closed: WSL2 re-measured, every hook event refuses without a boundary, release evidence written by the run.
 - **2026-11-08** — UX-1 closed: three Quiet UI rows fixed, the rest moved to beta.2 as known issues.
 - **2026-11-08** — UX-5 keyboard-only T-14 passes live; it found a readiness promise the server did not keep (FIXED-1333).

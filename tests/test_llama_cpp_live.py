@@ -85,7 +85,10 @@ def test_install_serve_infer_switch_and_stop_with_the_real_engine(tmp_path: Path
         started = client.post("/api/local-runtime/llama-cpp/install", headers=h, json=body)
         assert started.status_code == 200, started.text
         install = _op(client, h, started.json()["operation_id"])
-        assert install["state"] == "complete", install
+        # The reason first: a truncated operation dict hid why three CI runs failed.
+        assert install["state"] == "complete", {
+            key: install.get(key) for key in ("state", "error_code", "error_detail", "phase")
+        }
         overview = client.get("/api/local-runtime/llama-cpp", headers=h).json()
         installed = overview["installation"]
         print(f"installed llama.cpp {installed['tag']} ({installed['backend']}): {installed['version_text']}")

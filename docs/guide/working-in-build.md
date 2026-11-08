@@ -259,6 +259,15 @@ the real boundary, and each attempt is also made *outside* as a control. Only
 "worked outside, refused inside" counts; if a mandatory observation is not
 enforced, commands are refused rather than run on the host.
 
+**Memory and process limits.** On Windows a Job Object bounds each run. On
+Linux (and inside WSL2) one cgroup bounds the whole run — memory, swap and the
+number of processes together — only where your **systemd user manager** is
+running (`systemctl --user status` answers). Without it, each process gets its
+own limit instead, so a run that starts many processes can use more memory in
+total. The runtime probe in Settings › Advanced › Runtime says which applies
+(`cgroup_scope` or `rlimit`). On WSL2, enable systemd in `/etc/wsl.conf`
+(`[boot] systemd=true`) and restart WSL to get the whole-run limit.
+
 **The agent works in a copy of your project.** On a project's first edit or
 command, Raiker takes a private copy of the project (without `.git` or
 `.raiker`). The agent's file edits, searches and commands all use that copy, so
@@ -268,6 +277,12 @@ project**; **Discard** throws the copy away. If a file changed in your project
 since the copy was taken, or the copy changed after you looked, Apply is
 refused and nothing is written. Git tools still describe your real repository,
 because the copy has none.
+
+**Undo Apply.** After an Apply, **Undo Apply** puts every file back as it was
+and removes files the Apply added. It refuses, changing nothing, if you have
+edited any of those files since. Raiker keeps the last 20 Applies. An Apply is
+written to a journal before your project is touched, so if Raiker stops in the
+middle of one, the next start puts your project back exactly as it was.
 
 **No network unless you allow it.** Settings › Runtime › *Command downloads*
 lets sandboxed commands reach a list of hosts over HTTPS (the package registries

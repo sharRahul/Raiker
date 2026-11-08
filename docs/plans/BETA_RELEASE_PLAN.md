@@ -92,8 +92,8 @@ incomplete*). What exists:
 |---|---|---|---|---|---|
 | SB-1 | Windows isolation: ACLs, network, credentials, account cleanup | 🔴 | P0 | L | Per-task profile reset; deny network/remote logon rights; scan explicit ACEs under denied roots; scan explicit grants inside `.git`; measure the WFP filter on hosted and owner machines; account cleanup on uninstall |
 | SB-2 | macOS Seatbelt enforcement, containment, limits | 🟡 | P0 | M | Native-runner checks passed on `macos-15` and `macos-15-intel` for `9c532624`. Preserve this evidence on the release commit and add fresh-installer, toolchain and adversarial tests. |
-| SB-3 | Linux Bubblewrap and WSL2 enforcement | 🟡 | P0 | S | WSL2 was measured on Windows 11 and its static runner is packaged. Re-run on the release commit and document the systemd user-manager requirement for aggregate limits. |
-| SB-4 | Commands, plugins, hooks and local MCP use the sandbox or fail closed | 🟡 | P0 | S | **Inventory test landed** (`tests/test_process_spawn_inventory.py`): every process-spawning module in `raiker/` is listed with a reviewed category (sandbox, Raiker-owned program, host lifecycle, read-only facts, owner-approved host operation); a new spawn site or any shell use fails CI. Remaining: one live check per hook type that a hook command is refused on a host without an enforced boundary |
+| SB-3 | Linux Bubblewrap and WSL2 enforcement | ✅ | — | — | **2026-11-08:** WSL2 re-measured on the candidate with every observation enforced, `windows_interop` included; the systemd user-manager requirement for whole-run limits is in the Build guide ([record](../architecture/NATIVE_SANDBOX_MIGRATION.md#wsl2-re-measured-on-the-beta-candidate-2026-11-08)) |
+| SB-4 | Commands, plugins, hooks and local MCP use the sandbox or fail closed | ✅ | — | — | **Inventory test landed** (`tests/test_process_spawn_inventory.py`): every process-spawning module in `raiker/` is listed with a reviewed category (sandbox, Raiker-owned program, host lifecycle, read-only facts, owner-approved host operation); a new spawn site or any shell use fails CI. **2026-11-08:** `tests/test_hook_events_need_the_boundary.py` checks all 20 dispatched events: the command hook never starts on the host, the refusal is recorded as `native_sandbox_required`, and an enforcing hook on a deciding event asks the owner |
 | SB-5 | Disposable workspaces, reviewed promotion, rollback, crash recovery | 🟡 | P0 | M | **2026-11-08:** Undo Apply and a journalled Apply that a hard kill part-way rolls back on the next start ([FIXED-1332](FIXED_ITEMS.md#fixed-1332--an-apply-could-not-be-undone-and-a-crash-part-way-left-the-project-half-written-sb-5)). Still required: the pinned-handle link check (residual race documented today) |
 | SB-6 | No protected-file writes, no limit escape, no direct host execution | 🟡 | P0 | M | Adversarial suite per platform (below), run in CI where hosted runners allow it and recorded from owner machines where they do not |
 
@@ -414,9 +414,9 @@ a fresh install.
 |---|---|---|---|---|---|
 | CI-1 | All mandatory workflows green on the release commit | 🟡 | P0 | M | The three llama.cpp live jobs are green after PR #246, and the release gate requires the complete beta-critical CI, llama.cpp, native-runner and data-safety suites using the latest GitHub Actions result for the exact commit. Remaining: a green candidate-release run with its signed artifacts and attached evidence. |
 | CI-2 | Ruff, mypy, lint, unit, integration, security, packaging | 🟡 | P0 | S | Already wired; part of CI-1 |
-| CI-3 | Per-platform artifacts verified independently | 🟡 | P0 | S | Each target downloads its own artifact in a fresh job and runs the installed-host smoke (exists); signed builds are now verified against the pinned identities before install and on the installed program (`raiker.app.platform_signatures`, FIXED-1321); signed candidate [42430871211](https://github.com/sharRahul/Raiker/actions/runs/42430871211) passed (Windows and Linux signed, macOS unsigned); still required: the run on the exact release commit |
+| CI-3 | Per-platform artifacts verified independently | ✅ | — | — | **2026-11-08:** each signed build is verified against the pinned identities before install and on the installed program, in the release run ([42430871211](https://github.com/sharRahul/Raiker/actions/runs/42430871211)); the downloaded artifacts re-verify on the owner's machine (Windows Authenticode, Linux GPG under WSL, channel and provenance with the release key) |
 | CI-4 | Dependency vulnerability and secret scans | ✅ | — | — | `pip-audit`/`npm audit` and `scan_secrets.py` in CI |
-| CI-5 | Versioned, verified artifacts with reproducible evidence | 🟡 | P0 | M | The release carries `SHA256SUMS.txt` (exists), an SBOM (`licensing_check.py --sbom`), a provenance attestation (`actions/attest-build-provenance`) and a `RELEASE_EVIDENCE.md` linking the run IDs |
+| CI-5 | Versioned, verified artifacts with reproducible evidence | ✅ | — | — | **2026-11-08:** the release run writes `RELEASE_EVIDENCE.md` from its own outputs (`scripts/release_evidence.py`): commit, run, signing, each installer's SHA-256 and manifest signature, the signed channel, SBOM and provenance; a missing output fails the run, and the file is attached to the draft |
 
 ---
 
@@ -523,6 +523,7 @@ product refusing it, rather than delaying the date.
 
 ## Changelog
 
+- **2026-11-08** — SB-3, SB-4, CI-3 and CI-5 closed: WSL2 re-measured, every hook event refuses without a boundary, release evidence written by the run.
 - **2026-11-08** — UX-1 closed: three Quiet UI rows fixed, the rest moved to beta.2 as known issues.
 - **2026-11-08** — UX-5 keyboard-only T-14 passes live; it found a readiness promise the server did not keep (FIXED-1333).
 - **2026-11-08** — PL-4 closed by an adversarial MCP server test.

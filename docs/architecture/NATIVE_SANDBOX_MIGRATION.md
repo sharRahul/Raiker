@@ -726,3 +726,17 @@ with the Windows backend set to WSL2, a command read the project file from its
 copy, and a terminal run (`cat`) echoed typed input, turned `\r` into a line
 end and ended on Ctrl-D. Raiker now offers background runs and terminals on
 `wsl_bubblewrap`. `id -un` resolves the run user in this distribution.
+
+## WSL2 re-measured on the beta candidate (2026-11-08)
+
+On Windows 11 Pro 10.0.26300, with the packaged Linux runner and the existing
+`RaikerSandbox` distribution, `raiker-command-runner --wsl-status` reported
+`configured`, `distribution_present`, `runner_installed`, `bubblewrap_present`
+and `wsl_conf_current` all true. `--probe --boundary wsl` reported every
+observation **enforced**: relay, workspace write, escape write, masked read,
+egress, seccomp, descendant reaping and, for the first time, `windows_interop`.
+`resource_limits` was `rlimit`, because systemd is off in that distribution: the
+whole-run cgroup needs `[boot] systemd=true` in `/etc/wsl.conf` (now stated in
+the [Build guide](../guide/working-in-build.md)). The probe's
+`available: false` with `native_disposable_workspace_required` is expected for a
+probe pointed at an arbitrary folder rather than a disposable copy.

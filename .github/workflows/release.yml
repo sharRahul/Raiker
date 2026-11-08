@@ -283,6 +283,18 @@ jobs:
           print(public_key_of(bytes.fromhex(os.environ["RAIKER_RELEASE_SIGNING_KEY"])).hex())
           PY
           echo "pin with: raiker-app update --channel-url <url of desktop-${{ inputs.channel }}.json> --channel-key $(cat dist/release-public-key.txt)"
+      # CI-5 — the evidence record, written from this run's own outputs. A
+      # missing SBOM, provenance or channel signature fails the release here.
+      - name: Write RELEASE_EVIDENCE.md
+        env:
+          VERSION: ${{ inputs.version }}
+          CHANNEL: ${{ inputs.channel }}
+          SIGNING: ${{ inputs.signing }}
+        run: |
+          cp desktop/signing/raiker-linux-signing-key.asc dist/
+          python scripts/release_evidence.py --dir dist --version "$VERSION" --channel "$CHANNEL" \
+            --signing "$SIGNING" --out dist/RELEASE_EVIDENCE.md
+          cat dist/RELEASE_EVIDENCE.md >> "$GITHUB_STEP_SUMMARY"
       - name: Upload the signed channel
         # actions/upload-artifact v4
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0 (Node 24)
@@ -331,6 +343,7 @@ jobs:
           done
           cp source/desktop/signing/raiker-linux-signing-key.asc assets/
           cp source/desktop/signing/release-public-key.txt assets/
+          cp dist/RELEASE_EVIDENCE.md assets/
       # Keyless signing with this repository's GitHub identity: Sigstore
       # binds each file's digest to this workflow, commit and run, and the
       # signature is logged publicly. Owners check a download with
@@ -416,7 +429,7 @@ jobs:
             cat assets/SHA256SUMS.txt
             echo '```'
           } >> notes.md
-          gh release create "v${{ inputs.version }}" assets/Raiker-* assets/raiker-linux-signing-key.asc assets/release-public-key.txt \
+          gh release create "v${{ inputs.version }}" assets/Raiker-* assets/raiker-linux-signing-key.asc assets/release-public-key.txt assets/RELEASE_EVIDENCE.md \
             --draft --title "Raiker ${{ inputs.version }}" --notes-file notes.md
 
   # Beta distribution can be a deliberate, unsigned download while platform

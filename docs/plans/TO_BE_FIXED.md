@@ -1629,3 +1629,14 @@ against the exact frozen candidate after this change. RPM extracted-host smoke
 and onboarding passed; one separate Setup window test crashed its renderer
 before passing in isolation. Preserve that first failure and investigate if
 it repeats; native Fedora acceptance remains untested.
+
+## Signed candidate dispatch is blocked by Actions permissions
+
+All required CI checks and the exact Release Plan verification script passed
+on `8a053a907b9c9e97bef4163f479650ac3d652f28`. Dispatching `release.yml`
+with version `0.9.0`, beta channel, `require-except-macos` and publication
+disabled returned **403 Resource not accessible by integration**. Pushing
+main is permitted; Actions dispatch is not. Grant Actions write access or run
+the documented workflow manually. No new signed candidate, signed channel or
+full `RELEASE_EVIDENCE.md` is claimed from that rejected attempt.
+[Run record and concrete command](LINUX_BETA_2026_11_09.md#github-qualification-and-release-dispatch-access).

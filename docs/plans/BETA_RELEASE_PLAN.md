@@ -626,3 +626,10 @@ The egress follow-through also found an unrequested ChatGPT status sidecar
 (FIXED-1375): unconnected status reads are now passive, with explicit owner
 actions for sign-in and adoption. The failed egress receipts remain attached;
 MM-5 is still partial pending a fresh exact-candidate recording.
+
+CI, engine/live inference and data safety are green on runtime `8a053a90`.
+The exact Release Plan verification script passed locally, but GitHub rejected
+the signed non-published candidate dispatch with 403 (Actions access). CI-1
+and CI-5 retain the signed candidate/evidence requirement;
+[the run record](LINUX_BETA_2026_11_09.md#github-qualification-and-release-dispatch-access)
+contains the workflow links, access blocker and concrete manual command.

@@ -1,0 +1,13 @@
+{
+  "commit": "8a053a907b9c9e97bef4163f479650ac3d652f28",
+  "scope": "focused unconnected ChatGPT status UI regression, not the full release audit",
+  "capture_sha256": "fa05020e12f854dfb851d0280da4e265987cb1fc016e8191b1dbcc33412abc1e",
+  "observed_hosts": [
+    "10.0.0.1",
+    "10.0.12.212",
+    "127.0.0.1",
+    "192.0.2.1"
+  ],
+  "public_destinations": [],
+  "release_audit_approved": false
+}

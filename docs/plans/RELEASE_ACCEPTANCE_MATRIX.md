@@ -177,3 +177,11 @@ installation acceptance. Both attempts are retained in the run record.
 FIXED-1375 prevents unconnected ChatGPT status reads from starting Codex App
 Server. Candidate egress qualification must include that correction and a
 fresh recording; earlier failed reports are not superseded by unit tests.
+
+**Exact runtime qualification:** `8a053a90` passed CI, data-safety drills and
+all llama.cpp engine/live jobs. The exact Release Plan script passed locally.
+The signed non-published candidate dispatch was refused by GitHub (403,
+Actions access), so signed candidate artifacts and generated release evidence
+remain **BLOCKED**, not passed. The earlier desktop matrix on `91b07ce2` is
+green on every target, including Windows-on-Arm emulation.
+[Receipts and workflow links](LINUX_BETA_2026_11_09.md#github-qualification-and-release-dispatch-access).

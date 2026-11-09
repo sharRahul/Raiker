@@ -1,0 +1,8 @@
+{
+  "source_commit": "8a053a907b9c9e97bef4163f479650ac3d652f28",
+  "gate": "exact script from release.yml / Plan / Refuse a commit whose required verification did not pass",
+  "exit_code": 0,
+  "stdout": "all required release verification passed on this commit\n",
+  "stderr": "",
+  "signed_release_dispatch": "403 Resource not accessible by integration"
+}

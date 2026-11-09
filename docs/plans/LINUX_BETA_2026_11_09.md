@@ -148,3 +148,47 @@ window test initially observed a renderer crash during Setup; its isolated
 fresh-profile retry passed (`rpm-window-retry.log`). Both attempts are retained.
 A retry does not erase the initial crash; native Fedora installation and a
 repeatability check remain outside this Ubuntu extraction test.
+
+## GitHub qualification and release-dispatch access
+
+Runtime commit `8a053a907b9c9e97bef4163f479650ac3d652f28` is pushed to main.
+[CI](https://github.com/sharRahul/Raiker/actions/runs/42639300007),
+[llama.cpp engine](https://github.com/sharRahul/Raiker/actions/runs/42639300373)
+and [Data safety drills](https://github.com/sharRahul/Raiker/actions/runs/42639300064)
+are all green, including Ruff, mypy, lint/type checking, every Python shard,
+security/dependency checks and real inference on all three operating systems.
+The exact verification script from Release → Plan also passed locally for
+that SHA ([receipt](evidence/linux-beta-2026-11-09/exact-release-gate-8a053a90.json)).
+The previous runtime/packaging commit `91b07ce2` additionally passed all desktop
+targets and the Windows-on-Arm emulated installation in
+[Desktop package](https://github.com/sharRahul/Raiker/actions/runs/42637512116).
+That packaging evidence is explicitly not an exact-`8a053a90` package claim.
+
+The signed, non-published release dispatch was attempted with version `0.9.0`,
+channel `beta`, signing `require-except-macos`, and `publish=false`. GitHub
+rejected it: **403 Resource not accessible by integration**. No release run or
+new signed artifacts were created by that attempt. Actions write access or an
+owner-triggered manual run is required; do not change the workflow's deliberate
+manual trigger or weaken its gate to bypass this permission boundary.
+
+Once access is available, the concrete non-publishing command is:
+
+```bash
+gh workflow run release.yml --ref main \
+  -f version=0.9.0 -f channel=beta -f signing=require-except-macos \
+  -F publish=false
+```
+
+Recheck every required result on the SHA selected by that run. Signed channel,
+SBOM, provenance and `RELEASE_EVIDENCE.md` must come from its actual outputs;
+they remain blocked here. An unsigned local candidate cannot substitute for
+those trust records. Publication remains blocked by the feature/journey/audit
+gates independently of workflow access.
+
+The final source UI status check returned `not_connected`, kept the explicit
+adoption button visible, and observed no public destinations in its focused
+trace ([UI receipt](evidence/linux-beta-2026-11-09/passive-status-ui-8a053a90.json),
+[network receipt](evidence/linux-beta-2026-11-09/passive-status-network-8a053a90.json)).
+It is a short regression check, not MM-5 acceptance.
+
+![Explicit sign-in and adoption without a background account check](screenshots/linux-beta-2026-11-09/explicit-chatgpt-connection.png)

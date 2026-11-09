@@ -43,10 +43,9 @@
   const uid = `cp-${Math.random().toString(36).slice(2, 8)}`;
   const customHref = $derived(capability ? `#/capabilities?item=${encodeURIComponent(capability)}` : "#/capabilities");
 
-  // Found live: the connection refreshes after a preset is saved, so a second
-  // read starts while the first is out, and the older one's answer (or its
-  // cancellation) landed last and read as "could not be read". Only the
-  // newest read may set what the page says.
+  // The connection refreshes after a preset is saved, so a second read can
+  // start while the first is out. Only the newest read may set what the page
+  // says; an older answer arriving later is ignored.
   let readSeq = 0;
   async function readActivity(id: string) {
     const seq = ++readSeq;

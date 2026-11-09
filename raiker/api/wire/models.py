@@ -267,7 +267,7 @@ class WeeklyBudgetSet(TypedDict):
 class CodexStatus(TypedDict):
     """Whether the ChatGPT subscription is connected, offered, signed out or not installed."""
 
-    connection_status: Literal["connected", "available", "signed_out", "codex_missing"]
+    connection_status: Literal["connected", "available", "signed_out", "codex_missing", "not_connected"]
     plan_type: str | None
 
 

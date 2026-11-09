@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Models: readiness, decisions, operations, the library, Hugging Face, pricing,
 capacity, usage, connections, setup, speech, images and language."""
 
@@ -196,6 +197,9 @@ class _FakeCodex:
         from raiker.models.codex_app_server import CodexAccountStatus
 
         return CodexAccountStatus(signed_in=True, plan_type="plus")
+
+    async def passive_status(self, _principal_id: str) -> None:
+        return None
 
     async def start_login(self, _principal_id: str) -> Any:
         from raiker.models.codex_app_server import CodexLogin

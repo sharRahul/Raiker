@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Small, safe boundary around Codex App Server's JSON-RPC stdio protocol.
 
 Codex owns ChatGPT OAuth tokens and opens the browser flow.  Raiker receives
@@ -339,6 +340,20 @@ class CodexSubscriptionSessions:
                 self._clients.pop(principal_id, None)
             await client.aclose()
         return status
+
+    async def passive_status(self, principal_id: str) -> CodexAccountStatus | None:
+        """Poll an owner-started login, never start a sidecar from a page read."""
+        async with self._lock:
+            client = self._clients.get(principal_id)
+            if client is None:
+                return None
+            # Disconnect waits for this in-flight read. Do not check membership
+            # then call status(), which could recreate a just-revoked client.
+            account = await client.account_status()
+            if account.signed_in:
+                self._clients.pop(principal_id, None)
+                await client.aclose()
+            return account
 
     async def start_login(self, principal_id: str) -> CodexLogin:
         return await (await self._client(principal_id)).start_chatgpt_login()

@@ -6452,7 +6452,8 @@
               "connected",
               "available",
               "signed_out",
-              "codex_missing"
+              "codex_missing",
+              "not_connected"
             ],
             "title": "Connection Status",
             "type": "string"

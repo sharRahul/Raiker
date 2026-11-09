@@ -167,3 +167,13 @@ RPM's extracted frozen host/window checks and native Fedora installation are
 separate from successful package creation. The corrected-source 1,805.76-second
 trace retains a **not approved** verifier result and does not close MM-5; see
 the [receipts](LINUX_BETA_2026_11_09.md#artifact-and-audit-receipts).
+
+**RPM payload checks:** extracted frozen-host smoke, restart and setup
+persistence passed. Extracted-window onboarding passed; the independent
+first-run window test crashed its renderer on its first attempt and passed an
+isolated fresh-profile retry. This is Ubuntu payload evidence, not Fedora RPM
+installation acceptance. Both attempts are retained in the run record.
+
+FIXED-1375 prevents unconnected ChatGPT status reads from starting Codex App
+Server. Candidate egress qualification must include that correction and a
+fresh recording; earlier failed reports are not superseded by unit tests.

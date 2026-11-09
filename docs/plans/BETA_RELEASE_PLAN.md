@@ -621,3 +621,8 @@ native Linux adversarial/resource tests and real llama.cpp CPU inference
 passed. Full Voice V1, seven real-model journeys, live OAuth revocation,
 30-minute exact-candidate all-feature egress, signed candidate qualification
 and owner sign-off retain their gates. No beta scope decision was changed.
+
+The egress follow-through also found an unrequested ChatGPT status sidecar
+(FIXED-1375): unconnected status reads are now passive, with explicit owner
+actions for sign-in and adoption. The failed egress receipts remain attached;
+MM-5 is still partial pending a fresh exact-candidate recording.

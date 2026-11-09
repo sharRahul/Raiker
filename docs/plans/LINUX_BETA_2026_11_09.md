@@ -128,3 +128,23 @@ connection observations to fill that gap. In addition to documented local
 probe/route-discovery destinations, the navigation sweep observed external
 addresses still requiring attribution and an explicit local-only policy.
 The corrected startup guard alone does not close MM-5.
+
+## Sidecar status and RPM payload follow-through
+
+The navigation sweep also exercised ChatGPT subscription status, which started
+the installed Codex App Server before this Raiker profile had connected it.
+FIXED-1375 makes an unconnected status read passive (`not_connected`) and
+retains explicit sign-in/adoption. This corrects another unsolicited-network
+path; it does not retroactively approve either failed capture or establish
+that every external address in them came from this process. Local evidence:
+`passive-codex.xml` (22 tests), `codex-contracts-locked.log` (5 contract cases),
+`passive-codex-mypy.txt` and `passive-codex-web-check-final.log`. API generation
+was verified under the locked Python 3.12 build environment; the workspace's
+Python 3.14 renders some existing optional-union inventory names differently.
+
+The RPM's extracted host passed the full smoke/restart/setup-persistence suite
+(`rpm-host-smoke.txt`). Its onboarding window passed. The separate first-run
+window test initially observed a renderer crash during Setup; its isolated
+fresh-profile retry passed (`rpm-window-retry.log`). Both attempts are retained.
+A retry does not erase the initial crash; native Fedora installation and a
+repeatability check remain outside this Ubuntu extraction test.

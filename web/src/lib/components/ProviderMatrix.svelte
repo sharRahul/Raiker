@@ -889,6 +889,7 @@
           <button class="btn btn-ghost btn-sm" type="button" disabled={busy[row.profileId] !== undefined} onclick={() => void startSubscriptionLogin(row)}>Use a different account</button>
         {:else}
           <button class="btn btn-sm btn-primary" type="button" disabled={busy[row.profileId] !== undefined} onclick={() => void startSubscriptionLogin(row)}>{busy[row.profileId] === "saving" ? "Opening sign-in…" : "Sign in with ChatGPT"}</button>
+          <button class="btn btn-ghost btn-sm" type="button" disabled={busy[row.profileId] !== undefined} onclick={() => void connectSubscription(row)}>Use existing sign-in</button>
         {/if}
       </div>
       <p class="state">

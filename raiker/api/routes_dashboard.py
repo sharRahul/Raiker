@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 from __future__ import annotations
 
 import asyncio
@@ -2814,8 +2815,17 @@ async def get_chatgpt_codex_status(
     auth_data: tuple[ApiSession, Principal] = Depends(_auth),
 ) -> dict[str, Any]:
     session, _principal = auth_data
+    store = SQLiteStore(request.app.state.workspace_root)
+    adopted = get_model_connection(store, session.principal_id, CODEX_SUBSCRIPTION_PROFILE_ID) is not None
     try:
-        account = await _codex_sessions(request).status(session.principal_id)
+        sessions = _codex_sessions(request)
+        account = (
+            await sessions.status(session.principal_id) if adopted
+            else await sessions.passive_status(session.principal_id)
+        )
+        if account is None:
+            unchecked: CodexStatus = {"connection_status": "not_connected", "plan_type": None}
+            return serialize_dto(unchecked)
     except ProviderConfigurationError as exc:
         # A device without Codex is a state to describe, not a failure to
         # report: the row can only tell the owner what to install if the read
@@ -2832,18 +2842,14 @@ async def get_chatgpt_codex_status(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail={"reason_code": safe_error(str(exc))},
         ) from exc
-    # BUG-259 — a read reports; it does not adopt. Three states, not two, because
+    # BUG-259 — a read reports; it does not adopt or start an unrequested check.
     # "Codex is signed in" and "this owner chose to use it" are different facts
     # and collapsing them is what made a fresh install connect itself:
     #
+    #   not_connected — no owner-started login or adopted connection; no sidecar.
     #   connected  — this owner has adopted the subscription.
     #   available  — Codex is signed in, and nobody here has said to use it.
     #   signed_out — Codex has no session to offer.
-    store = SQLiteStore(request.app.state.workspace_root)  # type: ignore[attr-defined]
-    adopted = (
-        get_model_connection(store, session.principal_id, CODEX_SUBSCRIPTION_PROFILE_ID)
-        is not None
-    )
     if adopted and not account.signed_in:
         # The Codex session went away underneath a connection Raiker recorded.
         # Leaving the marker would keep offering models nothing can serve.

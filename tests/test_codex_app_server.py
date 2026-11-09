@@ -1,5 +1,6 @@
 """Contract tests for the local Codex App Server boundary."""
 
+# SPDX-License-Identifier: Apache-2.0
 from __future__ import annotations
 
 import asyncio
@@ -115,3 +116,22 @@ def test_provider_adapts_codex_models_and_text_only_chat(tmp_path: Path) -> None
             await provider.aclose()
 
     asyncio.run(run())
+
+
+def test_passive_status_never_constructs_or_starts_an_unrequested_client() -> None:
+    from raiker.models.codex_app_server import CodexSubscriptionSessions
+
+    calls = []
+
+    def forbidden_factory():  # type: ignore[no-untyped-def]
+        calls.append("started")
+        raise AssertionError("a page read must not start Codex")
+
+    async def scenario() -> None:
+        sessions = CodexSubscriptionSessions(client_factory=forbidden_factory)
+        assert await sessions.passive_status("principal_owner") is None
+        await sessions.disconnect("principal_owner")
+        assert await sessions.passive_status("principal_owner") is None
+
+    asyncio.run(scenario())
+    assert calls == []

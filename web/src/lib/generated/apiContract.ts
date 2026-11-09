@@ -1287,7 +1287,7 @@ export type CodexLoginStarted = {
 
 /** Whether the ChatGPT subscription is connected, offered, signed out or not installed. */
 export type CodexStatus = {
-  connection_status: "connected" | "available" | "signed_out" | "codex_missing";
+  connection_status: "connected" | "available" | "signed_out" | "codex_missing" | "not_connected";
   plan_type: string | null;
 };
 

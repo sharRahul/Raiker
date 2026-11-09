@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 from __future__ import annotations
 
 from pathlib import Path
@@ -16,13 +17,20 @@ class FakeCodexSessions:
 
     def __init__(self, signed_in: bool = True) -> None:
         self.signed_in = signed_in
+        self.pending = False
+        self.status_calls = 0
 
     async def status(self, principal_id: str) -> CodexAccountStatus:
         assert principal_id == "principal_owner"
+        self.status_calls += 1
         return CodexAccountStatus(signed_in=self.signed_in, plan_type="plus")
+
+    async def passive_status(self, principal_id: str) -> CodexAccountStatus | None:
+        return await self.status(principal_id) if self.pending else None
 
     async def start_login(self, principal_id: str) -> CodexLogin:
         assert principal_id == "principal_owner"
+        self.pending = True
         return CodexLogin(login_id="login_1")
 
     async def disconnect(self, principal_id: str) -> None:
@@ -53,12 +61,15 @@ def test_subscription_routes_expose_safe_status_and_start_local_login(
     # honestly instead of quietly adopting the first.
     status = client.get("/api/models/chatgpt-codex/status", headers=_headers(workspace))
     assert status.status_code == 200, status.text
-    assert status.json() == {"connection_status": "available", "plan_type": "plus"}
+    assert status.json() == {"connection_status": "not_connected", "plan_type": None}
+    assert sessions.status_calls == 0
     assert "email" not in status.text.casefold()
 
     login = client.post("/api/models/chatgpt-codex/login", headers=_headers(workspace))
     assert login.status_code == 200, login.text
     assert login.json() == {"ok": True, "connection_status": "login_pending"}
+    polled = client.get("/api/models/chatgpt-codex/status", headers=_headers(workspace))
+    assert polled.json()["connection_status"] == "available"
 
     connect = client.post("/api/models/chatgpt-codex/connection", headers=_headers(workspace))
     assert connect.status_code == 200, connect.text
@@ -89,11 +100,13 @@ def test_reading_the_status_never_connects_the_subscription(
 
     import raiker.api.routes_dashboard as routes
 
-    monkeypatch.setattr(routes, "_codex_sessions", lambda request: FakeCodexSessions())
+    sessions = FakeCodexSessions()
+    monkeypatch.setattr(routes, "_codex_sessions", lambda request: sessions)
 
     for _ in range(3):
         body = client.get("/api/models/chatgpt-codex/status", headers=_headers(workspace)).json()
-        assert body["connection_status"] == "available"
+        assert body["connection_status"] == "not_connected"
+    assert sessions.status_calls == 0
 
     from raiker.models.connections import get_model_connection
     from raiker.storage.sqlite import SQLiteStore
@@ -120,7 +133,7 @@ def test_a_signed_out_codex_cannot_be_connected(
     )
 
     status = client.get("/api/models/chatgpt-codex/status", headers=_headers(workspace))
-    assert status.json()["connection_status"] == "signed_out"
+    assert status.json()["connection_status"] == "not_connected"
 
     refused = client.post("/api/models/chatgpt-codex/connection", headers=_headers(workspace))
     assert refused.status_code == 409

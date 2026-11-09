@@ -1,5 +1,18 @@
 # Fixed items
 
+## FIXED-1375 — Reading ChatGPT status started an unrequested network-capable sidecar
+
+An unconnected profile's Models status read used to start Codex App Server to
+inspect the machine's ChatGPT account. The egress navigation sweep exposed
+that process/network path even though Raiker had never adopted a subscription.
+Status now reports `not_connected` without constructing a client. Only a
+previously connected subscription or an explicitly started login may query
+the sidecar. **Use existing sign-in** remains an explicit owner action. Passive
+polling and disconnect share the session lock, so polling cannot recreate a
+revoked client. Tests cover repeated reads without client construction, pending
+login polling and explicit connect/disconnect. The API contract includes the
+unchecked state; the full local-only audit still requires a fresh candidate run.
+
 ## FIXED-1370 — Linux Apply could follow a parent swapped after its link check
 
 Apply now holds no-follow directory handles for both project and task copy
@@ -1731,6 +1744,7 @@ file you can open. The two capture sets that remain — `screenshots/pages/` and
 | [FIXED-1372](#fixed-1372--a-fresh-local-only-profile-downloaded-public-feeds-at-startup) | High | Linux beta hardening | Fixed 2026-11-09 |
 | [FIXED-1373](#fixed-1373--whisper-models-still-had-no-immutable-download-pins) | High | Linux beta hardening | Fixed 2026-11-09 |
 | [FIXED-1374](#fixed-1374--rpm-used-unbounded-level-9-multithreaded-xz-compression) | High | Linux beta hardening | Fixed 2026-11-09 |
+| [FIXED-1375](#fixed-1375--reading-chatgpt-status-started-an-unrequested-network-capable-sidecar) | High | Local-only egress | Fixed 2026-11-09 |
 
 ---
 

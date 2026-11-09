@@ -1622,3 +1622,10 @@ installation on Fedora remains untested. The corrected-source trace covered
 connection-activity span and external destinations during the navigation
 sweep). Attribute those calls and define auditable recording boundaries for
 idle periods before closing local-only egress; retain the failed report.
+
+FIXED-1375 additionally prevents an unconnected ChatGPT status read from
+starting Codex App Server. The failed egress captures remain failed; rerun
+against the exact frozen candidate after this change. RPM extracted-host smoke
+and onboarding passed; one separate Setup window test crashed its renderer
+before passing in isolation. Preserve that first failure and investigate if
+it repeats; native Fedora acceptance remains untested.

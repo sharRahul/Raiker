@@ -395,4 +395,8 @@ vulnerabilities according to [SECURITY.md](SECURITY.md).
 ## License
 
 Raiker is licensed under the [Apache License 2.0](LICENSE). Third-party notices
-are listed in [NOTICE](NOTICE).
+are listed in [NOTICE](NOTICE). The opt-in personal Kokoro voice build
+(`--bundle-voice`) also includes GPL-3.0 components (phonemizer, espeak-ng);
+their licences and pinned corresponding sources are described in
+[docs/licensing/voice](docs/licensing/voice/README.md). Public release builds
+do not include them.

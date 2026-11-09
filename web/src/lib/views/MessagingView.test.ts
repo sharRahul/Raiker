@@ -595,4 +595,47 @@ describe("MessagingView", () => {
     await screen.findByText(/untrusted content with a named sender who is not you/i);
     expect(screen.queryByRole("heading", { name: "Routing contract" })).toBeNull();
   });
+  it("keeps sender input when pairing is not confirmed", async () => {
+    stubFetch({ "GET /api/channels": channelsView(), "POST /api/channels/pairings": { __status: 503 } });
+    render(MessagingView);
+    await openAddChannel();
+    await fireEvent.input(screen.getByLabelText("Allowed senders"), { target: { value: "owner-42" } });
+    await fireEvent.click(screen.getByRole("button", { name: "Pair", exact: true }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("Check the profile before pairing again");
+    expect(screen.getByLabelText("Allowed senders")).toHaveValue("owner-42");
+  });
+
+  it.each([
+    ["Delivery address", "Delivery address", "https://example.com/new", "Save address", "destination"],
+    ["Senders", "Allowed senders", "owner-42", "Save senders", "senders"],
+  ])("keeps the %s editor after an uncertain write", async (button, label, value, save, endpoint) => {
+    stubFetch({
+      "GET /api/channels": channelsView({ profiles: [{ ...channelsView().profiles[0], linked: true, pairing_id: "chp_1", revision: "r1", senders: ["ops"] }] }),
+      [`PUT /api/channels/pairings/chp_1/${endpoint}`]: { __status: 503 },
+    });
+    render(MessagingView);
+    await screen.findByRole("option", { name: /Webhooks/ });
+    await fireEvent.click(screen.getByRole("button", { name: button, exact: true }));
+    await fireEvent.input(screen.getByLabelText(label), { target: { value } });
+    await fireEvent.click(screen.getByRole("button", { name: save, exact: true }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("was not confirmed");
+    expect(screen.getByLabelText(label)).toHaveValue(value);
+  });
+
+  it("retries an unavailable conversation list without pretending it is empty", async () => {
+    const routes: Record<string, unknown> = {
+      "GET /api/channels": channelsView({ profiles: [{ ...channelsView().profiles[0], linked: true, pairing_id: "chp_1", revision: "r1", senders: ["ops"] }] }),
+      "GET /api/sessions": { __status: 503 },
+    };
+    stubFetch(routes);
+    render(MessagingView);
+    await screen.findByRole("option", { name: /Webhooks/ });
+    await fireEvent.click(screen.getByRole("button", { name: "Routing", exact: true }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("Conversations could not be read");
+    routes["GET /api/sessions"] = [{ session_id: "sess_1", title: "Recovered conversation" }];
+    await fireEvent.click(screen.getByRole("button", { name: "Retry conversations" }));
+    await fireEvent.change(screen.getByLabelText("Inbound"), { target: { value: "side_question" } });
+    expect(await screen.findByRole("option", { name: "Recovered conversation" })).toBeInTheDocument();
+  });
+
 });

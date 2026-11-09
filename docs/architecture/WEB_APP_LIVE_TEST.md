@@ -2280,3 +2280,38 @@ scenarios, dark/native platform rendering and assistive technology checks remain
 open in TO_BE_FIXED. GitHub's implementation-commit Web UI, Python 3.11,
 Data safety, Ruff/Mypy validation and platform jobs were monitored after push;
 the final workflow outcome is reported with the delivery summary.
+
+## Result — 2026-11-09 (Beta Messaging and Design recovery)
+
+[FIXED-1367](../plans/FIXED_ITEMS.md#fixed-1367--messaging-discarded-setup-drafts-and-design-claimed-uncertain-writes-changed-nothing-qui-g06)
+implements the 20-item recovery slice that can be tested on this Linux PC.
+Spec: `web/e2e/beta-messaging-design-recovery-live.spec.ts`, running host and
+production UI on loopback. HTTP 503 responses are injected explicitly; provider
+credentials and external deliveries are not needed. No real image-provider
+inference or write-that-committed-before-disconnect claim follows from this run.
+
+| Case | Check | Capture directory: `output/playwright/2026-11-09-beta-recovery/` |
+|---|---|---|
+| RT-BETA-REC-01 | Messaging read failure is distinct from empty; retry reads host profiles | `messaging-read.png` |
+| RT-BETA-REC-02 | Failed pairing keeps sender draft and check-first advice | `pairing-draft.png` |
+| RT-BETA-REC-03 | Unavailable image history has a retry that recovers | `design-history.png` |
+| RT-BETA-REC-04 | Unavailable model discovery is named and can be retried | `design-models.png` |
+
+The component suites additionally exercise retained address/sender editors,
+conversation retry, model retry and uncertain image deletion. Design research,
+Documents, committed-write response loss, screen readers, fresh signed installers
+and other-machine platform/GPU evidence remain outside this slice. The beta
+release plan's security and distribution evidence gates remain open.
+
+**Results.** The isolated running-host suite passed **4/4**. All four captures
+were inspected at original resolution. The first pass exposed a duplicate
+Design-history alert; it was removed without presenting an empty history.
+Visual review also exposed a pairing error behind its modal; it now appears
+inside the pairing dialog, and RT-BETA-REC-02 asserts that location. The final
+component run passed **51/51**, including stale-image retention after refresh.
+Production build, design tokens, Ruff and the 26 documentation/governance
+contracts pass. Concurrent local validation caused Chromium crashes and a
+terminated Svelte check; browser validation was repeated in isolation.
+The corrected pairing case passed its dedicated rerun (**1/1**) and its new
+capture was inspected: the actionable error and retained sender entry are
+visible together inside the dialog.

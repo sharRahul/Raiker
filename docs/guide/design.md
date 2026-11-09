@@ -21,6 +21,15 @@ count, and everything you have asked for. Open a picture and it becomes a canvas
 — the picture in the middle, everything else down the left, and what is known
 about it on the right. What it does not do is hide the path underneath it.
 
+## Recovering from an unavailable response
+
+**Retry Design** refreshes unavailable image history or model discovery. Known
+images stay visible with a warning if a later history read fails. A generation
+whose response was lost may already exist: check history before generating or
+importing again. Your failed-generation prompt stays in the composer. For an
+unconfirmed delete, restore or version change, check image history and Recently
+deleted before repeating the action.
+
 ## The composer
 
 Design uses the same composer as Chat and Build, so the shape is one you already

@@ -305,6 +305,14 @@ Attachments, reactions, typing indicators and reply quotes are not carried
 yet. Raiker's channels are a governed text relay (see below).
 
 
+## Recovering from an unavailable response
+
+**Retry messaging** refreshes the profiles after a failed read. When a setup
+write is not confirmed, its editor and draft stay open. Copy your entries before
+leaving the page, then refresh and check what was saved before trying again.
+Routing has **Retry conversations** when conversation choices cannot be read.
+After an uncertain test or held reply, check delivery receipts before resending.
+
 ## Adding another platform
 
 A channel type is one entry in `raiker/channels/adapters.py`, and it answers two

@@ -1542,7 +1542,9 @@ fails closed as `connector_reauth_required`.
 
 Skills, Goals, Rewind and the GitHub settings recovery copy is implemented in
 [FIXED-1366](FIXED_ITEMS.md#fixed-1366--skills-goals-rewind-and-github-errors-lacked-safe-recovery-qui-g06).
-Messaging and Design still need their error audit. Lost-response writes that
+Messaging and Design images now have their recovery implementation in
+[FIXED-1367](FIXED_ITEMS.md#fixed-1367--messaging-discarded-setup-drafts-and-design-claimed-uncertain-writes-changed-nothing-qui-g06).
+Design Documents and research still need their separate error audit. Lost-response writes that
 commit before disconnect, real GitHub authentication failures, and every Goal
 lifecycle refusal still need dedicated running-host evidence. Do not treat
 response-failure injection as proof of those scenarios.
@@ -1550,3 +1552,13 @@ response-failure injection as proof of those scenarios.
 2026-11-09 provider live check: UI entry succeeded for all three supplied keys;
 OpenAI and OpenRouter completed real turns. Anthropic reported **No credit**,
 so its inference and the stopped-turn check still need a funded connection.
+
+## Beta recovery evidence after 2026-11-09 follow-through
+
+The Messaging and Design image implementation slice is complete in
+[FIXED-1367](FIXED_ITEMS.md#fixed-1367--messaging-discarded-setup-drafts-and-design-claimed-uncertain-writes-changed-nothing-qui-g06).
+Four running-host injected-error cases and 51 component tests were exercised
+on this Linux PC. Individual live mutation cases (routing, held-send/review,
+image version restore and purge), committed-write response loss, Design research
+and Documents still need evidence or audit. Native signed-installer, other-OS
+and GPU requirements in the beta plan are not closed by these checks.

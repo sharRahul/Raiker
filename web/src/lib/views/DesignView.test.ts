@@ -818,3 +818,38 @@ describe("the revision strip (QUI-L13)", () => {
     expect(await screen.findByRole("button", { name: "Edit" })).toBeInTheDocument();
   });
 });
+
+
+describe("Design recovery for beta", () => {
+  it("retries model discovery and identifies what is unavailable", async () => {
+    const responses = routes({ "GET /api/models": { __status: 503 } });
+    stubFetch(responses);
+    render(DesignView);
+    expect(await screen.findByRole("alert")).toHaveTextContent("Image models could not be read");
+    responses["GET /api/models"] = { profiles: [], selected_profile_id: null };
+    await fireEvent.click(screen.getByRole("button", { name: "Retry Design" }));
+    await waitFor(() => expect(screen.queryByText(/Image models could not be read/)).toBeNull());
+  });
+
+  it("explains uncertain deletion without claiming the image is unchanged", async () => {
+    stubFetch(routes({ "DELETE /api/images/img_1": { __status: 503 } }));
+    render(DesignView);
+    await fireEvent.click(await screen.findByRole("button", { name: "Open a maple leaf on the canvas" }));
+    await fireEvent.click(screen.getByRole("button", { name: "Delete", exact: true }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("Check Recently deleted before deleting again");
+    expect(screen.getByRole("alert")).not.toHaveTextContent("Nothing was changed");
+  });
+  it("keeps known images visible when a later history read fails", async () => {
+    const responses = routes({ "GET /api/models": { __status: 503 } });
+    stubFetch(responses);
+    render(DesignView);
+    await screen.findByRole("button", { name: "Retry Design" });
+    expect(screen.getByRole("button", { name: "Open a maple leaf on the canvas" })).toBeInTheDocument();
+    responses["GET /api/models"] = { profiles: [], selected_profile_id: null };
+    responses["GET /api/images"] = { __status: 503 };
+    await fireEvent.click(screen.getByRole("button", { name: "Retry Design" }));
+    await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent("Image history could not be read"));
+    expect(screen.getByRole("button", { name: "Open a maple leaf on the canvas" })).toBeInTheDocument();
+  });
+
+});

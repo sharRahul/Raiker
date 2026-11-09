@@ -14,6 +14,7 @@
    * audit event, and a routing decision the owner stored out of band. Telegram
    * gets no shortcut for being a name you recognise.
    */
+  import { failure } from "../errorCopy";
   import { onMount } from "svelte";
   import GuideLink from "../components/GuideLink.svelte";
   import ListDetail from "../components/ListDetail.svelte";
@@ -43,6 +44,8 @@
   let destinationUrl = $state("");
   let sendersFor = $state<string | null>(null);
   let sendersDraft = $state("");
+  let conversationsError = $state<string | null>(null);
+  let conversationsBusy = $state(false);
   let conversations = $state<{ session_id: string; title: string }[] | null>(null);
   let routingFor = $state<string | null>(null);
   let routeMode = $state<"record_only" | "new_turn" | "side_question" | "interrupt">("record_only");
@@ -95,7 +98,7 @@
   }
 
   function channelReason(error: unknown): string {
-    if (!(error instanceof ApiError)) return "That request failed.";
+    if (!(error instanceof ApiError)) return "";
     const code = error.reasonCode ?? "";
     if (CHANNEL_REASONS[code]) return CHANNEL_REASONS[code];
     if (code.startsWith("egress_denied"))
@@ -105,7 +108,25 @@
     if (code.startsWith("fetch_failed"))
       return "The destination could not be reached.";
     if (code.startsWith("unknown_connector")) return "That connector is not in the registry.";
-    return code || "That request failed.";
+    return "";
+  }
+
+  function channelActionError(key: string, error: unknown): string {
+    const operation = key.split(":")[0];
+    const actions: Record<string, [string, string]> = {
+      pair: ["Pairing the channel was not confirmed", "Check the profile before pairing again. Your sender entry is kept here."],
+      destination: ["Saving the delivery address was not confirmed", "Copy the address, then refresh and check the saved destination before retrying."],
+      senders: ["Saving allowed senders was not confirmed", "Copy your sender list, then refresh and check the saved allowlist before retrying."],
+      routing: ["Saving channel routing was not confirmed", "Check the saved routing before retrying. Your selections are kept here."],
+      enable: ["Changing the channel switch was not confirmed", "Refresh and check the switch before retrying."],
+      pause: ["Changing channel pause was not confirmed", "Refresh and check whether the channel is paused before retrying."],
+      unpair: ["Unpairing the channel was not confirmed", "Refresh and check whether it is still paired before retrying."],
+      test: ["The test delivery was not confirmed", "Check delivery receipts before sending another test."],
+      send: ["Sending the held reply was not confirmed", "Check delivery receipts before sending the reply again."],
+      review: ["Reviewing the receipt was not confirmed", "Refresh and check whether the receipt is reviewed before retrying."],
+    };
+    const [what, next] = actions[operation] ?? ["The channel action was not confirmed", "Refresh and check saved state before retrying."];
+    return failure(what, "The channel may have changed.", next, error) + " " + channelReason(error);
   }
 
   async function loadChannels() {
@@ -113,14 +134,12 @@
       channels = await api.channels();
       channelsError = null;
     } catch (error) {
-      channels = null;
-      channelsError =
-        error instanceof ApiError ? error.message : "Channel profiles are unavailable.";
+      channelsError = failure("Messaging profiles could not be read", "The list may be out of date.", "Retry messaging to refresh it.", error);
     }
   }
 
   async function runChannelAction(key: string, action: () => Promise<unknown>, done: string) {
-    if (channelBusy) return;
+    if (channelBusy) return false;
     channelBusy = key;
     channelsError = null;
     channelNotice = null;
@@ -128,12 +147,14 @@
       await action();
       channelNotice = done;
       await loadChannels();
+      return true;
     } catch (error) {
-      channelsError = channelReason(error);
+      const actionError = channelActionError(key, error);
       // FIXED-719 — a refused action can still change what the server holds:
       // a refused test is recorded on the channel and as a receipt.
       await loadChannels();
-      channelsError = channelReason(error);
+      channelsError = actionError;
+      return false;
     } finally {
       channelBusy = null;
     }
@@ -150,9 +171,8 @@
       // Said at the moment it happens, because "paired" is the step most likely
       // to be read as "working".
       `Paired ${profile.display_name}. It is switched off until you turn it on.`,
-    ).then(() => {
-      pairSenders = "";
-      if (channelsError === null) addingChannel = false;
+    ).then((saved) => {
+      if (saved) { pairSenders = ""; addingChannel = false; }
     });
   }
 
@@ -181,7 +201,7 @@
       destinationUrl.trim()
         ? `${profile.display_name} delivers there now. Send a test to check it.`
         : `${profile.display_name} has no delivery address now.`,
-    ).then(() => (destinationFor = null));
+    ).then((saved) => { if (saved) destinationFor = null; });
   }
 
   function openSenders(profile: ChannelProfile) {
@@ -198,20 +218,24 @@
       `senders:${profile.connector_id}`,
       () => api.setChannelSenders(profile.pairing_id ?? "", senders, profile.revision),
       `${profile.display_name} accepts ${senders.length} sender${senders.length === 1 ? "" : "s"}.`,
-    ).then(() => (sendersFor = null));
+    ).then((saved) => { if (saved) sendersFor = null; });
   }
 
   /** UX-MSG-01 — the routed conversation is chosen by name, not typed as an id. */
   async function loadConversations() {
-    if (conversations !== null) return;
+    if (conversations !== null || conversationsBusy) return;
+    conversationsBusy = true;
+    conversationsError = null;
     try {
       const rows = await api.sessions(undefined, false, "chat");
       conversations = rows.slice(0, 50).map((row) => ({
         session_id: row.session_id,
         title: row.title?.trim() || "Untitled conversation",
       }));
-    } catch {
-      conversations = [];
+    } catch (error) {
+      conversationsError = failure("Conversations could not be read", "Routing choices are unavailable.", "Retry conversations to load the choices.", error);
+    } finally {
+      conversationsBusy = false;
     }
   }
 
@@ -265,14 +289,16 @@
       routeMode === "record_only"
         ? `${profile.display_name} records inbound messages without starting work.`
         : `${profile.display_name} now routes ${routeMode.replace("_", " ")}.`,
-    ).then(() => (routingFor = null));
+    ).then((saved) => { if (saved) routingFor = null; });
   }
 
   onMount(loadChannels);
 </script>
 
-{#if channelsError}
-  <div class="notice notice-danger" role="alert">{channelsError}</div>
+{#if channelsError && !addingChannel}
+  <div class="notice notice-danger" role="alert">{channelsError}
+    <button type="button" class="btn btn-sm" disabled={channelBusy !== null} onclick={loadChannels}>Retry messaging</button>
+  </div>
 {/if}
 {#if channelNotice}
   <div class="notice notice-ok" role="status">{channelNotice}</div>
@@ -292,7 +318,7 @@
     <a href="#/connections?tab=services">Connections › Services</a>.
   </p>
   {#if channels === null}
-    <p class="note">{channelsError ?? "Reading connector profiles…"}</p>
+    {#if !channelsError}<p class="note">Reading connector profiles…</p>{/if}
   {:else if channels.error}
     <p class="note">The connector registry could not be read, so nothing is offered here.</p>
   {:else}
@@ -589,6 +615,9 @@
               </form>
             {/if}
             {#if routingFor === profile.connector_id}
+              {#if conversationsError}<div class="notice notice-danger" role="alert">{conversationsError}
+                <button type="button" class="btn btn-sm" disabled={conversationsBusy} onclick={loadConversations}>Retry conversations</button>
+              </div>{/if}
               <form class="channel-form routing-form" onsubmit={(event) => { event.preventDefault(); saveRouting(profile); }}>
                 <div class="route-grid">
                   <label class="field-label" for={`route-${profile.connector_id}`}>Inbound</label>
@@ -776,6 +805,7 @@
         {#snippet steps(option)}
           {@const profile = channels?.profiles.find((row) => row.connector_id === option.id)}
           {#if profile}
+            {#if channelsError}<div class="notice notice-danger" role="alert">{channelsError}</div>{/if}
             {@render channelFacts(profile)}
               <form
                 class="channel-form"

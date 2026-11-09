@@ -1671,6 +1671,7 @@ file you can open. The two capture sets that remain — `screenshots/pages/` and
 | [FIXED-1364](#fixed-1364--a-permission-changed-in-one-place-stayed-stale-elsewhere-until-a-reload-qui-p02-acceptance) | Low | Permissions / every surface | Fixed 2026-11-08 |
 | [FIXED-1365](#fixed-1365--approvals-hid-allow-for-this-task-when-accepting-only-records-found-this-round) | Low | Approvals | Fixed 2026-11-08 |
 | [FIXED-1366](#fixed-1366--skills-goals-rewind-and-github-errors-lacked-safe-recovery-qui-g06) | Medium | Work / Connections / Recovery | Fixed 2026-11-09 |
+| [FIXED-1367](#fixed-1367--messaging-discarded-setup-drafts-and-design-claimed-uncertain-writes-changed-nothing-qui-g06) | Medium | Messaging / Design images | Fixed 2026-11-09 |
 
 ---
 
@@ -40518,3 +40519,27 @@ The existing inline alerts, typography and theme tokens are reused.
 
 **Evidence.** `errorCopy.test.ts`, `SkillsView.test.ts`, `GoalsView.test.ts`;
 [Live Test results](../architecture/WEB_APP_LIVE_TEST.md#result--2026-11-09-qui-g06-recovery).
+
+## FIXED-1367 — Messaging discarded setup drafts and Design claimed uncertain writes changed nothing (QUI-G06)
+
+**Severity: Medium. Area: Messaging / Design images. Status: Fixed 2026-11-09.**
+
+**Observed.** Pairing cleared allowed senders even when refused. Address,
+allowlist and routing editors closed after failed saves. Conversation lookup
+failure appeared as an empty list. Image lifecycle errors asserted unchanged
+state despite a lost response being ambiguous; image and model read failures
+had no direct recovery control.
+
+**Fixed.** The [20-item checklist](quiet-ui/07_QUICK_FIXES_AND_QUALITY.md#2026-11-09--beta-recovery-follow-through-on-this-pc)
+implements the remaining Messaging and Design image recovery slice. Channel
+mutations return an explicit success result so only confirmed writes dismiss
+the editor. Reads retain last-known profiles/images with a stale warning;
+conversation and model lookup failures have explicit retry controls. Each write
+names the action and asks the owner to check saved state before repeating a send,
+generation, version change or deletion. Existing server permission, revision and
+egress checks remain authoritative. This does not enable an integration or
+claim a real image-provider round trip.
+
+**Evidence.** `MessagingView.test.ts`, `DesignView.test.ts` and
+`beta-messaging-design-recovery-live.spec.ts`; see
+[Live Test results](../architecture/WEB_APP_LIVE_TEST.md#result--2026-11-09-beta-messaging-and-design-recovery).

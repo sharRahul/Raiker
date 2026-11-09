@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { failure as recoveryFailure } from "../errorCopy";
   import { isSendKeystroke, sendHint } from "../sendKey";
   import { uiPrefs } from "../prefs.svelte";
   import { askConfirm } from "../confirm.svelte";
@@ -84,6 +85,7 @@
   );
 
   let view = $state<ImageGenerationsView | null>(null);
+  let modelsError = $state<string | null>(null);
   let loadError = $state<string | null>(null);
   let gates = $state<CapabilityGate[]>([]);
   let models = $state<ModelsView | null>(null);
@@ -134,7 +136,7 @@
       starterNotice = "";
       starterNeedsImage = false;
     } catch (error) {
-      failure = error instanceof ApiError ? error.message : "The image could not be imported.";
+      failure = recoveryFailure("Importing the image was not confirmed", "The image may already be in history.", "Check the image history before importing the file again.", error);
     } finally { importing = false; }
   }
 
@@ -574,8 +576,7 @@
       loadError = null;
       if (view.sizes.length && !view.sizes.includes(size)) size = view.sizes[0];
     } catch (error) {
-      view = null;
-      loadError = error instanceof ApiError ? error.message : "Generations are unavailable.";
+      loadError = recoveryFailure("Image history could not be read", "The displayed history may be out of date.", "Retry Design to refresh it.", error);
     }
     // Neither of these may take the page down: the thread is still readable
     // without them, and a failed gate read must not be reported as a refusal.
@@ -589,6 +590,7 @@
     await refreshReadCapabilities();
     try {
       models = await api.models();
+      modelsError = null;
       if (!choiceKey && imageChoices.length) {
         // The remembered choice first, and only then the head of the list. A
         // model that is no longer connected is not restored: falling back to
@@ -603,8 +605,9 @@
           : undefined;
         choiceKey = (restored ?? imageChoices[0]).key;
       }
-    } catch {
+    } catch (error) {
       models = null;
+      modelsError = recoveryFailure("Image models could not be read", "Model availability is unknown.", "Retry Design to check connected models.", error);
     }
     await toLatest();
   }
@@ -639,7 +642,7 @@
       if (sentDraft.text === sentText) sentDraft.text = "";
     } catch (error) {
       failure =
-        error instanceof ApiError ? readable(error.reasonCode ?? null) : "That request failed.";
+        recoveryFailure("Image generation was not confirmed", "Your prompt is kept here; an image may already exist.", "Check image history before generating again.", error) + (error instanceof ApiError ? " " + readable(error.reasonCode ?? null) : "");
     } finally {
       busy = false;
       // Reloaded either way: a refusal is recorded, so the thread is where the
@@ -714,8 +717,8 @@
     try {
       await api.deleteImage(generationId);
       if (selectedId === generationId) selectedId = null;
-    } catch {
-      lifecycleNotice = "That picture could not be deleted. Nothing was changed.";
+    } catch (error) {
+      lifecycleNotice = recoveryFailure("Deleting the image was not confirmed", "The image may already be in Recently deleted.", "Check Recently deleted before deleting again.", error);
     }
     await load();
   }
@@ -724,8 +727,8 @@
     lifecycleNotice = null;
     try {
       await api.restoreImage(generationId);
-    } catch {
-      lifecycleNotice = "That picture could not be restored. It is still in Recently deleted.";
+    } catch (error) {
+      lifecycleNotice = recoveryFailure("Restoring the image was not confirmed", "The image may already be restored.", "Check image history and Recently deleted before retrying.", error);
     }
     await load();
   }
@@ -740,8 +743,8 @@
       const answer = await api.revertImage(headId, toId);
       await load();
       selectedId = answer.generation.generation_id;
-    } catch {
-      lifecycleNotice = "That version could not be brought back. Nothing was changed.";
+    } catch (error) {
+      lifecycleNotice = recoveryFailure("Restoring the image version was not confirmed", "A new version may already exist.", "Check the version history before bringing it back again.", error);
       await load();
     }
   }
@@ -750,8 +753,8 @@
     lifecycleNotice = null;
     try {
       await api.purgeImage(generationId);
-    } catch {
-      lifecycleNotice = "That picture could not be removed. It is still in Recently deleted.";
+    } catch (error) {
+      lifecycleNotice = recoveryFailure("Permanently deleting the image was not confirmed", "The image may already be removed.", "Check Recently deleted before retrying permanent deletion.", error);
     }
     await load();
   }
@@ -827,6 +830,11 @@
       <span class="pill">Preview</span>
       Image generation has not been verified end to end with a real image provider in this beta.
     </p>
+    {#if modelsError || loadError}
+      <div class="notice notice-danger" role="alert">{modelsError ?? loadError}
+        <button type="button" class="btn btn-sm" onclick={load}>Retry Design</button>
+      </div>
+    {/if}
     {#if lifecycleNotice !== null}
       <p class="notice" role="alert">{lifecycleNotice}</p>
     {/if}
@@ -859,11 +867,11 @@
       {#if (view.deleted ?? []).length > 0}
         <DesignCanvasRegion turns={turns} loading={false} {readable} bind:selectedId deleted={view.deleted} {filedIn} onrestore={restoreAsset} onpurge={purgeAsset} />
       {/if}
-    {:else}
+    {:else if !loadError || view !== null}
     <DesignCanvasRegion
       turns={turns}
-      loading={view === null}
-      {loadError}
+      loading={view === null && !loadError}
+      loadError={view === null ? loadError : null}
       {readable}
       sizedProviders={view?.sized_providers}
       bind:selectedId

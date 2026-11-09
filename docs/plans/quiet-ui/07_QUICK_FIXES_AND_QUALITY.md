@@ -290,3 +290,32 @@ inline alerts; no new modal interruption.
 18. [x] GitHub connection read.
 19. [x] GitHub action failure.
 20. [x] GitHub unreachable outcome.
+
+## 2026-11-09 — Beta recovery follow-through on this PC
+
+Plan: complete the remaining Messaging and Design image recovery audit (QUI-G06).
+Keep drafts and last-known reads, distinguish unavailable from empty, and avoid
+repeating uncertain sends or destructive writes without checking saved state.
+Test with component fault injection and running-host browser checks on Linux.
+Native signing, GPU and other-machine evidence stay outside this PC run.
+
+1. [x] Messaging list: retain known profiles and offer retry.
+2. [x] Pair channel: preserve allowed-sender input on failure.
+3. [x] Save destination: retain the address editor on failure.
+4. [x] Save senders: retain the allowlist editor on failure.
+5. [x] Save routing: retain routing selections on failure.
+6. [x] Conversation lookup: distinguish unavailable from empty and retry.
+7. [x] Enable channel: explain uncertain switch state.
+8. [x] Pause channel: explain uncertain pause state.
+9. [x] Unpair channel: verify pairing before retrying.
+10. [x] Test delivery: check receipts before sending again.
+11. [x] Held reply: check receipts before resending.
+12. [x] Review receipt: verify reviewed state before retrying.
+13. [x] Design image import: explain uncertainty and preserve context.
+14. [x] Design image history: retain known images and offer retry.
+15. [x] Design model lookup: show unavailable state with retry.
+16. [x] Image generation: preserve prompt and check history before retrying.
+17. [x] Delete image: verify Recently deleted before repeating.
+18. [x] Restore image: verify saved state before repeating.
+19. [x] Revert image: check versions before creating another.
+20. [x] Purge image: verify permanent deletion before repeating.

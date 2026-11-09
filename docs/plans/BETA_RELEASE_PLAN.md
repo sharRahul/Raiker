@@ -600,3 +600,11 @@ and after restart, and the same task id. The native probe reports Bubblewrap
 available with descendant reaping, egress, escape-write denial, masked reads,
 relay and seccomp enforced; runner trust is `package_relative_integrity`.
 These source-tree measurements do not replace frozen/installed-host evidence.
+
+**Installed result.** The frozen and installed host smoke checks passed; the
+unpacked and installed desktop suites each passed 2/2 under Xvfb. The `.deb`
+is installed at `/opt/Raiker` and the new-profile Home screenshot was inspected.
+AppImage and `.deb` artifacts with hashes are in `output/linux-beta/packages/`.
+The all-format wrapper stopped at RPM; that format is not accepted on this run.
+The owner selected `sharRahul/raiker-test-sandbox` for RR-40, but this integration
+cannot create repositories (HTTP 403); that journey waits for repository access.

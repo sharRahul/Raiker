@@ -1575,3 +1575,20 @@ and rollback acceptance, and owner sign-off remain open. The issue-to-PR
 journey needs an explicitly authorized test repository and permission to create
 its issue and draft PR. Do not relabel the unsigned test installation as an
 approved beta release.
+
+### Linux run follow-up: repository creation and RPM packaging
+
+The owner authorized an empty private `sharRahul/raiker-test-sandbox` for the
+issue-to-PR journey. Creation was attempted through GraphQL and REST, but the
+current GitHub integration returned `403 Resource not accessible by integration`.
+No repository, issue or PR was created. The owner must create the empty
+repository and grant the integration access, or enable repository creation.
+
+Ubuntu `.deb` installation and installed-window tests passed. The all-format
+build produced AppImage and `.deb`, then `rpmbuild` exited without a numeric
+exit code under `xzmt` compression on this Codespaces host. Its cause is not
+proved, and RPM acceptance remains open; this does not invalidate the tested
+Ubuntu installation. An attempted separate RPM retry lacked the build wrapper's
+target environment and produced no RPM. Do not record the all-format build as
+passing. The two successful artifacts and hashes are retained in
+`output/linux-beta/packages/`.

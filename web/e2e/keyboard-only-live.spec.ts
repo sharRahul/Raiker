@@ -76,7 +76,7 @@ test("KB-01 — start: reach the composer by keyboard, send, and get an answer",
   await tabTo(page, /^Prompt$|What would you like Raiker to do/);
   await page.keyboard.type("Reply with one short sentence about keyboards.");
   await page.keyboard.press("Enter");
-  await expect(page.locator("summary", { hasText: /no charge|cost/ }).last()).toBeVisible({ timeout: 180_000 });
+  await expect(page.getByTestId("turn-receipt").last()).toBeVisible({ timeout: 180_000 });
   await capture(page, join(SHOTS, "kb-01-answered.png"));
 });
 
@@ -88,6 +88,7 @@ test("KB-02 — stop: a long answer is stopped from the keyboard", async ({ page
   // Focus stays with the composer; the send control has become Stop safely.
   const stop = page.getByRole("button", { name: /Stop safely/ });
   await expect(stop).toBeVisible({ timeout: 60_000 });
+  await expect(stop).toBeEnabled({ timeout: 60_000 });
   await tabTo(page, /Stop safely/, { max: 30 });
   await page.keyboard.press("Enter");
   await expect(page.getByText(/Stopped|stopped/).last()).toBeVisible({ timeout: 60_000 });

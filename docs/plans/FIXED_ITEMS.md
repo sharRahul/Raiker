@@ -1,4 +1,29 @@
 # Fixed items
+
+## FIXED-1383 — Keyboard start evidence depended on retired receipt wording
+
+**Severity: Low. Area: Beta live tests. Status: Fixed 2026-11-09.**
+
+KB-01 received the real model answer but waited three minutes for a summary
+containing `cost` or `no charge`. Current receipts show provider/model and a
+currency amount. The check now waits for the existing `turn-receipt` test
+identifier. Keyboard navigation and submission remain entirely keyboard driven.
+
+**Evidence.** `web/e2e/keyboard-only-live.spec.ts`, Windows Chromium diagnostic
+failure followed by a passing KB-01 rerun against hosted Haiku 4.5.
+
+## FIXED-1382 — Linux filesystem flags broke Windows type checking
+
+**Severity: Low. Area: Platform portability. Status: Fixed 2026-11-09.**
+
+The pinned promotion path now explicitly returns on non-Linux platforms before
+using Linux-only flags. Linux-only FIFO/tmpfs test bodies also declare their
+platform requirement before referencing unavailable OS APIs. No Windows
+pinned-handle protection is claimed. Full Windows mypy passes 1,285 files;
+16 workspace tests pass, with seven Linux-only cases skipped on Windows.
+
+**Evidence.** `tests/test_task_workspaces.py`, `tests/test_promotion_link_races.py`,
+`tests/test_storage_exhaustion_live.py`, `python -m mypy raiker apps tests`.
 ## FIXED-1381 — An initial update read erased a failed update check
 
 **Severity: Medium. Area: Quiet UI update recovery. Status: Fixed 2026-11-09.**
@@ -1844,6 +1869,8 @@ file you can open. The two capture sets that remain — `screenshots/pages/` and
 | [FIXED-1379](#fixed-1379--redirected-windows-web-cli-help-crashed-on-cp1252) | Low | Windows CLI | Fixed 2026-11-09 |
 | [FIXED-1380](#fixed-1380--a-late-library-read-erased-a-newer-scan-failure) | Medium | Quiet UI model recovery | Fixed 2026-11-09 |
 | [FIXED-1381](#fixed-1381--an-initial-update-read-erased-a-failed-update-check) | Medium | Quiet UI update recovery | Fixed 2026-11-09 |
+| [FIXED-1382](#fixed-1382--linux-filesystem-flags-broke-windows-type-checking) | Low | Platform portability | Fixed 2026-11-09 |
+| [FIXED-1383](#fixed-1383--keyboard-start-evidence-depended-on-retired-receipt-wording) | Low | Beta live tests | Fixed 2026-11-09 |
 
 ---
 

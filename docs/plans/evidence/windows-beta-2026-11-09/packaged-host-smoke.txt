@@ -1,0 +1,21 @@
+PASS provenance names the desktop distribution
+PASS provenance says signed=False
+INFO version 0.9.0 target windows-x86_64 signed=False
+PASS host ready at http://127.0.0.1:62433/
+PASS health answers ok
+PASS encrypted store opens
+PASS full-text search is FTS5
+PASS web app is served
+PASS fresh profile offers owner registration
+PASS owner account is created
+PASS first-run setup is required on a fresh profile
+PASS system check answers
+PASS system check has no blocking failure []
+PASS installation check answers
+PASS installation check has no failed mandatory component []
+PASS the in-app guide is bundled
+PASS setup progress is saved
+PASS host quits on request
+PASS restart opens the same profile (owner account survives)
+PASS owner signs in after restart
+PASS setup progress survives restart

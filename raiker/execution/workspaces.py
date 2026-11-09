@@ -224,7 +224,7 @@ class _PromotionPaths:
 
     def path(self, relative: str, *, create: bool = False) -> Path:
         target = _target(self.root, relative)
-        if not self.handles:
+        if sys.platform != "linux" or not self.handles:
             return target
         parts = PurePosixPath(relative).parts
         for index, part in enumerate(parts[:-1]):

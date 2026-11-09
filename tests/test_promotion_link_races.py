@@ -78,6 +78,8 @@ def test_rollback_replaces_a_planted_leaf_without_truncating_its_referent(
 
 
 def test_fifo_substitution_is_refused_without_waiting_for_a_writer(tmp_path: Path) -> None:
+    if sys.platform != "linux":
+        pytest.skip("Linux FIFO substitution")
     fifo = tmp_path / "fifo"
     os.mkfifo(fifo)
     with pytest.raises(workspaces.WorkspaceError, match="workspace_path_unsafe"):

@@ -2402,3 +2402,26 @@ accessibility, clean-desktop or signed-update acceptance record. The first
 freeze attempt failed because the workspace Python lacks a shared library;
 an isolated system-Python 3.12 build environment passed. The minimal Codespaces
 image also needed GTK 3 for Electron, and `rpm` for all-format packaging.
+
+## Result — 2026-11-09 (Windows plan follow-through beyond twenty)
+
+The owner's expanded beta-plan request continues in the
+[plan run record](../plans/BETA_RELEASE_PLAN.md#2026-11-09--windows-owner-pc-follow-through).
+Keyboard-only `keyboard-only-live.spec.ts` passes **5/5** against real Haiku:
+start/answer, stop, Ctrl+K navigation, verified backup and Approvals. Two
+harness corrections were needed (FIXED-1383): use the stable receipt identifier
+and wait for Stop safely to be enabled before tabbing to it. No pointer action
+was added. `beta-release-round-live.spec.ts` RT-BETA-09/10 pass **2/2**:
+axe checks every destination at 1440/1280/390 and existing page-size budgets.
+Captures are in `output/playwright/2026-11-08-keyboard/`; the stopped-turn
+screenshot was inspected. This does not replace NVDA evaluation by a person.
+
+Downloaded package `5860a1f6` (personal Windows workflow `42670993951`), verified
+both installer hashes and extracted the MSI without installing it. Its frozen
+host smoke passes setup/encryption/FTS5/restart; its real packaged Kokoro worker
+passes; its packaged window and onboarding tests pass **2/2** on this PC.
+The completed Home screenshot was inspected under
+`output/playwright/owner-packaged/`. Actual owner-PC install/uninstall, full
+microphone round trip and packaging of the later fixes remain separate gates.
+The [plan record](../plans/BETA_RELEASE_PLAN.md#2026-11-09--windows-owner-pc-follow-through)
+links the redacted crash and package receipts.

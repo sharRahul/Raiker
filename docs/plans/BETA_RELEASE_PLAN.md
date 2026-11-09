@@ -8,7 +8,7 @@
 
 
 **Status:** active plan, opened 2026-11-02. **Owner:** release owner.
-**Target:** Raiker `0.9.0-beta.1`, the first public beta, as soon as the gates in
+**Target:** Raiker `0.9.0-beta.1`, the personal PC beta for at most five users, as soon as the applicable gates in
 [Beta release criteria](#beta-release-criteria) pass on one commit.
 
 This plan turns the beta checklist into tracked work. For each of the twelve
@@ -43,8 +43,10 @@ Effort: **S** under a day, **M** two to five days, **L** more than a week.
 
 ## The beta in one paragraph
 
-`beta.1` is a **local, single-owner desktop app** on Windows 10/11 x64, macOS
-12+ on Apple silicon and Linux x64/arm64. It offers Chat, Build, Models,
+`beta.1` is a **local, single-owner desktop app**, qualified first on the owner's
+Windows PC. Linux artifacts retain their separately recorded evidence; macOS
+owner-hardware qualification waits for beta.2. Phone and iPad access is later
+work. It offers Chat, Build, Models,
 Tasks, Schedule, Memory and Settings. It works with hosted providers and with
 local models (Ollama, LM Studio, and the llama.cpp engine Raiker installs).
 **Command execution runs only where the native sandbox measures as enforced
@@ -351,7 +353,7 @@ because the Playwright browser download was unavailable.
 
 | ID | Item | State | P | Effort | Work left |
 |---|---|---|---|---|---|
-| VD-1 | On-device dictation and read-aloud setup | 🟡 | P0 | L | **Implemented** (voice spec V1): verified catalogue (`raiker/config/voice-catalogue.json`), profiles with a hardware recommendation, shared `ResourceLedger` and placement planner, digest-verified installer run as a model operation, contained whisper-server and a token-protected speaking worker (Kokoro/Piper), idle and low-memory unload, Settings › Voice, the *Voice* first-run step, dictation and read-aloud on the managed engines. Kokoro speaking was installed, verified and run for real here (`tests/test_voice_live.py`). **2026-11-09:** all five Whisper models are pinned to immutable revisions, LFS SHA-256 and exact sizes ([FIXED-1373](FIXED_ITEMS.md#fixed-1373--whisper-models-still-had-no-immutable-download-pins)). Still required: review the Piper voice licence and pin/install its JSON sidecar, build Linux/macOS `whisper-server` in the release workflow, bundle `kokoro-onnx` once its espeak-ng (GPL-3.0) use is signed off, and run the §14 acceptance on all three OSes |
+| VD-1 | On-device dictation and read-aloud setup | 🟡 | P0 | L | **Implemented** (voice spec V1): verified catalogue (`raiker/config/voice-catalogue.json`), profiles with a hardware recommendation, shared `ResourceLedger` and placement planner, digest-verified installer run as a model operation, contained whisper-server and a token-protected Kokoro speaking worker, idle and low-memory unload, Settings › Voice, the *Voice* first-run step, dictation and read-aloud on the managed engines. Kokoro speaking was installed, verified and run for real here (`tests/test_voice_live.py`). **2026-11-09:** all five Whisper models are pinned to immutable revisions, LFS SHA-256 and exact sizes ([FIXED-1373](FIXED_ITEMS.md#fixed-1373--whisper-models-still-had-no-immutable-download-pins)). **Owner scope, 2026-11-09:** Piper and its sidecar/licence work are removed (FIXED-1378). Personal frozen Kokoro workers have real Linux and Windows workflow evidence with retained GPL runtime notices and pinned sources; this does not approve public redistribution. Still required for the PC candidate: full managed speech/microphone round trip and §14 acceptance. Linux Whisper packaging and macOS owner-hardware qualification retain their separate scope in PERSONAL_BETA_SCOPE.md |
 | VD-2 | Mic permissions, cancellation, audio privacy, no browser speech | ✅ | — | — | **2026-11-07:** the unused browser adapter is removed and a test fails if any source reads `SpeechRecognition` ([FIXED-1314](FIXED_ITEMS.md#fixed-1314--the-page-still-carried-a-browser-speech-recognition-adapter-vd-2)); read-aloud refuses non-local voices (done). **2026-11-08:** fake-microphone live run 6/6 (denied, cancel, device lost, the page's own 6-minute stop, no `SpeechRecognition`) found and fixed four defects ([FIXED-1327](FIXED_ITEMS.md#fixed-1327--the-microphone-could-fail-in-four-ways-the-owner-was-told-about-wrongly-or-not-at-all-vd-2)) |
 | VD-3 | Design composer, templates, attachments, image generation | 🟡 | P1 | M | Image generation is labelled **Preview** (2026-11-07, FIXED-1315). Still required: ship the document editor; drop the label once BUG-287 has a real-provider round trip |
 | VD-4 | Disable unfinished capabilities clearly | ✅ | — | — | Hands-free conversation is **Preview** behind Settings › Voice (*Hands-free conversation*), and the conversation panel carries a *Preview* label; voice components that cannot be offered yet are shown with their reason, not hidden. BUG-348's unfinished rows are absent from the menus, and a guard test keeps them out (2026-11-07, FIXED-1315) |
@@ -477,18 +479,19 @@ from the `llama-cpp.yml` live job.
 
 ## Beta release criteria
 
-`beta.1` is published only when **every** item below is true on one commit,
+The personal `beta.1` candidate is accepted only when **every applicable** item
+below is true on one commit under [the owner's scope](PERSONAL_BETA_SCOPE.md),
 and the release owner signs off in `RELEASE_EVIDENCE.md`.
 
 1. **CI.** Every required workflow is green on the exact commit: `ci.yml`,
    `web` jobs, `desktop-package.yml`, `llama-cpp.yml` (engine and live),
    SAST, secrets and dependency audit.
-2. **Sandbox.** On each platform, either the native sandbox probe reports
+2. **Sandbox.** On each qualified host, either the native sandbox probe reports
    every mandatory observation enforced and SB-6 passes, or command execution
    is refused on that platform and the beta guide says so.
-3. **Installers.** IN-1 to IN-5 pass on clean machines. Builds are signed on
-   macOS and Windows, or the beta guide states the build is unsigned and how to
-   open it. *Unsigned is acceptable for a closed beta only.*
+3. **Installers.** The applicable IN-1 to IN-5 checks pass for the PC candidate.
+   Verified hashes and truthful unsigned-build guidance are required; commercial
+   signing identities and public distribution are outside this personal scope.
 4. **Journeys.** The seven E2E-1 journeys pass with real models, with evidence
    stored.
 5. **Data.** MM-3 (canary) and MM-4 (corruption drill) pass; MM-5 egress
@@ -518,7 +521,7 @@ and the release owner signs off in `RELEASE_EVIDENCE.md`.
    guide, feedback route, issue forms and spawn inventory test). Add
    `support_level` (PL-5) and the reason-code label audit (UX-4).
    Fix the CI failures (CI-1).
-2. **Week 2 — voice V1 and data drills.** Managed whisper.cpp and Piper/Kokoro
+2. **Week 2 — voice V1 and data drills.** Managed whisper.cpp and Kokoro
    (VD-1). MM-3 canary, MM-4 corruption drill, MM-5 egress audit. Apply
    conflict refusal (BD-4).
 3. **Week 3 — platforms.** macOS sandbox CI (SB-2), Windows gaps (SB-1),
@@ -681,3 +684,40 @@ revocation/reconnect, full-feature signed-artifact egress and owner-machine
 acceptance remain open. The reporting fix preserves that candidate's SHA; the subsequent owner-requested
 Kokoro/Piper runtime change requires a new personal candidate.
 [Artifact, signatures and receipts](LINUX_BETA_2026_11_09.md#verified-non-published-signed-candidate).
+
+## 2026-11-09 — Windows owner-PC follow-through
+
+The owner asked to continue beyond the twenty recovery scenarios. The plan now
+uses PERSONAL_BETA_SCOPE.md consistently: personal PC qualification first,
+Kokoro only, no commercial signing prerequisite. Unresolved safeguards and
+real-model journey gates remain; this is not release-owner sign-off.
+
+- **UX-4/UX-5:** twenty recovery scenarios pass across the diagnostic round and
+  focused rerun. Keyboard-only T-14 passes 5/5 with real hosted Haiku 4.5,
+  including a stopped turn and a verified backup. RT-BETA-09/10 pass the axe
+  destination sweep (1440/1280/390) and existing page-size budgets. NVDA human
+  qualification is still separate. FIXED-1379–1383 record the discovered fixes.
+- **AG-4/E2E-3:** the real Windows host kill/restart drill passes with a scripted
+  delayed model: one model call before/after, identical task identity, failed
+  step reason `interrupted_by_restart`, no false completion or duplicate work.
+  This is a process-crash check, not a real-model T-03 completion claim.
+  [Redacted receipt](evidence/windows-beta-2026-11-09/goal-restart.json).
+- **MM-3/MM-4/SB-4:** 13 canary, destructive recovery, egress-verifier and spawn
+  inventory tests pass. Forty provider-fault, truthful-reporting, persistence
+  and disposable-workspace tests pass. These do not close a full-feature
+  30-minute owner-PC traffic audit.
+- **IN/VD-1:** downloaded personal Windows artifact from run `42670993951`,
+  exact package commit `5860a1f6`, verified both NSIS/MSI SHA-256 values, and
+  administratively extracted the MSI (exit 0). On this PC its frozen host passes
+  encrypted store/FTS5/setup/restart smoke; the real Kokoro worker passes
+  token refusal, nonzero 24 kHz WAV and shutdown; packaged-window/onboarding
+  Playwright passes 2/2 with screenshots inspected. This is extracted-package
+  evidence, not owner-machine install/uninstall evidence or a candidate built
+  from the later recovery fixes.
+  [Host receipt](evidence/windows-beta-2026-11-09/packaged-host-smoke.txt),
+  [worker result](evidence/windows-beta-2026-11-09/kokoro-owner-worker.xml).
+- **CI-2:** full Windows mypy passes 1,285 files; Ruff and documentation contracts
+  pass. Linux filesystem attack tests remain skipped on Windows. Exact-commit
+  candidate packaging and required GitHub checks remain required.
+
+See the [Live Test run](../architecture/WEB_APP_LIVE_TEST.md#result--2026-11-09-windows-beta-recovery-twenty-case-round).

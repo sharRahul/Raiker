@@ -10,6 +10,7 @@ from __future__ import annotations
 import json
 import os
 import shutil
+import sys
 import tempfile
 from pathlib import Path
 
@@ -19,6 +20,8 @@ from raiker.execution import workspaces
 
 
 def test_actual_storage_exhaustion_preserves_originals_and_recovers(tmp_path: Path) -> None:
+    if sys.platform != "linux":
+        pytest.skip("requires a disposable Linux tmpfs")
     configured = os.environ.get("RAIKER_STORAGE_FAULT_ROOT")
     if not configured:
         pytest.skip("requires an empty disposable tmpfs: RAIKER_STORAGE_FAULT_ROOT")

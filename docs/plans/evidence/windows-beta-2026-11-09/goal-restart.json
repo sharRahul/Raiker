@@ -1,0 +1,36 @@
+﻿{
+    "after_restart":  {
+                          "status":  "failed",
+                          "steps":  [
+                                        {
+                                            "reason":  "interrupted_by_restart",
+                                            "state":  "failed"
+                                        }
+                                    ]
+                      },
+    "before_kill":  {
+                        "status":  "running",
+                        "steps":  [
+                                      "running"
+                                  ]
+                    },
+    "killed":  true,
+    "model_calls_after_restart":  1,
+    "model_calls_before_kill":  1,
+    "result":  "pass",
+    "scenario":  "AG-4 host killed mid-goal-step",
+    "started":  {
+                    "status":  "running",
+                    "steps":  [
+                                  "running"
+                              ]
+                },
+    "tasks":  {
+                  "after":  [
+                                "task_e821a7ed998e45549ec408e14fb7a033"
+                            ],
+                  "before":  [
+                                 "task_e821a7ed998e45549ec408e14fb7a033"
+                             ]
+              }
+}

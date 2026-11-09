@@ -3,6 +3,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
+
 from raiker.app.desktop_build import pyinstaller_command
 from scripts.build_installer import _WXS
 
@@ -36,7 +38,7 @@ def test_windows_installer_adds_a_start_menu_shortcut_to_the_frozen_runtime() ->
     assert '<ComponentGroupRef Id="Payload" />' in _WXS
 
 
-def test_voice_freeze_refuses_unavailable_pinned_runtime(tmp_path: Path, monkeypatch) -> None:
+def test_voice_freeze_refuses_unavailable_pinned_runtime(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     import pytest
 
     from raiker.app import desktop_build
@@ -48,7 +50,7 @@ def test_voice_freeze_refuses_unavailable_pinned_runtime(tmp_path: Path, monkeyp
     (tmp_path / "requirements").mkdir()
     (tmp_path / "requirements/voice.txt").write_text("test-runtime==1.0 \\\n    --hash=sha256:abc\n")
 
-    def missing(_name):
+    def missing(_name: str) -> str:
         raise desktop_build.metadata.PackageNotFoundError
 
     monkeypatch.setattr(desktop_build.metadata, "version", missing)

@@ -35,7 +35,10 @@ yet says why instead of being hidden. In this build:
 - **Kokoro's runtime** is `kokoro-onnx` (tested here with version `0.6.1`). On
   a source install, `pip install kokoro-onnx==0.6.1` enables it. The personal
   `--bundle-voice` build includes its pinned runtime and has passed frozen-worker
-  synthesis. A build without it uses the local system-voice fallback.
+  synthesis. A build without it uses the local system-voice fallback. A
+  personal Windows build is unsigned, so Windows SmartScreen may ask you to
+  confirm before it installs; its licence notices and the pinned sources for
+  the speech components travel with it.
 - The app keeps its memory guard. When available memory is too low, free
   resources or select a smaller profile; it does not start an unsafe workload.
 

@@ -1,0 +1,27 @@
+{
+  "schema": 1,
+  "notes": "Unmodified corresponding sources for the optional Kokoro phonemizer stack; espeakng-loader native library reports 1.52.0.",
+  "sources": [
+    {
+      "name": "espeak-ng-1.52.0.tar.gz",
+      "licence": "GPL-3.0",
+      "url": "https://codeload.github.com/espeak-ng/espeak-ng/tar.gz/4870adfa25b1a32b4361592f1be8a40337c58d6c",
+      "sha256": "cd83f84c4e495f281ac14e919aecf2834306ec1ea1b498de8ef6000f3a0f90de",
+      "size": 17747711
+    },
+    {
+      "name": "espeakng-loader-0.2.4.tar.gz",
+      "licence": "MIT",
+      "url": "https://codeload.github.com/thewh1teagle/espeakng-loader/tar.gz/0ddc87adf77e5850d7eeb542ac8a87d421b64daa",
+      "sha256": "c52fde6a08f790dc9f150b68205a35d3ce0aa95dbd5fa8be7b22989b26d1ba09",
+      "size": 4595
+    },
+    {
+      "name": "phonemizer-3.6.0.tar.gz",
+      "licence": "GPL-3.0",
+      "url": "https://files.pythonhosted.org/packages/77/f8/6965b81854d1a5e4a0cb77a7b9df2ec97e2609e6c5d4e4c001232bc28635/phonemizer-3.6.0.tar.gz",
+      "sha256": "9808c897773a23def58d89e1a3ac3506f56e8d04ee806d3ee80214880e2c9261",
+      "size": 109008
+    }
+  ]
+}

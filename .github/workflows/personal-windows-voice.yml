@@ -1,0 +1,137 @@
+name: Personal Windows voice
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "raiker/voice/**"
+      - "raiker/config/voice-catalogue.json"
+      - "raiker/app/desktop_build.py"
+      - "requirements/voice.txt"
+      - "scripts/package_voice_sources.py"
+      - "docs/licensing/voice/**"
+      - ".github/workflows/personal-windows-voice.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: personal-windows-voice-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # Windows cannot build the static Linux runner bundled for WSL2, so this
+  # workflow builds its own copy (as desktop-package.yml does) rather than
+  # depending on another workflow having run for the same commit.
+  wsl-runner:
+    name: WSL2 Linux runner
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.0.0
+      - name: Set up Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
+        with:
+          python-version: "3.12"
+      - name: Build the static Linux runner
+        run: |
+          rustup target add x86_64-unknown-linux-musl
+          python scripts/build_native_runner.py --wsl
+          file raiker/native/wsl-x86_64/raiker-command-runner | tee /dev/stderr | grep -q "static"
+      - name: Upload
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        with:
+          name: personal-wsl-linux-runner
+          path: raiker/native/wsl-x86_64/raiker-command-runner
+          retention-days: 3
+
+  windows:
+    name: Windows personal Kokoro package
+    needs: wsl-runner
+    runs-on: windows-latest
+    timeout-minutes: 60
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Checkout
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.0.0
+      - name: Set up Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
+        with:
+          python-version: "3.12"
+      - name: Set up Node
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: "24"
+      - name: Install pinned build and voice dependencies
+        run: |
+          python -m pip install --require-hashes --no-deps -r requirements/release-build.txt
+          python -m pip install --require-hashes --no-deps -r requirements/voice.txt
+          python -m pip install --no-deps -e .
+          python -m pip check
+      - name: Build the governed Windows runner
+        run: python scripts/build_native_runner.py
+      - name: Download the WSL runner
+        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
+        with:
+          name: personal-wsl-linux-runner
+          path: wsl-runner
+      - name: Bundle the WSL runner
+        run: python scripts/build_native_runner.py --wsl --from "$GITHUB_WORKSPACE/wsl-runner/raiker-command-runner"
+      - name: Build web and shell assets
+        run: |
+          npm ci --prefix web
+          npm run build --prefix web
+          npm ci --prefix desktop
+      - name: Build unsigned personal installers with Kokoro
+        run: |
+          python scripts/build_desktop_app.py --version 0.9.0 --target windows-x86_64 \
+            --channel beta --commit "$GITHUB_SHA" --bundle-voice --out personal-windows
+      - name: Verify installer checksums
+        working-directory: personal-windows
+        run: sha256sum --check SHA256SUMS-windows-x86_64.txt
+      - name: Install the personal package
+        shell: pwsh
+        run: |
+          $setup = Get-ChildItem personal-windows\*-setup*.exe | Select-Object -First 1
+          $p = Start-Process -FilePath $setup.FullName -ArgumentList "/S" -Wait -PassThru
+          if ($p.ExitCode -ne 0) { throw "installer exited $($p.ExitCode)" }
+          $root = Join-Path $env:LOCALAPPDATA "Programs\Raiker"
+          if (-not (Test-Path "$root\Raiker.exe")) { throw "Raiker.exe was not installed" }
+          "APP=$root\Raiker.exe" >> $env:GITHUB_ENV
+          "HOST=$root\resources\host\Raiker.exe" >> $env:GITHUB_ENV
+          "INSTALL_ROOT=$root" >> $env:GITHUB_ENV
+      - name: Verify installed host and real Kokoro speech
+        env:
+          RAIKER_VOICE_LIVE: "1"
+        run: |
+          python -m raiker.app.desktop_smoke --host "$HOST" --expect-unsigned --report personal-windows/installed-smoke.txt
+          export RAIKER_VOICE_PACKAGED_HOST="$HOST"
+          python -m pytest tests/test_voice_live.py -vv --junitxml=personal-windows/voice-live.xml
+      - name: Verify installed window and onboarding
+        working-directory: desktop
+        env:
+          RAIKER_DESKTOP_SHOTS: ${{ github.workspace }}/personal-windows/screenshots
+        run: |
+          export RAIKER_PACKAGED_APP="$APP"
+          npx playwright test packaged-live.spec.ts packaged-onboarding-live.spec.ts --project=live
+      - name: Retain notices, pinned corresponding sources and dependency inventory
+        run: python -m scripts.package_voice_sources --out personal-windows/sources
+      - name: Uninstall the application
+        shell: pwsh
+        run: |
+          $p = Start-Process -FilePath "$env:INSTALL_ROOT\Uninstall Raiker.exe" -ArgumentList "/S" -Wait -PassThru
+          if ($p.ExitCode -ne 0) { throw "uninstall exited $($p.ExitCode)" }
+          Start-Sleep -Seconds 5
+          if (Test-Path "$env:INSTALL_ROOT\Raiker.exe") { throw "application remains installed" }
+      - name: Upload personal candidate and evidence
+        if: always()
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        with:
+          name: personal-windows-kokoro
+          path: personal-windows
+          if-no-files-found: warn
+          retention-days: 30

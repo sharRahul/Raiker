@@ -16,6 +16,8 @@ ROOT = Path(__file__).resolve().parents[1]
 UNKNOWN = {"", "UNKNOWN", "NOASSERTION", "UNLICENSED", "NONE"}
 LICENSE_ALIASES = {
     "Apache License 2.0": "Apache-2.0",
+    "Apache 2.0": "Apache-2.0",
+    "3-Clause BSD License": "BSD-3-Clause",
     "Apache Software License": "Apache-2.0",
     "BSD License": "BSD-3-Clause",
     "MIT License": "MIT",
@@ -75,6 +77,23 @@ def license_from_files(distribution: importlib.metadata.Distribution) -> str | N
     return None
 
 
+def distribution_license(distribution: importlib.metadata.Distribution) -> str | None:
+    """A distribution's licence: its expression, licence field, classifier, then licence texts."""
+    metadata = distribution.metadata
+    if "License-Expression" in metadata:
+        license_value = metadata["License-Expression"]
+    elif "License" in metadata:
+        license_value = metadata["License"]
+    else:
+        license_value = None
+    if not license_value:
+        classifiers = metadata.get_all("Classifier") or []
+        license_value = next((item.rsplit("::", 1)[-1].strip() for item in classifiers if item.startswith("License ::")), None)
+    if not license_value:
+        license_value = license_from_files(distribution)
+    return normalize_license(license_value)
+
+
 def classify_license(value: str | None, policy: dict[str, list[str]]) -> str:
     value = normalize_license(value)
     if value is None or value.upper() in UNKNOWN:
@@ -128,18 +147,7 @@ def python_components(root: Path) -> list[dict[str, str | None]]:
         resolved.add(name)
         distribution = distributions[name]
         metadata = distribution.metadata
-        if "License-Expression" in metadata:
-            license_value = metadata["License-Expression"]
-        elif "License" in metadata:
-            license_value = metadata["License"]
-        else:
-            license_value = None
-        if not license_value:
-            classifiers = metadata.get_all("Classifier") or []
-            license_value = next((item.rsplit("::", 1)[-1].strip() for item in classifiers if item.startswith("License ::")), None)
-        if not license_value:
-            license_value = license_from_files(distribution)
-        components.append({"name": metadata["Name"], "version": metadata["Version"], "license": normalize_license(license_value)})
+        components.append({"name": metadata["Name"], "version": metadata["Version"], "license": distribution_license(distribution)})
         for requirement in metadata.get_all("Requires-Dist") or []:
             if ";" in requirement and "extra ==" in requirement.split(";", 1)[1]:
                 continue

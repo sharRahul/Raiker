@@ -73,6 +73,27 @@ public workflow does not opt into this private runtime bundle. A later mobile
 client does not need to run the speech model on the phone/iPad to use the PC's
 authenticated service.
 
+## Personal Windows qualification
+
+`.github/workflows/personal-windows-voice.yml` qualifies the same opt-in
+runtime natively on Windows without a production signing service. It builds
+its own static WSL2 runner, freezes the host with `--bundle-voice`, produces
+**unsigned** NSIS/MSI installers and checks their `SHA256SUMS`, installs the
+per-user package silently, and then tests the installed copy:
+`desktop_smoke --expect-unsigned`, the real Kokoro tests in
+`tests/test_voice_live.py` against the installed host
+(`RAIKER_VOICE_LIVE=1`, `RAIKER_VOICE_PACKAGED_HOST`), and the packaged
+window/onboarding Playwright specs. It then uninstalls and confirms removal.
+
+The uploaded `personal-windows-kokoro` artifact also carries the corresponding
+sources from `python -m scripts.package_voice_sources`: espeak-ng 1.52.0,
+espeakng-loader 0.2.4 and phonemizer 3.6.0, each pinned by URL, size and
+SHA-256 in [`runtime-sources.json`](../licensing/voice/runtime-sources.json)
+and refused on mismatch, plus a `git archive` of the building commit, the
+GPL-3.0 and loader MIT texts, `VOICE_RUNTIME_INVENTORY.json` and an SPDX SBOM.
+Every voice runtime dependency resolves to an SPDX licence there. This is
+personal qualification evidence, not approval for public redistribution.
+
 The 13 exact optional runtime dependency versions were also queried against
 OSV on 2026-11-09: no advisory IDs were returned. This is a dated dependency
 check, not a permanent safety assertion.

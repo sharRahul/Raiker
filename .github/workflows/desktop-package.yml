@@ -26,6 +26,8 @@ on:
     paths: &package_paths
       - "desktop/**"
       - "raiker/app/**"
+      - "raiker/voice/**"
+      - "raiker/config/voice-catalogue.json"
       - "raiker/auth/**"
       - "scripts/build_desktop*.py"
       - "scripts/build_native_runner.py"

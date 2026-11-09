@@ -25,7 +25,17 @@ Upstream source and licence records:
 
 The loader supplies a native espeak-ng library and data. Its wheel lacks a
 licence file; the GPL text above is therefore included explicitly in addition
-to dependency metadata. Personal use does not require production publisher
+to dependency metadata, and `espeakng-loader-MIT.txt` is the loader's own MIT
+licence taken from its pinned upstream source.
+
+`runtime-sources.json` pins the unmodified corresponding sources for the
+phonemizer stack (espeak-ng 1.52.0, espeakng-loader 0.2.4, phonemizer 3.6.0)
+by URL, size and SHA-256. `python -m scripts.package_voice_sources --out DIR`
+downloads each one, refuses any that does not match, and writes them beside
+these notices, a `git archive` of the building Raiker commit, the voice
+requirements, a runtime inventory and an SPDX SBOM. The personal Windows
+workflow (`.github/workflows/personal-windows-voice.yml`) uploads that
+directory with the unsigned installer and its speech-test evidence. Personal use does not require production publisher
 infrastructure. A public redistributable variant still needs its corresponding
 sources and complete notices reviewed; the opt-in private build is not that
 approval. No third-party source is modified here.

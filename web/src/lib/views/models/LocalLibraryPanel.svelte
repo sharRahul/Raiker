@@ -27,6 +27,7 @@
   };
 
   async function load() {
+    error = null;
     try {
       const body = await api.modelLibrary();
       // Same reasoning as `DownloadsPanel`: a body without `roots` reached
@@ -37,7 +38,6 @@
         roots: Array.isArray(body?.roots) ? body.roots : [],
         models: Array.isArray(body?.models) ? body.models : [],
       };
-      error = null;
     } catch (e) {
       error = failure("Could not load the local model library", "The folder and model list could not be refreshed.", "Reopen this panel to try again.", e);
     }
@@ -59,6 +59,7 @@
   }
 
   async function scan() {
+    error = null;
     busy = true;
     notice = null;
     try {

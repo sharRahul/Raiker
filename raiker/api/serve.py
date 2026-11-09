@@ -35,7 +35,7 @@ def main(argv: list[str] | None = None) -> int:
     Raiker's own listener is on this computer only (``127.0.0.1`` by default).
     Other devices reach it through one remote listener (BUG-347, BUG-358): a
     private-network address where Raiker serves HTTPS itself, or a listener for
-    a reverse proxy on this computer. It is chosen in Settings → Security →
+    a reverse proxy on this computer. It is chosen in Settings > Security >
     Remote access, or here with start options, and it opens only while every
     account has two-step sign-in. Every request on it is remote: it needs a
     session made with the password and a code from another device, and it never
@@ -55,7 +55,7 @@ def main(argv: list[str] | None = None) -> int:
     )
     remote = parser.add_argument_group(
         "remote access",
-        "Open a remote listener for this start only, instead of the one in Settings → Security → Remote access. "
+        "Open a remote listener for this start only, instead of the one in Settings > Security > Remote access. "
         "It needs two-step sign-in on every account.",
     )
     remote.add_argument("--proxy-port", type=int, default=None,
@@ -85,7 +85,7 @@ def main(argv: list[str] | None = None) -> int:
     if args.allow_public or not _is_loopback(args.host):
         print(
             "[raiker-web] Raiker's own listener stays on this computer, so --host must be a loopback address "
-            "and --allow-public is retired. To reach Raiker from other devices, choose Settings → Security → "
+            "and --allow-public is retired. To reach Raiker from other devices, choose Settings > Security > "
             "Remote access, or start with --private-host and --tls-cert/--tls-key (a private or VPN address, "
             "served over HTTPS), or --proxy-port/--proxy-socket (behind a reverse proxy). Refusing to start.",
         )

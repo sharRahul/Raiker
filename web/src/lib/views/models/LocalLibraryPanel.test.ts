@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { stubFetch } from "../../test-helpers";
 import LocalLibraryPanel from "./LocalLibraryPanel.svelte";
 
-afterEach(() => vi.unstubAllGlobals());
+afterEach(() => { vi.unstubAllGlobals(); vi.restoreAllMocks(); });
 
 describe("LocalLibraryPanel", () => {
   // The library answers "what is on disk"; the runtime slot rows
@@ -48,4 +48,20 @@ describe("LocalLibraryPanel", () => {
       await screen.findByText(/will not search the rest of your computer/i),
     ).toBeTruthy();
   });
+});
+
+it("keeps a newer scan error when the initial library read finishes late", async () => {
+  const { api } = await import("../../api");
+  let finish!: (value: Awaited<ReturnType<typeof api.modelLibrary>>) => void;
+  vi.spyOn(api, "modelLibrary").mockImplementation(() => new Promise(resolve => { finish = resolve; }));
+  vi.spyOn(api, "rescanModelLibrary").mockRejectedValue(new Error("injected failure"));
+  const { fireEvent } = await import("@testing-library/svelte");
+  render(LocalLibraryPanel);
+  await fireEvent.click(screen.getByRole("button", { name: "Scan now" }));
+  expect(await screen.findByRole("alert")).toHaveTextContent("Could not scan the approved model folders");
+  finish({ roots: [], models: [] } as Awaited<ReturnType<typeof api.modelLibrary>>);
+  const { tick } = await import("svelte");
+  await tick();
+  await vi.waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent("Choose Scan now"));
+
 });

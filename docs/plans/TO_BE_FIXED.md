@@ -1671,3 +1671,15 @@ hash-locked runtime and retained notices; public redistribution approval is
 separate. Full managed speech/microphone round trip and Linux Whisper engine
 packaging remain engineering checks. Earlier candidate/audit receipts name
 `6c211b60`; they precede this runtime change.
+
+## Windows beta recovery follow-through — 2026-11-09 evening
+
+The Windows browser round found and fixed a late model-library read erasing a
+newer scan error (FIXED-1380), and redirected CP1252 CLI help crashing
+(FIXED-1379). Existing broad recovery, provider and installer gates remain.
+Native Windows `python -m mypy raiker` still reports Unix-only `O_DIRECTORY`
+and `O_NOFOLLOW` references in `_PromotionPaths.path`; the method is reached
+with pinned handles only on Linux. Record this as a Windows static-analysis
+portability issue, not evidence that Windows promotion has Linux protection.
+CI type checking uses Linux. Local keyring typing also needs the non-Windows
+optional package installed when emulating that platform with mypy.

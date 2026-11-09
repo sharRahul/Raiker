@@ -84,7 +84,8 @@
   );
 
   async function load() {
-    try { update = await api.hostUpdate(); notice = null; }
+    notice = null;
+    try { update = await api.hostUpdate(); }
     catch (error) { notice = failure("Update status could not be read", "The installed release status is unconfirmed.", "Reopen Updates to refresh it.", error); }
   }
   async function check() {

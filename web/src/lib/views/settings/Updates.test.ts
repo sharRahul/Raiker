@@ -243,3 +243,16 @@ it("says a self-signed build is signed by Raiker, not verified by Windows (IN-3)
   expect(await screen.findByText("Signed by Raiker (self-signed — Windows shows Unknown publisher)")).toBeTruthy();
   expect(screen.queryByText("Verified by Raiker")).toBeNull();
 });
+
+it("retains a failed check when the initial status arrives late", async () => {
+  let finish!: (value: UpdateStatusView) => void;
+  vi.spyOn(api, "hostUpdate").mockImplementation(() => new Promise(resolve => { finish = resolve; }));
+  vi.spyOn(api, "checkHostUpdate").mockRejectedValue(new Error("injected failure"));
+  render(Updates);
+  await fireEvent.click(screen.getByRole("button", { name: "Check for updates" }));
+  expect(await screen.findByText(/The update check did not finish/)).toBeVisible();
+  finish(status());
+  const { tick } = await import("svelte");
+  await tick();
+  await waitFor(() => expect(screen.getByText(/The update check did not finish/)).toBeVisible());
+});

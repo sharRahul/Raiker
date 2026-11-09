@@ -15,6 +15,68 @@ the model provider → the audit event log. It also exercises the two features i
 PR #106: the **user-owned fallback sequence** and **prompt caching + normalised
 cache-hit metrics**.
 
+
+## Result — 2026-11-09 (Windows beta recovery, twenty-case round)
+
+Built the SPA and served a new disposable workspace on this Windows PC at
+loopback port 8765. Chromium exercised the real owner session and product UI;
+HTTP 503 injection was limited to the operation under test. No inference was
+needed for these twenty checks. Source: the remaining Windows/shared QUI-G06
+evidence in TO_BE_FIXED.md. The twenty-item plan was created before execution;
+its completed checklist is retained below as the run record.
+
+Initial result: **19 passed, 1 failed**. The failure exposed FIXED-1381.
+The Models slice also exposed FIXED-1380 on the earlier diagnostic run.
+After corrections, all four Settings cases passed; the other sixteen passed
+in the twenty-case run. This is twenty scenario passes across the run and
+focused rerun, not a claim of a fresh twenty-case single pass.
+
+| # | Scenario | Planned verification | Result |
+|---|---|---|---|
+| 1 | Projects list read and retry | RT-PROJECT-RECOVERY-01 | Passed |
+| 2 | Project create/attach uncertain writes | RT-PROJECT-RECOVERY-02 | Passed |
+| 3 | Project tasks/images/instruction retry | RT-PROJECT-RECOVERY-03 | Passed |
+| 4 | Project instructions/root/export | RT-PROJECT-RECOVERY-04 | Passed |
+| 5 | Project archive/delete preview | RT-PROJECT-RECOVERY-05 | Passed |
+| 6 | Project details/chat/hierarchy move | RT-PROJECT-RECOVERY-06 | Passed |
+| 7 | Project restore and read-back | RT-PROJECT-RECOVERY-07 | Passed |
+| 8 | Project limits read/save | RT-PROJECT-RECOVERY-08 | Passed |
+| 9 | Model library read on phone viewport | RT-MODEL-RECOVERY-01 | Passed |
+| 10 | Model library scan | RT-MODEL-RECOVERY-02 | Passed |
+| 11 | Model job retry | RT-MODEL-RECOVERY-03 | Passed |
+| 12 | Model job cancel | RT-MODEL-RECOVERY-04 | Passed |
+| 13 | Model partial-file inspection | RT-MODEL-RECOVERY-05 | Passed |
+| 14 | Model job record cleanup | RT-MODEL-RECOVERY-06 | Passed |
+| 15 | Memory use uncertain write | RT-MEM-RECOVERY-01 | Passed |
+| 16 | Memory export recovery | RT-MEM-RECOVERY-02 | Passed |
+| 17 | Update read and retry | RT-SETTINGS-RECOVERY-01 | Passed |
+| 18 | Update check uncertainty | RT-SETTINGS-RECOVERY-02 | Passed |
+| 19 | Saved execution-profile read | RT-SETTINGS-RECOVERY-03 | Passed |
+| 20 | Runtime-status failure in dark theme | RT-SETTINGS-RECOVERY-04 | Passed |
+
+
+**Provider smoke (separate from the twenty checks).** Anthropic, OpenAI and OpenRouter credentials were entered and saved through Add model. Anthropic returned its real catalogue; Haiku 4.5 passed readiness and returned `RAIKER_BETA_OK` to the exact smoke prompt, with a provider receipt. Capture: `output/playwright/windows-beta-provider-chat.png`. OpenAI/OpenRouter inference and local Ollama/LM Studio were not qualified in this round.
+
+**Validation.** Web unit suite: 302 files, 2,872 passed, one skipped. Python
+launcher/CLI: 24 passed, including CP1252 strict subprocess regression
+(FIXED-1379). Ruff, secret scan and SAST pass. Mypy with the CI Linux target:
+1,285 files pass after updating this PC's older Starlette and installing the
+non-Windows keyring dependency. Native Windows mypy's Unix-constant issue
+remains in TO_BE_FIXED.md.
+
+**Captures.** `output/playwright/2026-11-06-{memory,model,project,settings}-recovery/`
+contains this run's PNGs and revision/route manifests (historic folder names
+are preserved by the existing specs). Inspected Memory export, model scan,
+Projects content/deletion preview and update-check screenshots. Project dark
+captures can contain theme-transition colours; they establish message presence,
+not final native-theme qualification. The update-check screenshot shows the
+retained uncertainty message. No keys were captured.
+
+**Scope.** These are injected-response recovery checks, not real lost-write,
+provider-failure, signed-install, sandbox-enforcement, speech or usability
+acceptance. No active workflow or unresolved plan was deleted. The completed
+run-only plan was removed after moving its checklist here.
+
 ## Result — 2026-11-08 (Allow with limits, Within limits, suggestions and connection presets)
 
 The rest of the Quiet UI plan's permissions and approvals, after which 02 was

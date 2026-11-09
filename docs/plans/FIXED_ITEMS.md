@@ -1,4 +1,42 @@
 # Fixed items
+## FIXED-1381 — An initial update read erased a failed update check
+
+**Severity: Medium. Area: Quiet UI update recovery. Status: Fixed 2026-11-09.**
+
+A successful initial status read could arrive after a failed Check for updates
+and erase the uncertainty message. Clear the old notice when the read starts,
+not when it completes. A delayed-response component regression reproduced the
+failure before the change and passes afterward. This is recovery evidence,
+not an installer update or signed-channel acceptance test.
+
+**Evidence.** `web/src/lib/views/settings/Updates.test.ts`,
+`web/e2e/settings-error-recovery-live.spec.ts` (RT-SETTINGS-RECOVERY-02).
+
+## FIXED-1380 — A late library read erased a newer scan failure
+
+**Severity: Medium. Area: Quiet UI model recovery. Status: Fixed 2026-11-09.**
+
+The initial model-library read could finish after a failed Scan now action and
+clear its recovery message. Clear the previous error when a read starts rather
+than when it completes; a new scan also clears its previous message before it
+starts. The delayed-read regression failed before the change and passes after.
+Windows Chromium now captures the retained scan failure and safe retry step.
+
+**Evidence.** `web/src/lib/views/models/LocalLibraryPanel.test.ts`,
+`web/e2e/model-error-recovery-live.spec.ts` (RT-MODEL-RECOVERY-02).
+
+## FIXED-1379 — Redirected Windows web CLI help crashed on CP1252
+
+**Severity: Low. Area: Windows CLI. Status: Fixed 2026-11-09.**
+
+`python -m raiker.api.serve --help` raised UnicodeEncodeError when a redirected
+Windows stream used CP1252. CLI navigation hints now use ASCII separators.
+The regression invokes the actual entry point with CP1252 strict encoding;
+it failed before the correction and passes after it. Remote-access behavior
+and authentication requirements are unchanged.
+
+**Evidence.** `tests/test_web_cli_encoding.py`; 24 launcher/CLI tests pass.
+
 
 ## FIXED-1378 — Lite TTS depended on an unreviewed Piper voice
 

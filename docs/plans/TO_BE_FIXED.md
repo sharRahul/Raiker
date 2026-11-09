@@ -1537,3 +1537,12 @@ live run per provider needs a client registered to the owner's account, once:
 Then, for each: sign in from Connections, enable the connector's gate with
 *allow*, read in Chat, revoke at the provider, and confirm that the next read
 fails closed as `connector_reauth_required`.
+
+## QUI-G06 recovery follow-through after 2026-11-09
+
+Skills, Goals, Rewind and the GitHub settings recovery copy is implemented in
+[FIXED-1366](FIXED_ITEMS.md#fixed-1366--skills-goals-rewind-and-github-errors-lacked-safe-recovery-qui-g06).
+Messaging and Design still need their error audit. Lost-response writes that
+commit before disconnect, real GitHub authentication failures, and every Goal
+lifecycle refusal still need dedicated running-host evidence. Do not treat
+response-failure injection as proof of those scenarios.

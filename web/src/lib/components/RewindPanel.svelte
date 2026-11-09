@@ -28,10 +28,11 @@
    * * **The escalation is stated before the ask, not after.** A rewind over
    *   another principal's work is critical and says so here.
    */
+  import { failure } from "../errorCopy";
   import Icon from "./Icon.svelte";
   import PageState from "./PageState.svelte";
   import SidePanel from "./SidePanel.svelte";
-  import { api, ApiError } from "../api";
+  import { api } from "../api";
   import type { RestorePlan, RestoreRequestResult } from "../apiTypes";
   import { shortId } from "../format";
 
@@ -91,10 +92,7 @@
       try {
         plan = await api.checkpointRestorePlan(id);
       } catch (e) {
-        planError =
-          e instanceof ApiError
-            ? `Could not compute the restore plan (${e.status}).`
-            : "Could not compute the restore plan.";
+        planError = failure("The restore preview could not be read", "No current preview is available.", "Close and reopen this panel to recompute it.", e);
       } finally {
         planBusy = false;
       }
@@ -108,10 +106,7 @@
     try {
       requested = await api.requestCheckpointRestore(checkpointId);
     } catch (e) {
-      requestError =
-        e instanceof ApiError
-          ? `Could not raise the approval (${e.status}).`
-          : "Could not raise the approval.";
+      requestError = failure("The restore approval request was not confirmed", "An approval may already exist.", "Check Approvals before requesting another restore.", e);
     } finally {
       requestBusy = false;
     }

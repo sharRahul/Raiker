@@ -263,3 +263,30 @@ Implementation and evidence: [FIXED-1302](../FIXED_ITEMS.md#fixed-1302--approval
 and [Live Test docs](../../architecture/WEB_APP_LIVE_TEST.md#result--2026-11-06-qui-g06-approvals-library-and-sessions-recovery).
 QUI-G01, QUI-G04, QUI-G07 and the remaining QUI-G06 views stay open, so this
 document is retained.
+
+## 2026-11-09 — QUI-G06 Skills, Goals, Rewind and GitHub recovery
+
+Plan: preserve drafts and diagnostic evidence, name the affected action, and
+verify saved state before retrying uncertain writes. Reuse existing tokens and
+inline alerts; no new modal interruption.
+
+1. [x] Skills list read.
+2. [x] Skill upload.
+3. [x] Skill URL import.
+4. [x] Skill build.
+5. [x] Skill rename.
+6. [x] Skill activation.
+7. [x] Skill command.
+8. [x] Skill download.
+9. [x] Skill deletion.
+10. [x] Goals list read.
+11. [x] Goal detail read.
+12. [x] Goal plan save.
+13. [x] Goal lifecycle action.
+14. [x] Goal criterion confirmation.
+15. [x] Goal polling preserves action errors.
+16. [x] Rewind preflight.
+17. [x] Rewind approval request.
+18. [x] GitHub connection read.
+19. [x] GitHub action failure.
+20. [x] GitHub unreachable outcome.

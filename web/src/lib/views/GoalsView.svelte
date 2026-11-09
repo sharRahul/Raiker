@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { failure } from "../errorCopy";
   /**
    * PA-D01 / PA-D06 — Work → Goals.
    *
@@ -84,13 +85,13 @@
         if (fresh) selected = fresh;
       }
     } catch (err) {
-      loadError = err instanceof Error ? err.message : "Could not load goals.";
+      loadError = failure("Goals could not be read", "The list may be out of date.", "Reopen Goals to refresh it.", err);
     }
   }
 
-  async function open(goalId: string) {
+  async function open(goalId: string, polling = false) {
     confirmStop = false;
-    notice = null;
+    if (!polling) notice = null;
     try {
       selected = await contract.readGoal(goalId);
       // The list card reads the same goal; keep it from saying "Working" while
@@ -98,7 +99,7 @@
       const fresh = selected;
       if (list) list = { ...list, goals: list.goals.map((g) => (g.goal_id === fresh.goal_id ? fresh : g)) };
     } catch (err) {
-      notice = goalRefusal(reason(err), "This goal could not be opened.");
+      notice = failure("The goal could not be read", "Its current state is unavailable.", "Reopen the goal to refresh it.", err);
     }
   }
 
@@ -125,7 +126,7 @@
     // A running goal moves on the host's tick; reading it back every few
     // seconds keeps the page true without a stream the server does not have.
     timer = setInterval(() => {
-      if (selected && ["running", "waiting"].includes(selected.status) && !busy) void open(selected.goal_id);
+      if (selected && ["running", "waiting"].includes(selected.status) && !busy) void open(selected.goal_id, true);
     }, 5000);
   });
   onDestroy(() => {
@@ -218,7 +219,7 @@
       selected = goal;
       await load();
     } catch (err) {
-      formError = goalRefusal(reason(err), "The plan could not be saved.");
+      formError = failure("Saving the goal plan was not confirmed", "Your draft is kept here.", "Copy the draft, then reopen Goals and check the saved plan before retrying.", err) + " " + goalRefusal(reason(err));
     } finally {
       busy = false;
     }
@@ -252,7 +253,7 @@
       confirmStop = false;
       await load();
     } catch (err) {
-      notice = goalRefusal(reason(err));
+      notice = failure("The goal action was not confirmed", "The goal may have changed.", "Reopen the goal and check its state before retrying.", err) + " " + goalRefusal(reason(err));
       if (reason(err) === "goal_revision_stale") await open(goalId);
     } finally {
       busy = false;
@@ -270,7 +271,7 @@
       });
       await load();
     } catch (err) {
-      notice = goalRefusal(reason(err));
+      notice = failure("Confirming the criterion was not confirmed", "Your note is kept here.", "Copy the note, then reopen the goal and check the criterion before retrying.", err) + " " + goalRefusal(reason(err));
     } finally {
       busy = false;
     }

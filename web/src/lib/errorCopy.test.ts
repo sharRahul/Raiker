@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { ApiError } from "./api";
-import { failure, NOT_ANSWERING } from "./errorCopy";
+import { failure } from "./errorCopy";
 
 describe("failure (QUI-G06)", () => {
   it("names what failed, what it affected and one next step, with the status as evidence", () => {
@@ -10,10 +10,14 @@ describe("failure (QUI-G06)", () => {
     );
   });
 
-  it("says Raiker did not answer when the request never reached it", () => {
+  it("keeps recovery advice when the server response is lost", () => {
     expect(failure("Stop was not sent", "The turn is still running.", "Try again.", new TypeError("fetch failed"))).toBe(
-      `Stop was not sent. The turn is still running. ${NOT_ANSWERING}`,
+      `Stop was not sent. The turn is still running. Raiker did not answer. Check that it is still running. Try again.`,
     );
+  });
+
+  it("preserves check-first advice for an uncertain write without a response", () => {
+    expect(failure("Deletion was not confirmed", "The skill may be gone.", "Check Skills before deleting again.", new TypeError("fetch failed"))).toContain("Check Skills before deleting again.");
   });
 
   it("says why when the refusal has copy (UX-4)", () => {

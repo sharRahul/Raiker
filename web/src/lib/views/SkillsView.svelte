@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { failure } from "../errorCopy";
   import { askConfirm } from "../confirm.svelte";
   /**
    * Extensions → Skills.
@@ -114,9 +115,9 @@
       if (REASONS[code]) return REASONS[code];
       if (code.startsWith("skill_fetch_failed"))
         return "That link could not be read. Check it points at a raw SKILL.md.";
-      return code || `Request failed (${e.status})`;
+      return "";
     }
-    return "Request failed";
+    return "";
   }
 
   function sourceLabel(skill: SkillView): string {
@@ -144,8 +145,7 @@
     try {
       skills = await api.skills();
     } catch (e) {
-      skills = null;
-      error = reason(e);
+      error = failure("Skills could not be read", "The list may be out of date.", "Reopen Skills to refresh the list.", e) + " " + reason(e);
     }
   }
 
@@ -175,7 +175,7 @@
       notice = `Installed “${result.skill?.name ?? file.name}”.`;
       await load();
     } catch (e) {
-      error = reason(e);
+      error = failure("Installing the uploaded skill was not confirmed", "The file may already be installed.", "Reopen Skills and check the list before uploading again.", e) + " " + reason(e);
     } finally {
       busy = null;
       input.value = "";
@@ -195,7 +195,7 @@
       importUrl = "";
       await load();
     } catch (e) {
-      error = reason(e);
+      error = failure("Importing the skill was not confirmed", "The skill may already be installed.", "Copy the link, then reopen Skills and check the list before importing again.", e) + " " + reason(e);
     } finally {
       busy = null;
     }
@@ -218,7 +218,7 @@
       buildOpen = false;
       await load();
     } catch (e) {
-      error = reason(e);
+      error = failure("Building the skill was not confirmed", "Your draft is kept here.", "Copy the draft, then reopen Skills and check the list before building again.", e) + " " + reason(e);
     } finally {
       busy = null;
     }
@@ -242,7 +242,7 @@
       renamingId = null;
       await load();
     } catch (e) {
-      error = reason(e);
+      error = failure("Renaming the skill was not confirmed", "The saved name may have changed.", "Check the name in Skills before retrying.", e) + " " + reason(e);
     } finally {
       busy = null;
     }
@@ -259,7 +259,7 @@
         : `“${skill.name}” is on.`;
       await load();
     } catch (e) {
-      error = reason(e);
+      error = failure("Changing skill activation was not confirmed", "The saved switch may have changed.", "Reopen Skills and check the switch before retrying.", e) + " " + reason(e);
     } finally {
       busy = null;
     }
@@ -282,7 +282,7 @@
       commandEditingId = null;
       await load();
     } catch (e) {
-      error = reason(e);
+      error = failure("Saving the skill command was not confirmed", "Your command entry is kept here.", "Copy it, then reopen Skills and check the saved command before retrying.", e) + " " + reason(e);
     } finally {
       busy = null;
     }
@@ -300,7 +300,7 @@
       anchor.click();
       URL.revokeObjectURL(url);
     } catch (e) {
-      error = reason(e);
+      error = failure("The skill download did not finish", "No download was confirmed.", "Try again, then check browser download permissions.", e) + " " + reason(e);
     } finally {
       busy = null;
     }
@@ -316,7 +316,7 @@
       notice = `Deleted “${skill.name}”.`;
       await load();
     } catch (e) {
-      error = reason(e);
+      error = failure("Deleting the skill was not confirmed", "The skill may already be removed.", "Reopen Skills and check whether it still exists before deleting again.", e) + " " + reason(e);
     } finally {
       busy = null;
     }

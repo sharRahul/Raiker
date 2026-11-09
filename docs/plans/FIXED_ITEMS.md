@@ -1670,6 +1670,7 @@ file you can open. The two capture sets that remain — `screenshots/pages/` and
 | [FIXED-1363](#fixed-1363--a-connection-was-on-or-off-with-nothing-between-qui-p04) | Medium | Connections | Fixed 2026-11-08 |
 | [FIXED-1364](#fixed-1364--a-permission-changed-in-one-place-stayed-stale-elsewhere-until-a-reload-qui-p02-acceptance) | Low | Permissions / every surface | Fixed 2026-11-08 |
 | [FIXED-1365](#fixed-1365--approvals-hid-allow-for-this-task-when-accepting-only-records-found-this-round) | Low | Approvals | Fixed 2026-11-08 |
+| [FIXED-1366](#fixed-1366--skills-goals-rewind-and-github-errors-lacked-safe-recovery-qui-g06) | Medium | Work / Connections / Recovery | Fixed 2026-11-09 |
 
 ---
 
@@ -40498,3 +40499,22 @@ one runs it, so Approvals offers it wherever the card does: on every
 non-critical approval.
 
 **Evidence.** Live RT-LIM-01, on a workspace with the relay off.
+
+## FIXED-1366 — Skills, Goals, Rewind and GitHub errors lacked safe recovery (QUI-G06)
+
+**Severity: Medium. Area: Work / Connections / Recovery. Status: Fixed 2026-11-09.**
+
+**Observed.** Failures showed bare codes or generic refusals. A failed GitHub
+request claimed nothing changed. Goal polling cleared an action error before
+the owner could act on it, and refreshing Skills discarded the last known list.
+
+**Fixed.** The [20-item implementation checklist](quiet-ui/07_QUICK_FIXES_AND_QUALITY.md#2026-11-09--qui-g06-skills-goals-rewind-and-github-recovery)
+names each failed operation and a recovery step. Uncertain writes advise
+checking the saved state before repeating them; drafts stay available to copy.
+Goal polling retains action notices and Skills retains its last known list.
+Rewind distinguishes an unavailable preview from an unconfirmed approval.
+Transport failures now retain action-specific advice in the shared error helper.
+The existing inline alerts, typography and theme tokens are reused.
+
+**Evidence.** `errorCopy.test.ts`, `SkillsView.test.ts`, `GoalsView.test.ts`;
+[Live Test results](../architecture/WEB_APP_LIVE_TEST.md#result--2026-11-09-qui-g06-recovery).

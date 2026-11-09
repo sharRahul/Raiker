@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { failure } from "../../errorCopy";
   import { githubAppRegistrationUrl } from "../../githubAppLink";
   /**
    * ADD-27 GH-19 — Settings → Connections → GitHub.
@@ -94,7 +95,7 @@
     [/credential_rejected/, "Access was revoked at GitHub. Sign in again."],
     [/account_mismatch/, "This credential now belongs to a different GitHub account. Select it again."],
     [/unavailable|not_installed|not_signed_in|helper/, "That credential isn't available on this machine. Choose another."],
-    [/github_unreachable/, "Couldn't reach GitHub. Nothing was changed."],
+    [/github_unreachable/, "Couldn't reach GitHub. Refresh the connection and check its saved state before retrying."],
     [/github_app_/, "This GitHub App configuration is incomplete. Check the fields under Advanced."],
     [/not_delegable/, "Merging, deleting branches and changing workflows are never delegated — they ask every time."],
     [/branch_pattern/, "Name a work-branch prefix such as raiker/* — a delegation never reaches the default branch."],
@@ -115,7 +116,7 @@
       await action();
       if (done) notice = done;
     } catch (error) {
-      notice = explain(error);
+      notice = failure("The GitHub action was not confirmed", "The connection may have changed.", "Reopen GitHub settings and check the saved state before retrying.", error) + " " + explain(error);
     } finally {
       busy = false;
     }
@@ -126,7 +127,7 @@
       loadError = null;
       connection = await api.github();
     } catch (error) {
-      loadError = error instanceof ApiError ? error.message : String(error);
+      loadError = failure("The GitHub connection could not be read", "Its current state is unavailable.", "Reopen GitHub settings to refresh it.", error);
     }
   }
 

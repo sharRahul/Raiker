@@ -59,6 +59,17 @@ async function chooseAddMode(mode: RegExp): Promise<void> {
 }
 
 describe("SkillsView", () => {
+  it("keeps the last known list when a refresh fails", async () => {
+    const routes: Record<string, unknown> = { "GET /api/skills": { skills: [skill()] } };
+    stubFetch(routes);
+    render(SkillsView);
+    expect(await screen.findByText("algorithm-creator")).toBeInTheDocument();
+    routes["GET /api/skills"] = { __status: 503 };
+    await fireEvent.click(screen.getByRole("button", { name: "Refresh" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("The list may be out of date");
+    expect(screen.getByText("algorithm-creator")).toBeInTheDocument();
+  });
+
   it("lists installed skills with their description", async () => {
     stubFetch({ "GET /api/skills": { skills: [skill()] } });
     render(SkillsView);

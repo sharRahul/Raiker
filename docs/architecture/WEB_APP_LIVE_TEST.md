@@ -2229,3 +2229,43 @@ suites named in FIXED-1318 to -1321.
 
 **Limits.** NVIDIA only (AMD Vulkan still required). One Windows machine; no
 fresh VM.
+
+## Result — 2026-11-09 (QUI-G06 recovery)
+
+Scope: [FIXED-1366](../plans/FIXED_ITEMS.md#fixed-1366--skills-goals-rewind-and-github-errors-lacked-safe-recovery-qui-g06).
+The repeatable spec is `web/e2e/skills-goals-recovery-live.spec.ts`.
+A disposable Linux workspace serves the production build on loopback. Response
+failures are explicitly injected; these checks do not prove a write committed
+before its reply was lost. No provider is needed for these recovery cases.
+
+| Case | Procedure | Evidence |
+|---|---|---|
+| RT-RECOVERY-01 | Fail the Skills list with HTTP 503, verify recovery advice, remove the fault and refresh from the host | `output/playwright/2026-11-09-recovery/skills-read.png` |
+| RT-RECOVERY-02 | Fill a skill draft, fail Build with HTTP 503, verify retained instructions and advice to check the list before retrying | `output/playwright/2026-11-09-recovery/skill-draft.png` |
+| RT-RECOVERY-03 | Fail the Goals list with HTTP 503 and verify the named affected list and recovery step | `output/playwright/2026-11-09-recovery/goals-read.png` |
+
+Local validation: production build, ESLint, Ruff, Mypy (631 source files),
+Svelte check (zero errors/warnings), documentation/governance contracts, and
+focused error-copy, Skills and Goals component tests. Browser results and visual
+inspection are recorded after the run below. An initial browser attempt could
+not launch because Chromium's Linux libraries were missing; they were installed.
+
+Design references: installed `frontend-design` from Anthropic's official plugin,
+`apple-design` from dickwu, `impeccable` from pbakaus, and macOS design from
+ceorkm and davepoon. The happycapy and skill-repo listings resolve to davepoon's
+same upstream skill. The Agent SDK Development plugin has commands and agents,
+not the advertised skill path; its README was reviewed as a reference. Existing
+Raiker tokens and inline feedback take precedence over suggested window chrome.
+The installed skills become available for subsequent turns.
+
+Browser result: **3/3 passed**. All three captures were inspected at original
+resolution: readable inline alerts, preserved draft and unchanged navigation.
+Visual review caught a repeated unknown reason code in Skills; it was removed
+from the extra explanation (the diagnostic remains in the HTTP evidence).
+A repeat run follows that correction. The focused suites passed 31/31 before
+the additional stale-list regression; that regression also passed. A repository
+scan test timed out under concurrent local checks and is rerun independently.
+
+Remaining evidence: provider-key entry and funded model turns were not exercised
+by this recovery slice. Full mutation/disconnect scenarios, dark/native platform
+rendering and assistive technology checks remain open in TO_BE_FIXED.

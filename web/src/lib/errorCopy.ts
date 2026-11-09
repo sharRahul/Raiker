@@ -16,10 +16,11 @@ export const NOT_ANSWERING = "Raiker did not answer. Check that it is still runn
  * One sentence of each: `failure("Stop was not sent", "The turn is still
  * running.", "Try again.", error)` → "Stop was not sent (HTTP 500). The turn is
  * still running. Try again." An error that never reached Raiker says so in
- * place of the status and the step, because the step is then always the same.
+ * place of the status. Keep the action-specific recovery step: a lost reply
+ * does not prove that a write never reached the server.
  */
 export function failure(what: string, affected: string, next: string, error?: unknown): string {
-  if (error !== undefined && !(error instanceof ApiError)) return `${what}. ${affected} ${NOT_ANSWERING}`;
+  if (error !== undefined && !(error instanceof ApiError)) return `${what}. ${affected} Raiker did not answer. Check that it is still running. ${next}`;
   const code = error instanceof ApiError ? ` (HTTP ${error.status}${error.reasonCode ? `, ${error.reasonCode}` : ""})` : "";
   // UX-4 — a refusal Raiker has words for says why, between what failed and
   // what it affected, so the code in brackets is never the only explanation.

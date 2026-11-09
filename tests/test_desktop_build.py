@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 from __future__ import annotations
 
 from pathlib import Path
@@ -33,3 +34,29 @@ def test_windows_installer_adds_a_start_menu_shortcut_to_the_frozen_runtime() ->
     assert 'Name="Raiker"' in _WXS
     assert 'Target="[INSTALLFOLDER]desktop\\Raiker\\Raiker.exe"' in _WXS
     assert '<ComponentGroupRef Id="Payload" />' in _WXS
+
+
+def test_voice_freeze_refuses_unavailable_pinned_runtime(tmp_path: Path, monkeypatch) -> None:
+    import pytest
+
+    from raiker.app import desktop_build
+
+    (tmp_path / "raiker/app").mkdir(parents=True)
+    (tmp_path / "raiker/app/launcher.py").write_text("")
+    (tmp_path / "web").mkdir()
+    (tmp_path / "web/index.html").write_text("")
+    (tmp_path / "requirements").mkdir()
+    (tmp_path / "requirements/voice.txt").write_text("test-runtime==1.0 \\\n    --hash=sha256:abc\n")
+
+    def missing(_name):
+        raise desktop_build.metadata.PackageNotFoundError
+
+    monkeypatch.setattr(desktop_build.metadata, "version", missing)
+    with pytest.raises(SystemExit, match="voice runtime missing"):
+        desktop_build.freeze_host(source_root=tmp_path, web_assets=tmp_path / "web",
+                                  out_dir=tmp_path / "out", bundle_voice=True)
+    monkeypatch.setattr(desktop_build.metadata, "version", lambda _name: "2.0")
+    with pytest.raises(SystemExit, match="voice runtime mismatch"):
+        desktop_build.freeze_host(source_root=tmp_path, web_assets=tmp_path / "web",
+                                  out_dir=tmp_path / "out", bundle_voice=True)
+    assert not (tmp_path / "out").exists()

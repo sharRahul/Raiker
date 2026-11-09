@@ -1,0 +1,6 @@
+<frozen runpy>:128: RuntimeWarning: 'raiker.app.release' found in sys.modules after import of package 'raiker.app', but prior to execution of 'raiker.app.release'; this may result in unpredictable behaviour
+verified linux-arm64 Raiker-0.9.0-linux-arm64.AppImage f46b294ef06b092b0bedfebdff3133189e2eeb36e55b417f43f0674121c3e68e
+verified linux-x86_64 Raiker-0.9.0-linux-x86_64.AppImage 47fd179501464987ae3cdfde524d9cdc9768d5187fe6be444660de313b7aa180
+verified macos-arm64 Raiker-0.9.0-macos-arm64.zip 54d6cba124af8c5aa304c40c1dbae1c51d93b2219726a19471580d5c2675f4a8
+verified windows-x86_64 Raiker-0.9.0-windows-x86_64-setup.exe 1c7657d96c672012f5a97dbf4d8e9c09332ef7b2a4981c3516117e78f0b8af5f
+verified provenance release-provenance.json and SHA256SUMS

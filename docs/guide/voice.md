@@ -14,7 +14,7 @@ computer's memory and graphics card.
 
 | Profile | For | Listening | Speaking |
 |---|---|---|---|
-| **Lite** | 8 GB of memory, no graphics card | Whisper base | Piper |
+| **Lite** | 8 GB of memory, no graphics card | Whisper base | Kokoro-82M (int8) |
 | **Balanced** | 16 GB of memory | Whisper small, or large-v3-turbo when a graphics card has room | Kokoro-82M |
 | **High quality** | 32 GB of memory, or a graphics card with 12 GB | Whisper large-v3-turbo | Kokoro-82M (full precision) |
 
@@ -27,19 +27,17 @@ file, and the page says how much space that freed.
 Settings shows each component's state. A component that cannot be offered
 yet says why instead of being hidden. In this build:
 
-- **Speaking with Kokoro** (Balanced, High quality) is installable today.
-- **Speech recognition** (the Whisper models) and **Piper's voices** are
-  listed but not yet offered. Their files are hosted on Hugging Face, and
-  their digests are pinned with `python -m scripts.pin_voice_catalogue
-  --write` on a machine that can reach it. Piper voices also need their
-  dataset licences reviewed.
-- **whisper-server** is published upstream for Windows only. Linux and macOS
-  builds come from Raiker's release workflow.
-- **Kokoro's runtime** is the `kokoro-onnx` Python package. It is not bundled
-  in packaged builds until the licence review of its espeak-ng phonemizer
-  (GPL-3.0) is signed off. On a source install, `pip install kokoro-onnx`
-  enables it. Without it, Kokoro reports *runtime missing* and read-aloud
-  uses the system voice.
+- **Speaking with Kokoro** uses Kokoro-82M in every profile: int8 for Lite
+  and Balanced, full precision for High quality. Model and voice files are
+  pinned and verified before installation. Piper is no longer offered.
+- **Speech recognition** has pinned Whisper models. Windows has a verified
+  upstream engine; Linux and macOS engine packaging remains pending.
+- **Kokoro's runtime** is `kokoro-onnx` (tested here with version `0.6.1`). On
+  a source install, `pip install kokoro-onnx==0.6.1` enables it. Frozen runtime
+  packaging still needs verification; *runtime missing* uses the system-voice
+  fallback. Removing Piper does not by itself bundle Kokoro's dependencies.
+- The app keeps its memory guard. When available memory is too low, free
+  resources or select a smaller profile; it does not start an unsafe workload.
 
 ## Where it runs
 
@@ -51,7 +49,7 @@ because the GPU is busy with the model you chose."*
 
 - A local model keeps priority on the graphics card.
 - Whisper goes on the graphics card only when there is room beside that model.
-- Kokoro and Piper run on the processor.
+- Kokoro runs on the processor.
 - A profile that does not fit next to what is already running is refused, and
   the next smaller profile is offered.
 

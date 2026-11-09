@@ -1,0 +1,62 @@
+{
+  "source_commit": "6c211b605d3c42d77215ff69cbed3f346c95d685",
+  "recording_stopped_at": "2026-11-09T16:18:49.648022+00:00",
+  "reason": "Stopped dedicated host and Electron after the complete 30-minute UI exercise, before the 33-minute safety timeout.",
+  "verifier_exit_code": 0,
+  "capture_scope": {
+    "source_commit": "6c211b605d3c42d77215ff69cbed3f346c95d685",
+    "version": "0.9.0",
+    "distribution": "installed DEB, unsigned qualification build",
+    "prepared_at": "2026-11-09T15:47:18.901172+00:00",
+    "duration_requested_seconds": 1980,
+    "process_scope": "installed Electron shell and traced descendants, including its frozen host",
+    "instrumentation": "strace --seccomp-bpf -f -ttt -s 0; socket/close plus connect/sendto/sendmsg/sendmmsg; payloads elided",
+    "allowed_hosts": {
+      "127.0.0.1": "loopback services and managed-model detection",
+      "::1": "IPv6 loopback",
+      "10.0.12.212": "listener on this host used as the native sandbox outside-control probe",
+      "10.0.0.1": "native probe UDP route discovery; connect alone sends no datagram",
+      "192.0.2.1": "system-readiness UDP route discovery to RFC 5737 address; connect alone sends no datagram",
+      "2001:4860:4860::8888": "Chromium IPv6 UDP reachability/route probe: no DNS datagram. Retain and inspect socket/connect/close evidence; this is not permission for cloud requests."
+    },
+    "limits": [
+      "fresh synthetic owner; no hosted provider or external connector credentials",
+      "unavailable voice/components are exercised as refusal/setup states",
+      "connection metadata cannot prove request payload content",
+      "local navigation coverage does not replace all seven real-model journeys"
+    ],
+    "browser_test_flags": [
+      "--no-sandbox",
+      "--remote-debugging-port=9229"
+    ],
+    "release_signoff": false,
+    "route_probe_reference": "https://chromium.googlesource.com/chromium/src/+/refs/heads/main/net/dns/README.md#IPv6-and-connectivity"
+  },
+  "release_signoff": false,
+  "files": {
+    "scope.json": {
+      "size": 1627,
+      "sha256": "9009d46e1e40243c73c48f1608bb3821a7d7ab48fa78cd16ccb7540e23797af1"
+    },
+    "ui-receipt.json": {
+      "size": 6728,
+      "sha256": "12190dfd8c7ecd33b73d9fc29d431e65270195daa7c31b13a5d0c1240cf553d1"
+    },
+    "network.strace": {
+      "size": 21674490,
+      "sha256": "cfe3b3095f51d2839f642720a5bda0b783e213a7129fff4069f54d258f834ea4"
+    },
+    "connections.jsonl": {
+      "size": 273150,
+      "sha256": "1bb8fb59ae41f2b27dc6fa45a5af088c38875c3a06575a02d6de37f5222b15ba"
+    },
+    "route-probes.json": {
+      "size": 60590,
+      "sha256": "f19e5d74e74b96f91d174dbae0606da144d19ba9a6071ce719f753cf4674b09b"
+    },
+    "verifier-report.json": {
+      "size": 626,
+      "sha256": "2023f70921fcb323d148ac3f9f2b73fa6480cb066602a1f2fb2b0f0a7f1e4663"
+    }
+  }
+}

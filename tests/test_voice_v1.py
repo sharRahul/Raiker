@@ -87,7 +87,7 @@ def test_unverified_or_unreviewed_items_are_refused() -> None:
     with pytest.raises(CatalogueError, match="voice_item_pending"):
         require_installable(replace(catalogue.get("whisper-small-q5_1"), pending_reason="not verified"))
     with pytest.raises(CatalogueError, match="voice_item_pending"):
-        require_installable(catalogue.get("piper-voice-en_US-amy-medium"))
+        require_installable(replace(catalogue.get("kokoro-82m-int8"), pending_reason="licence review"))
     item = catalogue.get("kokoro-82m-int8")
     assert require_installable(item) is item
     assert replace(item, licence="GPL-3.0").refusal() == "voice_item_licence_unreviewed"
@@ -128,7 +128,8 @@ def test_a_profile_resolves_to_this_machines_builds() -> None:
     # English-only picks the .en variant where the profile offers one.
     lite = resolve(catalogue, "lite", _hardware(memory_gib=8, os_name="linux"), english_only=True)
     assert lite.part("whisper_model").item_id == "whisper-base.en-q5_1"  # type: ignore[union-attr]
-    assert lite.part("piper_engine").item_id == "piper-linux-x64"  # type: ignore[union-attr]
+    assert lite.speaking == "kokoro" and lite.speaking_installable
+    assert lite.part("kokoro_model").item_id == "kokoro-82m-int8"  # type: ignore[union-attr]
     # Windows has a pinned engine and models. Linux still waits on its engine.
     assert balanced.speaking_installable and balanced.listening_installable
     linux = resolve(catalogue, "balanced", _hardware(os_name="linux"))
@@ -523,6 +524,11 @@ def test_the_pin_script_fills_digests_from_hugging_face_without_downloading() ->
     for item in data["items"]:
         if item.get("hf_repo"):
             item["pending_reason"] = "test unpinned entry"
+    # Preserve the generic licence-refusal contract with a synthetic item;
+    # removed Piper entries must not remain a supported download dependency.
+    data["items"].append({"id": "unreviewed-test", "component": "kokoro_model",
+                          "name": "test", "licence": "unreviewed", "source_page": "https://huggingface.co/test/model",
+                          "hf_repo": "test/model", "hf_path": "model.onnx", "pending_reason": "test unpinned entry"})
     commit = "a" * 40
     seen: list[str] = []
 
@@ -538,10 +544,36 @@ def test_the_pin_script_fills_digests_from_hugging_face_without_downloading() ->
     assert small["url"] == f"https://huggingface.co/ggerganov/whisper.cpp/resolve/{commit}/ggml-small-q5_1.bin"
     assert small["sha256"] == "b" * 64 and small["size_bytes"] == 1234 and "pending_reason" not in small
     # A voice whose licence is unreviewed gets its digest but stays pending.
-    amy = next(item for item in data["items"] if item["id"] == "piper-voice-en_US-amy-medium")
-    assert amy["sha256"] == "b" * 64 and "licence" in amy["pending_reason"]
+    unreviewed = next(item for item in data["items"] if item["id"] == "unreviewed-test")
+    assert unreviewed["sha256"] == "b" * 64 and "licence" in unreviewed["pending_reason"]
     assert any("digest only" in line for line in changes)
     # One revision lookup per repository, and nothing downloaded.
     assert seen.count("GET /api/models/ggerganov/whisper.cpp/revision/main") == 1
     assert not any("/resolve/" in entry for entry in seen)
     assert parse(data).get("whisper-small-q5_1").installable
+
+
+def test_all_managed_profiles_use_kokoro_and_removed_piper_is_refused() -> None:
+    from raiker.voice.catalogue import parse
+    from raiker.voice.tts_worker import parse_args
+
+    catalogue = load()
+    assert all(profile.speaking == "kokoro" for profile in catalogue.profiles.values())
+    assert not any("piper" in item.item_id or "piper" in item.component for item in catalogue.items)
+    for name in catalogue.profiles:
+        profile = resolve(catalogue, name, _hardware(memory_gib=32, os_name="linux"))
+        assert profile.speaking_installable
+        assert profile.part("kokoro_model") and profile.part("kokoro_voices")
+    with pytest.raises(CatalogueError, match="voice_item_unknown"):
+        catalogue.get("piper-voice-en_US-amy-medium")
+    raw = json.loads(Path("raiker/config/voice-catalogue.json").read_text())
+    raw["profiles"]["lite"]["speaking"] = "piper"
+    with pytest.raises(CatalogueError, match="voice_catalogue_invalid"):
+        parse(raw)
+    with pytest.raises(SystemExit):
+        parse_args(["--engine", "piper"])
+
+
+def test_removed_voice_settings_fall_back_to_kokoro_default() -> None:
+    assert parse_settings({"profile": "lite", "voice": "en_US-amy-medium"}).voice is None
+    assert parse_settings({"profile": "lite", "voice": "af_heart"}).voice == "af_heart"

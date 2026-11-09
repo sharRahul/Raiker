@@ -1602,8 +1602,7 @@ handles remain open. Fresh-profile unsolicited threat-feed downloads are
 fixed (FIXED-1372); full installed-candidate egress qualification remains open.
 
 Whisper model pinning is complete (FIXED-1373). Voice V1 remains blocked by
-Linux/macOS whisper-server artifacts, Piper dataset/licence review and a
-verified JSON sidecar, Kokoro/espeak-ng distribution review, and actual
+Linux/macOS whisper-server artifacts, optional runtime distribution notices, and actual
 packaged speech validation. Do not promote the catalogue's model pins into
 a cross-platform voice-acceptance claim.
 
@@ -1630,16 +1629,18 @@ and onboarding passed; one separate Setup window test crashed its renderer
 before passing in isolation. Preserve that first failure and investigate if
 it repeats; native Fedora acceptance remains untested.
 
-## Signed candidate dispatch is blocked by Actions permissions
+## Actions dispatch access — manual candidate workaround verified
 
-All required CI checks and the exact Release Plan verification script passed
-on `8a053a907b9c9e97bef4163f479650ac3d652f28`. Dispatching `release.yml`
-with version `0.9.0`, beta channel, `require-except-macos` and publication
-disabled returned **403 Resource not accessible by integration**. Pushing
-main is permitted; Actions dispatch is not. Grant Actions write access or run
-the documented workflow manually. No new signed candidate, signed channel or
-full `RELEASE_EVIDENCE.md` is claimed from that rejected attempt.
-[Run record and concrete command](LINUX_BETA_2026_11_09.md#github-qualification-and-release-dispatch-access).
+This session's workflow dispatch returned **403 Resource not accessible by
+integration**. The owner manually started Release `42650624663` for runtime
+`6c211b60`, version `0.9.0`, beta, `require-except-macos`, publish disabled.
+It passed; independent checks verify all ten installer manifests/hashes,
+six Linux GPG signatures, signed channel/provenance, SBOM/lock bindings and
+evidence outputs. This candidate is no longer blocked on creation. Direct
+workflow-dispatch access remains unavailable, so future dispatches still need
+an authorized integration or owner start. Beta feature/owner-machine gates
+are separate from artifact creation.
+[Verified candidate and receipts](LINUX_BETA_2026_11_09.md#verified-non-published-signed-candidate).
 
 The full installed-shell capture also found Electron startup resolver traffic
 that the host-only trace missed. FIXED-1376 disables automatic DoH and
@@ -1647,3 +1648,26 @@ non-loopback shell resource requests; 36 unit and 13 UI tests pass. Chromium's
 non-sending IPv6 UDP route probe remains explicitly recorded. A fresh candidate
 with this shell correction needs its own CI, package and egress evidence.
 [Follow-through](LINUX_BETA_2026_11_09.md#electron-network-process-follow-through).
+
+The corrected installed unsigned shell/host profile now has a passing
+1,862-second scoped audit with no unexpected destinations. MM-5 remains
+partial pending useful models, managed speech, enabled integrations and a
+full-feature signed-artifact owner-machine recording. Earlier failed captures
+are retained. [Audit scope and receipts](LINUX_BETA_2026_11_09.md#completed-installed-shell-audit-and-ci-artifact-verification).
+
+## Personal-beta scope after owner clarification
+
+Personal use is limited to the supported scope of five users, PC first;
+phone/iPad app access is future work. Production signing/publisher anchors,
+public distribution and a multi-evaluator rollout study are not private
+personal-beta prerequisites. Existing authentication, isolation, Apply/recovery,
+limits and integrity requirements remain.
+[Owner decision](PERSONAL_BETA_SCOPE.md).
+
+Piper and its per-voice licence/JSON-sidecar blockers are removed (FIXED-1378).
+Kokoro int8 serves Lite/Balanced. Real direct synthesis and frozen-worker
+loopback/auth/WAV tests passed. An opt-in personal build bundles the exact
+hash-locked runtime and retained notices; public redistribution approval is
+separate. Full managed speech/microphone round trip and Linux Whisper engine
+packaging remain engineering checks. Earlier candidate/audit receipts name
+`6c211b60`; they precede this runtime change.

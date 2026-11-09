@@ -1,25 +1,11 @@
 # SPDX-License-Identifier: Apache-2.0
-"""Pin the voice catalogue's Hugging Face items to a revision and a SHA-256.
+"""Resolve immutable Hugging Face voice-model revisions and LFS digests.
 
-Voice spec §5.6: nothing outside ``raiker/config/voice-catalogue.json`` is
-downloaded, and nothing in it is installable without a digest. Whisper models
-and Piper voices live on Hugging Face, which was unreachable where the
-catalogue was first built, so those entries carry ``pending_reason``.
+Only catalogue entries that need pins are updated. A nonpermissive component
+stays refused unless its specific licence has been reviewed and supplied with
+--licence-reviewed ID=LICENCE. No model bytes are downloaded by this script.
 
-This script resolves each pending Hugging Face item without downloading it:
-the repository's current commit (``/api/models/<repo>/revision/main``) becomes
-the pinned revision, and the file's Git LFS object id — which *is* its SHA-256
-— and size come from ``/api/models/<repo>/paths-info/<revision>``. The entry's
-``url`` is then the immutable ``resolve/<revision>/<path>`` address, and its
-``pending_reason`` is removed.
-
-An item whose licence is not on the permissive list (a Piper voice whose
-dataset licence has not been reviewed) gets its digest but stays pending until
-``--licence-reviewed <id>`` names it, with the licence it was reviewed as.
-
-    python -m scripts.pin_voice_catalogue                 # print what would change
-    python -m scripts.pin_voice_catalogue --write         # update the catalogue
-    python -m scripts.pin_voice_catalogue --write --licence-reviewed piper-voice-en_US-amy-medium=CC-BY-4.0
+    python -m scripts.pin_voice_catalogue --write
 """
 
 from __future__ import annotations

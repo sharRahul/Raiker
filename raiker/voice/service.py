@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Voice for one owner: what they chose, what is installed, and using it.
 
 The settings live in the owner's settings blob under ``voice_engines`` (the
@@ -73,6 +74,9 @@ def parse_settings(raw: Any, catalogue: Catalogue | None = None) -> VoiceSetting
     }:
         whisper_model = None
     voice = raw.get("voice") if isinstance(raw.get("voice"), str) and len(raw["voice"]) <= 40 else None
+    offered_voices = {name for item in catalogue.of("kokoro_voices") for name in item.voices}
+    if voice not in offered_voices:
+        voice = None
     profile = str(raw.get("profile")) if raw.get("profile") in PROFILES else "off"
     run_on = str(raw.get("run_on")) if raw.get("run_on") in {"auto", "cpu", "gpu"} else "auto"
     mode = str(convo.get("mode")) if convo.get("mode") in {"push_to_talk", "hands_free"} else "push_to_talk"
@@ -326,12 +330,6 @@ class VoiceService:
             if model is None or voices is None:
                 raise VoiceEngineError("voice_speaking_not_installed")
             self.engines.ensure_speaker("kokoro", model=model, voices=voices, threads=threads, ram=ram)
-        elif resolved.speaking == "piper":
-            piper = self._path(resolved.part("piper_engine"))
-            voice = self._path(resolved.part("piper_voice"))
-            if piper is None or voice is None:
-                raise VoiceEngineError("voice_speaking_not_installed")
-            self.engines.ensure_speaker("piper", model=voice, piper=piper, threads=threads, ram=ram)
         else:
             raise VoiceEngineError("voice_speaking_system")
         return self.engines.synthesise(text, voice=settings.voice, speed=settings.speed)

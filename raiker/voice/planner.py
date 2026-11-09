@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Where each voice engine runs: processor or GPU, and how many threads.
 
 Voice spec §7, placement policy:
@@ -7,7 +8,7 @@ Voice spec §7, placement policy:
    VRAM covers Whisper plus 512 MB. Otherwise the processor, with threads at
    half the physical cores, at most 8.
 3. Kokoro runs on the processor unless the profile is High quality and the GPU
-   has room. Piper always runs on the processor.
+   has room.
 4. Voice activity detection runs in the client.
 
 A profile that does not fit in system memory next to what is already held is
@@ -113,13 +114,6 @@ def plan(
             engine="kokoro", device="cpu", gpu_name=None, threads=min(4, threads),
             ram_bytes=need, vram_bytes=0,
             reason="Speech runs on the processor.",
-        ))
-    elif profile.speaking == "piper":
-        voice = profile.part("piper_voice")
-        placements.append(Placement(
-            engine="piper", device="cpu", gpu_name=None, threads=min(2, threads),
-            ram_bytes=(voice.memory_bytes_cpu or 0) if voice else 0, vram_bytes=0,
-            reason="Piper runs on the processor.",
         ))
 
     needed = sum(item.ram_bytes for item in placements)

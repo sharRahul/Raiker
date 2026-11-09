@@ -14,7 +14,11 @@
       "sha256": "1a153a22f4509e292a94e67d6f9b85e8deb25b4988682b7e174c65279d8788e3",
       "size_bytes": 2327524,
       "memory_bytes_cpu": 20000000,
-      "profiles": ["lite", "balanced", "high"]
+      "profiles": [
+        "lite",
+        "balanced",
+        "high"
+      ]
     },
     {
       "id": "whisper-server-windows-x64-cpu",
@@ -25,9 +29,17 @@
       "url": "https://github.com/ggml-org/whisper.cpp/releases/download/v1.9.0/whisper-bin-x64.zip",
       "sha256": "00c4304b6be363a224a4b69829df49009f74131df8c3ce6a5878b89a11cd26ef",
       "size_bytes": 5410599,
-      "platform": {"os": "windows", "arch": "x64", "backend": "cpu"},
+      "platform": {
+        "os": "windows",
+        "arch": "x64",
+        "backend": "cpu"
+      },
       "executable": "whisper-server.exe",
-      "profiles": ["lite", "balanced", "high"]
+      "profiles": [
+        "lite",
+        "balanced",
+        "high"
+      ]
     },
     {
       "id": "whisper-server-windows-x64-cuda",
@@ -38,9 +50,16 @@
       "url": "https://github.com/ggml-org/whisper.cpp/releases/download/v1.9.0/whisper-cublas-12.4.0-bin-x64.zip",
       "sha256": "9c18e266aa428f643462485f2d45223320480b5fd09b320bb7fc5b9c7fda4e92",
       "size_bytes": 461124610,
-      "platform": {"os": "windows", "arch": "x64", "backend": "cuda"},
+      "platform": {
+        "os": "windows",
+        "arch": "x64",
+        "backend": "cuda"
+      },
       "executable": "whisper-server.exe",
-      "profiles": ["balanced", "high"]
+      "profiles": [
+        "balanced",
+        "high"
+      ]
     },
     {
       "id": "whisper-server-linux-x64-cpu",
@@ -48,9 +67,17 @@
       "name": "whisper.cpp v1.9.0 (Linux x64, processor)",
       "licence": "MIT",
       "source_page": "https://github.com/ggml-org/whisper.cpp/releases/tag/v1.9.0",
-      "platform": {"os": "linux", "arch": "x64", "backend": "cpu"},
+      "platform": {
+        "os": "linux",
+        "arch": "x64",
+        "backend": "cpu"
+      },
       "executable": "whisper-server",
-      "profiles": ["lite", "balanced", "high"],
+      "profiles": [
+        "lite",
+        "balanced",
+        "high"
+      ],
       "pending_reason": "Upstream publishes no Linux whisper-server build. Raiker's release workflow builds it from the pinned v1.9.0 tag and publishes it with a digest (voice spec 5.2)."
     },
     {
@@ -59,9 +86,17 @@
       "name": "whisper.cpp v1.9.0 (Linux ARM64, processor)",
       "licence": "MIT",
       "source_page": "https://github.com/ggml-org/whisper.cpp/releases/tag/v1.9.0",
-      "platform": {"os": "linux", "arch": "arm64", "backend": "cpu"},
+      "platform": {
+        "os": "linux",
+        "arch": "arm64",
+        "backend": "cpu"
+      },
       "executable": "whisper-server",
-      "profiles": ["lite", "balanced", "high"],
+      "profiles": [
+        "lite",
+        "balanced",
+        "high"
+      ],
       "pending_reason": "Upstream publishes no Linux ARM64 whisper-server build; built by Raiker's release workflow."
     },
     {
@@ -70,9 +105,17 @@
       "name": "whisper.cpp v1.9.0 (macOS Apple silicon, Metal)",
       "licence": "MIT",
       "source_page": "https://github.com/ggml-org/whisper.cpp/releases/tag/v1.9.0",
-      "platform": {"os": "macos", "arch": "arm64", "backend": "metal"},
+      "platform": {
+        "os": "macos",
+        "arch": "arm64",
+        "backend": "metal"
+      },
       "executable": "whisper-server",
-      "profiles": ["lite", "balanced", "high"],
+      "profiles": [
+        "lite",
+        "balanced",
+        "high"
+      ],
       "pending_reason": "Upstream publishes only an XCFramework for macOS; whisper-server is built by Raiker's release workflow."
     },
     {
@@ -195,20 +238,29 @@
       "component": "kokoro_model",
       "name": "Kokoro-82M (int8)",
       "licence": "Apache-2.0",
-      "languages": ["en-us", "en-gb"],
+      "languages": [
+        "en-us",
+        "en-gb"
+      ],
       "source_page": "https://github.com/thewh1teagle/kokoro-onnx/releases/tag/model-files-v1.0",
       "url": "https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files-v1.0/kokoro-v1.0.int8.onnx",
       "sha256": "6e742170d309016e5891a994e1ce1559c702a2ccd0075e67ef7157974f6406cb",
       "size_bytes": 92361271,
       "memory_bytes_cpu": 450000000,
-      "profiles": ["balanced"]
+      "profiles": [
+        "lite",
+        "balanced"
+      ]
     },
     {
       "id": "kokoro-82m-fp16",
       "component": "kokoro_model",
       "name": "Kokoro-82M (fp16)",
       "licence": "Apache-2.0",
-      "languages": ["en-us", "en-gb"],
+      "languages": [
+        "en-us",
+        "en-gb"
+      ],
       "source_page": "https://github.com/thewh1teagle/kokoro-onnx/releases/tag/model-files-v1.0",
       "url": "https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files-v1.0/kokoro-v1.0.fp16.onnx",
       "sha256": "c1610a859f3bdea01107e73e50100685af38fff88f5cd8e5c56df109ec880204",
@@ -221,136 +273,89 @@
       "component": "kokoro_model",
       "name": "Kokoro-82M (fp32)",
       "licence": "Apache-2.0",
-      "languages": ["en-us", "en-gb"],
+      "languages": [
+        "en-us",
+        "en-gb"
+      ],
       "source_page": "https://github.com/thewh1teagle/kokoro-onnx/releases/tag/model-files-v1.0",
       "url": "https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files-v1.0/kokoro-v1.0.onnx",
       "sha256": "7d5df8ecf7d4b1878015a32686053fd0eebe2bc377234608764cc0ef3636a6c5",
       "size_bytes": 325532387,
       "memory_bytes_cpu": 1000000000,
-      "profiles": ["high"]
+      "profiles": [
+        "high"
+      ]
     },
     {
       "id": "kokoro-voices-v1",
       "component": "kokoro_voices",
       "name": "Kokoro voices v1.0",
       "licence": "Apache-2.0",
-      "languages": ["en-us", "en-gb"],
+      "languages": [
+        "en-us",
+        "en-gb"
+      ],
       "source_page": "https://github.com/thewh1teagle/kokoro-onnx/releases/tag/model-files-v1.0",
       "url": "https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files-v1.0/voices-v1.0.bin",
       "sha256": "bca610b8308e8d99f32e6fe4197e7ec01679264efed0cac9140fe9c29f1fbf7d",
       "size_bytes": 28214398,
-      "voices": ["af_heart", "af_bella", "af_nicole", "af_sky", "am_adam", "am_michael", "bf_emma", "bf_isabella", "bm_george", "bm_lewis"],
-      "profiles": ["balanced", "high"]
-    },
-    {
-      "id": "piper-linux-x64",
-      "component": "piper_engine",
-      "name": "Piper 2023.11.14-2 (Linux x64)",
-      "licence": "MIT",
-      "source_page": "https://github.com/rhasspy/piper/releases/tag/2023.11.14-2",
-      "url": "https://github.com/rhasspy/piper/releases/download/2023.11.14-2/piper_linux_x86_64.tar.gz",
-      "sha256": "a50cb45f355b7af1f6d758c1b360717877ba0a398cc8cbe6d2a7a3a26e225992",
-      "size_bytes": 26460462,
-      "platform": {"os": "linux", "arch": "x64", "backend": "cpu"},
-      "executable": "piper",
-      "profiles": ["lite"]
-    },
-    {
-      "id": "piper-linux-arm64",
-      "component": "piper_engine",
-      "name": "Piper 2023.11.14-2 (Linux ARM64)",
-      "licence": "MIT",
-      "source_page": "https://github.com/rhasspy/piper/releases/tag/2023.11.14-2",
-      "url": "https://github.com/rhasspy/piper/releases/download/2023.11.14-2/piper_linux_aarch64.tar.gz",
-      "sha256": "fea0fd2d87c54dbc7078d0f878289f404bd4d6eea6e7444a77835d1537ab88eb",
-      "size_bytes": 26004717,
-      "platform": {"os": "linux", "arch": "arm64", "backend": "cpu"},
-      "executable": "piper",
-      "profiles": ["lite"]
-    },
-    {
-      "id": "piper-macos-x64",
-      "component": "piper_engine",
-      "name": "Piper 2023.11.14-2 (macOS Intel)",
-      "licence": "MIT",
-      "source_page": "https://github.com/rhasspy/piper/releases/tag/2023.11.14-2",
-      "url": "https://github.com/rhasspy/piper/releases/download/2023.11.14-2/piper_macos_x64.tar.gz",
-      "sha256": "ced85c0a3df13945b1e623b878a48fdc2854d5c485b4b67f62857cf551deaf8b",
-      "size_bytes": 19146927,
-      "platform": {"os": "macos", "arch": "x64", "backend": "cpu"},
-      "executable": "piper",
-      "profiles": ["lite"]
-    },
-    {
-      "id": "piper-macos-arm64",
-      "component": "piper_engine",
-      "name": "Piper 2023.11.14-2 (macOS Apple silicon)",
-      "licence": "MIT",
-      "source_page": "https://github.com/rhasspy/piper/releases/tag/2023.11.14-2",
-      "url": "https://github.com/rhasspy/piper/releases/download/2023.11.14-2/piper_macos_aarch64.tar.gz",
-      "sha256": "6b1eb03b3735946cb35216e063e7eebcc33a6bbf5dd96ec0217959bf1cdcb0cc",
-      "size_bytes": 19146957,
-      "platform": {"os": "macos", "arch": "arm64", "backend": "cpu"},
-      "executable": "piper",
-      "profiles": ["lite"]
-    },
-    {
-      "id": "piper-windows-x64",
-      "component": "piper_engine",
-      "name": "Piper 2023.11.14-2 (Windows x64)",
-      "licence": "MIT",
-      "source_page": "https://github.com/rhasspy/piper/releases/tag/2023.11.14-2",
-      "url": "https://github.com/rhasspy/piper/releases/download/2023.11.14-2/piper_windows_amd64.zip",
-      "sha256": "f3c58906402b24f3a96d92145f58acba6d86c9b5db896d207f78dc80811efcea",
-      "size_bytes": 22477236,
-      "platform": {"os": "windows", "arch": "x64", "backend": "cpu"},
-      "executable": "piper.exe",
-      "profiles": ["lite"]
-    },
-    {
-      "id": "piper-voice-en_US-amy-medium",
-      "component": "piper_voice",
-      "name": "Piper voice: Amy (US English, medium)",
-      "licence": "unreviewed",
-      "languages": [
-        "en-us"
+      "voices": [
+        "af_heart",
+        "af_bella",
+        "af_nicole",
+        "af_sky",
+        "am_adam",
+        "am_michael",
+        "bf_emma",
+        "bf_isabella",
+        "bm_george",
+        "bm_lewis"
       ],
-      "source_page": "https://huggingface.co/rhasspy/piper-voices",
-      "hf_repo": "rhasspy/piper-voices",
-      "hf_path": "en/en_US/amy/medium/en_US-amy-medium.onnx",
-      "hf_config_path": "en/en_US/amy/medium/en_US-amy-medium.onnx.json",
-      "memory_bytes_cpu": 150000000,
       "profiles": [
-        "lite"
-      ],
-      "pending_reason": "Digest pinned; the licence still needs review under LICENSING_POLICY.md before this is offered.",
-      "revision": "e7229f7d33a10e145e109b886d661984201ac3c4",
-      "url": "https://huggingface.co/rhasspy/piper-voices/resolve/e7229f7d33a10e145e109b886d661984201ac3c4/en/en_US/amy/medium/en_US-amy-medium.onnx",
-      "sha256": "b3a6e47b57b8c7fbe6a0ce2518161a50f59a9cdd8a50835c02cb02bdd6206c18",
-      "size_bytes": 63201294
+        "lite",
+        "balanced",
+        "high"
+      ]
     }
   ],
   "profiles": {
     "lite": {
       "name": "Lite",
       "for": "8 GB of memory, no graphics card, ARM64 boards",
-      "listening": ["whisper-base-q5_1", "whisper-base.en-q5_1"],
-      "speaking": "piper",
-      "speaking_items": ["piper-voice-en_US-amy-medium"]
+      "listening": [
+        "whisper-base-q5_1",
+        "whisper-base.en-q5_1"
+      ],
+      "speaking": "kokoro",
+      "speaking_items": [
+        "kokoro-82m-int8",
+        "kokoro-voices-v1"
+      ]
     },
     "balanced": {
       "name": "Balanced",
       "for": "16 GB of memory, with or without a graphics card",
-      "listening": ["whisper-small-q5_1", "whisper-large-v3-turbo-q5_0"],
+      "listening": [
+        "whisper-small-q5_1",
+        "whisper-large-v3-turbo-q5_0"
+      ],
       "speaking": "kokoro",
-      "speaking_items": ["kokoro-82m-int8", "kokoro-voices-v1"]
+      "speaking_items": [
+        "kokoro-82m-int8",
+        "kokoro-voices-v1"
+      ]
     },
     "high": {
       "name": "High quality",
       "for": "32 GB of memory or a graphics card with 12 GB",
-      "listening": ["whisper-large-v3-turbo-q8_0"],
+      "listening": [
+        "whisper-large-v3-turbo-q8_0"
+      ],
       "speaking": "kokoro",
-      "speaking_items": ["kokoro-82m-fp32", "kokoro-voices-v1"]
+      "speaking_items": [
+        "kokoro-82m-fp32",
+        "kokoro-voices-v1"
+      ]
     }
   }
 }

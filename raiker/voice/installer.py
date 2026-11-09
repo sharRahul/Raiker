@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Download, verify and lay out voice components. Nothing unverified is kept.
 
 Every file comes from the catalogue (:mod:`raiker.voice.catalogue`) and is
@@ -34,7 +35,7 @@ from raiker.voice.catalogue import (
 )
 
 _CHUNK = 1024 * 1024
-ARCHIVE_COMPONENTS = frozenset({"whisper_engine", "piper_engine"})
+ARCHIVE_COMPONENTS = frozenset({"whisper_engine"})
 
 
 class VoiceInstallError(RuntimeError):

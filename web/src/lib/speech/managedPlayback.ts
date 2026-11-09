@@ -1,7 +1,7 @@
 /**
  * Read-aloud on the installed speaking engine, with the system voice behind it.
  *
- * Voice spec V1: once Kokoro or Piper is installed, read-aloud uses it — the
+ * Voice spec V1: once Kokoro is installed, read-aloud uses it — the
  * same on-device rule as before, a better voice. When no engine is installed
  * (or voice is off) the request is refused with a reason code, and read-aloud
  * falls back to today's `localService`-only system voice. A refusal is

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Every place Raiker starts a process is reviewed (beta plan SB-4).
 
 The beta rule is that agent commands, plugins, hooks and local MCP servers run
@@ -55,7 +56,6 @@ REVIEWED: dict[str, tuple[str, str]] = {
     "raiker/models/llama_cpp/process.py": (OWNED, "The digest-verified llama.cpp server, in a Windows job object"),
     "raiker/models/llama_cpp/installer.py": (OWNED, "Self-check of the digest-verified llama.cpp build (--version, --list-devices)"),
     "raiker/models/llama_cpp/hardware.py": (FACTS, "nvidia-smi and sysctl for GPU memory and CUDA version"),
-    "raiker/voice/tts_worker.py": (OWNED, "The digest-verified Piper binary, fixed argv, text on stdin, from Raiker's speaking worker"),
     "raiker/models/conversion.py": (SANDBOX, "Model conversion through the native runner, never on the host"),
     "raiker/models/codex_app_server.py": (OWNER, "The owner's Codex app server for ChatGPT sign-in, over stdio"),
     "raiker/storage/sqlcipher_probe.py": (OWNED, "Raiker's own SQLCipher capability probe, in a child interpreter"),

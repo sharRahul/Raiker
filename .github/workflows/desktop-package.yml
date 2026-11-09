@@ -525,7 +525,7 @@ jobs:
               verdict() { if [ -f "$1" ] && ! grep -q '^FAIL' "$1"; then echo PASS; elif [ -f "$1" ]; then echo FAIL; else echo "NOT RUN"; fi; }
               installed=$(verdict "$dir/smoke-installed-$target.txt")
               extra=$(verdict "$dir/smoke-appimage-$target.txt"); [ "$extra" = "NOT RUN" ] && extra=$(verdict "$dir/smoke-msi-$target.txt")
-              window=$( [ -f "$dir/onboarding-7-home.png" ] && echo PASS || echo "NOT RUN")
+              window=$( [ -f "$dir/onboarding-3-home.png" ] && echo PASS || echo "NOT RUN")
               uninstall=$(verdict "$dir/uninstall-$target.txt")
               echo "| $target | ${installers:-none} | $installed | $extra | $window | $uninstall |"
             done

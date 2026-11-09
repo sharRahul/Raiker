@@ -1,0 +1,1092 @@
+{
+  "source_commit": "6c211b605d3c42d77215ff69cbed3f346c95d685",
+  "trace_sha256": "cfe3b3095f51d2839f642720a5bda0b783e213a7129fff4069f54d258f834ea4",
+  "route_probe_count": 135,
+  "all_udp_unreachable_closed_without_same_tid_send": true,
+  "limits": [
+    "Per-thread syscall inspection; Chromium reference explains the route-only probe. Does not assert zero public-address syscalls.",
+    "Destinations outside this literal are evaluated independently by the full metadata verifier."
+  ],
+  "probes": [
+    {
+      "tid": 129947,
+      "timestamp": "1794239245.006817",
+      "socket": "socket(AF_INET6, SOCK_DGRAM, IPPROTO_IP) = 22",
+      "connect": "connect(22, {sa_family=AF_INET6, sin6_port=htons(443), sin6_flowinfo=htonl(0), inet_pton(AF_INET6, \"2001:4860:4860::8888\", &sin6_addr), sin6_scope_id=0}, 28) = -1 ENETUNREACH (Network is unreachable)",
+      "close": "close(22)      = 0",
+      "send_calls_on_same_tid_before_close": []
+    },
+    {
+      "tid": 129947,
+      "timestamp": "1794239272.204308",
+      "socket": "socket(AF_INET6, SOCK_DGRAM, IPPROTO_IP) = 23",
+      "connect": "connect(23, {sa_family=AF_INET6, sin6_port=htons(443), sin6_flowinfo=htonl(0), inet_pton(AF_INET6, \"2001:4860:4860::8888\", &sin6_addr), sin6_scope_id=0}, 28) = -1 ENETUNREACH (Network is unreachable)",
+      "close": "close(23) = 0",
+      "send_calls_on_same_tid_before_close": []
+    },
+    {
+      "tid": 129947,
+      "timestamp": "1794239283.977549",
+      "socket": "socket(AF_INET6, SOCK_DGRAM, IPPROTO_IP) = 32",
+      "connect": "connect(32, {sa_family=AF_INET6, sin6_port=htons(443), sin6_flowinfo=htonl(0), inet_pton(AF_INET6, \"2001:4860:4860::8888\", &sin6_addr), sin6_scope_id=0}, 28) = -1 ENETUNREACH (Network is unreachable)",
+      "close": "close(32)      = 0",
+      "send_calls_on_same_tid_before_close": []
+    },
+    {
+      "tid": 129947,
+      "timestamp": "1794239298.743987",
+      "socket": "socket(AF_INET6, SOCK_DGRAM, IPPROTO_IP) = 25",
+      "connect": "connect(25, {sa_family=AF_INET6, sin6_port=htons(443), sin6_flowinfo=htonl(0), inet_pton(AF_INET6, \"2001:4860:4860::8888\", &sin6_addr), sin6_scope_id=0}, 28) = -1 ENETUNREACH (Network is unreachable)",
+      "close": "close(25)      = 0",
+      "send_calls_on_same_tid_before_close": []
+    },
+    {
+      "tid": 129947,
+      "timestamp": "1794239313.742258",
+      "socket": "socket(AF_INET6, SOCK_DGRAM, IPPROTO_IP) = 23",
+      "connect": "connect(23, {sa_family=AF_INET6, sin6_port=htons(443), sin6_flowinfo=htonl(0), inet_pton(AF_INET6, \"2001:4860:4860::8888\", &sin6_addr), sin6_scope_id=0}, 28) = -1 ENETUNREACH (Network is unreachable)",
+      "close": "close(23)      = 0",
+      "send_calls_on_same_tid_before_close": []
+    },
+    {
+      "tid": 129947,
+      "timestamp": "1794239328.753366",
+      "socket": "socket(AF_INET6, SOCK_DGRAM, IPPROTO_IP) = 23",
+      "connect": "connect(23, {sa_family=AF_INET6, sin6_port=htons(443), sin6_flowinfo=htonl(0), inet_pton(AF_INET6, \"2001:4860:4860::8888\", &sin6_addr), sin6_scope_id=0}, 28) = -1 ENETUNREACH (Network is unreachable)",
+      "close": "close(23)      = 0",
+      "send_calls_on_same_tid_before_close": []
+    },
+    {
+      "tid": 129947,
+      "timestamp": "1794239343.743088",
+      "socket": "socket(AF_INET6, SOCK_DGRAM, IPPROTO_IP) = 23",
+      "connect": "connect(23, {sa_family=AF_INET6, sin6_port=htons(443), sin6_flowinfo=htonl(0), inet_pton(AF_INET6, \"2001:4860:4860::8888\", &sin6_addr), sin6_scope_id=0}, 28) = -1 ENETUNREACH (Network is unreachable)",
+      "close": "close(23)      = 0",
+      "send_calls_on_same_tid_before_close": []
+    },
+    {
+      "tid": 129947,
+      "timestamp": "1794239358.759669",
+      "socket": "socket(AF_INET6, SOCK_DGRAM, IPPROTO_IP) = 23",
+      "connect": "connect(23, {sa_family=AF_INET6, sin6_port=htons(443), sin6_flowinfo=htonl(0), inet_pton(AF_INET6, \"2001:4860:4860::8888\", &sin6_addr), sin6_scope_id=0}, 28) = -1 ENETUNREACH (Network is unreachable)",
+      "close": "close(23)      = 0",
+      "send_calls_on_same_tid_before_close": []
+    },
+    {
+      "tid": 129947,
+      "timestamp": "1794239368.762471",
+      "socket": "socket(AF_INET6, SOCK_DGRAM, IPPROTO_IP) = 25",
+      "connect": "connect(25, {sa_family=AF_INET6, sin6_port=htons(443), sin6_flowinfo=htonl(0), inet_pton(AF_INET6, \"2001:4860:4860::8888\", &sin6_addr), sin6_scope_id=0}, 28) = -1 ENETUNREACH (Network is unreachable)",
+      "close": "close(25)      = 0",
+      "send_calls_on_same_tid_before_close": []
+    },
+    {
+      "tid": 129947,
+      "timestamp": "1794239373.743217",
+      "socket": "socket(AF_INET6, SOCK_DGRAM, IPPROTO_IP) = 23",
+      "connect": "connect(23, {sa_family=AF_INET6, sin6_port=htons(443), sin6_flowinfo=htonl(0), inet_pton(AF_INET6, \"2001:4860:4860::8888\", &sin6_addr), sin6_scope_id=0}, 28) = -1 ENETUNREACH (Network is unreachable)",
+      "close": "close(23) = 0",
+      "send_calls_on_same_tid_before_close": []
+    },
+    {
+      "tid": 129947,
+      "timestamp": "1794239388.744067",
+      "socket": "socket(AF_INET6, SOCK_DGRAM, IPPROTO_IP) = 23",
+      "connect": "connect(23, {sa_family=AF_INET6, sin6_port=htons(443), sin6_flowinfo=htonl(0), inet_pton(AF_INET6, \"2001:4860:4860::8888\", &sin6_addr), sin6_scope_id=0}, 28) = -1 ENETUNREACH (Network is unreachable)",
+      "close": "close(23) = 0",
+      "send_calls_on_same_tid_before_close": []
+    },
+    {
+      "tid": 129947,
+      "timestamp": "1794239403.748135",
+      "socket": "socket(AF_INET6, SOCK_DGRAM, IPPROTO_IP) = 25",
+      "connect": "connect(25, {sa_family=AF_INET6, sin6_port=htons(443), sin6_flowinfo=htonl(0), inet_pton(AF_INET6, \"2001:4860:4860::8888\", &sin6_addr), sin6_scope_id=0}, 28) = -1 ENETUNREACH (Network is unreachable)",
+      "close": "close(25) = 0",
+      "send_calls_on_same_tid_before_close": []
+    },
+    {
+      "tid": 129947,
+      "timestamp": "1794239418.750890",
+      "socket": "socket(AF_INET6, SOCK_DGRAM, IPPROTO_IP) = 25",
+      "connect": "connect(25, {sa_family=AF_INET6, sin6_port=htons(443), sin6_flowinfo=htonl(0), inet_pton(AF_INET6, \"2001:4860:4860::8888\", &sin6_addr), sin6_scope_id=0}, 28) = -1 ENETUNREACH (Network is unreachable)",
+      "close": "close(25)      = 0",
+      "send_calls_on_same_tid_before_close": []
+    },
+    {
+      "tid": 129947,
+      "timestamp": "1794239433.749419",
+      "socket": "socket(AF_INET6, SOCK_DGRAM, IPPROTO_IP) = 23",
+      "connect": "connect(23, {sa_family=AF_INET6, sin6_port=htons(443), sin6_flowinfo=htonl(0), inet_pton(AF_INET6, \"2001:4860:4860::8888\", &sin6_addr), sin6_scope_id=0}, 28) = -1 ENETUNREACH (Network is unreachable)",
+      "close": "close(23)      = 0",
+      "send_calls_on_same_tid_before_close": []
+    },
+    {
+      "tid": 129947,
+      "timestamp": "1794239448.744499",
+      "socket": "socket(AF_INET6, SOCK_DGRAM, IPPROTO_IP) = 25",
+      "connect": "connect(25, {sa_family=AF_INET6, sin6_port=htons(443), sin6_flowinfo=htonl(0), inet_pton(AF_INET6, \"2001:4860:4860::8888\", &sin6_addr), sin6_scope_id=0}, 28) = -1 ENETUNREACH (Network is unreachable)",
+      "close": "close(25)      = 0",
+      "send_calls_on_same_tid_before_close": []
+    },
+    {
+      "tid": 129947,
+      "timestamp": "1794239463.743090",
+      "socket": "socket(AF_INET6, SOCK_DGRAM, IPPROTO_IP) = 25",
+      "connect": "connect(25, {sa_family=AF_INET6, sin6_port=htons(443), sin6_flowinfo=htonl(0), inet_pton(AF_INET6, \"2001:4860:4860::8888\", &sin6_addr), sin6_scope_id=0}, 28) = -1 ENETUNREACH (Network is unreachable)",
+      "close": "close(25)      = 0",
+      "send_calls_on_same_tid_before_close": []
+    },
+    {
+      "tid": 129947,
+      "timestamp": "1794239473.755728",
+      "socket": "socket(AF_INET6, SOCK_DGRAM, IPPROTO_IP) = 25",
+      "connect": "connect(25, {sa_family=AF_INET6, sin6_port=htons(443), sin6_flowinfo=htonl(0), inet_pton(AF_INET6, \"2001:4860:4860::8888\", &sin6_addr), sin6_scope_id=0}, 28) = -1 ENETUNREACH (Network is unreachable)",
+      "close": "close(25)      = 0",
+      "send_calls_on_same_tid_before_close": []
+    },
+    {
+      "tid": 129947,
+      "timestamp": "1794239478.747536",
+      "socket": "socket(AF_INET6, SOCK_DGRAM, IPPROTO_IP) = 27",
+      "connect": "connect(27, {sa_family=AF_INET6, sin6_port=htons(443), sin6_flowinfo=htonl(0), inet_pton(AF_INET6, \"2001:4860:4860::8888\", &sin6_addr), sin6_scope_id=0}, 28) = -1 ENETUNREACH (Network is unreachable)",
+      "close": "close(27)      = 0",
+      "send_calls_on_same_tid_before_close": []
+    },
+    {
+      "tid": 129947,
+      "timestamp": "1794239489.543558",
+      "socket": "socket(AF_INET6, SOCK_DGRAM, IPPROTO_IP) = 26",
+      "connect": "connect(26, {sa_family=AF_INET6, sin6_port=htons(443), sin6_flowinfo=htonl(0), inet_pton(AF_INET6, \"2001:4860:4860::8888\", &sin6_addr), sin6_scope_id=0}, 28) = -1 ENETUNREACH (Network is unreachable)",
+      "close": "close(26)      = 0",
+      "send_calls_on_same_tid_before_close": []
+    },
+    {
+      "tid": 129947,
+      "timestamp": "1794239493.760407",
+      "socket": "socket(AF_INET6, SOCK_DGRAM, IPPROTO_IP) = 27",
+      "connect": "connect(27, {sa_family=AF_INET6, sin6_port=htons(443), sin6_flowinfo=htonl(0), inet_pton(AF_INET6, \"2001:4860:4860::8888\", &sin6_addr), sin6_scope_id=0}, 28) = -1 ENETUNREACH (Network is unreachable)",
+      "close": "close(27)      = 0",
+      "send_calls_on_same_tid_before_close": []
+    },
+    {
+      "tid": 129947,
+      "timestamp": "1794239508.741414",
+      "socket": "socket(AF_INET6, SOCK_DGRAM, IPPROTO_IP) = 23",
+      "connect": "connect(23, {sa_family=AF_INET6, sin6_port=htons(443), sin6_flowinfo=htonl(0), inet_pton(AF_INET6, \"2001:4860:4860::8888\", &sin6_addr), sin6_scope_id=0}, 28) = -1 ENETUNREACH (Network is unreachable)",
+      "close": "close(23)      = 0",
+      "send_calls_on_same_tid_before_close": []
+    },
+    {
+      "tid": 129947,
+      "timestamp": "1794239523.761055",
+      "socket": "socket(AF_INET6, SOCK_DGRAM, IPPROTO_IP) = 23",
+      "connect": "connect(23, {sa_family=AF_INET6, sin6_port=htons(443), sin6_flowinfo=htonl(0), inet_pton(AF_INET6, \"2001:4860:4860::8888\", &sin6_addr), sin6_scope_id=0}, 28) = -1 ENETUNREACH (Network is unreachable)",
+      "close": "close(23)      = 0",
+      "send_calls_on_same_tid_before_close": []
+    },
+    {
+      "tid": 129947,
+      "timestamp": "1794239538.749562",
+      "socket": "socket(AF_INET6, SOCK_DGRAM, IPPROTO_IP) = 23",
+      "connect": "connect(23, {sa_family=AF_INET6, sin6_port=htons(443), sin6_flowinfo=htonl(0), inet_pton(AF_INET6, \"2001:4860:4860::8888\", &sin6_addr), sin6_scope_id=0}, 28) = -1 ENETUNREACH (Network is unreachable)",
+      "close": "close(23)      = 0",
+      "send_calls_on_same_tid_before_close": []
+    },
+    {
+      "tid": 129947,
+      "timestamp": "1794239553.743494",
+      "socket": "socket(AF_INET6, SOCK_DGRAM, IPPROTO_IP) = 23",
+      "connect": "connect(23, {sa_family=AF_INET6, sin6_port=htons(443), sin6_flowinfo=htonl(0), inet_pton(AF_INET6, \"2001:4860:4860::8888\", &sin6_addr), sin6_scope_id=0}, 28) = -1 ENETUNREACH (Network is unreachable)",
+      "close": "close(23)      = 0",
+      "send_calls_on_same_tid_before_close": []
+    },
+    {
+      "tid": 129947,
+      "timestamp": "1794239568.741752",
+      "socket": "socket(AF_INET6, SOCK_DGRAM, IPPROTO_IP) = 25",
+      "connect": "connect(25, {sa_family=AF_INET6, sin6_port=htons(443), sin6_flowinfo=htonl(0), inet_pton(AF_INET6, \"2001:4860:4860::8888\", &sin6_addr), sin6_scope_id=0}, 28) = -1 ENETUNREACH (Network is unreachable)",
+      "close": "close(25)      = 0",
+      "send_calls_on_same_tid_before_close": []
+    },
+    {
+      "tid": 129947,
+      "timestamp": "1794239583.772256",
+      "socket": "socket(AF_INET6, SOCK_DGRAM, IPPROTO_IP) = 23",
+      "connect": "connect(23, {sa_family=AF_INET6, sin6_port=htons(443), sin6_flowinfo=htonl(0), inet_pton(AF_INET6, \"2001:4860:4860::8888\", &sin6_addr), sin6_scope_id=0}, 28) = -1 ENETUNREACH (Network is unreachable)",
+      "close": "close(23) = 0",
+      "send_calls_on_same_tid_before_close": []
+    },
+    {
+      "tid": 129947,
+      "timestamp": "1794239598.777925",
+      "socket": "socket(AF_INET6, SOCK_DGRAM, IPPROTO_IP) = 23",
+      "connect": "connect(23, {sa_family=AF_INET6, sin6_port=htons(443), sin6_flowinfo=htonl(0), inet_pton(AF_INET6, \"2001:4860:4860::8888\", &sin6_addr), sin6_scope_id=0}, 28) = -1 ENETUNREACH (Network is unreachable)",
+      "close": "close(23)      = 0",
+      "send_calls_on_same_tid_before_close": []
+    },
+    {
+      "tid": 129947,
+      "timestamp": "1794239613.770584",
+      "socket": "socket(AF_INET6, SOCK_DGRAM, IPPROTO_IP) = 25",
+      "connect": "connect(25, {sa_family=AF_INET6, sin6_port=htons(443), sin6_flowinfo=htonl(0), inet_pton(AF_INET6, \"2001:4860:4860::8888\", &sin6_addr), sin6_scope_id=0}, 28) = -1 ENETUNREACH (Network is unreachable)",
+      "close": "close(25) = 0",
+      "send_calls_on_same_tid_before_close": []
+    },
+    {
+      "tid": 129947,
+      "timestamp": "1794239628.749346",
+      "socket": "socket(AF_INET6, SOCK_DGRAM, IPPROTO_IP) = 25",
+      "connect": "connect(25, {sa_family=AF_INET6, sin6_port=htons(443), sin6_flowinfo=htonl(0), inet_pton(AF_INET6, \"2001:4860:4860::8888\", &sin6_addr), sin6_scope_id=0}, 28) = -1 ENETUNREACH (Network is unreachable)",
+      "close": "close(25) = 0",
+      "send_calls_on_same_tid_before_close": []
+    },
+    {
+      "tid": 129947,
+      "timestamp": "1794239638.750313",
+      "socket": "socket(AF_INET6, SOCK_DGRAM, IPPROTO_IP) = 25",
+      "connect": "connect(25, {sa_family=AF_INET6, sin6_port=htons(443), sin6_flowinfo=htonl(0), inet_pton(AF_INET6, \"2001:4860:4860::8888\", &sin6_addr), sin6_scope_id=0}, 28) = -1 ENETUNREACH (Network is unreachable)",
+      "close": "close(25)      = 0",
+      "send_calls_on_same_tid_before_close": []
+    },
+    {
+      "tid": 129947,
+      "timestamp": "1794239643.744016",
+      "socket": "socket(AF_INET6, SOCK_DGRAM, IPPROTO_IP) = 23",
+      "connect": "connect(23, {sa_family=AF_INET6, sin6_port=htons(443), sin6_flowinfo=htonl(0), inet_pton(AF_INET6, \"2001:4860:4860::8888\", &sin6_addr), sin6_scope_id=0}, 28) = -1 ENETUNREACH (Network is unreachable)",
+      "close": "close(23)      = 0",
+      "send_calls_on_same_tid_before_close": []
+    },
+    {
+      "tid": 129947,
+      "timestamp": "1794239658.746782",
+      "socket": "socket(AF_INET6, SOCK_DGRAM, IPPROTO_IP) = 25",
+      "connect": "connect(25, {sa_family=AF_INET6, sin6_port=htons(443), sin6_flowinfo=htonl(0), inet_pton(AF_INET6, \"2001:4860:4860::8888\", &sin6_addr), sin6_scope_id=0}, 28) = -1 ENETUNREACH (Network is unreachable)",
+      "close": "close(25)      = 0",
+      "send_calls_on_same_tid_before_close": []
+    },
+    {
+      "tid": 129947,
+      "timestamp": "1794239673.774449",
+      "socket": "socket(AF_INET6, SOCK_DGRAM, IPPROTO_IP) = 23",
+      "connect": "connect(23, {sa_family=AF_INET6, sin6_port=htons(443), sin6_flowinfo=htonl(0), inet_pton(AF_INET6, \"2001:4860:4860::8888\", &sin6_addr), sin6_scope_id=0}, 28) = -1 ENETUNREACH (Network is unreachable)",
+      "close": "close(23)      = 0",
+      "send_calls_on_same_tid_before_close": []
+    },
+    {
+      "tid": 129947,
+      "timestamp": "1794239688.759875",
+      "socket": "socket(AF_INET6, SOCK_DGRAM, IPPROTO_IP) = 23",
+      "connect": "connect(23, {sa_family=AF_INET6, sin6_port=htons(443), sin6_flowinfo=htonl(0), inet_pton(AF_INET6, \"2001:4860:4860::8888\", &sin6_addr), sin6_scope_id=0}, 28) = -1 ENETUNREACH (Network is unreachable)",
+      "close": "close(23)      = 0",
+      "send_calls_on_same_tid_before_close": []
+    },
+    {
+      "tid": 129947,
+      "timestamp": "1794239703.787029",
+      "socket": "socket(AF_INET6, SOCK_DGRAM, IPPROTO_IP) = 25",
+      "connect": "connect(25, {sa_family=AF_INET6, sin6_port=htons(443), sin6_flowinfo=htonl(0), inet_pton(AF_INET6, \"2001:4860:4860::8888\", &sin6_addr), sin6_scope_id=0}, 28) = -1 ENETUNREACH (Network is unreachable)",
+      "close": "close(25)      = 0",
+      "send_calls_on_same_tid_before_close": []
+    },
+    {
+      "tid": 129947,
+      "timestamp": "1794239718.887313",
+      "socket": "socket(AF_INET6, SOCK_DGRAM, IPPROTO_IP) = 23",
+      "connect": "connect(23, {sa_family=AF_INET6, sin6_port=htons(443), sin6_flowinfo=htonl(0), inet_pton(AF_INET6, \"2001:4860:4860::8888\", &sin6_addr), sin6_scope_id=0}, 28) = -1 ENETUNREACH (Network is unreachable)",
+      "close": "close(23)      = 0",
+      "send_calls_on_same_tid_before_close": []
+    },
+    {
+      "tid": 129947,
+      "timestamp": "1794239733.743888",
+      "socket": "socket(AF_INET6, SOCK_DGRAM, IPPROTO_IP) = 23",
+      "connect": "connect(23, {sa_family=AF_INET6, sin6_port=htons(443), sin6_flowinfo=htonl(0), inet_pton(AF_INET6, \"2001:4860:4860::8888\", &sin6_addr), sin6_scope_id=0}, 28) = -1 ENETUNREACH (Network is unreachable)",
+      "close": "close(23)      = 0",
+      "send_calls_on_same_tid_before_close": []
+    },
+    {
+      "tid": 129947,
+      "timestamp": "1794239748.742469",
+      "socket": "socket(AF_INET6, SOCK_DGRAM, IPPROTO_IP) = 25",
+      "connect": "connect(25, {sa_family=AF_INET6, sin6_port=htons(443), sin6_flowinfo=htonl(0), inet_pton(AF_INET6, \"2001:4860:4860::8888\", &sin6_addr), sin6_scope_id=0}, 28) = -1 ENETUNREACH (Network is unreachable)",
+      "close": "close(25)      = 0",
+      "send_calls_on_same_tid_before_close": []
+    },
+    {
+      "tid": 129947,
+      "timestamp": "1794239763.741828",
+      "socket": "socket(AF_INET6, SOCK_DGRAM, IPPROTO_IP) = 23",
+      "connect": "connect(23, {sa_family=AF_INET6, sin6_port=htons(443), sin6_flowinfo=htonl(0), inet_pton(AF_INET6, \"2001:4860:4860::8888\", &sin6_addr), sin6_scope_id=0}, 28) = -1 ENETUNREACH (Network is unreachable)",
+      "close": "close(23)      = 0",
+      "send_calls_on_same_tid_before_close": []
+    },
+    {
+      "tid": 129947,
+      "timestamp": "1794239778.754951",
+      "socket": "socket(AF_INET6, SOCK_DGRAM, IPPROTO_IP) = 23",
+      "connect": "connect(23, {sa_family=AF_INET6, sin6_port=htons(443), sin6_flowinfo=htonl(0), inet_pton(AF_INET6, \"2001:4860:4860::8888\", &sin6_addr), sin6_scope_id=0}, 28) = -1 ENETUNREACH (Network is unreachable)",
+      "close": "close(23)      = 0",
+      "send_calls_on_same_tid_before_close": []
+    },
+    {
+      "tid": 129947,
+      "timestamp": "1794239793.748459",
+      "socket": "socket(AF_INET6, SOCK_DGRAM, IPPROTO_IP) = 23",
+      "connect": "connect(23, {sa_family=AF_INET6, sin6_port=htons(443), sin6_flowinfo=htonl(0), inet_pton(AF_INET6, \"2001:4860:4860::8888\", &sin6_addr), sin6_scope_id=0}, 28) = -1 ENETUNREACH (Network is unreachable)",
+      "close": "close(23) = 0",
+      "send_calls_on_same_tid_before_close": []
+    },
+    {
+      "tid": 129947,
+      "timestamp": "1794239808.744485",
+      "socket": "socket(AF_INET6, SOCK_DGRAM, IPPROTO_IP) = 23",
+      "connect": "connect(23, {sa_family=AF_INET6, sin6_port=htons(443), sin6_flowinfo=htonl(0), inet_pton(AF_INET6, \"2001:4860:4860::8888\", &sin6_addr), sin6_scope_id=0}, 28) = -1 ENETUNREACH (Network is unreachable)",
+      "close": "close(23)      = 0",
+      "send_calls_on_same_tid_before_close": []
+    },
+    {
+      "tid": 129947,
+      "timestamp": "1794239823.749630",
+      "socket": "socket(AF_INET6, SOCK_DGRAM, IPPROTO_IP) = 23",
+      "connect": "connect(23, {sa_family=AF_INET6, sin6_port=htons(443), sin6_flowinfo=htonl(0), inet_pton(AF_INET6, \"2001:4860:4860::8888\", &sin6_addr), sin6_scope_id=0}, 28) = -1 ENETUNREACH (Network is unreachable)",
+      "close": "close(23) = 0",
+      "send_calls_on_same_tid_before_close": []
+    },
+    {
+      "tid": 129947,
+      "timestamp": "1794239838.746728",
+      "socket": "socket(AF_INET6, SOCK_DGRAM, IPPROTO_IP) = 26",
+      "connect": "connect(26, {sa_family=AF_INET6, sin6_port=htons(443), sin6_flowinfo=htonl(0), inet_pton(AF_INET6, \"2001:4860:4860::8888\", &sin6_addr), sin6_scope_id=0}, 28) = -1 ENETUNREACH (Network is unreachable)",
+      "close": "close(26)      = 0",
+      "send_calls_on_same_tid_before_close": []
+    },
+    {
+      "tid": 129947,
+      "timestamp": "1794239853.771980",
+      "socket": "socket(AF_INET6, SOCK_DGRAM, IPPROTO_IP) = 23",
+      "connect": "connect(23, {sa_family=AF_INET6, sin6_port=htons(443), sin6_flowinfo=htonl(0), inet_pton(AF_INET6, \"2001:4860:4860::8888\", &sin6_addr), sin6_scope_id=0}, 28) = -1 ENETUNREACH (Network is unreachable)",
+      "close": "close(23)      = 0",
+      "send_calls_on_same_tid_before_close": []
+    },
+    {
+      "tid": 129947,
+      "timestamp": "1794239868.743130",
+      "socket": "socket(AF_INET6, SOCK_DGRAM, IPPROTO_IP) = 23",
+      "connect": "connect(23, {sa_family=AF_INET6, sin6_port=htons(443), sin6_flowinfo=htonl(0), inet_pton(AF_INET6, \"2001:4860:4860::8888\", &sin6_addr), sin6_scope_id=0}, 28) = -1 ENETUNREACH (Network is unreachable)",
+      "close": "close(23)      = 0",
+      "send_calls_on_same_tid_before_close": []
+    },
+    {
+      "tid": 129947,
+      "timestamp": "1794239878.781214",
+      "socket": "socket(AF_INET6, SOCK_DGRAM, IPPROTO_IP) = 25",
+      "connect": "connect(25, {sa_family=AF_INET6, sin6_port=htons(443), sin6_flowinfo=htonl(0), inet_pton(AF_INET6, \"2001:4860:4860::8888\", &sin6_addr), sin6_scope_id=0}, 28) = -1 ENETUNREACH (Network is unreachable)",
+      "close": "close(25)      = 0",
+      "send_calls_on_same_tid_before_close": []
+    },
+    {
+      "tid": 129947,
+      "timestamp": "1794239883.759973",
+      "socket": "socket(AF_INET6, SOCK_DGRAM, IPPROTO_IP) = 23",
+      "connect": "connect(23, {sa_family=AF_INET6, sin6_port=htons(443), sin6_flowinfo=htonl(0), inet_pton(AF_INET6, \"2001:4860:4860::8888\", &sin6_addr), sin6_scope_id=0}, 28) = -1 ENETUNREACH (Network is unreachable)",
+      "close": "close(23)      = 0",
+      "send_calls_on_same_tid_before_close": []
+    },
+    {
+      "tid": 129947,
+      "timestamp": "1794239898.741106",
+      "socket": "socket(AF_INET6, SOCK_DGRAM, IPPROTO_IP) = 23",
+      "connect": "connect(23, {sa_family=AF_INET6, sin6_port=htons(443), sin6_flowinfo=htonl(0), inet_pton(AF_INET6, \"2001:4860:4860::8888\", &sin6_addr), sin6_scope_id=0}, 28) = -1 ENETUNREACH (Network is unreachable)",
+      "close": "close(23)      = 0",
+      "send_calls_on_same_tid_before_close": []
+    },
+    {
+      "tid": 129947,
+      "timestamp": "1794239913.745415",
+      "socket": "socket(AF_INET6, SOCK_DGRAM, IPPROTO_IP) = 23",
+      "connect": "connect(23, {sa_family=AF_INET6, sin6_port=htons(443), sin6_flowinfo=htonl(0), inet_pton(AF_INET6, \"2001:4860:4860::8888\", &sin6_addr), sin6_scope_id=0}, 28) = -1 ENETUNREACH (Network is unreachable)",
+      "close": "close(23)      = 0",
+      "send_calls_on_same_tid_before_close": []
+    },
+    {
+      "tid": 129947,
+      "timestamp": "1794239928.748984",
+      "socket": "socket(AF_INET6, SOCK_DGRAM, IPPROTO_IP) = 23",
+      "connect": "connect(23, {sa_family=AF_INET6, sin6_port=htons(443), sin6_flowinfo=htonl(0), inet_pton(AF_INET6, \"2001:4860:4860::8888\", &sin6_addr), sin6_scope_id=0}, 28) = -1 ENETUNREACH (Network is unreachable)",
+      "close": "close(23)      = 0",
+      "send_calls_on_same_tid_before_close": []
+    },
+    {
+      "tid": 129947,
+      "timestamp": "1794239943.741998",
+      "socket": "socket(AF_INET6, SOCK_DGRAM, IPPROTO_IP) = 23",
+      "connect": "connect(23, {sa_family=AF_INET6, sin6_port=htons(443), sin6_flowinfo=htonl(0), inet_pton(AF_INET6, \"2001:4860:4860::8888\", &sin6_addr), sin6_scope_id=0}, 28) = -1 ENETUNREACH (Network is unreachable)",
+      "close": "close(23)      = 0",
+      "send_calls_on_same_tid_before_close": []
+    },
+    {
+      "tid": 129947,
+      "timestamp": "1794239958.755101",
+      "socket": "socket(AF_INET6, SOCK_DGRAM, IPPROTO_IP) = 25",
+      "connect": "connect(25, {sa_family=AF_INET6, sin6_port=htons(443), sin6_flowinfo=htonl(0), inet_pton(AF_INET6, \"2001:4860:4860::8888\", &sin6_addr), sin6_scope_id=0}, 28) = -1 ENETUNREACH (Network is unreachable)",
+      "close": "close(25)      = 0",
+      "send_calls_on_same_tid_before_close": []
+    },
+    {
+      "tid": 129947,
+      "timestamp": "1794239973.743287",
+      "socket": "socket(AF_INET6, SOCK_DGRAM, IPPROTO_IP) = 23",
+      "connect": "connect(23, {sa_family=AF_INET6, sin6_port=htons(443), sin6_flowinfo=htonl(0), inet_pton(AF_INET6, \"2001:4860:4860::8888\", &sin6_addr), sin6_scope_id=0}, 28) = -1 ENETUNREACH (Network is unreachable)",
+      "close": "close(23)      = 0",
+      "send_calls_on_same_tid_before_close": []
+    },
+    {
+      "tid": 129947,
+      "timestamp": "1794239988.745267",
+      "socket": "socket(AF_INET6, SOCK_DGRAM, IPPROTO_IP) = 25",
+      "connect": "connect(25, {sa_family=AF_INET6, sin6_port=htons(443), sin6_flowinfo=htonl(0), inet_pton(AF_INET6, \"2001:4860:4860::8888\", &sin6_addr), sin6_scope_id=0}, 28) = -1 ENETUNREACH (Network is unreachable)",
+      "close": "close(25) = 0",
+      "send_calls_on_same_tid_before_close": []
+    },
+    {
+      "tid": 129947,
+      "timestamp": "1794240003.743333",
+      "socket": "socket(AF_INET6, SOCK_DGRAM, IPPROTO_IP) = 25",
+      "connect": "connect(25, {sa_family=AF_INET6, sin6_port=htons(443), sin6_flowinfo=htonl(0), inet_pton(AF_INET6, \"2001:4860:4860::8888\", &sin6_addr), sin6_scope_id=0}, 28) = -1 ENETUNREACH (Network is unreachable)",
+      "close": "close(25)      = 0",
+      "send_calls_on_same_tid_before_close": []
+    },
+    {
+      "tid": 129947,
+      "timestamp": "1794240018.742974",
+      "socket": "socket(AF_INET6, SOCK_DGRAM, IPPROTO_IP) = 23",
+      "connect": "connect(23, {sa_family=AF_INET6, sin6_port=htons(443), sin6_flowinfo=htonl(0), inet_pton(AF_INET6, \"2001:4860:4860::8888\", &sin6_addr), sin6_scope_id=0}, 28) = -1 ENETUNREACH (Network is unreachable)",
+      "close": "close(23)      = 0",
+      "send_calls_on_same_tid_before_close": []
+    },
+    {
+      "tid": 129947,
+      "timestamp": "1794240029.431478",
+      "socket": "socket(AF_INET6, SOCK_DGRAM, IPPROTO_IP) = 26",
+      "connect": "connect(26, {sa_family=AF_INET6, sin6_port=htons(443), sin6_flowinfo=htonl(0), inet_pton(AF_INET6, \"2001:4860:4860::8888\", &sin6_addr), sin6_scope_id=0}, 28) = -1 ENETUNREACH (Network is unreachable)",
+      "close": "close(26)      = 0",
+      "send_calls_on_same_tid_before_close": []
+    },
+    {
+      "tid": 129947,
+      "timestamp": "1794240033.746408",
+      "socket": "socket(AF_INET6, SOCK_DGRAM, IPPROTO_IP) = 27",
+      "connect": "connect(27, {sa_family=AF_INET6, sin6_port=htons(443), sin6_flowinfo=htonl(0), inet_pton(AF_INET6, \"2001:4860:4860::8888\", &sin6_addr), sin6_scope_id=0}, 28) = -1 ENETUNREACH (Network is unreachable)",
+      "close": "close(27) = 0",
+      "send_calls_on_same_tid_before_close": []
+    },
+    {
+      "tid": 129947,
+      "timestamp": "1794240048.742672",
+      "socket": "socket(AF_INET6, SOCK_DGRAM, IPPROTO_IP) = 23",
+      "connect": "connect(23, {sa_family=AF_INET6, sin6_port=htons(443), sin6_flowinfo=htonl(0), inet_pton(AF_INET6, \"2001:4860:4860::8888\", &sin6_addr), sin6_scope_id=0}, 28) = -1 ENETUNREACH (Network is unreachable)",
+      "close": "close(23)      = 0",
+      "send_calls_on_same_tid_before_close": []
+    },
+    {
+      "tid": 129947,
+      "timestamp": "1794240063.740731",
+      "socket": "socket(AF_INET6, SOCK_DGRAM, IPPROTO_IP) = 23",
+      "connect": "connect(23, {sa_family=AF_INET6, sin6_port=htons(443), sin6_flowinfo=htonl(0), inet_pton(AF_INET6, \"2001:4860:4860::8888\", &sin6_addr), sin6_scope_id=0}, 28) = -1 ENETUNREACH (Network is unreachable)",
+      "close": "close(23)      = 0",
+      "send_calls_on_same_tid_before_close": []
+    },
+    {
+      "tid": 129947,
+      "timestamp": "1794240078.742330",
+      "socket": "socket(AF_INET6, SOCK_DGRAM, IPPROTO_IP) = 23",
+      "connect": "connect(23, {sa_family=AF_INET6, sin6_port=htons(443), sin6_flowinfo=htonl(0), inet_pton(AF_INET6, \"2001:4860:4860::8888\", &sin6_addr), sin6_scope_id=0}, 28) = -1 ENETUNREACH (Network is unreachable)",
+      "close": "close(23)      = 0",
+      "send_calls_on_same_tid_before_close": []
+    },
+    {
+      "tid": 129947,
+      "timestamp": "1794240093.741554",
+      "socket": "socket(AF_INET6, SOCK_DGRAM, IPPROTO_IP) = 23",
+      "connect": "connect(23, {sa_family=AF_INET6, sin6_port=htons(443), sin6_flowinfo=htonl(0), inet_pton(AF_INET6, \"2001:4860:4860::8888\", &sin6_addr), sin6_scope_id=0}, 28) = -1 ENETUNREACH (Network is unreachable)",
+      "close": "close(23)      = 0",
+      "send_calls_on_same_tid_before_close": []
+    },
+    {
+      "tid": 129947,
+      "timestamp": "1794240108.742910",
+      "socket": "socket(AF_INET6, SOCK_DGRAM, IPPROTO_IP) = 23",
+      "connect": "connect(23, {sa_family=AF_INET6, sin6_port=htons(443), sin6_flowinfo=htonl(0), inet_pton(AF_INET6, \"2001:4860:4860::8888\", &sin6_addr), sin6_scope_id=0}, 28) = -1 ENETUNREACH (Network is unreachable)",
+      "close": "close(23)      = 0",
+      "send_calls_on_same_tid_before_close": []
+    },
+    {
+      "tid": 129947,
+      "timestamp": "1794240123.741776",
+      "socket": "socket(AF_INET6, SOCK_DGRAM, IPPROTO_IP) = 23",
+      "connect": "connect(23, {sa_family=AF_INET6, sin6_port=htons(443), sin6_flowinfo=htonl(0), inet_pton(AF_INET6, \"2001:4860:4860::8888\", &sin6_addr), sin6_scope_id=0}, 28) = -1 ENETUNREACH (Network is unreachable)",
+      "close": "close(23)      = 0",
+      "send_calls_on_same_tid_before_close": []
+    },
+    {
+      "tid": 129947,
+      "timestamp": "1794240133.751991",
+      "socket": "socket(AF_INET6, SOCK_DGRAM, IPPROTO_IP) = 25",
+      "connect": "connect(25, {sa_family=AF_INET6, sin6_port=htons(443), sin6_flowinfo=htonl(0), inet_pton(AF_INET6, \"2001:4860:4860::8888\", &sin6_addr), sin6_scope_id=0}, 28) = -1 ENETUNREACH (Network is unreachable)",
+      "close": "close(25)      = 0",
+      "send_calls_on_same_tid_before_close": []
+    },
+    {
+      "tid": 129947,
+      "timestamp": "1794240138.748164",
+      "socket": "socket(AF_INET6, SOCK_DGRAM, IPPROTO_IP) = 23",
+      "connect": "connect(23, {sa_family=AF_INET6, sin6_port=htons(443), sin6_flowinfo=htonl(0), inet_pton(AF_INET6, \"2001:4860:4860::8888\", &sin6_addr), sin6_scope_id=0}, 28) = -1 ENETUNREACH (Network is unreachable)",
+      "close": "close(23) = 0",
+      "send_calls_on_same_tid_before_close": []
+    },
+    {
+      "tid": 129947,
+      "timestamp": "1794240149.544438",
+      "socket": "socket(AF_INET6, SOCK_DGRAM, IPPROTO_IP) = 26",
+      "connect": "connect(26, {sa_family=AF_INET6, sin6_port=htons(443), sin6_flowinfo=htonl(0), inet_pton(AF_INET6, \"2001:4860:4860::8888\", &sin6_addr), sin6_scope_id=0}, 28) = -1 ENETUNREACH (Network is unreachable)",
+      "close": "close(26)      = 0",
+      "send_calls_on_same_tid_before_close": []
+    },
+    {
+      "tid": 129947,
+      "timestamp": "1794240153.753458",
+      "socket": "socket(AF_INET6, SOCK_DGRAM, IPPROTO_IP) = 27",
+      "connect": "connect(27, {sa_family=AF_INET6, sin6_port=htons(443), sin6_flowinfo=htonl(0), inet_pton(AF_INET6, \"2001:4860:4860::8888\", &sin6_addr), sin6_scope_id=0}, 28) = -1 ENETUNREACH (Network is unreachable)",
+      "close": "close(27)      = 0",
+      "send_calls_on_same_tid_before_close": []
+    },
+    {
+      "tid": 129947,
+      "timestamp": "1794240168.741924",
+      "socket": "socket(AF_INET6, SOCK_DGRAM, IPPROTO_IP) = 23",
+      "connect": "connect(23, {sa_family=AF_INET6, sin6_port=htons(443), sin6_flowinfo=htonl(0), inet_pton(AF_INET6, \"2001:4860:4860::8888\", &sin6_addr), sin6_scope_id=0}, 28) = -1 ENETUNREACH (Network is unreachable)",
+      "close": "close(23) = 0",
+      "send_calls_on_same_tid_before_close": []
+    },
+    {
+      "tid": 129947,
+      "timestamp": "1794240183.747973",
+      "socket": "socket(AF_INET6, SOCK_DGRAM, IPPROTO_IP) = 26",
+      "connect": "connect(26, {sa_family=AF_INET6, sin6_port=htons(443), sin6_flowinfo=htonl(0), inet_pton(AF_INET6, \"2001:4860:4860::8888\", &sin6_addr), sin6_scope_id=0}, 28) = -1 ENETUNREACH (Network is unreachable)",
+      "close": "close(26) = 0",
+      "send_calls_on_same_tid_before_close": []
+    },
+    {
+      "tid": 129947,
+      "timestamp": "1794240198.743195",
+      "socket": "socket(AF_INET6, SOCK_DGRAM, IPPROTO_IP) = 23",
+      "connect": "connect(23, {sa_family=AF_INET6, sin6_port=htons(443), sin6_flowinfo=htonl(0), inet_pton(AF_INET6, \"2001:4860:4860::8888\", &sin6_addr), sin6_scope_id=0}, 28) = -1 ENETUNREACH (Network is unreachable)",
+      "close": "close(23)      = 0",
+      "send_calls_on_same_tid_before_close": []
+    },
+    {
+      "tid": 129947,
+      "timestamp": "1794240213.754822",
+      "socket": "socket(AF_INET6, SOCK_DGRAM, IPPROTO_IP) = 25",
+      "connect": "connect(25, {sa_family=AF_INET6, sin6_port=htons(443), sin6_flowinfo=htonl(0), inet_pton(AF_INET6, \"2001:4860:4860::8888\", &sin6_addr), sin6_scope_id=0}, 28) = -1 ENETUNREACH (Network is unreachable)",
+      "close": "close(25)      = 0",
+      "send_calls_on_same_tid_before_close": []
+    },
+    {
+      "tid": 129947,
+      "timestamp": "1794240228.741439",
+      "socket": "socket(AF_INET6, SOCK_DGRAM, IPPROTO_IP) = 25",
+      "connect": "connect(25, {sa_family=AF_INET6, sin6_port=htons(443), sin6_flowinfo=htonl(0), inet_pton(AF_INET6, \"2001:4860:4860::8888\", &sin6_addr), sin6_scope_id=0}, 28) = -1 ENETUNREACH (Network is unreachable)",
+      "close": "close(25)      = 0",
+      "send_calls_on_same_tid_before_close": []
+    },
+    {
+      "tid": 129947,
+      "timestamp": "1794240243.742774",
+      "socket": "socket(AF_INET6, SOCK_DGRAM, IPPROTO_IP) = 23",
+      "connect": "connect(23, {sa_family=AF_INET6, sin6_port=htons(443), sin6_flowinfo=htonl(0), inet_pton(AF_INET6, \"2001:4860:4860::8888\", &sin6_addr), sin6_scope_id=0}, 28) = -1 ENETUNREACH (Network is unreachable)",
+      "close": "close(23)      = 0",
+      "send_calls_on_same_tid_before_close": []
+    },
+    {
+      "tid": 129947,
+      "timestamp": "1794240258.743882",
+      "socket": "socket(AF_INET6, SOCK_DGRAM, IPPROTO_IP) = 23",
+      "connect": "connect(23, {sa_family=AF_INET6, sin6_port=htons(443), sin6_flowinfo=htonl(0), inet_pton(AF_INET6, \"2001:4860:4860::8888\", &sin6_addr), sin6_scope_id=0}, 28) = -1 ENETUNREACH (Network is unreachable)",
+      "close": "close(23)      = 0",
+      "send_calls_on_same_tid_before_close": []
+    },
+    {
+      "tid": 129947,
+      "timestamp": "1794240273.744230",
+      "socket": "socket(AF_INET6, SOCK_DGRAM, IPPROTO_IP) = 25",
+      "connect": "connect(25, {sa_family=AF_INET6, sin6_port=htons(443), sin6_flowinfo=htonl(0), inet_pton(AF_INET6, \"2001:4860:4860::8888\", &sin6_addr), sin6_scope_id=0}, 28) = -1 ENETUNREACH (Network is unreachable)",
+      "close": "close(25) = 0",
+      "send_calls_on_same_tid_before_close": []
+    },
+    {
+      "tid": 129947,
+      "timestamp": "1794240288.742390",
+      "socket": "socket(AF_INET6, SOCK_DGRAM, IPPROTO_IP) = 23",
+      "connect": "connect(23, {sa_family=AF_INET6, sin6_port=htons(443), sin6_flowinfo=htonl(0), inet_pton(AF_INET6, \"2001:4860:4860::8888\", &sin6_addr), sin6_scope_id=0}, 28) = -1 ENETUNREACH (Network is unreachable)",
+      "close": "close(23)      = 0",
+      "send_calls_on_same_tid_before_close": []
+    },
+    {
+      "tid": 129947,
+      "timestamp": "1794240299.464657",
+      "socket": "socket(AF_INET6, SOCK_DGRAM, IPPROTO_IP) = 25",
+      "connect": "connect(25, {sa_family=AF_INET6, sin6_port=htons(443), sin6_flowinfo=htonl(0), inet_pton(AF_INET6, \"2001:4860:4860::8888\", &sin6_addr), sin6_scope_id=0}, 28) = -1 ENETUNREACH (Network is unreachable)",
+      "close": "close(25)      = 0",
+      "send_calls_on_same_tid_before_close": []
+    },
+    {
+      "tid": 129947,
+      "timestamp": "1794240303.745696",
+      "socket": "socket(AF_INET6, SOCK_DGRAM, IPPROTO_IP) = 23",
+      "connect": "connect(23, {sa_family=AF_INET6, sin6_port=htons(443), sin6_flowinfo=htonl(0), inet_pton(AF_INET6, \"2001:4860:4860::8888\", &sin6_addr), sin6_scope_id=0}, 28) = -1 ENETUNREACH (Network is unreachable)",
+      "close": "close(23) = 0",
+      "send_calls_on_same_tid_before_close": []
+    },
+    {
+      "tid": 129947,
+      "timestamp": "1794240318.742215",
+      "socket": "socket(AF_INET6, SOCK_DGRAM, IPPROTO_IP) = 23",
+      "connect": "connect(23, {sa_family=AF_INET6, sin6_port=htons(443), sin6_flowinfo=htonl(0), inet_pton(AF_INET6, \"2001:4860:4860::8888\", &sin6_addr), sin6_scope_id=0}, 28) = -1 ENETUNREACH (Network is unreachable)",
+      "close": "close(23)      = 0",
+      "send_calls_on_same_tid_before_close": []
+    },
+    {
+      "tid": 129947,
+      "timestamp": "1794240333.741006",
+      "socket": "socket(AF_INET6, SOCK_DGRAM, IPPROTO_IP) = 23",
+      "connect": "connect(23, {sa_family=AF_INET6, sin6_port=htons(443), sin6_flowinfo=htonl(0), inet_pton(AF_INET6, \"2001:4860:4860::8888\", &sin6_addr), sin6_scope_id=0}, 28) = -1 ENETUNREACH (Network is unreachable)",
+      "close": "close(23)      = 0",
+      "send_calls_on_same_tid_before_close": []
+    },
+    {
+      "tid": 129947,
+      "timestamp": "1794240348.742513",
+      "socket": "socket(AF_INET6, SOCK_DGRAM, IPPROTO_IP) = 23",
+      "connect": "connect(23, {sa_family=AF_INET6, sin6_port=htons(443), sin6_flowinfo=htonl(0), inet_pton(AF_INET6, \"2001:4860:4860::8888\", &sin6_addr), sin6_scope_id=0}, 28) = -1 ENETUNREACH (Network is unreachable)",
+      "close": "close(23)      = 0",
+      "send_calls_on_same_tid_before_close": []
+    },
+    {
+      "tid": 129947,
+      "timestamp": "1794240363.748721",
+      "socket": "socket(AF_INET6, SOCK_DGRAM, IPPROTO_IP) = 25",
+      "connect": "connect(25, {sa_family=AF_INET6, sin6_port=htons(443), sin6_flowinfo=htonl(0), inet_pton(AF_INET6, \"2001:4860:4860::8888\", &sin6_addr), sin6_scope_id=0}, 28) = -1 ENETUNREACH (Network is unreachable)",
+      "close": "close(25) = 0",
+      "send_calls_on_same_tid_before_close": []
+    },
+    {
+      "tid": 129947,
+      "timestamp": "1794240378.742199",
+      "socket": "socket(AF_INET6, SOCK_DGRAM, IPPROTO_IP) = 23",
+      "connect": "connect(23, {sa_family=AF_INET6, sin6_port=htons(443), sin6_flowinfo=htonl(0), inet_pton(AF_INET6, \"2001:4860:4860::8888\", &sin6_addr), sin6_scope_id=0}, 28) = -1 ENETUNREACH (Network is unreachable)",
+      "close": "close(23)      = 0",
+      "send_calls_on_same_tid_before_close": []
+    },
+    {
+      "tid": 129947,
+      "timestamp": "1794240393.745704",
+      "socket": "socket(AF_INET6, SOCK_DGRAM, IPPROTO_IP) = 23",
+      "connect": "connect(23, {sa_family=AF_INET6, sin6_port=htons(443), sin6_flowinfo=htonl(0), inet_pton(AF_INET6, \"2001:4860:4860::8888\", &sin6_addr), sin6_scope_id=0}, 28) = -1 ENETUNREACH (Network is unreachable)",
+      "close": "close(23)      = 0",
+      "send_calls_on_same_tid_before_close": []
+    },
+    {
+      "tid": 129947,
+      "timestamp": "1794240408.742687",
+      "socket": "socket(AF_INET6, SOCK_DGRAM, IPPROTO_IP) = 23",
+      "connect": "connect(23, {sa_family=AF_INET6, sin6_port=htons(443), sin6_flowinfo=htonl(0), inet_pton(AF_INET6, \"2001:4860:4860::8888\", &sin6_addr), sin6_scope_id=0}, 28) = -1 ENETUNREACH (Network is unreachable)",
+      "close": "close(23)      = 0",
+      "send_calls_on_same_tid_before_close": []
+    },
+    {
+      "tid": 129947,
+      "timestamp": "1794240423.760954",
+      "socket": "socket(AF_INET6, SOCK_DGRAM, IPPROTO_IP) = 31",
+      "connect": "connect(31, {sa_family=AF_INET6, sin6_port=htons(443), sin6_flowinfo=htonl(0), inet_pton(AF_INET6, \"2001:4860:4860::8888\", &sin6_addr), sin6_scope_id=0}, 28) = -1 ENETUNREACH (Network is unreachable)",
+      "close": "close(31)      = 0",
+      "send_calls_on_same_tid_before_close": []
+    },
+    {
+      "tid": 129947,
+      "timestamp": "1794240438.741588",
+      "socket": "socket(AF_INET6, SOCK_DGRAM, IPPROTO_IP) = 25",
+      "connect": "connect(25, {sa_family=AF_INET6, sin6_port=htons(443), sin6_flowinfo=htonl(0), inet_pton(AF_INET6, \"2001:4860:4860::8888\", &sin6_addr), sin6_scope_id=0}, 28) = -1 ENETUNREACH (Network is unreachable)",
+      "close": "close(25)      = 0",
+      "send_calls_on_same_tid_before_close": []
+    },
+    {
+      "tid": 129947,
+      "timestamp": "1794240453.742408",
+      "socket": "socket(AF_INET6, SOCK_DGRAM, IPPROTO_IP) = 25",
+      "connect": "connect(25, {sa_family=AF_INET6, sin6_port=htons(443), sin6_flowinfo=htonl(0), inet_pton(AF_INET6, \"2001:4860:4860::8888\", &sin6_addr), sin6_scope_id=0}, 28) = -1 ENETUNREACH (Network is unreachable)",
+      "close": "close(25)      = 0",
+      "send_calls_on_same_tid_before_close": []
+    },
+    {
+      "tid": 129947,
+      "timestamp": "1794240468.742551",
+      "socket": "socket(AF_INET6, SOCK_DGRAM, IPPROTO_IP) = 26",
+      "connect": "connect(26, {sa_family=AF_INET6, sin6_port=htons(443), sin6_flowinfo=htonl(0), inet_pton(AF_INET6, \"2001:4860:4860::8888\", &sin6_addr), sin6_scope_id=0}, 28) = -1 ENETUNREACH (Network is unreachable)",
+      "close": "close(26)      = 0",
+      "send_calls_on_same_tid_before_close": []
+    },
+    {
+      "tid": 129947,
+      "timestamp": "1794240483.744626",
+      "socket": "socket(AF_INET6, SOCK_DGRAM, IPPROTO_IP) = 23",
+      "connect": "connect(23, {sa_family=AF_INET6, sin6_port=htons(443), sin6_flowinfo=htonl(0), inet_pton(AF_INET6, \"2001:4860:4860::8888\", &sin6_addr), sin6_scope_id=0}, 28) = -1 ENETUNREACH (Network is unreachable)",
+      "close": "close(23) = 0",
+      "send_calls_on_same_tid_before_close": []
+    },
+    {
+      "tid": 129947,
+      "timestamp": "1794240498.752900",
+      "socket": "socket(AF_INET6, SOCK_DGRAM, IPPROTO_IP) = 25",
+      "connect": "connect(25, {sa_family=AF_INET6, sin6_port=htons(443), sin6_flowinfo=htonl(0), inet_pton(AF_INET6, \"2001:4860:4860::8888\", &sin6_addr), sin6_scope_id=0}, 28) = -1 ENETUNREACH (Network is unreachable)",
+      "close": "close(25)      = 0",
+      "send_calls_on_same_tid_before_close": []
+    },
+    {
+      "tid": 129947,
+      "timestamp": "1794240513.758026",
+      "socket": "socket(AF_INET6, SOCK_DGRAM, IPPROTO_IP) = 25",
+      "connect": "connect(25, {sa_family=AF_INET6, sin6_port=htons(443), sin6_flowinfo=htonl(0), inet_pton(AF_INET6, \"2001:4860:4860::8888\", &sin6_addr), sin6_scope_id=0}, 28) = -1 ENETUNREACH (Network is unreachable)",
+      "close": "close(25)      = 0",
+      "send_calls_on_same_tid_before_close": []
+    },
+    {
+      "tid": 129947,
+      "timestamp": "1794240528.742544",
+      "socket": "socket(AF_INET6, SOCK_DGRAM, IPPROTO_IP) = 23",
+      "connect": "connect(23, {sa_family=AF_INET6, sin6_port=htons(443), sin6_flowinfo=htonl(0), inet_pton(AF_INET6, \"2001:4860:4860::8888\", &sin6_addr), sin6_scope_id=0}, 28) = -1 ENETUNREACH (Network is unreachable)",
+      "close": "close(23)      = 0",
+      "send_calls_on_same_tid_before_close": []
+    },
+    {
+      "tid": 129947,
+      "timestamp": "1794240543.744245",
+      "socket": "socket(AF_INET6, SOCK_DGRAM, IPPROTO_IP) = 23",
+      "connect": "connect(23, {sa_family=AF_INET6, sin6_port=htons(443), sin6_flowinfo=htonl(0), inet_pton(AF_INET6, \"2001:4860:4860::8888\", &sin6_addr), sin6_scope_id=0}, 28) = -1 ENETUNREACH (Network is unreachable)",
+      "close": "close(23) = 0",
+      "send_calls_on_same_tid_before_close": []
+    },
+    {
+      "tid": 129947,
+      "timestamp": "1794240558.745385",
+      "socket": "socket(AF_INET6, SOCK_DGRAM, IPPROTO_IP) = 26",
+      "connect": "connect(26, {sa_family=AF_INET6, sin6_port=htons(443), sin6_flowinfo=htonl(0), inet_pton(AF_INET6, \"2001:4860:4860::8888\", &sin6_addr), sin6_scope_id=0}, 28) = -1 ENETUNREACH (Network is unreachable)",
+      "close": "close(26)      = 0",
+      "send_calls_on_same_tid_before_close": []
+    },
+    {
+      "tid": 129947,
+      "timestamp": "1794240573.742793",
+      "socket": "socket(AF_INET6, SOCK_DGRAM, IPPROTO_IP) = 23",
+      "connect": "connect(23, {sa_family=AF_INET6, sin6_port=htons(443), sin6_flowinfo=htonl(0), inet_pton(AF_INET6, \"2001:4860:4860::8888\", &sin6_addr), sin6_scope_id=0}, 28) = -1 ENETUNREACH (Network is unreachable)",
+      "close": "close(23)      = 0",
+      "send_calls_on_same_tid_before_close": []
+    },
+    {
+      "tid": 129947,
+      "timestamp": "1794240588.743902",
+      "socket": "socket(AF_INET6, SOCK_DGRAM, IPPROTO_IP) = 25",
+      "connect": "connect(25, {sa_family=AF_INET6, sin6_port=htons(443), sin6_flowinfo=htonl(0), inet_pton(AF_INET6, \"2001:4860:4860::8888\", &sin6_addr), sin6_scope_id=0}, 28) = -1 ENETUNREACH (Network is unreachable)",
+      "close": "close(25)      = 0",
+      "send_calls_on_same_tid_before_close": []
+    },
+    {
+      "tid": 129947,
+      "timestamp": "1794240603.748354",
+      "socket": "socket(AF_INET6, SOCK_DGRAM, IPPROTO_IP) = 25",
+      "connect": "connect(25, {sa_family=AF_INET6, sin6_port=htons(443), sin6_flowinfo=htonl(0), inet_pton(AF_INET6, \"2001:4860:4860::8888\", &sin6_addr), sin6_scope_id=0}, 28) = -1 ENETUNREACH (Network is unreachable)",
+      "close": "close(25) = 0",
+      "send_calls_on_same_tid_before_close": []
+    },
+    {
+      "tid": 129947,
+      "timestamp": "1794240618.741691",
+      "socket": "socket(AF_INET6, SOCK_DGRAM, IPPROTO_IP) = 25",
+      "connect": "connect(25, {sa_family=AF_INET6, sin6_port=htons(443), sin6_flowinfo=htonl(0), inet_pton(AF_INET6, \"2001:4860:4860::8888\", &sin6_addr), sin6_scope_id=0}, 28) = -1 ENETUNREACH (Network is unreachable)",
+      "close": "close(25)      = 0",
+      "send_calls_on_same_tid_before_close": []
+    },
+    {
+      "tid": 129947,
+      "timestamp": "1794240633.745238",
+      "socket": "socket(AF_INET6, SOCK_DGRAM, IPPROTO_IP) = 23",
+      "connect": "connect(23, {sa_family=AF_INET6, sin6_port=htons(443), sin6_flowinfo=htonl(0), inet_pton(AF_INET6, \"2001:4860:4860::8888\", &sin6_addr), sin6_scope_id=0}, 28) = -1 ENETUNREACH (Network is unreachable)",
+      "close": "close(23)      = 0",
+      "send_calls_on_same_tid_before_close": []
+    },
+    {
+      "tid": 129947,
+      "timestamp": "1794240648.741091",
+      "socket": "socket(AF_INET6, SOCK_DGRAM, IPPROTO_IP) = 23",
+      "connect": "connect(23, {sa_family=AF_INET6, sin6_port=htons(443), sin6_flowinfo=htonl(0), inet_pton(AF_INET6, \"2001:4860:4860::8888\", &sin6_addr), sin6_scope_id=0}, 28) = -1 ENETUNREACH (Network is unreachable)",
+      "close": "close(23)      = 0",
+      "send_calls_on_same_tid_before_close": []
+    },
+    {
+      "tid": 129947,
+      "timestamp": "1794240658.750039",
+      "socket": "socket(AF_INET6, SOCK_DGRAM, IPPROTO_IP) = 25",
+      "connect": "connect(25, {sa_family=AF_INET6, sin6_port=htons(443), sin6_flowinfo=htonl(0), inet_pton(AF_INET6, \"2001:4860:4860::8888\", &sin6_addr), sin6_scope_id=0}, 28) = -1 ENETUNREACH (Network is unreachable)",
+      "close": "close(25)      = 0",
+      "send_calls_on_same_tid_before_close": []
+    },
+    {
+      "tid": 129947,
+      "timestamp": "1794240663.742215",
+      "socket": "socket(AF_INET6, SOCK_DGRAM, IPPROTO_IP) = 23",
+      "connect": "connect(23, {sa_family=AF_INET6, sin6_port=htons(443), sin6_flowinfo=htonl(0), inet_pton(AF_INET6, \"2001:4860:4860::8888\", &sin6_addr), sin6_scope_id=0}, 28) = -1 ENETUNREACH (Network is unreachable)",
+      "close": "close(23)      = 0",
+      "send_calls_on_same_tid_before_close": []
+    },
+    {
+      "tid": 129947,
+      "timestamp": "1794240678.741404",
+      "socket": "socket(AF_INET6, SOCK_DGRAM, IPPROTO_IP) = 23",
+      "connect": "connect(23, {sa_family=AF_INET6, sin6_port=htons(443), sin6_flowinfo=htonl(0), inet_pton(AF_INET6, \"2001:4860:4860::8888\", &sin6_addr), sin6_scope_id=0}, 28) = -1 ENETUNREACH (Network is unreachable)",
+      "close": "close(23)      = 0",
+      "send_calls_on_same_tid_before_close": []
+    },
+    {
+      "tid": 129947,
+      "timestamp": "1794240693.741886",
+      "socket": "socket(AF_INET6, SOCK_DGRAM, IPPROTO_IP) = 23",
+      "connect": "connect(23, {sa_family=AF_INET6, sin6_port=htons(443), sin6_flowinfo=htonl(0), inet_pton(AF_INET6, \"2001:4860:4860::8888\", &sin6_addr), sin6_scope_id=0}, 28) = -1 ENETUNREACH (Network is unreachable)",
+      "close": "close(23)      = 0",
+      "send_calls_on_same_tid_before_close": []
+    },
+    {
+      "tid": 129947,
+      "timestamp": "1794240708.744304",
+      "socket": "socket(AF_INET6, SOCK_DGRAM, IPPROTO_IP) = 25",
+      "connect": "connect(25, {sa_family=AF_INET6, sin6_port=htons(443), sin6_flowinfo=htonl(0), inet_pton(AF_INET6, \"2001:4860:4860::8888\", &sin6_addr), sin6_scope_id=0}, 28) = -1 ENETUNREACH (Network is unreachable)",
+      "close": "close(25)      = 0",
+      "send_calls_on_same_tid_before_close": []
+    },
+    {
+      "tid": 129947,
+      "timestamp": "1794240723.746595",
+      "socket": "socket(AF_INET6, SOCK_DGRAM, IPPROTO_IP) = 23",
+      "connect": "connect(23, {sa_family=AF_INET6, sin6_port=htons(443), sin6_flowinfo=htonl(0), inet_pton(AF_INET6, \"2001:4860:4860::8888\", &sin6_addr), sin6_scope_id=0}, 28) = -1 ENETUNREACH (Network is unreachable)",
+      "close": "close(23) = 0",
+      "send_calls_on_same_tid_before_close": []
+    },
+    {
+      "tid": 129947,
+      "timestamp": "1794240738.749274",
+      "socket": "socket(AF_INET6, SOCK_DGRAM, IPPROTO_IP) = 25",
+      "connect": "connect(25, {sa_family=AF_INET6, sin6_port=htons(443), sin6_flowinfo=htonl(0), inet_pton(AF_INET6, \"2001:4860:4860::8888\", &sin6_addr), sin6_scope_id=0}, 28) = -1 ENETUNREACH (Network is unreachable)",
+      "close": "close(25)      = 0",
+      "send_calls_on_same_tid_before_close": []
+    },
+    {
+      "tid": 129947,
+      "timestamp": "1794240753.743152",
+      "socket": "socket(AF_INET6, SOCK_DGRAM, IPPROTO_IP) = 23",
+      "connect": "connect(23, {sa_family=AF_INET6, sin6_port=htons(443), sin6_flowinfo=htonl(0), inet_pton(AF_INET6, \"2001:4860:4860::8888\", &sin6_addr), sin6_scope_id=0}, 28) = -1 ENETUNREACH (Network is unreachable)",
+      "close": "close(23)      = 0",
+      "send_calls_on_same_tid_before_close": []
+    },
+    {
+      "tid": 129947,
+      "timestamp": "1794240768.745079",
+      "socket": "socket(AF_INET6, SOCK_DGRAM, IPPROTO_IP) = 23",
+      "connect": "connect(23, {sa_family=AF_INET6, sin6_port=htons(443), sin6_flowinfo=htonl(0), inet_pton(AF_INET6, \"2001:4860:4860::8888\", &sin6_addr), sin6_scope_id=0}, 28) = -1 ENETUNREACH (Network is unreachable)",
+      "close": "close(23) = 0",
+      "send_calls_on_same_tid_before_close": []
+    },
+    {
+      "tid": 129947,
+      "timestamp": "1794240783.764062",
+      "socket": "socket(AF_INET6, SOCK_DGRAM, IPPROTO_IP) = 23",
+      "connect": "connect(23, {sa_family=AF_INET6, sin6_port=htons(443), sin6_flowinfo=htonl(0), inet_pton(AF_INET6, \"2001:4860:4860::8888\", &sin6_addr), sin6_scope_id=0}, 28) = -1 ENETUNREACH (Network is unreachable)",
+      "close": "close(23)      = 0",
+      "send_calls_on_same_tid_before_close": []
+    },
+    {
+      "tid": 129947,
+      "timestamp": "1794240798.744712",
+      "socket": "socket(AF_INET6, SOCK_DGRAM, IPPROTO_IP) = 23",
+      "connect": "connect(23, {sa_family=AF_INET6, sin6_port=htons(443), sin6_flowinfo=htonl(0), inet_pton(AF_INET6, \"2001:4860:4860::8888\", &sin6_addr), sin6_scope_id=0}, 28) = -1 ENETUNREACH (Network is unreachable)",
+      "close": "close(23)      = 0",
+      "send_calls_on_same_tid_before_close": []
+    },
+    {
+      "tid": 129947,
+      "timestamp": "1794240813.742215",
+      "socket": "socket(AF_INET6, SOCK_DGRAM, IPPROTO_IP) = 23",
+      "connect": "connect(23, {sa_family=AF_INET6, sin6_port=htons(443), sin6_flowinfo=htonl(0), inet_pton(AF_INET6, \"2001:4860:4860::8888\", &sin6_addr), sin6_scope_id=0}, 28) = -1 ENETUNREACH (Network is unreachable)",
+      "close": "close(23)      = 0",
+      "send_calls_on_same_tid_before_close": []
+    },
+    {
+      "tid": 129947,
+      "timestamp": "1794240828.751557",
+      "socket": "socket(AF_INET6, SOCK_DGRAM, IPPROTO_IP) = 25",
+      "connect": "connect(25, {sa_family=AF_INET6, sin6_port=htons(443), sin6_flowinfo=htonl(0), inet_pton(AF_INET6, \"2001:4860:4860::8888\", &sin6_addr), sin6_scope_id=0}, 28) = -1 ENETUNREACH (Network is unreachable)",
+      "close": "close(25)      = 0",
+      "send_calls_on_same_tid_before_close": []
+    },
+    {
+      "tid": 129947,
+      "timestamp": "1794240843.764911",
+      "socket": "socket(AF_INET6, SOCK_DGRAM, IPPROTO_IP) = 23",
+      "connect": "connect(23, {sa_family=AF_INET6, sin6_port=htons(443), sin6_flowinfo=htonl(0), inet_pton(AF_INET6, \"2001:4860:4860::8888\", &sin6_addr), sin6_scope_id=0}, 28) = -1 ENETUNREACH (Network is unreachable)",
+      "close": "close(23)      = 0",
+      "send_calls_on_same_tid_before_close": []
+    },
+    {
+      "tid": 129947,
+      "timestamp": "1794240858.742862",
+      "socket": "socket(AF_INET6, SOCK_DGRAM, IPPROTO_IP) = 25",
+      "connect": "connect(25, {sa_family=AF_INET6, sin6_port=htons(443), sin6_flowinfo=htonl(0), inet_pton(AF_INET6, \"2001:4860:4860::8888\", &sin6_addr), sin6_scope_id=0}, 28) = -1 ENETUNREACH (Network is unreachable)",
+      "close": "close(25)      = 0",
+      "send_calls_on_same_tid_before_close": []
+    },
+    {
+      "tid": 129947,
+      "timestamp": "1794240873.749543",
+      "socket": "socket(AF_INET6, SOCK_DGRAM, IPPROTO_IP) = 25",
+      "connect": "connect(25, {sa_family=AF_INET6, sin6_port=htons(443), sin6_flowinfo=htonl(0), inet_pton(AF_INET6, \"2001:4860:4860::8888\", &sin6_addr), sin6_scope_id=0}, 28) = -1 ENETUNREACH (Network is unreachable)",
+      "close": "close(25) = 0",
+      "send_calls_on_same_tid_before_close": []
+    },
+    {
+      "tid": 129947,
+      "timestamp": "1794240888.742999",
+      "socket": "socket(AF_INET6, SOCK_DGRAM, IPPROTO_IP) = 23",
+      "connect": "connect(23, {sa_family=AF_INET6, sin6_port=htons(443), sin6_flowinfo=htonl(0), inet_pton(AF_INET6, \"2001:4860:4860::8888\", &sin6_addr), sin6_scope_id=0}, 28) = -1 ENETUNREACH (Network is unreachable)",
+      "close": "close(23)      = 0",
+      "send_calls_on_same_tid_before_close": []
+    },
+    {
+      "tid": 129947,
+      "timestamp": "1794240903.741593",
+      "socket": "socket(AF_INET6, SOCK_DGRAM, IPPROTO_IP) = 23",
+      "connect": "connect(23, {sa_family=AF_INET6, sin6_port=htons(443), sin6_flowinfo=htonl(0), inet_pton(AF_INET6, \"2001:4860:4860::8888\", &sin6_addr), sin6_scope_id=0}, 28) = -1 ENETUNREACH (Network is unreachable)",
+      "close": "close(23)      = 0",
+      "send_calls_on_same_tid_before_close": []
+    },
+    {
+      "tid": 129947,
+      "timestamp": "1794240918.743054",
+      "socket": "socket(AF_INET6, SOCK_DGRAM, IPPROTO_IP) = 23",
+      "connect": "connect(23, {sa_family=AF_INET6, sin6_port=htons(443), sin6_flowinfo=htonl(0), inet_pton(AF_INET6, \"2001:4860:4860::8888\", &sin6_addr), sin6_scope_id=0}, 28) = -1 ENETUNREACH (Network is unreachable)",
+      "close": "close(23)      = 0",
+      "send_calls_on_same_tid_before_close": []
+    },
+    {
+      "tid": 129947,
+      "timestamp": "1794240933.742707",
+      "socket": "socket(AF_INET6, SOCK_DGRAM, IPPROTO_IP) = 23",
+      "connect": "connect(23, {sa_family=AF_INET6, sin6_port=htons(443), sin6_flowinfo=htonl(0), inet_pton(AF_INET6, \"2001:4860:4860::8888\", &sin6_addr), sin6_scope_id=0}, 28) = -1 ENETUNREACH (Network is unreachable)",
+      "close": "close(23)      = 0",
+      "send_calls_on_same_tid_before_close": []
+    },
+    {
+      "tid": 129947,
+      "timestamp": "1794240948.746159",
+      "socket": "socket(AF_INET6, SOCK_DGRAM, IPPROTO_IP) = 25",
+      "connect": "connect(25, {sa_family=AF_INET6, sin6_port=htons(443), sin6_flowinfo=htonl(0), inet_pton(AF_INET6, \"2001:4860:4860::8888\", &sin6_addr), sin6_scope_id=0}, 28) = -1 ENETUNREACH (Network is unreachable)",
+      "close": "close(25)      = 0",
+      "send_calls_on_same_tid_before_close": []
+    },
+    {
+      "tid": 129947,
+      "timestamp": "1794240963.744743",
+      "socket": "socket(AF_INET6, SOCK_DGRAM, IPPROTO_IP) = 25",
+      "connect": "connect(25, {sa_family=AF_INET6, sin6_port=htons(443), sin6_flowinfo=htonl(0), inet_pton(AF_INET6, \"2001:4860:4860::8888\", &sin6_addr), sin6_scope_id=0}, 28) = -1 ENETUNREACH (Network is unreachable)",
+      "close": "close(25) = 0",
+      "send_calls_on_same_tid_before_close": []
+    },
+    {
+      "tid": 129947,
+      "timestamp": "1794240978.747510",
+      "socket": "socket(AF_INET6, SOCK_DGRAM, IPPROTO_IP) = 23",
+      "connect": "connect(23, {sa_family=AF_INET6, sin6_port=htons(443), sin6_flowinfo=htonl(0), inet_pton(AF_INET6, \"2001:4860:4860::8888\", &sin6_addr), sin6_scope_id=0}, 28) = -1 ENETUNREACH (Network is unreachable)",
+      "close": "close(23)      = 0",
+      "send_calls_on_same_tid_before_close": []
+    },
+    {
+      "tid": 129947,
+      "timestamp": "1794240993.755525",
+      "socket": "socket(AF_INET6, SOCK_DGRAM, IPPROTO_IP) = 23",
+      "connect": "connect(23, {sa_family=AF_INET6, sin6_port=htons(443), sin6_flowinfo=htonl(0), inet_pton(AF_INET6, \"2001:4860:4860::8888\", &sin6_addr), sin6_scope_id=0}, 28) = -1 ENETUNREACH (Network is unreachable)",
+      "close": "close(23)      = 0",
+      "send_calls_on_same_tid_before_close": []
+    },
+    {
+      "tid": 129947,
+      "timestamp": "1794241008.751997",
+      "socket": "socket(AF_INET6, SOCK_DGRAM, IPPROTO_IP) = 23",
+      "connect": "connect(23, {sa_family=AF_INET6, sin6_port=htons(443), sin6_flowinfo=htonl(0), inet_pton(AF_INET6, \"2001:4860:4860::8888\", &sin6_addr), sin6_scope_id=0}, 28) = -1 ENETUNREACH (Network is unreachable)",
+      "close": "close(23)      = 0",
+      "send_calls_on_same_tid_before_close": []
+    },
+    {
+      "tid": 129947,
+      "timestamp": "1794241023.744740",
+      "socket": "socket(AF_INET6, SOCK_DGRAM, IPPROTO_IP) = 23",
+      "connect": "connect(23, {sa_family=AF_INET6, sin6_port=htons(443), sin6_flowinfo=htonl(0), inet_pton(AF_INET6, \"2001:4860:4860::8888\", &sin6_addr), sin6_scope_id=0}, 28) = -1 ENETUNREACH (Network is unreachable)",
+      "close": "close(23) = 0",
+      "send_calls_on_same_tid_before_close": []
+    },
+    {
+      "tid": 129947,
+      "timestamp": "1794241038.745183",
+      "socket": "socket(AF_INET6, SOCK_DGRAM, IPPROTO_IP) = 25",
+      "connect": "connect(25, {sa_family=AF_INET6, sin6_port=htons(443), sin6_flowinfo=htonl(0), inet_pton(AF_INET6, \"2001:4860:4860::8888\", &sin6_addr), sin6_scope_id=0}, 28) = -1 ENETUNREACH (Network is unreachable)",
+      "close": "close(25)      = 0",
+      "send_calls_on_same_tid_before_close": []
+    },
+    {
+      "tid": 129947,
+      "timestamp": "1794241053.743802",
+      "socket": "socket(AF_INET6, SOCK_DGRAM, IPPROTO_IP) = 25",
+      "connect": "connect(25, {sa_family=AF_INET6, sin6_port=htons(443), sin6_flowinfo=htonl(0), inet_pton(AF_INET6, \"2001:4860:4860::8888\", &sin6_addr), sin6_scope_id=0}, 28) = -1 ENETUNREACH (Network is unreachable)",
+      "close": "close(25)      = 0",
+      "send_calls_on_same_tid_before_close": []
+    },
+    {
+      "tid": 129947,
+      "timestamp": "1794241068.755658",
+      "socket": "socket(AF_INET6, SOCK_DGRAM, IPPROTO_IP) = 23",
+      "connect": "connect(23, {sa_family=AF_INET6, sin6_port=htons(443), sin6_flowinfo=htonl(0), inet_pton(AF_INET6, \"2001:4860:4860::8888\", &sin6_addr), sin6_scope_id=0}, 28) = -1 ENETUNREACH (Network is unreachable)",
+      "close": "close(23)      = 0",
+      "send_calls_on_same_tid_before_close": []
+    },
+    {
+      "tid": 129947,
+      "timestamp": "1794241083.744302",
+      "socket": "socket(AF_INET6, SOCK_DGRAM, IPPROTO_IP) = 23",
+      "connect": "connect(23, {sa_family=AF_INET6, sin6_port=htons(443), sin6_flowinfo=htonl(0), inet_pton(AF_INET6, \"2001:4860:4860::8888\", &sin6_addr), sin6_scope_id=0}, 28) = -1 ENETUNREACH (Network is unreachable)",
+      "close": "close(23) = 0",
+      "send_calls_on_same_tid_before_close": []
+    },
+    {
+      "tid": 129947,
+      "timestamp": "1794241098.740392",
+      "socket": "socket(AF_INET6, SOCK_DGRAM, IPPROTO_IP) = 25",
+      "connect": "connect(25, {sa_family=AF_INET6, sin6_port=htons(443), sin6_flowinfo=htonl(0), inet_pton(AF_INET6, \"2001:4860:4860::8888\", &sin6_addr), sin6_scope_id=0}, 28) = -1 ENETUNREACH (Network is unreachable)",
+      "close": "close(25)      = 0",
+      "send_calls_on_same_tid_before_close": []
+    },
+    {
+      "tid": 129947,
+      "timestamp": "1794241107.777683",
+      "socket": "socket(AF_INET6, SOCK_DGRAM, IPPROTO_IP) = 22",
+      "connect": "connect(22, {sa_family=AF_INET6, sin6_port=htons(443), sin6_flowinfo=htonl(0), inet_pton(AF_INET6, \"2001:4860:4860::8888\", &sin6_addr), sin6_scope_id=0}, 28) = -1 ENETUNREACH (Network is unreachable)",
+      "close": "close(22)      = 0",
+      "send_calls_on_same_tid_before_close": []
+    }
+  ]
+}

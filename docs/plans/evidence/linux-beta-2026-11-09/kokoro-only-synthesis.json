@@ -1,0 +1,18 @@
+{
+  "engine": "Kokoro-82M int8",
+  "runtime": "kokoro-onnx 0.6.1",
+  "voice": "af_heart",
+  "verified_catalogue_assets": {
+    "model": "kokoro-v1.0.int8.onnx",
+    "voices": "voices-v1.0.bin"
+  },
+  "sample_rate": 24000,
+  "seconds": 1.8773333333333333,
+  "elapsed_seconds": 5.171266858000308,
+  "nonzero_pcm": true,
+  "wav_sha256": "1c3dff1898c006709fa84667aac18d07131800ab0ecee1e7550babed8638f450",
+  "peak_rss_kib": 295440,
+  "packaged": false,
+  "scope": "Direct real Kokoro synthesis only; full VoiceService correctly refused profile startup under available-memory guard.",
+  "status": "passed"
+}

@@ -1,5 +1,12 @@
 # Native voice conversation
 
+> Current owner decision (2026-11-09): personal use, at most five users;
+> own PC first, phone/iPad clients later. All managed TTS profiles use
+> Kokoro-82M; Piper is removed. Production signing infrastructure and
+> mass-market distribution are outside this acceptance scope.
+> [Decision and retained safeguards](PERSONAL_BETA_SCOPE.md).
+
+
 **Status:** V1 implemented, V2 implemented as Preview (see §12a); opened 2026-11-02. Tracked in
 [BETA_RELEASE_PLAN.md](BETA_RELEASE_PLAN.md) as VD-1 (beta, **P0**) and VD-5
 (conversation, **Preview** in beta). Supersedes nothing: today's dictation and
@@ -18,13 +25,13 @@ the transcript text goes, never audio.
 The pipeline:
 
 ```
-Microphone ─► Silero VAD ─► Whisper ─► Raiker (governed turn, any LLM) ─► Kokoro-82M / Piper / system voice ─► Speaker
+Microphone ─► Silero VAD ─► Whisper ─► Raiker (governed turn, any LLM) ─► Kokoro-82M / system voice ─► Speaker
   (16 kHz)    (is anyone     (speech     (plans, uses tools under          (sentence-by-sentence speech,
                speaking?)     → text)     the owner's permissions)           interrupted when the owner speaks)
 ```
 
 Whisper is the speech-to-**text** stage only; it does not speak. The voices
-that answer are Kokoro-82M, Piper, or the operating system's own on-device
+that answer are Kokoro-82M or the operating system's own on-device
 voice.
 
 ## 2. The reference concept: a whole assistant on a Raspberry Pi
@@ -36,13 +43,13 @@ camera:
 |---|---|---|---|
 | Ears | **Whisper** | Listens: speech to text | Managed whisper.cpp engine (§5.2) |
 | Brain | **qwen3:1.7B** | Interprets and comes up with the response | **Always the owner's choice**: whatever model they selected for the conversation, local (Ollama, LM Studio, the llama.cpp engine from PR #245) or hosted. Voice profiles never choose, install or replace it |
-| Mouth | **Piper** | Answers aloud | Managed Piper engine (§5.3), or Kokoro-82M where there is room |
+| Mouth | **Piper** | Answers aloud | Managed Kokoro-82M (§5.3); Piper from the reference concept is removed |
 | Eyes | **Moondream** + camera | Describes what the camera sees, as text the brain can use | Optional *Look* step (§5.5): a camera frame goes to a local vision model (Moondream 2 GGUF with its projector on llama.cpp, or any vision-capable model the owner serves); the description joins the turn as context |
 
 Two lessons are taken from it.
 
 1. **Small speech engines are enough for a natural conversation.** A small
-   Whisper and Piper together need only a few hundred megabytes and keep up
+   Whisper and quantized Kokoro together need only a few hundred megabytes and keep up
    in real time on modest hardware. Raiker therefore ships a **Lite** voice
    profile with that ears-and-mouth stack for 8 GB laptops, ARM64 Linux boards
    and machines with no GPU. The brain is not part of any profile: it is the
@@ -96,10 +103,10 @@ never hard-coded in the UI.
 
 | Profile | For | VAD | Speech to text | Speech | Download | Resident memory |
 |---|---|---|---|---|---|---|
-| **Lite** | 8 GB RAM, no GPU, ARM64 boards | Silero v5 (2 MB) | Whisper **base** q5_1 (~60 MB), English-only variant offered | **Piper** medium voice (~60 MB) | ~0.1 GB | ~0.4 GB |
+| **Lite** | 8 GB RAM, no GPU, ARM64 boards | Silero v5 (2 MB) | Whisper **base** q5_1 (~60 MB), English-only variant offered | **Kokoro-82M** int8 (~90 MB + voices) | ~0.2 GB | ~0.7 GB |
 | **Balanced** *(default recommendation for 16 GB)* | 16 GB RAM, any GPU or none | Silero v5 | Whisper **small** q5_1 (~190 MB), or **large-v3-turbo** q5_0 (~550 MB) when a GPU has room | **Kokoro-82M** int8 (~90 MB + voices) | 0.3–0.7 GB | 1–1.5 GB |
 | **High quality** | ≥ 32 GB RAM or ≥ 12 GB VRAM | Silero v5 | Whisper **large-v3-turbo** q8_0 (~870 MB) on GPU | **Kokoro-82M** fp32 (~330 MB) | ~1.2 GB | ~2.5 GB |
-| **Custom** | Anyone | Silero v5 | Any catalogue tier: tiny, base, small, medium, large-v3-turbo; multilingual or English-only; q5/q8/f16 | Kokoro (fp32 / fp16 / int8) · Piper (x_low / low / medium / high per voice) · system voice | per choice | per choice |
+| **Custom** | Anyone | Silero v5 | Any catalogue tier: tiny, base, small, medium, large-v3-turbo; multilingual or English-only; q5/q8/f16 | Kokoro (fp32 / fp16 / int8) · system voice | per choice | per choice |
 
 The installer and Settings recommend one profile from detected hardware, using
 the same hardware probe as the llama.cpp engine
@@ -153,16 +160,15 @@ RTX 4060 (8 GB) can run speech recognition on the GPU next to a 7B model."*
 - **Placement:** GPU when the resource planner finds headroom (§7), otherwise
   CPU with `-t` set by the planner.
 
-### 5.3 Speech — Kokoro-82M and Piper
+### 5.3 Speech — Kokoro-82M
 
-| | Kokoro-82M | Piper | System voice |
-|---|---|---|---|
-| Quality | Most natural; expressive | Clear, slightly synthetic | Varies by OS |
-| Speed on CPU | Real-time or better on a modern laptop (int8) | Far faster than real-time, even on a Raspberry Pi | Fast |
-| Size | int8 ~90 MB, fp16 ~170 MB, fp32 ~330 MB, voices ~27 MB | ~20–110 MB per voice | 0 |
-| Languages | English (US/UK) first; others per upstream voices | Many, one model per voice | Per OS |
-| Output | 24 kHz | 16–22 kHz | Native |
-| Licence | Weights Apache-2.0 | Engine: see §11 | OS |
+| | Kokoro-82M | System voice |
+|---|---|---|
+| Quality | Natural and expressive | Varies by OS |
+| Size | int8 ~90 MB, fp16 ~170 MB, fp32 ~330 MB, voices ~27 MB | 0 |
+| Languages | English (US/UK) first; others per upstream voices | Per OS |
+| Output | 24 kHz | Native |
+| Model licence | Apache-2.0 | OS |
 
 - **Kokoro** runs in a Raiker-managed worker process. That process is Raiker's
   own Python with `onnxruntime` (bundled, CPU) and the `kokoro-onnx` package,
@@ -170,9 +176,6 @@ RTX 4060 (8 GB) can run speech recognition on the GPU next to a 7B model."*
   loopback socket. The CPU execution provider is the default; DirectML on
   Windows and CoreML on macOS are used only in the High-quality profile, and
   only when the planner allows.
-- **Piper** runs as the upstream `piper` binary per voice, managed and verified
-  like the others. Its catalogue lists **only voices whose dataset licence
-  permits this use**; voices under non-commercial licences are excluded.
 - **System voice** is today's read-aloud, limited to `localService` voices. It
   is the zero-download option and the fallback when no engine is installed.
 - **Streaming:** the model's answer is split into sentences as tokens stream
@@ -250,8 +253,7 @@ the AI provider:
 
 A new Settings page with four sections:
 
-1. **Engines.** Cards for *Listening* (Whisper) and *Speaking* (Kokoro / Piper
-   / system). Each shows its state (*Ready*, *Downloading 42%*,
+1. **Engines.** Cards for *Listening* (Whisper) and *Speaking* (Kokoro / system). Each shows its state (*Ready*, *Downloading 42%*,
    *Not installed*, *Paused to save memory*), the model, where it runs
    (*GPU · RTX 4060* or *Processor · 4 threads*), its memory, and **Change**,
    **Test** and **Remove**. Test plays a phrase, then transcribes it back and
@@ -279,7 +281,7 @@ the other holds.
 - **Shared ledger.** The llama.cpp supervisor's `committed_bytes` is
   generalised into a `ResourceLedger` (RAM and per-GPU VRAM) in
   `raiker/models/engines/resources.py`. Every running engine (LLM slots,
-  Whisper, Kokoro, Piper, vision) registers its *planned* footprint. The
+  Whisper, Kokoro, vision) registers its *planned* footprint. The
   llama.cpp planner already subtracts committed memory (PR #245); voice
   engines use the same planner pattern.
 - **Placement policy.**
@@ -290,7 +292,7 @@ the other holds.
      Whisper plus 512 MB. Otherwise it runs on the CPU, with threads set to
      half the physical cores (at most 8).
   3. Kokoro runs on the CPU (int8) unless the profile is High quality and VRAM
-     headroom covers it. Piper always runs on the CPU.
+     headroom covers it.
   4. VAD runs in the client on the CPU, at under 1% of one core.
 - **Time-sharing instead of over-subscription.** A conversation is
   half-duplex.
@@ -385,7 +387,6 @@ raiker/voice/
   profiles.py       # Lite/Balanced/High/Custom → concrete components, recommendation
   stt_whisper.py    # whisper-server engine (install, plan, start, transcribe)
   tts_kokoro.py     # Kokoro worker engine
-  tts_piper.py      # Piper engine
   tts_worker.py     # the Kokoro worker process entry point
   session.py        # conversation state machine, sentence splitter, barge-in
   planner.py        # placement on CPU/GPU from the shared ledger
@@ -428,9 +429,7 @@ catalogue.
 | Kokoro-82M weights | Apache-2.0 | — |
 | kokoro-onnx | MIT | — |
 | misaki (English G2P) | Apache-2.0 | — |
-| espeak-ng (Kokoro fallback G2P, Piper phonemes) | GPL-3.0 ⚠ | Used as a separate program or data; confirm the aggregation reading, or restrict Kokoro to misaki-only English in beta |
-| Piper engine | rhasspy/piper MIT (archived); successor OHF-Voice/piper1-gpl GPL-3.0 ⚠ | Prefer the last MIT release for beta; review the successor |
-| Piper voices | Per voice (dataset licences vary) ⚠ | Catalogue includes only permissive voices |
+| espeak-ng (Kokoro G2P) | GPL-3.0 ⚠ | Used as a separate program or data; confirm the aggregation reading, or restrict Kokoro to misaki-only English in beta |
 | Moondream 2 | Apache-2.0 | V3 |
 
 ## 12. Delivery phases
@@ -438,27 +437,29 @@ catalogue.
 | Phase | Scope | Beta |
 |---|---|---|
 | **V0** (shipped) | Dictation to an owner-configured local server; read-aloud with local OS voices; no browser speech | — |
-| **V1** | Managed whisper.cpp with the tier choice; managed Kokoro and Piper; Settings → Voice; installer step; dictation and read-aloud on the managed engines; the shared resource ledger | **beta.1, P0** |
+| **V1** | Managed whisper.cpp with the tier choice; managed Kokoro; Settings → Voice; installer step; dictation and read-aloud on the managed engines; the shared resource ledger | **beta.1, P0** |
 | **V2** | Conversation panel: push-to-talk first, then hands-free with Silero VAD, streaming TTS and barge-in; spoken-style hint; approvals by click | **Preview** in beta.1, Ship in beta.2 |
 | **V3** | *Look* (camera → Moondream or a vision model); the Lite profile validated on ARM64 Linux (Raspberry Pi 5, 8 GB) as in the reference concept | after beta |
 | **V4** | Opt-in local wake word; voice on messaging channels | later |
 
 ## 12a. Implementation status (2026-11-03)
 
-**V1 — implemented.** Code: `raiker/voice/`, `raiker/models/engines/`,
+**V1 — partial; packaged execution still needs qualification.** Code: `raiker/voice/`, `raiker/models/engines/`,
 `raiker/api/routes_voice.py`, `web/src/lib/views/settings/Voice.svelte`, the
 *Voice* setup stage. Kokoro speaking was installed from the catalogue,
 verified and run for real (`tests/test_voice_live.py`). What remains before the
 §14 acceptance:
 
-- Whisper models and Piper voices are listed with `pending_reason` until
-  `scripts/pin_voice_catalogue.py` pins them from Hugging Face. Piper voices
-  also need their dataset licences reviewed.
+- Whisper model revisions and digests were pinned on 2026-11-09.
+- Piper engines and voices were removed at the owner's request on 2026-11-09;
+  Lite now uses quantized Kokoro-82M. Piper voice/dataset and sidecar review
+  are no longer release work.
 - Upstream publishes `whisper-server` for Windows only. The Linux and macOS
   builds are pending in Raiker's release workflow (§5.2).
-- `kokoro-onnx` pulls in espeak-ng (GPL-3.0, §11 ⚠). It is not bundled until
-  that is signed off, and a build without it reports
-  `voice_kokoro_runtime_missing`.
+- `kokoro-onnx` pulls in phonemizer/espeak-ng (GPL-3.0, §11). The explicit
+  personal `--bundle-voice` build includes the hash-locked runtime and retained
+  notices. Public redistribution review remains separate. An ordinary build
+  without the runtime reports `voice_kokoro_runtime_missing`.
 - The installer step starts downloads when the step is answered. Pausing on a
   metered network is not implemented.
 
@@ -491,7 +492,7 @@ progress (the setting is stored; nothing speaks it yet).
 |---|---|---|
 | Unit | Profile recommendation per hardware fixture; placement decisions against a ledger; sentence splitter; state machine transitions including barge-in; catalogue validation (digest and licence present) | `tests/test_voice_*.py`, `voice/*.test.ts` |
 | Integration | Fake whisper-server (returns fixed text), fake TTS worker (returns a tone), a real WebSocket session through the host: utterance → transcript → turn (stub provider) → speak events → barge-in cancels the turn | `tests/test_voice_session.py` |
-| Real engines (opt-in, CI weekly on three OSes) | Install each catalogue tier from its real source; transcribe the JFK fixture (WER ≤ 10% on base); **round trip**: synthesise a sentence with Kokoro and Piper and transcribe it with Whisper (WER ≤ 15%); measure the real-time factor | `tests/test_voice_live.py`, `.github/workflows/voice.yml` |
+| Real engines (opt-in; frozen worker qualified on Linux) | Install each catalogue tier from its real source; transcribe the JFK fixture (WER ≤ 10% on base); **round trip**: synthesise a sentence with Kokoro and transcribe it with Whisper (WER ≤ 15%); measure the real-time factor | `tests/test_voice_live.py`; broader round-trip automation remains planned |
 | End to end | Playwright with Chromium's fake microphone (`--use-file-for-fake-audio-capture`) feeding a WAV: a spoken question appears as a caption, Raiker answers with a local model, audio playback is observed through a WebAudio analyser, and speaking over it interrupts. Screenshots of every orb state | `web/e2e/voice-conversation-live.spec.ts` |
 | Performance | Mouth-to-ear latency P50/P95 per profile on the reference machines; CPU and RAM while talking; no regression over 10% between releases | Recorded in TESTING.md run records |
 | Privacy | A recording proxy shows no audio bytes leave loopback; no audio is on disk after a session unless *Keep recordings* is on | Part of the MM-5 egress audit |

@@ -1,9 +1,8 @@
+# SPDX-License-Identifier: Apache-2.0
 """The speaking worker: one loopback process that turns text into WAV audio.
 
 Voice spec §5.3. Kokoro-82M runs in Raiker's own Python with ``onnxruntime``
-and the ``kokoro-onnx`` package; Piper runs as its upstream binary, called by
-this worker once per request. Either way the host talks to the worker the same
-way:
+and the ``kokoro-onnx`` package. The host talks to the worker through:
 
 * ``GET /health`` → ``{"ok": true, "engine": …, "voices": […]}``
 * ``POST /synthesize`` with ``{"text", "voice", "speed"}`` → ``audio/wav``
@@ -24,7 +23,6 @@ import contextlib
 import hmac
 import io
 import json
-import subprocess
 import sys
 import threading
 import wave
@@ -83,33 +81,6 @@ class KokoroSynthesiser:
             samples, rate = self._kokoro.create(text, voice=chosen, speed=speed, lang=lang)
         clipped = np.clip(np.asarray(samples, dtype=np.float32), -1.0, 1.0)
         return (clipped * 32767.0).astype("<i2").tobytes(), int(rate)
-
-
-class PiperSynthesiser:
-    engine = "piper"
-
-    def __init__(self, executable: Path, voice_model: Path, threads: int) -> None:
-        self._executable = executable
-        self._model = voice_model
-        config = json.loads(Path(str(voice_model) + ".json").read_text(encoding="utf-8"))
-        self._rate = int(config.get("audio", {}).get("sample_rate", 22050))
-
-    def voices(self) -> list[str]:
-        return [self._model.name.removesuffix(".onnx")]
-
-    def synthesise(self, text: str, voice: str | None, speed: float) -> tuple[bytes, int]:
-        length_scale = f"{1.0 / max(0.5, min(2.0, speed)):.3f}"
-        completed = subprocess.run(  # noqa: S603 - the verified Piper binary, fixed argv, text on stdin
-            [str(self._executable), "--model", str(self._model), "--output_raw", "--length_scale", length_scale],
-            input=text.encode("utf-8"),
-            capture_output=True,
-            timeout=60,
-            check=False,
-            creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
-        )
-        if completed.returncode != 0 or not completed.stdout:
-            raise RuntimeError("piper_failed")
-        return completed.stdout, self._rate
 
 
 def make_handler(synth: Synthesiser, token: str) -> type[BaseHTTPRequestHandler]:
@@ -178,17 +149,14 @@ def make_handler(synth: Synthesiser, token: str) -> type[BaseHTTPRequestHandler]
 def build_synthesiser(args: argparse.Namespace) -> Synthesiser:
     if args.engine == "kokoro":
         return KokoroSynthesiser(Path(args.model), Path(args.voices), args.threads)
-    if args.engine == "piper":
-        return PiperSynthesiser(Path(args.piper), Path(args.model), args.threads)
     raise SystemExit(2)
 
 
 def parse_args(argv: list[str]) -> argparse.Namespace:
     parser = argparse.ArgumentParser(prog="raiker-voice-tts-worker")
-    parser.add_argument("--engine", choices=("kokoro", "piper"), required=True)
+    parser.add_argument("--engine", choices=("kokoro",), required=True)
     parser.add_argument("--model", required=True)
     parser.add_argument("--voices", default="")
-    parser.add_argument("--piper", default="")
     parser.add_argument("--port", type=int, required=True)
     parser.add_argument("--threads", type=int, default=2)
     parser.add_argument("--token-file", required=True)

@@ -1,0 +1,29 @@
+{
+  "source_commit": "6c211b605d3c42d77215ff69cbed3f346c95d685",
+  "version": "0.9.0",
+  "distribution": "installed DEB, unsigned qualification build",
+  "prepared_at": "2026-11-09T15:47:18.901172+00:00",
+  "duration_requested_seconds": 1980,
+  "process_scope": "installed Electron shell and traced descendants, including its frozen host",
+  "instrumentation": "strace --seccomp-bpf -f -ttt -s 0; socket/close plus connect/sendto/sendmsg/sendmmsg; payloads elided",
+  "allowed_hosts": {
+    "127.0.0.1": "loopback services and managed-model detection",
+    "::1": "IPv6 loopback",
+    "10.0.12.212": "listener on this host used as the native sandbox outside-control probe",
+    "10.0.0.1": "native probe UDP route discovery; connect alone sends no datagram",
+    "192.0.2.1": "system-readiness UDP route discovery to RFC 5737 address; connect alone sends no datagram",
+    "2001:4860:4860::8888": "Chromium IPv6 UDP reachability/route probe: no DNS datagram. Retain and inspect socket/connect/close evidence; this is not permission for cloud requests."
+  },
+  "limits": [
+    "fresh synthetic owner; no hosted provider or external connector credentials",
+    "unavailable voice/components are exercised as refusal/setup states",
+    "connection metadata cannot prove request payload content",
+    "local navigation coverage does not replace all seven real-model journeys"
+  ],
+  "browser_test_flags": [
+    "--no-sandbox",
+    "--remote-debugging-port=9229"
+  ],
+  "release_signoff": false,
+  "route_probe_reference": "https://chromium.googlesource.com/chromium/src/+/refs/heads/main/net/dns/README.md#IPv6-and-connectivity"
+}

@@ -1,5 +1,43 @@
 # Fixed items
 
+## FIXED-1378 — Lite TTS depended on an unreviewed Piper voice
+
+**Severity: Medium. Area: Personal voice beta. Status: Fixed 2026-11-09.**
+
+The owner removed Piper from scope. All six Piper engine/voice catalogue
+entries and the Piper worker/planner/profile/download branches are removed.
+Lite now selects the same verified quantized Kokoro-82M and voice bank as
+Balanced; High keeps fp32. Removed voice settings return to the default;
+removed engine/item/profile inputs are refused. No Piper dataset or JSON
+sidecar is needed. Model and runtime dependency licences remain distinct.
+
+An opt-in personal `--bundle-voice` freeze checks the exact hash-locked runtime
+versions and includes phonemizer data, native libraries and retained notices.
+The real frozen Kokoro worker synthesized a nonzero 24 kHz clip, refused an
+unauthenticated request and stopped cleanly. Tests also cover absent/mismatched
+runtime dependencies; they cannot be reported as included.
+
+**Evidence.** `tests/test_voice_v1.py`, `tests/test_desktop_build.py`,
+`tests/test_voice_live.py::test_packaged_kokoro_worker_uses_verified_assets_and_local_token`;
+[personal scope and run record](LINUX_BETA_2026_11_09.md#owner-scope-and-kokoro-only-personal-build).
+
+## FIXED-1377 — Release matrix missed the completed onboarding screenshot
+
+**Severity: Low. Area: Release reporting. Status: Fixed 2026-11-09.**
+
+The matrix summary looked for `onboarding-7-home.png`, while the packaged
+onboarding test writes `onboarding-3-home.png`. Successful test jobs could
+therefore display `NOT RUN` in the summary. The workflow now checks the
+filename actually emitted by the test. This corrects reporting; it does not
+turn a missing screenshot or failed test into acceptance.
+
+**Evidence.** The downloaded Linux artifact from desktop run `42646385236`
+contains `onboarding-3-home.png`; the corresponding packaged onboarding job
+passed and the screenshot was inspected. The summary condition was checked
+against both that artifact and an empty directory. Candidate runtime remains
+`6c211b60`; the reporting correction changes no runtime behavior. The separate owner-requested
+Piper removal requires a new runtime candidate.
+
 ## FIXED-1376 — Electron performed public resolver requests before setup
 
 The installed-shell capture (unlike the earlier host-only recording) observed
@@ -1763,6 +1801,8 @@ file you can open. The two capture sets that remain — `screenshots/pages/` and
 | [FIXED-1374](#fixed-1374--rpm-used-unbounded-level-9-multithreaded-xz-compression) | High | Linux beta hardening | Fixed 2026-11-09 |
 | [FIXED-1375](#fixed-1375--reading-chatgpt-status-started-an-unrequested-network-capable-sidecar) | High | Local-only egress | Fixed 2026-11-09 |
 | [FIXED-1376](#fixed-1376--electron-performed-public-resolver-requests-before-setup) | High | Desktop local-only traffic | Fixed 2026-11-09 |
+| [FIXED-1377](#fixed-1377--release-matrix-missed-the-completed-onboarding-screenshot) | Low | Release reporting | Fixed 2026-11-09 |
+| [FIXED-1378](#fixed-1378--lite-tts-depended-on-an-unreviewed-piper-voice) | Medium | Personal voice beta | Fixed 2026-11-09 |
 
 ---
 

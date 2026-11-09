@@ -1,0 +1,320 @@
+{
+  "commit": "6c211b605d3c42d77215ff69cbed3f346c95d685",
+  "started_at": "2026-11-09T15:47:22.421Z",
+  "pages": [
+    {
+      "at": "2026-11-09T15:48:04.978Z",
+      "route": "models",
+      "title": "Raiker"
+    },
+    {
+      "at": "2026-11-09T15:48:05.998Z",
+      "route": "home",
+      "title": "Raiker"
+    },
+    {
+      "at": "2026-11-09T15:49:04.965Z",
+      "route": "models",
+      "title": "Raiker"
+    },
+    {
+      "at": "2026-11-09T15:49:05.998Z",
+      "route": "new-chat",
+      "title": "Raiker"
+    },
+    {
+      "at": "2026-11-09T15:50:04.979Z",
+      "route": "models",
+      "title": "Raiker"
+    },
+    {
+      "at": "2026-11-09T15:50:06.005Z",
+      "route": "build",
+      "title": "Raiker"
+    },
+    {
+      "at": "2026-11-09T15:51:04.958Z",
+      "route": "models",
+      "title": "Raiker"
+    },
+    {
+      "at": "2026-11-09T15:51:05.970Z",
+      "route": "design",
+      "title": "Raiker"
+    },
+    {
+      "at": "2026-11-09T15:52:04.968Z",
+      "route": "models",
+      "title": "Raiker"
+    },
+    {
+      "at": "2026-11-09T15:52:05.992Z",
+      "route": "work",
+      "title": "Raiker"
+    },
+    {
+      "at": "2026-11-09T15:53:04.963Z",
+      "route": "models",
+      "title": "Raiker"
+    },
+    {
+      "at": "2026-11-09T15:53:05.979Z",
+      "route": "memory",
+      "title": "Raiker"
+    },
+    {
+      "at": "2026-11-09T15:54:04.973Z",
+      "route": "models",
+      "title": "Raiker"
+    },
+    {
+      "at": "2026-11-09T15:54:05.991Z",
+      "route": "models",
+      "title": "Raiker"
+    },
+    {
+      "at": "2026-11-09T15:55:04.968Z",
+      "route": "models",
+      "title": "Raiker"
+    },
+    {
+      "at": "2026-11-09T15:55:05.991Z",
+      "route": "connections",
+      "title": "Raiker"
+    },
+    {
+      "at": "2026-11-09T15:56:04.958Z",
+      "route": "models",
+      "title": "Raiker"
+    },
+    {
+      "at": "2026-11-09T15:56:05.982Z",
+      "route": "settings?tab=general",
+      "title": "Raiker"
+    },
+    {
+      "at": "2026-11-09T15:57:04.970Z",
+      "route": "models",
+      "title": "Raiker"
+    },
+    {
+      "at": "2026-11-09T15:57:05.989Z",
+      "route": "settings?tab=voice",
+      "title": "Raiker"
+    },
+    {
+      "at": "2026-11-09T15:58:04.970Z",
+      "route": "models",
+      "title": "Raiker"
+    },
+    {
+      "at": "2026-11-09T15:58:05.991Z",
+      "route": "settings?tab=backups",
+      "title": "Raiker"
+    },
+    {
+      "at": "2026-11-09T15:59:04.968Z",
+      "route": "models",
+      "title": "Raiker"
+    },
+    {
+      "at": "2026-11-09T15:59:05.992Z",
+      "route": "settings?tab=advanced&kind=runtime",
+      "title": "Raiker"
+    },
+    {
+      "at": "2026-11-09T16:00:04.966Z",
+      "route": "models",
+      "title": "Raiker"
+    },
+    {
+      "at": "2026-11-09T16:00:05.994Z",
+      "route": "approvals",
+      "title": "Raiker"
+    },
+    {
+      "at": "2026-11-09T16:01:04.963Z",
+      "route": "models",
+      "title": "Raiker"
+    },
+    {
+      "at": "2026-11-09T16:01:05.975Z",
+      "route": "schedule",
+      "title": "Raiker"
+    },
+    {
+      "at": "2026-11-09T16:02:04.958Z",
+      "route": "models",
+      "title": "Raiker"
+    },
+    {
+      "at": "2026-11-09T16:02:05.979Z",
+      "route": "observe",
+      "title": "Raiker"
+    },
+    {
+      "at": "2026-11-09T16:03:04.961Z",
+      "route": "models",
+      "title": "Raiker"
+    },
+    {
+      "at": "2026-11-09T16:03:05.986Z",
+      "route": "home",
+      "title": "Raiker"
+    },
+    {
+      "at": "2026-11-09T16:04:04.957Z",
+      "route": "models",
+      "title": "Raiker"
+    },
+    {
+      "at": "2026-11-09T16:04:05.980Z",
+      "route": "new-chat",
+      "title": "Raiker"
+    },
+    {
+      "at": "2026-11-09T16:05:04.966Z",
+      "route": "models",
+      "title": "Raiker"
+    },
+    {
+      "at": "2026-11-09T16:05:05.988Z",
+      "route": "build",
+      "title": "Raiker"
+    },
+    {
+      "at": "2026-11-09T16:06:04.961Z",
+      "route": "models",
+      "title": "Raiker"
+    },
+    {
+      "at": "2026-11-09T16:06:05.979Z",
+      "route": "design",
+      "title": "Raiker"
+    },
+    {
+      "at": "2026-11-09T16:07:04.974Z",
+      "route": "models",
+      "title": "Raiker"
+    },
+    {
+      "at": "2026-11-09T16:07:05.994Z",
+      "route": "work",
+      "title": "Raiker"
+    },
+    {
+      "at": "2026-11-09T16:08:04.958Z",
+      "route": "models",
+      "title": "Raiker"
+    },
+    {
+      "at": "2026-11-09T16:08:05.974Z",
+      "route": "memory",
+      "title": "Raiker"
+    },
+    {
+      "at": "2026-11-09T16:09:04.957Z",
+      "route": "models",
+      "title": "Raiker"
+    },
+    {
+      "at": "2026-11-09T16:09:05.976Z",
+      "route": "models",
+      "title": "Raiker"
+    },
+    {
+      "at": "2026-11-09T16:10:04.958Z",
+      "route": "models",
+      "title": "Raiker"
+    },
+    {
+      "at": "2026-11-09T16:10:05.965Z",
+      "route": "connections",
+      "title": "Raiker"
+    },
+    {
+      "at": "2026-11-09T16:11:04.960Z",
+      "route": "models",
+      "title": "Raiker"
+    },
+    {
+      "at": "2026-11-09T16:11:05.980Z",
+      "route": "settings?tab=general",
+      "title": "Raiker"
+    },
+    {
+      "at": "2026-11-09T16:12:04.964Z",
+      "route": "models",
+      "title": "Raiker"
+    },
+    {
+      "at": "2026-11-09T16:12:05.980Z",
+      "route": "settings?tab=voice",
+      "title": "Raiker"
+    },
+    {
+      "at": "2026-11-09T16:13:04.958Z",
+      "route": "models",
+      "title": "Raiker"
+    },
+    {
+      "at": "2026-11-09T16:13:05.987Z",
+      "route": "settings?tab=backups",
+      "title": "Raiker"
+    },
+    {
+      "at": "2026-11-09T16:14:04.959Z",
+      "route": "models",
+      "title": "Raiker"
+    },
+    {
+      "at": "2026-11-09T16:14:05.981Z",
+      "route": "settings?tab=advanced&kind=runtime",
+      "title": "Raiker"
+    },
+    {
+      "at": "2026-11-09T16:15:04.974Z",
+      "route": "models",
+      "title": "Raiker"
+    },
+    {
+      "at": "2026-11-09T16:15:05.992Z",
+      "route": "approvals",
+      "title": "Raiker"
+    },
+    {
+      "at": "2026-11-09T16:16:04.962Z",
+      "route": "models",
+      "title": "Raiker"
+    },
+    {
+      "at": "2026-11-09T16:16:05.975Z",
+      "route": "schedule",
+      "title": "Raiker"
+    },
+    {
+      "at": "2026-11-09T16:17:04.964Z",
+      "route": "models",
+      "title": "Raiker"
+    },
+    {
+      "at": "2026-11-09T16:17:05.983Z",
+      "route": "observe",
+      "title": "Raiker"
+    },
+    {
+      "at": "2026-11-09T16:18:04.962Z",
+      "route": "models",
+      "title": "Raiker"
+    },
+    {
+      "at": "2026-11-09T16:18:06.042Z",
+      "route": "home",
+      "title": "Raiker"
+    }
+  ],
+  "failures": [],
+  "completed": true,
+  "exercise_started_at": "2026-11-09T15:48:03.948Z",
+  "ended_at": "2026-11-09T16:18:06.218Z"
+}

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """The running voice engines of one workspace: started on use, stopped when idle.
 
 Voice spec §7, *warm and cold*. Engines start when a voice feature is used
@@ -12,7 +13,7 @@ macOS and Linux), and each registers its planned memory in the shared
   the chosen Whisper model. Dictation and conversation post to it through the
   existing transcription client (``speech_runtime.transcribe``).
 * **Speaking** — the speaking worker (:mod:`raiker.voice.tts_worker`) with
-  Kokoro or Piper, reached with a per-start token.
+  Kokoro, reached with a per-start token.
 """
 
 from __future__ import annotations
@@ -247,7 +248,7 @@ class VoiceEngines:
     # ── speaking ───────────────────────────────────────────────────────
 
     def ensure_speaker(self, engine: str, *, model: Path, voices: Path | None = None,
-                       piper: Path | None = None, threads: int, ram: int) -> RunningEngine:
+                       threads: int, ram: int) -> RunningEngine:
         with self._lock:
             current = self.running("speaker")
             if current is not None and current.detail == engine:
@@ -265,8 +266,6 @@ class VoiceEngines:
                     "--threads", str(max(1, threads)), "--token-file", str(token_file)]
             if voices is not None:
                 argv += ["--voices", str(voices)]
-            if piper is not None:
-                argv += ["--piper", str(piper)]
 
             def healthy(running: RunningEngine) -> bool:
                 try:

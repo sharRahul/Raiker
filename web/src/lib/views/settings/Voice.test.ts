@@ -20,7 +20,7 @@ function status(profile = "balanced", overrides: Record<string, unknown> = {}) {
     recommended_profile: "balanced",
     recommendation: "Your NVIDIA RTX 4060 can run speech recognition next to a local model.",
     profiles: [
-      { profile_id: "lite", name: "Lite", audience: "8 GB", speaking: "piper", download_bytes: 1, memory_bytes: 1,
+      { profile_id: "lite", name: "Lite", audience: "8 GB", speaking: "kokoro", download_bytes: 1, memory_bytes: 1,
         listening_available: false, speaking_available: false, recommended: false },
       { profile_id: "balanced", name: "Balanced", audience: "16 GB", speaking: "kokoro", download_bytes: 600_000_000,
         memory_bytes: 1, listening_available: false, speaking_available: true, recommended: true },

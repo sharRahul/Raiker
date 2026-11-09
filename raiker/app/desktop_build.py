@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Build the desktop application an owner installs (DESK-12, DIST-01).
 
 Two layers, run in order by :func:`build_app` (``scripts/build_desktop_app.py``):
@@ -27,6 +28,7 @@ import os
 import shutil
 import subprocess
 import sys
+from importlib import metadata
 from pathlib import Path
 
 #: electron-builder is fetched by exact version, never a range: the package an
@@ -35,7 +37,8 @@ ELECTRON_BUILDER = "electron-builder@26.17.0"
 
 
 def pyinstaller_command(
-    *, source_root: Path, web_assets: Path, out_dir: Path, platform_name: str = sys.platform
+    *, source_root: Path, web_assets: Path, out_dir: Path, platform_name: str = sys.platform,
+    bundle_voice: bool = False,
 ) -> list[str]:
     separator = ";" if platform_name == "win32" else ":"
     entry = source_root / "raiker" / "app" / "launcher.py"
@@ -57,6 +60,14 @@ def pyinstaller_command(
         str(out_dir / ".work"),
         "--specpath",
         str(out_dir / ".spec"),
+        *(
+            [arg for module in ("kokoro_onnx", "onnxruntime", "phonemizer", "espeakng_loader")
+             for arg in ("--collect-all", module)]
+            + [arg for name, _ in voice_runtime_pins(source_root)
+               for arg in ("--copy-metadata", name)]
+            + ["--add-data", f"{source_root / 'docs' / 'licensing' / 'voice'}{separator}docs/licensing/voice"]
+            if bundle_voice else []
+        ),
         "--collect-all",
         "pystray",
         "--collect-all",
@@ -93,14 +104,32 @@ def pyinstaller_command(
     ]
 
 
-def freeze_host(*, source_root: Path, web_assets: Path, out_dir: Path) -> int:
+def voice_runtime_pins(source_root: Path) -> list[tuple[str, str]]:
+    """The opt-in runtime uses the exact separately hash-locked dependencies."""
+    pins = []
+    for line in (source_root / "requirements" / "voice.txt").read_text().splitlines():
+        if line and not line.startswith(("#", " ")):
+            name, version = line.split(" ", 1)[0].split("==", 1)
+            pins.append((name, version))
+    return pins
+
+
+def freeze_host(*, source_root: Path, web_assets: Path, out_dir: Path, bundle_voice: bool = False) -> int:
     if not (source_root / "raiker" / "app" / "launcher.py").is_file():
         raise SystemExit("source root does not contain raiker/app/launcher.py")
     if not (web_assets / "index.html").is_file():
         raise SystemExit("web assets do not contain index.html")
+    if bundle_voice:
+        for name, expected in voice_runtime_pins(source_root):
+            try:
+                installed = metadata.version(name)
+            except metadata.PackageNotFoundError:
+                raise SystemExit(f"voice runtime missing: {name}; install requirements/voice.txt with --require-hashes") from None
+            if installed != expected:
+                raise SystemExit(f"voice runtime mismatch: {name} needs {expected}, found {installed}")
     out_dir.mkdir(parents=True, exist_ok=True)
     completed = subprocess.run(  # noqa: S603 - argv is fixed and paths are explicit
-        pyinstaller_command(source_root=source_root, web_assets=web_assets, out_dir=out_dir),
+        pyinstaller_command(source_root=source_root, web_assets=web_assets, out_dir=out_dir, bundle_voice=bundle_voice),
         check=False,
     )
     return completed.returncode
@@ -112,11 +141,13 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--source-root", default=".")
     parser.add_argument("--web-assets", default="web/dist")
     parser.add_argument("--out", default="desktop-dist")
+    parser.add_argument("--bundle-voice", action="store_true", help="Include the hash-locked personal Kokoro runtime.")
     args = parser.parse_args(argv)
     return freeze_host(
         source_root=Path(args.source_root).resolve(),
         web_assets=Path(args.web_assets).resolve(),
         out_dir=Path(args.out).resolve(),
+        bundle_voice=args.bundle_voice,
     )
 
 
@@ -197,9 +228,12 @@ def build_app(argv: list[str] | None = None) -> int:
         "--self-signed", action="store_true",
         help="The platform certificate is Raiker's own, not one the OS trusts (IN-3). Recorded for Settings.",
     )
+    parser.add_argument("--bundle-voice", action="store_true", help="Include the hash-locked personal Kokoro runtime.")
     parser.add_argument("--skip-freeze", action="store_true", help="Reuse desktop-dist/Raiker.")
     parser.add_argument("--skip-smoke", action="store_true", help="Do not start the frozen host.")
     args = parser.parse_args(argv)
+    if args.bundle_voice and args.skip_freeze:
+        parser.error("--bundle-voice requires a fresh freeze; remove --skip-freeze")
 
     target_id = args.target or (here.target_id if here else "")
     known = {target.target_id for target in DESKTOP_TARGETS}
@@ -212,7 +246,8 @@ def build_app(argv: list[str] | None = None) -> int:
     if not args.skip_freeze:
         shutil.rmtree(host_dir, ignore_errors=True)
         code = freeze_host(
-            source_root=source_root, web_assets=Path(args.web_assets).resolve(), out_dir=host_root
+            source_root=source_root, web_assets=Path(args.web_assets).resolve(), out_dir=host_root,
+            bundle_voice=args.bundle_voice,
         )
         if code != 0:
             return code

@@ -85,3 +85,18 @@ the finding and separates installed pre-fix evidence from the corrected-source
 recording. A corrected-source recording cannot close exact-candidate MM-5.
 `strace_egress_metadata.py` extracts only actual destination/timing observations
 and keeps failed attempts; the verifier's 1,800-second minimum is unchanged.
+
+## 2026-11-09 — Completed bounded installed-shell audit
+
+The `6c211b60` installed unsigned Linux shell/host audit passes its predeclared
+fresh-profile scope: 1,862 seconds of actual destination activity, 4,115
+observations, no unexpected hosts. The 30-minute navigation driver completed
+62 visits without failure; screenshot states were inspected. Chromium's 135
+non-sending IPv6 UDP route probes and native control probes remain explicit
+in the scope and receipts. Earlier failed captures remain failed.
+
+**MM-5 remains partial:** no selected useful model, managed speech, enabled
+external connector, owner-machine full-feature sign-off or signed-artifact
+capture is inferred. All four qualification workflows for runtime `6c211b60`
+are green; downloaded CI Linux artifact hashes and RPM digests verify.
+[Evidence and limits](LINUX_BETA_2026_11_09.md#completed-installed-shell-audit-and-ci-artifact-verification).

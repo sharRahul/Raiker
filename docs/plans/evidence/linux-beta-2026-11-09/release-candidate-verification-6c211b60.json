@@ -1,0 +1,88 @@
+{
+  "source_commit": "6c211b605d3c42d77215ff69cbed3f346c95d685",
+  "version": "0.9.0",
+  "channel": "beta",
+  "workflow_run": "https://github.com/sharRahul/Raiker/actions/runs/42650624663",
+  "release_key_matches_repository_pin": true,
+  "channel_signature_verified": true,
+  "provenance_signature_verified": true,
+  "lock_matches_uv_lock": true,
+  "sbom_digest_verified": true,
+  "all_checksum_files_verified": true,
+  "evidence_outputs_complete": true,
+  "artifacts": [
+    {
+      "name": "Raiker-0.9.0-linux-arm64.AppImage",
+      "sha256": "f46b294ef06b092b0bedfebdff3133189e2eeb36e55b417f43f0674121c3e68e",
+      "size": 201041972,
+      "manifest_signature_verified": true,
+      "linux_gpg_pin_verified": true
+    },
+    {
+      "name": "Raiker-0.9.0-linux-arm64.deb",
+      "sha256": "8fea55cbce09f742afa166023b53d57ebe63e4d605a6135fc223bbb914049f6f",
+      "size": 157205956,
+      "manifest_signature_verified": true,
+      "linux_gpg_pin_verified": true
+    },
+    {
+      "name": "Raiker-0.9.0-linux-arm64.rpm",
+      "sha256": "6bd5d4b9175c0ff8f2e91c8e22782acfa70e22f7b2259fb4c29dcabbc54a3ccc",
+      "size": 144974841,
+      "manifest_signature_verified": true,
+      "linux_gpg_pin_verified": true
+    },
+    {
+      "name": "Raiker-0.9.0-linux-x86_64.AppImage",
+      "sha256": "47fd179501464987ae3cdfde524d9cdc9768d5187fe6be444660de313b7aa180",
+      "size": 201459885,
+      "manifest_signature_verified": true,
+      "linux_gpg_pin_verified": true
+    },
+    {
+      "name": "Raiker-0.9.0-linux-x86_64.deb",
+      "sha256": "bf7798360a4bcd16fe245dd1b09b4819af25564d770ae399009f7cb9a6c8d87a",
+      "size": 164192540,
+      "manifest_signature_verified": true,
+      "linux_gpg_pin_verified": true
+    },
+    {
+      "name": "Raiker-0.9.0-linux-x86_64.rpm",
+      "sha256": "5437cc27ad1ee91db37bb6b2397354ba9107d73cbd92d8140b751f4b6923815e",
+      "size": 152473941,
+      "manifest_signature_verified": true,
+      "linux_gpg_pin_verified": true
+    },
+    {
+      "name": "Raiker-0.9.0-macos-arm64.dmg",
+      "sha256": "86637e726e919f60ba5dee4580d732ec11057653c6641f9c527cb3ed36c2589f",
+      "size": 190699987,
+      "manifest_signature_verified": true
+    },
+    {
+      "name": "Raiker-0.9.0-macos-arm64.zip",
+      "sha256": "54d6cba124af8c5aa304c40c1dbae1c51d93b2219726a19471580d5c2675f4a8",
+      "size": 185424716,
+      "manifest_signature_verified": true
+    },
+    {
+      "name": "Raiker-0.9.0-windows-x86_64-setup.exe",
+      "sha256": "1c7657d96c672012f5a97dbf4d8e9c09332ef7b2a4981c3516117e78f0b8af5f",
+      "size": 152662648,
+      "manifest_signature_verified": true
+    },
+    {
+      "name": "Raiker-0.9.0-windows-x86_64.msi",
+      "sha256": "7336b103701ab53af842ee431352198538838f7a017774d229fe7b87d1cc3f09",
+      "size": 174415872,
+      "manifest_signature_verified": true
+    }
+  ],
+  "published": false,
+  "beta_release_signoff": false,
+  "limits": [
+    "Windows Authenticode and native installation are checked by the workflow on Windows; not independently rerun on Linux.",
+    "macOS platform signing is deliberately excepted; Ed25519 manifests remain verified.",
+    "Feature, real-model journey, licence and owner-machine gates remain separate."
+  ]
+}

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Voice profiles made concrete for this machine, and the one to recommend.
 
 Voice spec §4. A profile chooses the *speech* components only — the model that
@@ -108,13 +109,7 @@ def resolve(
                 model = plain[0] if plain else (choices[0] if choices else None)
     if model is not None:
         components.append(Component("whisper_model", model))
-    if profile.speaking == "piper":
-        piper = catalogue.engine_for("piper_engine", hardware.os, hardware.arch)
-        if piper is not None:
-            components.append(Component("piper_engine", piper))
-        for item_id in profile.speaking_items:
-            components.append(Component("piper_voice", catalogue.get(item_id)))
-    elif profile.speaking == "kokoro":
+    if profile.speaking == "kokoro":
         for item_id in profile.speaking_items:
             item = catalogue.get(item_id)
             components.append(Component(item.component, item))

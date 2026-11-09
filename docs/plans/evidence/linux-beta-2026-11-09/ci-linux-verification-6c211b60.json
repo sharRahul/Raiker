@@ -1,0 +1,34 @@
+{
+  "version": "0.0.0",
+  "target": "linux-x86_64",
+  "signed": false,
+  "commit": "6c211b605d3c42d77215ff69cbed3f346c95d685",
+  "artifacts": [
+    {
+      "name": "Raiker-0.0.0-linux-x86_64.AppImage",
+      "sha256": "3940ba706c0e083714f74df374da7e0aa07f366f275b6a0134883ce4362ac923",
+      "size": 201455793,
+      "hash_verified": true,
+      "size_verified": true
+    },
+    {
+      "name": "Raiker-0.0.0-linux-x86_64.deb",
+      "sha256": "d825452d42fef0d656eba4fe17e8a78b420c59381a1c4b0c42bf2e68ae150606",
+      "size": 164192864,
+      "hash_verified": true,
+      "size_verified": true
+    },
+    {
+      "name": "Raiker-0.0.0-linux-x86_64.rpm",
+      "sha256": "e3aaca324c7d8b992c7cc0168a8e432519c652dd234e7d855ae5843f3131a346",
+      "size": 152478105,
+      "hash_verified": true,
+      "size_verified": true
+    }
+  ],
+  "workflow_run": "https://github.com/sharRahul/Raiker/actions/runs/42646385236",
+  "rpm_payload_compression": "xz 6",
+  "rpm_digests_verified": true,
+  "release_approved": false,
+  "note": "Unsigned CI 0.0.0 packaging qualification, separate from local unsigned 0.9.0 and the requested signed Release candidate."
+}

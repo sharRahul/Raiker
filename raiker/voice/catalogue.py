@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """The voice catalogue: every downloadable voice component, and nothing else.
 
 Voice spec §5.6. ``raiker/config/voice-catalogue.json`` lists engine builds,
@@ -41,7 +42,7 @@ ALLOWED_DOWNLOAD_HOSTS = frozenset({
 })
 
 COMPONENTS = frozenset({
-    "vad", "whisper_engine", "whisper_model", "kokoro_model", "kokoro_voices", "piper_engine", "piper_voice",
+    "vad", "whisper_engine", "whisper_model", "kokoro_model", "kokoro_voices",
 })
 
 _SHA256 = re.compile(r"^[0-9a-f]{64}$")
@@ -195,7 +196,7 @@ def parse(data: dict[str, Any]) -> Catalogue:
         for item_id in (*profile.listening, *profile.speaking_items):
             if item_id not in ids:
                 raise CatalogueError("voice_catalogue_profile_unknown_item")
-        if profile.speaking not in {"kokoro", "piper", "system"}:
+        if profile.speaking not in {"kokoro", "system"}:
             raise CatalogueError("voice_catalogue_invalid")
         profiles[profile_id] = profile
     return Catalogue(items=items, profiles=profiles)

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Voice spec §13, real engines — opt in with ``RAIKER_VOICE_LIVE=1``.
 
 Downloads real catalogue items from their sources, verifies them against the
@@ -50,3 +51,40 @@ def test_balanced_speaking_installs_verifies_and_speaks(tmp_path: Path, monkeypa
         engines.stop_all()
     assert service.remove() > 100_000_000
     assert installer.installed_bytes(ws) == 0
+
+
+@pytest.mark.skipif(not os.environ.get("RAIKER_VOICE_PACKAGED_HOST"), reason="set RAIKER_VOICE_PACKAGED_HOST")
+def test_packaged_kokoro_worker_uses_verified_assets_and_local_token(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Exercise the frozen worker separately from whole-profile memory admission."""
+    from raiker.models.engines.resources import ResourceLedger
+    from raiker.voice import engines as engine_module
+    from raiker.voice import installer
+    from raiker.voice.catalogue import load
+
+    host = Path(os.environ["RAIKER_VOICE_PACKAGED_HOST"]).resolve()
+    assert host.is_file()
+    ws = tmp_path / "ws"
+    ws.mkdir()
+    catalogue = load()
+    paths: dict[str, Path] = {}
+    with httpx.Client(timeout=httpx.Timeout(30.0, read=300.0)) as client:
+        for name in ("kokoro-82m-int8", "kokoro-voices-v1"):
+            item = catalogue.get(name)
+            installer.install_item(ws, item, client=client)
+            path = installer.installed_path(ws, item)
+            assert path is not None
+            paths[name] = path
+    monkeypatch.setattr(engine_module, "worker_argv", lambda: [str(host), "--voice-tts-worker"])
+    engines = engine_module.VoiceEngines(ws, ledger=ResourceLedger())
+    try:
+        running = engines.ensure_speaker("kokoro", model=paths["kokoro-82m-int8"],
+                                         voices=paths["kokoro-voices-v1"], threads=1, ram=450_000_000)
+        assert httpx.get(f"{running.endpoint}/health").status_code == 403
+        audio = engines.synthesise("Your next meeting is at three o'clock.", voice="af_heart", speed=1.0)
+        with wave.open(io.BytesIO(audio)) as clip:
+            assert clip.getframerate() == 24000
+            assert 1.0 < clip.getnframes() / clip.getframerate() < 8.0
+            assert any(clip.readframes(clip.getnframes()))
+    finally:
+        engines.stop_all()
+    assert engines.running("speaker") is None

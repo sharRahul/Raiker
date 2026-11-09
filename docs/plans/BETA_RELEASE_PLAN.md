@@ -1,5 +1,12 @@
 # First beta release plan
 
+> Owner scope update: personal use for at most five users, PC first and
+> phone/iPad later; no commercial-grade distribution/signing prerequisite.
+> Piper is removed in favor of Kokoro-82M. The earlier `6c211b60` signed
+> candidate/audit precede this change and retain their original SHA.
+> [Authoritative scope and remaining engineering checks](PERSONAL_BETA_SCOPE.md).
+
+
 **Status:** active plan, opened 2026-11-02. **Owner:** release owner.
 **Target:** Raiker `0.9.0-beta.1`, the first public beta, as soon as the gates in
 [Beta release criteria](#beta-release-criteria) pass on one commit.
@@ -640,3 +647,37 @@ non-loopback shell resource requests; 36 unit and 13 UI tests pass. Chromium's
 non-sending IPv6 UDP route probe remains explicitly recorded. A fresh candidate
 with this shell correction needs its own CI, package and egress evidence.
 [Follow-through](LINUX_BETA_2026_11_09.md#electron-network-process-follow-through).
+
+## 2026-11-09 — Completed bounded installed-shell audit
+
+The `6c211b60` installed unsigned Linux shell/host audit passes its predeclared
+fresh-profile scope: 1,862 seconds of actual destination activity, 4,115
+observations, no unexpected hosts. The 30-minute navigation driver completed
+62 visits without failure; screenshot states were inspected. Chromium's 135
+non-sending IPv6 UDP route probes and native control probes remain explicit
+in the scope and receipts. Earlier failed captures remain failed.
+
+**MM-5 remains partial:** no selected useful model, managed speech, enabled
+external connector, owner-machine full-feature sign-off or signed-artifact
+capture is inferred. All four qualification workflows for runtime `6c211b60`
+are green; downloaded CI Linux artifact hashes and RPM digests verify.
+[Evidence and limits](LINUX_BETA_2026_11_09.md#completed-installed-shell-audit-and-ci-artifact-verification).
+
+## 2026-11-09 — Signed candidate output verified
+
+[Release 42650624663](https://github.com/sharRahul/Raiker/actions/runs/42650624663)
+passed for exact runtime `6c211b60`, version `0.9.0`, beta channel,
+`require-except-macos`, publication disabled. Independent checks passed for
+all 10 installer hashes/Ed25519 manifests, six Linux GPG signatures, signed
+channel/provenance, SBOM binding, repository lock hash and checksum files.
+The product verifier and generated evidence inventory pass. The owner's
+manual dispatch supplied the needed access; this candidate is no longer
+blocked on candidate creation. Windows native checks passed in the workflow;
+macOS retains its platform-signing exception.
+
+This establishes CI-1/CI-5 candidate-output evidence, not beta sign-off.
+Full Voice/licence/packaged-speech, seven real-model journeys, live connector
+revocation/reconnect, full-feature signed-artifact egress and owner-machine
+acceptance remain open. The reporting fix preserves that candidate's SHA; the subsequent owner-requested
+Kokoro/Piper runtime change requires a new personal candidate.
+[Artifact, signatures and receipts](LINUX_BETA_2026_11_09.md#verified-non-published-signed-candidate).

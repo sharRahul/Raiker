@@ -19,12 +19,13 @@ const GATES = [
 ];
 
 describe("conversation profile (QUI-P02)", () => {
-  it("offers Careful and Standard only: no Off, no Within limits yet", () => {
-    expect(CONVERSATION_PROFILES.map((item) => item.label)).toEqual(["Careful", "Standard"]);
+  it("offers Careful, Standard and Within limits: never Off", () => {
+    expect(CONVERSATION_PROFILES.map((item) => item.label)).toEqual(["Careful", "Standard", "Within limits"]);
   });
 
-  it("sends nothing in Standard", () => {
+  it("sends nothing in Standard or Within limits: the runtime reads the profile itself", () => {
     expect(profileCapabilityModes("standard", GATES)).toEqual({});
+    expect(profileCapabilityModes("within_limits", GATES)).toEqual({});
   });
 
   it("asks, and only asks, before every capability that changes something in Careful", () => {

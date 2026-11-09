@@ -162,3 +162,47 @@ it("does not hold anything that is not sent through a connection", async () => {
   await fireEvent.click(await screen.findByRole("button", { name: "Allow once" }));
   expect(screen.queryByText(/Sending in/)).not.toBeInTheDocument();
 });
+
+// QUI-P05 — Allow for this task: allowed once, then the rule with its limits.
+const DRAFT = {
+  approval_id: "ap_1",
+  tool_name: "write_file",
+  risk_level: "medium",
+  project_id: null,
+  limits: { scope: "conversation", targets: [], max_uses: 10, expires_hours: 8, attachments: false, sensitive_asks: true },
+};
+
+it("allows this once and keeps a rule with the limits chosen (QUI-P05)", async () => {
+  stub(detail());
+  const resolve = vi.spyOn(api, "resolveApproval").mockResolvedValue({
+    approval_id: "ap_1", status: "approved", resume: { resumable: true, session_id: "sess_1", turn_id: "turn_1" },
+  } as never);
+  vi.spyOn(contract, "limitRuleDraft").mockResolvedValue(DRAFT as never);
+  const create = vi.spyOn(contract, "createLimitRule").mockResolvedValue({
+    ok: true,
+    grant: { limits_words: ["Only in the conversation it was allowed in", "10 of 10 uses left", "Attachments still ask"] },
+  } as never);
+  render(SafetyCard, { props: { approval: INFO, sessionId: "sess_1" } });
+
+  await fireEvent.click(await screen.findByRole("button", { name: "Allow for this task…" }));
+  await fireEvent.click(await screen.findByRole("button", { name: "Allow and keep these limits" }));
+  await waitFor(() => expect(create).toHaveBeenCalled());
+  // The decision first, then the rule: a refused rule never loses the decision.
+  expect(resolve.mock.invocationCallOrder[0]).toBeLessThan(create.mock.invocationCallOrder[0]);
+  expect(create).toHaveBeenCalledWith("ap_1", { limits: DRAFT.limits });
+  expect(
+    await screen.findByText("Allowed. Only in the conversation it was allowed in · 10 of 10 uses left · Attachments still ask."),
+  ).toHaveAttribute("role", "status");
+});
+
+it("says it was allowed once only when the rule is refused (QUI-P05)", async () => {
+  stub(detail());
+  vi.spyOn(api, "resolveApproval").mockResolvedValue({ approval_id: "ap_1", status: "approved" } as never);
+  vi.spyOn(contract, "limitRuleDraft").mockResolvedValue(DRAFT as never);
+  vi.spyOn(contract, "createLimitRule").mockRejectedValue(new ApiError(422, "grant_limit_expiry_invalid", "refused"));
+  render(SafetyCard, { props: { approval: INFO } });
+
+  await fireEvent.click(await screen.findByRole("button", { name: "Allow for this task…" }));
+  await fireEvent.click(await screen.findByRole("button", { name: "Allow and keep these limits" }));
+  expect(await screen.findByText(/^Allowed once\. Choose an expiry from 1 hour to 1 week\./)).toBeInTheDocument();
+});

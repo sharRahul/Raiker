@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { onPermissionsChanged } from "../permissionSync";
   import { isSendKeystroke, runningSendHint, sendHint } from "../sendKey";
   import { uiPrefs } from "../prefs.svelte";
   import { askConfirm } from "../confirm.svelte";
@@ -219,6 +220,13 @@
     if (!visible) audioSessionCoordinator.stopAll("route");
   });
 
+  // QUI-P02 acceptance — the Auto posture line follows a permission changed in
+  // another place or tab, without a reload.
+  onMount(() =>
+    onPermissionsChanged((kind) => {
+      if (kind === "modes" || kind === "gates") void readStandingModes();
+    }),
+  );
   $effect(() => {
     if (!visible) return;
     void loadRepos();

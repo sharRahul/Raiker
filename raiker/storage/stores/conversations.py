@@ -344,7 +344,7 @@ class ConversationStore:
 
     #: QUI-P02 — the profiles a conversation can carry. Careful narrows a turn;
     #: Standard sends no override. Anything else is refused, not stored.
-    CONVERSATION_PROFILES = ("careful", "standard")
+    CONVERSATION_PROFILES = ("careful", "standard", "within_limits")
 
     def set_session_profile(
         self: SQLiteStore, session_id: str, profile: str, user_id: str | None = None

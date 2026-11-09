@@ -38,6 +38,10 @@
   import { HELD_SEND_SECONDS, holdsBeforeSending } from "../heldSend";
   import { shownInline } from "../inlineDecisions.svelte";
   import Icon from "./Icon.svelte";
+  import LimitRuleForm from "./LimitRuleForm.svelte";
+  import { limitRuleReason } from "../limitRules";
+  import { announcePermissionsChanged } from "../permissionSync";
+  import type { LimitRuleLimits } from "../generated/apiContract";
 
   let {
     approval,
@@ -73,6 +77,9 @@
   let holdLeft = $state<number | null>(null);
   let undoing = $state(false);
   let undone = $state(false);
+  // QUI-P05 — Allow for this task: the limits form, and what became of the rule.
+  let limiting = $state(false);
+  let ruleNote = $state<string | null>(null);
 
   const critical = $derived(detail?.approval.critical ?? false);
   const settled = $derived(detail !== null && detail.approval.status !== "pending");
@@ -129,8 +136,26 @@
     })();
   });
 
-  async function decide(approve: boolean) {
-    if (busy || disabled) return;
+  /**
+   * Allow this once, then keep a rule with these limits for what follows.
+   * The approval is decided first, so a rule the runtime refuses never leaves
+   * the owner's decision unrecorded; the card then says the rule was not kept.
+   */
+  async function allowWithLimits(limits: LimitRuleLimits) {
+    const allowed = await decide(true);
+    if (!allowed) return;
+    limiting = false;
+    try {
+      const made = await contract.createLimitRule(approval.approval_id, { limits });
+      ruleNote = `Allowed. ${made.grant.limits_words.slice(0, 3).join(" · ")}.`;
+      announcePermissionsChanged("rules");
+    } catch (error) {
+      ruleNote = `Allowed once. ${limitRuleReason(error instanceof ApiError ? error.reasonCode : null)}`;
+    }
+  }
+
+  async function decide(approve: boolean): Promise<boolean> {
+    if (busy || disabled) return false;
     busy = true;
     failure = null;
     let ticker: ReturnType<typeof setInterval> | null = null;
@@ -153,6 +178,7 @@
         approved: approve,
       });
       onDecided?.(approve, result.resume?.resumable ?? false);
+      return true;
     } catch (error) {
       if (error instanceof ApiError && error.reasonCode === "approval_expired") {
         expired = true;
@@ -168,6 +194,7 @@
       holdLeft = null;
       busy = false;
     }
+    return false;
   }
 
   async function undoSend() {
@@ -243,6 +270,13 @@
         Undo
       </button>
     </div>
+  {:else if !settled && !undone && limiting}
+    <LimitRuleForm
+      approvalId={approval.approval_id}
+      busy={busy || disabled}
+      onallow={(limits) => void allowWithLimits(limits)}
+      oncancel={() => (limiting = false)}
+    />
   {:else if !settled && !undone}
     {#if failure}<p class="note failure" role="alert">{failure}</p>{/if}
     <div class="actions">
@@ -250,6 +284,11 @@
         Decline
       </button>
       <a class="btn btn-ghost btn-sm" href={changeHref}>Change</a>
+      <!-- QUI-P05 — where policy allows: never on a critical action, which
+           returns earlier with its own ceremony, nor on a question. -->
+      <button type="button" class="btn btn-sm" disabled={busy || disabled} onclick={() => (limiting = true)}>
+        Allow for this task…
+      </button>
       <button
         type="button"
         class="btn btn-primary btn-sm allow"
@@ -260,6 +299,7 @@
       </button>
     </div>
   {/if}
+  {#if ruleNote}<p class="note rule-note" role="status">{ruleNote}</p>{/if}
 </section>
 
 <style>

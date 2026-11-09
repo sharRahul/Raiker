@@ -930,6 +930,7 @@ class RuntimeAuthority:
         scope_pattern: str = "*",
         reason: str = "",
         ttl_days: float = grants.DEFAULT_GRANT_TTL_DAYS,
+        limits: dict[str, Any] | None = None,
     ) -> str | dict[str, Any]:
         """Create a scoped standing grant (a critical, human-decided action).
 
@@ -956,6 +957,7 @@ class RuntimeAuthority:
                 risk_ceiling=risk_ceiling,
                 reason=reason,
                 ttl_days=ttl_days,
+                limits_json=json.dumps(limits, sort_keys=True) if limits else "{}",
             )
         except grants.GrantValidationError as exc:
             self._event("standing_grant_denied", granted_by.principal_id, {
@@ -972,6 +974,9 @@ class RuntimeAuthority:
             "risk_ceiling": risk_ceiling,
             "expires_at": record["expires_at"],
             "reason": reason,
+            # QUI-P03 — what the rule is limited to, so the audit trail says
+            # which limits the owner chose, not only that a grant exists.
+            **({"limits": limits} if limits else {}),
         })
         return record
 
@@ -1089,9 +1094,16 @@ class RuntimeAuthority:
             return None
         if risk_level == RiskLevelValue.CRITICAL:
             return None
+        from raiker.runtime.authority import grant_limits
+
         for row in self.store.find_active_standing_grants(
             principal.principal_id, action.action_type
         ):
+            # QUI-P03 — a rule with limits is the broker's to apply, where the
+            # conversation, its profile and the action's targets are known. Here
+            # it would cover the bare action shape, so it covers nothing.
+            if grant_limits.load(row) is not None:
+                continue
             if grants.grant_covers(
                 row,
                 action_type=action.action_type,

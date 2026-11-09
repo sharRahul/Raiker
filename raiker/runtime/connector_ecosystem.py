@@ -466,6 +466,16 @@ class ConnectorInvoker:
         self._require_enabled(principal_id, connector_id)
         definition = ConnectorCatalog().get(connector_id)
         operation, base_url = self._operation(connector_id, operation_id)
+        # QUI-P04 — a Read only connection changes nothing, even when a write
+        # was approved before the owner chose Read only. Checked here as well as
+        # at the route, so no caller reaches a write around the preset.
+        from raiker.runtime import connector_policy
+
+        refused = connector_policy.refusal(
+            connector_policy.get(self.store, principal_id, connector_id), str(operation.get("method", ""))
+        )
+        if refused is not None:
+            raise ValueError(refused)
         parsed = urlparse(base_url)
         if parsed.scheme != "https" or parsed.hostname != definition.host:
             raise ValueError("connector_manifest_host_denied")

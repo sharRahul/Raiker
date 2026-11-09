@@ -8,6 +8,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import Field
 
 from raiker.api.dependencies import authenticate as _auth
+from raiker.api.dependencies import require_human
 from raiker.api.dependencies import workspace_root as _ws
 from raiker.api.schemas import StrictRequest, serialize_dto
 from raiker.api.sessions import ApiSession
@@ -18,9 +19,11 @@ from raiker.api.wire.connectors import (
     ConnectorAccounts,
     ConnectorActionCompleted,
     ConnectorActionQueued,
+    ConnectorActivity,
     ConnectorCredentialsSet,
     ConnectorEnabledSet,
     ConnectorInstalled,
+    ConnectorPresetSet,
     ConnectorStoreView,
     ConnectorUninstalled,
     ManifestRegistered,
@@ -29,6 +32,7 @@ from raiker.api.wire.connectors import (
 from raiker.contracts.ids import new_id, utc_now
 from raiker.contracts.models import ToolAction
 from raiker.runtime import connector_accounts as accounts
+from raiker.runtime import connector_policy
 from raiker.runtime.authority.models import Principal
 from raiker.runtime.connector_ecosystem import (
     ConnectorCatalog,
@@ -160,6 +164,7 @@ async def connector_store(
                 "operations": operations,
                 "accounts": _account_views(store, session.principal_id, definition.connector_id, definition.name)
                 if installed is not None else [],
+                "preset": connector_policy.get(store, session.principal_id, definition.connector_id),
             })
         )
     answer: ConnectorStoreView = {
@@ -189,6 +194,8 @@ async def install_connector(
                ON CONFLICT(principal_id, connector_id) DO UPDATE SET updated_at=excluded.updated_at""",
             (session.principal_id, connector_id, now, now),
         )
+    # QUI-P04 — a new connection starts Read only; changing that is the owner's.
+    connector_policy.start_new(store, session.principal_id, connector_id)
     installed: ConnectorInstalled = {
         "ok": True, "connector_id": connector_id, "installed": True, "enabled": False
     }
@@ -445,7 +452,14 @@ async def invoke_connector_action(
         )
     except accounts.AccountError as exc:
         raise _account_refusal(exc) from exc
-    if operation["requires_confirmation"]:
+    # QUI-P04 — the connection's preset narrows what its manifest allows: Read
+    # only refuses a change outright, Ask before changes sends every change to
+    # the owner, Custom adds nothing.
+    preset = connector_policy.get(store, session.principal_id, connector_id)
+    refused = connector_policy.refusal(preset, str(operation.get("method", "")))
+    if refused is not None:
+        raise HTTPException(status_code=409, detail={"reason_code": refused})
+    if operation["requires_confirmation"] or connector_policy.must_ask(preset, str(operation.get("method", ""))):
         action_id = new_id("act_")
         approval_id = new_id("appr_")
         intent_id = new_id("cwi_")
@@ -499,3 +513,55 @@ async def invoke_connector_action(
         raise HTTPException(status_code=409, detail={"reason_code": str(exc)}) from exc
     completed = cast(ConnectorActionCompleted, {"status": "completed", **result})
     return serialize_dto(completed)
+
+
+class ConnectorPresetRequest(StrictRequest):
+    """QUI-P04 — Read only, Ask before changes, or Custom."""
+
+    preset: str = Field(min_length=1, max_length=16)
+
+
+@router.put("/api/connector-store/{connector_id}/preset")
+async def set_connector_preset(
+    connector_id: str,
+    body: ConnectorPresetRequest,
+    request: Request,
+    _auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+) -> dict[str, Any]:
+    """What Raiker may do with this connection. Applies from the next action."""
+    session, principal = _auth_data
+    require_human(principal)
+    store = SQLiteStore(_ws(request))
+    if _installation(store, session.principal_id, connector_id) is None:
+        raise HTTPException(status_code=404, detail={"reason_code": "connector_not_installed"})
+    try:
+        preset = connector_policy.set_preset(store, session.principal_id, connector_id, body.preset)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail={"reason_code": str(exc)}) from exc
+    answer: ConnectorPresetSet = {"ok": True, "connector_id": connector_id, "preset": preset}
+    return serialize_dto(answer)
+
+
+@router.get("/api/connector-store/{connector_id}/activity")
+async def connector_activity(
+    connector_id: str,
+    request: Request,
+    _auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+) -> dict[str, Any]:
+    """QUI-P04 — what Raiker last did with this connection: the newest ten calls."""
+    session, _principal = _auth_data
+    store = SQLiteStore(_ws(request))
+    with store.connect() as connection:
+        rows = connection.execute(
+            """SELECT operation_id, status, started_at FROM connector_invocations
+               WHERE principal_id=? AND connector_id=? ORDER BY started_at DESC LIMIT 10""",
+            (session.principal_id, connector_id),
+        ).fetchall()
+    answer: ConnectorActivity = {
+        "connector_id": connector_id,
+        "items": [
+            {"operation_id": str(row["operation_id"]), "status": str(row["status"]), "started_at": str(row["started_at"])}
+            for row in rows
+        ],
+    }
+    return serialize_dto(answer)

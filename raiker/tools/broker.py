@@ -202,6 +202,8 @@ class ToolBroker:
         # BUG-218 — actions Auto's alignment check withheld this turn, so the
         # approval raised in their place can say why. Keyed by action id.
         self._alignment_withheld: dict[str, AlignmentVerdict] = {}
+        # QUI-P03 — the Allow-with-limits rule a parked action ran under.
+        self._limit_rule_applied: dict[str, dict[str, Any]] = {}
         self.command_service = CommandService.for_workspace(self.workspace_root)
         self.memory_service = GovernedMemoryService(
             self.workspace_root,
@@ -1780,6 +1782,48 @@ class ToolBroker:
             ]
         )
 
+    def _covering_limit_rule(self, action: ToolAction, session_id: str) -> dict[str, Any] | None:
+        """QUI-P03 — the owner's Allow-with-limits rule that covers this action, if any.
+
+        Only rules the owner made (``granted_by``), active, for this exact tool,
+        at or above the action's risk, and whose every limit holds for this
+        conversation, its profile, and the action's own arguments. Critical
+        actions never reach here: they are not ordinary approvals.
+        """
+        if self.store is None or action.risk_level == "critical" or not session_id:
+            return None
+        from raiker.runtime.authority import grant_limits, grants
+
+        session = self.store._row(
+            "SELECT project_id, conversation_profile FROM sessions WHERE session_id = ?", (session_id,)
+        )
+        project = str(session["project_id"]) if session is not None and session["project_id"] else None
+        profile = str(session["conversation_profile"] or "standard") if session is not None else "standard"
+        for row in self.store.list_standing_grants(granted_by=self.principal_id, include_inactive=False):
+            limits = grant_limits.load(row)
+            if limits is None:
+                continue
+            # The rule's shape: same tool, not revoked or expired, and the action
+            # at or below the rule's risk ceiling (critical has no rank at all).
+            if not grants.grant_covers(
+                row,
+                action_type=action.tool_name,
+                tool_name=action.tool_name,
+                scope="",
+                risk_level=action.risk_level,
+            ):
+                continue
+            if grant_limits.uncovered_reason(
+                limits,
+                arguments=action.arguments,
+                session_id=session_id,
+                session_project=project,
+                session_profile=profile,
+                use_count=int(row.get("use_count") or 0),
+            ) is None:
+                return row
+        return None
+
     def _approval_mode_principal(self) -> Principal | None:
         """Return the human owner represented by the composer setting.
 
@@ -1826,6 +1870,7 @@ class ToolBroker:
             "auto",
             "skip",
             "standing_allow",
+            "limit_rule",
         } or not self._is_ordinary_approval_decision(action, decision):
             return None
         # ADD-22 — a question is not an approval, and no composer mode may answer
@@ -1917,6 +1962,12 @@ class ToolBroker:
             client=client,
         )
         self._stream_tool(action, "tool_started", status="running")
+        rule = self._limit_rule_applied.get(action.action_id) if approval_mode == "limit_rule" else None
+        if rule is not None:
+            # Spent before the attempt, like a delegation: a use the executor
+            # then refuses is still a use, so a refused action cannot be retried
+            # past the limit the owner set.
+            self.store.record_standing_grant_use(str(rule["grant_id"]))
         governed_result = authority.route_action(governed, principal)
         if governed_result.decision != "allow" or governed_result.error is not None:
             blocked_decision = PolicyDecision(
@@ -1959,6 +2010,8 @@ class ToolBroker:
                 *decision.reasons,
                 "capability_mode:allow"
                 if approval_mode == "standing_allow"
+                else f"limit_rule:{rule['grant_id']}"
+                if rule is not None
                 else f"approval_mode:{approval_mode}",
             ],
             requires_user_approval=False,
@@ -1982,6 +2035,8 @@ class ToolBroker:
             if approval_mode == "auto"
             else "capability_allow_executed"
             if approval_mode == "standing_allow"
+            else "limit_rule_executed"
+            if rule is not None
             else "approval_preview_skipped"
         )
         self._event(
@@ -1995,6 +2050,7 @@ class ToolBroker:
                 "approval_mode": approval_mode,
                 "policy_reasons": decision.reasons,
                 **({"proposal_preview": preview} if approval_mode == "auto" else {}),
+                **({"grant_id": rule["grant_id"]} if rule is not None else {}),
             },
             client=client,
         )
@@ -2218,6 +2274,17 @@ class ToolBroker:
             # that is never read, which is the outcome the mode exists to avoid.
             if approval_mode != "dont_ask":
                 approval_mode = "manual"
+        elif (
+            decision.decision == "needs_approval"
+            and approval_mode == "manual"
+            and (rule := self._covering_limit_rule(action, session_id)) is not None
+        ):
+            # QUI-P03 — an Allow-with-limits rule the owner made covers this
+            # exact action. It runs through the same owner-preauthorised path
+            # as a standing allow: every gate, the critical floor and the
+            # executor's own checks still apply, and the rule's use is counted.
+            self._limit_rule_applied[action.action_id] = rule
+            approval_mode = "limit_rule"
         elif decision.decision == "needs_approval" and self._memory_write_has_standing_allow(action):
             # The owner made the durable, capability-specific decision in
             # Permissions. Carry it into the broker before the approval queue;

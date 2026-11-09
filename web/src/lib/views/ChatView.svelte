@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { onPermissionsChanged } from "../permissionSync";
   import { isSendKeystroke, runningSendHint, sendHint } from "../sendKey";
   import { addPin, withPins, type PromptPin } from "../promptPins";
   import { contextWarning, estimateDraftTokens } from "../tokenEstimate";
@@ -444,6 +445,13 @@
     // Re-read each time Careful is chosen, so it covers what Permissions lists now.
     if (conversationProfile === "careful") void loadProfileGates();
   });
+  // QUI-P02 acceptance — and again when a permission changes anywhere, so a
+  // Careful turn covers a capability turned on in another tab without a reload.
+  onMount(() =>
+    onPermissionsChanged((kind) => {
+      if (conversationProfile === "careful" && (kind === "gates" || kind === "modes")) void loadProfileGates();
+    }),
+  );
   async function profileModes(): Promise<Record<string, string> | null> {
     if (conversationProfile !== "careful") return {};
     if (profileGates === null) await loadProfileGates();

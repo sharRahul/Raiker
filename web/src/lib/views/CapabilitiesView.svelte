@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { onPermissionsChanged } from "../permissionSync";
   import ApprovalModeControl from "../components/ApprovalModeControl.svelte";
   import { goalSummaries } from "../permissionGoals";
   import { onMount, tick } from "svelte";
@@ -640,6 +641,10 @@
   }
 
   onMount(load);
+  // QUI-P02 acceptance — a change made in another tab, or on an approval card,
+  // shows here without a reload. Only another tab's or surface's change: this
+  // page re-reads after its own writes already.
+  onMount(() => onPermissionsChanged(() => void load()));
 </script>
 
 <!-- QUI-L06 — one line for the active profile, then categories beside the

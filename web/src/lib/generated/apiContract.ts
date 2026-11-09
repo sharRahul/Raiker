@@ -1526,6 +1526,18 @@ export type ConnectorActionRequest = {
   account_id?: string | null;
 };
 
+/** QUI-P04 — recent activity under a connection, newest first. */
+export type ConnectorActivity = {
+  connector_id: string;
+  items: ConnectorActivityItem[];
+};
+
+export type ConnectorActivityItem = {
+  operation_id: string;
+  status: string;
+  started_at: string;
+};
+
 /** The operation that undoes a write, and how long it stays possible. */
 export type ConnectorCompensation = {
   operation_id: string;
@@ -1570,6 +1582,17 @@ export type ConnectorOperation = {
   description: string;
   requires_confirmation: boolean;
   compensation?: ConnectorCompensation;
+};
+
+/** QUI-P04 — Read only, Ask before changes, or Custom. */
+export type ConnectorPresetRequest = {
+  preset: string;
+};
+
+export type ConnectorPresetSet = {
+  ok: boolean;
+  connector_id: string;
+  preset: "read_only" | "ask" | "custom";
 };
 
 /** Where the owner's browser goes to sign in; Raiker never sees the password. */
@@ -1852,6 +1875,7 @@ export type CreateStandingGrantRequest = {
   reason?: string;
   ttl_days?: number | null;
   as_principal?: string | null;
+  limits?: Record<string, unknown> | null;
 };
 
 export type CreateTelemetryDestinationRequest = {
@@ -3736,6 +3760,49 @@ export type LibraryRootAdded = {
 export type LibraryView = {
   items: LibraryItem[];
   kinds: string[];
+};
+
+export type LimitRuleCreated = {
+  ok: boolean;
+  grant: StandingGrantView;
+};
+
+/** What **Allow for this task** starts from. Grants nothing. */
+export type LimitRuleDraft = {
+  approval_id: string;
+  tool_name: string;
+  risk_level: string;
+  project_id: string | null;
+  limits: LimitRuleLimits;
+};
+
+/** The limits as the owner edits them; ``expires_hours`` instead of a date. */
+export type LimitRuleLimits = {
+  scope: "conversation" | "project" | "future";
+  targets: string[];
+  max_uses: number;
+  expires_hours: number;
+  attachments: boolean;
+  sensitive_asks: boolean;
+};
+
+/** QUI-P03 — the limits of an Allow-with-limits rule made from an approval. */
+export type LimitRuleRequest = {
+  limits?: Record<string, unknown>;
+};
+
+/** QUI-P09 — the same narrow action, allowed again and again. */
+export type LimitRuleSuggestion = {
+  tool_name: string;
+  targets: string[];
+  count: number;
+  risk_level: string;
+  approval_id: string;
+  limits: LimitRuleLimits;
+};
+
+export type LimitRuleSuggestions = {
+  suggestions: LimitRuleSuggestion[];
 };
 
 /** One limit the provider stated, exactly as stated. */
@@ -6072,7 +6139,7 @@ export type SetSessionPinnedRequest = {
 };
 
 export type SetSessionProfileRequest = {
-  profile: "careful" | "standard";
+  profile: "careful" | "standard" | "within_limits";
 };
 
 export type SetSessionProjectRequest = {
@@ -6379,6 +6446,8 @@ export type StandingGrantView = {
   revoked_at: string | null;
   use_count: number;
   last_used_at: string | null;
+  limits: Record<string, unknown> | null;
+  limits_words: string[];
 };
 
 /** GEP-02 — every task, turn and command the stop switch reached, and what would not stop. */
@@ -6425,6 +6494,7 @@ export type StoreConnector = {
   last_invoked_at: string | null;
   operations: ConnectorOperation[];
   accounts: ConnectorAccount[];
+  preset: "read_only" | "ask" | "custom";
 };
 
 /** What a provider volunteered with a turn about its own limits — never fetched. */
@@ -7295,6 +7365,10 @@ export const contract = {
     request<ApprovalDetailView>(`/api/approvals/${encodeURIComponent(approvalId)}`),
   answerOwnerQuestion: (approvalId: string, body: AnswerOwnerQuestionRequest) =>
     call<OwnerQuestionAnswered>("POST", `/api/approvals/${encodeURIComponent(approvalId)}/answer`, { body }),
+  limitRuleDraft: (approvalId: string) =>
+    request<LimitRuleDraft>(`/api/approvals/${encodeURIComponent(approvalId)}/limit-rule`),
+  createLimitRule: (approvalId: string, body: LimitRuleRequest) =>
+    call<LimitRuleCreated>("POST", `/api/approvals/${encodeURIComponent(approvalId)}/limit-rule`, { body }),
   replaceApprovalWithEdit: (approvalId: string, body: ReplaceApprovalRequest) =>
     call<ApprovalReplaced>("POST", `/api/approvals/${encodeURIComponent(approvalId)}/replace`, { body }),
   resolveApproval: (approvalId: string, body: ResolveApprovalRequest) =>
@@ -7539,6 +7613,8 @@ export const contract = {
     call<ConnectorCredentialsSet>("PUT", `/api/connector-store/${encodeURIComponent(connectorId)}/accounts/${encodeURIComponent(accountId)}/credentials`, { body }),
   invokeConnectorAction: (connectorId: string, body: ConnectorActionRequest) =>
     call<ConnectorActionCompleted | ConnectorActionQueued>("POST", `/api/connector-store/${encodeURIComponent(connectorId)}/actions`, { body }),
+  connectorActivity: (connectorId: string) =>
+    request<ConnectorActivity>(`/api/connector-store/${encodeURIComponent(connectorId)}/activity`),
   setConnectorCredentials: (connectorId: string, body: CredentialRequest) =>
     call<ConnectorCredentialsSet>("PUT", `/api/connector-store/${encodeURIComponent(connectorId)}/credentials`, { body }),
   setConnectorEnabled: (connectorId: string, query: { enabled: boolean }) =>
@@ -7547,6 +7623,8 @@ export const contract = {
     call<ConnectorInstalled>("POST", `/api/connector-store/${encodeURIComponent(connectorId)}/install`),
   registerConnectorManifest: (connectorId: string, body: ManifestRequest) =>
     call<ManifestRegistered>("POST", `/api/connector-store/${encodeURIComponent(connectorId)}/manifest`, { body }),
+  setConnectorPreset: (connectorId: string, body: ConnectorPresetRequest) =>
+    call<ConnectorPresetSet>("PUT", `/api/connector-store/${encodeURIComponent(connectorId)}/preset`, { body }),
   listCredentialDeltas: (query: { environment_profile_id: string }) =>
     request<CredentialDeltaList>(withQuery("/api/credential-deltas", query)),
   discardCredentialDelta: (runId: string, body: Record<string, unknown>) =>
@@ -7785,6 +7863,8 @@ export const contract = {
     call<LibraryPinRemoved>("DELETE", `/api/library/pins/${encodeURIComponent(pinId)}`),
   movePin: (pinId: string, body: LibraryPinMoveRequest) =>
     call<LibraryPinned>("PUT", `/api/library/pins/${encodeURIComponent(pinId)}/project`, { body }),
+  limitRuleSuggestions: () =>
+    request<LimitRuleSuggestions>("/api/limit-rules/suggestions"),
   getLlamaRuntime: (query: { refresh?: boolean } = {}) =>
     request<LlamaRuntimeOverview>(withQuery("/api/local-runtime/llama-cpp", query)),
   installLlamaRuntime: (body: LlamaCppInstallRequest) =>

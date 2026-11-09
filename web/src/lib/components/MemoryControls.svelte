@@ -13,6 +13,8 @@
    *
    * Memories themselves are on Memories, where each has its own Forget.
    */
+  import { grantSummary } from "../limitRules";
+  import { announcePermissionsChanged, onPermissionsChanged } from "../permissionSync";
   import { onMount } from "svelte";
   import { api } from "../api";
   import type { SkillView, StandingGrant } from "../apiTypes";
@@ -42,6 +44,8 @@
   }
 
   onMount(() => void load());
+  // QUI-P02 acceptance — a rule made on an approval card shows here at once.
+  onMount(() => onPermissionsChanged(() => void load()));
 
   async function undoSkill(skill: SkillView): Promise<void> {
     busy = skill.skill_id;
@@ -70,6 +74,7 @@
     notice = null;
     try {
       await api.revokeStandingGrant(grant.grant_id);
+      announcePermissionsChanged("rules");
       notice = `${what} asks you again from now on.`;
       await load();
     } catch (error) {
@@ -110,10 +115,7 @@
         <li>
           <div>
             <strong>{humanize(grant.tool_name)}</strong>
-            <span>
-              {grant.scope_pattern ? `On ${grant.scope_pattern} · ` : ""}up to {grant.risk_ceiling} risk · used {grant.use_count}
-              {grant.use_count === 1 ? "time" : "times"} · ends {relativeTime(grant.expires_at)}
-            </span>
+            <span>{grantSummary(grant)} · ends {relativeTime(grant.expires_at)}</span>
           </div>
           <button type="button" class="btn btn-ghost btn-sm" disabled={busy === grant.grant_id} onclick={() => void undoGrant(grant)}>Undo</button>
         </li>

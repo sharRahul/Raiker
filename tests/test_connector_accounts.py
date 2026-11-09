@@ -62,6 +62,8 @@ _MANIFEST = {
 
 def _installed(client: TestClient, auth: dict[str, str]) -> None:
     assert client.post("/api/connector-store/github/install", headers=auth).status_code == 200
+    # QUI-P04 — a new connection starts Read only; this owner allows changes.
+    assert client.put("/api/connector-store/github/preset", json={"preset": "custom"}, headers=auth).status_code == 200
     assert client.put(
         "/api/connector-store/github/credentials", headers=auth, json={"values": {"access_token": "work-token"}}
     ).status_code == 200

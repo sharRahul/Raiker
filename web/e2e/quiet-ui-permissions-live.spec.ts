@@ -1,6 +1,6 @@
 /**
  * Quiet UI — permissions and approvals
- * (docs/plans/quiet-ui/02_PERMISSIONS_AND_APPROVALS.md), against a running host
+ * (Quiet UI plan 02, closed 2026-11-08), against a running host
  * and a real hosted model.
  *
  * Prerequisites:

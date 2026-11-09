@@ -190,6 +190,45 @@ It is bounded by design: a critical action is never covered by one, the grant
 names the tool and the scope pattern it matches, and every use is recorded
 against the grant so the record shows what it actually authorised. **Settings →
 Security** lists the grants you hold, their use count, and when each expires.
+No grant lasts longer than a week.
+
+### Allow with limits
+
+A rule made with **Allow with limits** is a standing grant that names its limits.
+You make one from an approval with **Allow for this task…** (in the conversation
+or on **Approvals**), or accept one Raiker suggests on **Approvals** after you
+have allowed the same narrow action three times in a week to the same place.
+Raiker never makes one on its own.
+
+A rule covers an ordinary approval only, never a critical action, a question or
+a pause a hook asked for, and the action still runs through every gate and the
+executor's own checks. Each limit fails closed:
+
+| Limit | What it means |
+|---|---|
+| Applies to | This conversation; its project; or future work. Project and future rules apply only in conversations set to **Within limits** |
+| Only to | Recipients, sites, repositories or channels. A site covers its subdomains. An action that reaches anyone else, or whose target cannot be read, still asks |
+| At most | How many times, from 1 to 100. A use is spent when the action is tried |
+| For | From an hour to a week |
+| Attachments still ask | On by default |
+| Sensitive content still asks | On by default: text that looks like a password, key or token keeps the action outside the rule |
+
+**Careful** still asks under every rule. **Memory → Controls** and **Settings →
+Security** list each rule in these words, with **Undo** or **Revoke**, and a
+rule revoked in one place disappears from the others at once, in every open tab.
+
+### What Raiker may do with a connection
+
+Each catalogue connection's detail in **Connections** offers three presets:
+
+- **Read only**, where every new connection starts: reads go ahead under your
+  permissions, and a change is refused for this connection whatever else allows it.
+- **Ask before changes**: every change waits for you.
+- **Custom**: your permissions as set, opened at the connection's permission.
+
+A connection added before presets existed reads as **Custom**, so nothing it
+already did changes. **Recent activity** under the presets lists what Raiker
+last did with the connection.
 
 ---
 

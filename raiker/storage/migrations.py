@@ -5107,6 +5107,27 @@ MigrationStep = Migration | SearchMigration | RunnerStep
 # Models, and which model each managed slot was serving, so the servers the
 # owner deployed come back when Raiker starts again. A deployment row is deleted
 # when the owner stops that slot; a crash or a host restart leaves it in place.
+# QUI-P03 — Allow with limits: a standing grant that names its limits (where it
+# applies, recipients or sites, account, uses, attachments, sensitive content).
+# An empty object is a grant made without limits, which behaves as before.
+GRANT_LIMITS_MIGRATION_ID = "RAIKER-2131-grant-limits"
+GRANT_LIMITS_SQL = """
+ALTER TABLE standing_grants ADD COLUMN limits_json TEXT NOT NULL DEFAULT '{}';
+"""
+
+# QUI-P04 — what Raiker may do with one connection: Read only, Ask before
+# changes, or Custom. One row per owner and connection; none reads as Custom.
+CONNECTOR_POLICIES_MIGRATION_ID = "RAIKER-2132-connector-policies"
+CONNECTOR_POLICIES_SQL = """
+CREATE TABLE IF NOT EXISTS connector_policies (
+  principal_id TEXT NOT NULL,
+  connector_id TEXT NOT NULL,
+  preset TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  PRIMARY KEY (principal_id, connector_id)
+);
+"""
+
 LLAMA_RUNTIME_MIGRATION_ID = "RAIKER-2130-llama-runtime"
 LLAMA_RUNTIME_SQL = """
 CREATE TABLE IF NOT EXISTS local_model_runtime_settings (
@@ -5368,6 +5389,8 @@ MIGRATIONS: tuple[MigrationStep, ...] = (
     Migration(ROUTINE_DELIVERIES_MIGRATION_ID, ROUTINE_DELIVERIES_SQL),
     Migration(REMOTE_ACCESS_MIGRATION_ID, REMOTE_ACCESS_SQL),
     Migration(LLAMA_RUNTIME_MIGRATION_ID, LLAMA_RUNTIME_SQL),
+    Migration(GRANT_LIMITS_MIGRATION_ID, GRANT_LIMITS_SQL),
+    Migration(CONNECTOR_POLICIES_MIGRATION_ID, CONNECTOR_POLICIES_SQL),
 )
 
 #: DEC-17 step 8 — how far along the registry this build is, as one number.

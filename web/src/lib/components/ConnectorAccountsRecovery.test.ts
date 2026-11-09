@@ -13,6 +13,7 @@ it("keeps a private account credential entry on failure without claiming rollbac
     auth_status: "not_connected", vault_configured: true, activity_status: "idle",
     active_operation: null, last_invoked_at: null, operations: [], support_level: "experimental",
     accounts: [{ account_id: "default", label: "Work Gmail", is_default: true, auth_status: "not_connected" }],
+    preset: "read_only",
   };
   stubFetch({ "PUT /api/connector-store/gmail/accounts/default/credentials": {
     __status: 503, detail: { reason_code: "injected_failure" },

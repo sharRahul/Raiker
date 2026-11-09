@@ -195,6 +195,8 @@ EVENT_TYPES = {
     # A capability-specific standing Allow reached its governed executor. The
     # policy decision records which capability supplied the authority.
     "capability_allow_executed",
+    # QUI-P03 — an ordinary approval an Allow-with-limits rule covered.
+    "limit_rule_executed",
     # BUG-218 — `auto` promises a review, so it records when the review said no.
     # The action falls back to the ordinary approval queue; this event is the
     # evidence that Auto declined to grant it, with the path that did not match.

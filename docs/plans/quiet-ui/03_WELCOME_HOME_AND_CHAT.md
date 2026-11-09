@@ -131,7 +131,7 @@ switch in the top bar and keep the draft.
 | Tool step | 36 px row, grouped ("2 steps") and expandable |
 | Plan | Checklist card with real states and the path line |
 | Result | Bordered card with one action (Open draft, View diff, Open image) |
-| Approval | Raiker Safety card ([02, QUI-P05](02_PERMISSIONS_AND_APPROVALS.md#qui-p05--the-approval-card-raiker-safety)) |
+| Approval | Raiker Safety card (QUI-P05, [Chat guide](../../guide/working-in-chat.md)) |
 | Question | Clarifying-question card ([QUI-F02, FIXED-1151](../FIXED_ITEMS.md#fixed-1151--a-question-asked-mid-task-was-offered-as-an-approval-in-chat-build-and-the-floating-card-qui-f02)) |
 | Visual answer | Answer blocks ([Chat guide](../../guide/working-in-chat.md#tables-charts-and-other-answer-blocks)) |
 

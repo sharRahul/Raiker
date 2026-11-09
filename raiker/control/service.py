@@ -532,12 +532,23 @@ class RuntimeControlService:
         scope_pattern: str = "*",
         reason: str = "",
         ttl_days: float | None = None,
+        limits: dict[str, Any] | None = None,
+        session_id: str | None = None,
+        project_id: str | None = None,
     ) -> ControlResult:
-        from raiker.runtime.authority import grants
+        from raiker.runtime.authority import grant_limits, grants
 
         principal, err = resolve_local_principal(self._workspace_root, acting_principal_id)
         if principal is None:
             return ControlResult(ok=False, reason_code=err or "principal_not_resolved")
+        cleaned: dict[str, Any] | None = None
+        if limits is not None:
+            try:
+                rule, hours = grant_limits.clean(limits, session_id=session_id, project_id=project_id)
+            except grant_limits.LimitsError as exc:
+                return ControlResult(ok=False, reason_code=str(exc))
+            cleaned = dict(rule)
+            ttl_days = hours / 24
         outcome = self._authority.create_standing_grant(
             granted_by=principal,
             principal_id=principal.principal_id,
@@ -547,6 +558,7 @@ class RuntimeControlService:
             scope_pattern=scope_pattern,
             reason=reason,
             ttl_days=ttl_days if ttl_days is not None else grants.DEFAULT_GRANT_TTL_DAYS,
+            limits=cleaned,
         )
         if isinstance(outcome, str):
             return ControlResult(ok=False, reason_code=outcome)

@@ -444,6 +444,20 @@ async def create_standing_grant(
     """Create a scoped standing grant (a critical, human-decided action)."""
     session, _principal = _auth_data
     service = _get_service(request)
+    project_id: str | None = None
+    if body.limits is not None:
+        # A rule for one conversation is made from that conversation's own
+        # approval (`/api/approvals/{id}/limit-rule`), never named here.
+        if body.limits.get("scope") == "conversation":
+            _deny("grant_limit_conversation_from_approval")
+        if body.limits.get("scope") == "project":
+            project_id = str(body.limits.get("project_id") or "")
+            from raiker.storage.sqlite import SQLiteStore
+
+            store = SQLiteStore(request.app.state.workspace_root)
+            owner = store.principal_user_id(session.principal_id)
+            if not project_id or store.load_project(project_id, user_id=owner) is None:
+                _deny("grant_limit_project_not_found")
     result = service.create_standing_grant(
         session.principal_id,
         action_type=body.action_type,
@@ -452,6 +466,8 @@ async def create_standing_grant(
         scope_pattern=body.scope_pattern,
         reason=body.reason,
         ttl_days=body.ttl_days,
+        limits=body.limits,
+        project_id=project_id,
     )
     if not result.ok:
         _deny(result.reason_code)

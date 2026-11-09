@@ -15,6 +15,31 @@ the model provider → the audit event log. It also exercises the two features i
 PR #106: the **user-owned fallback sequence** and **prompt caching + normalised
 cache-hit metrics**.
 
+## Result — 2026-11-08 (Allow with limits, Within limits, suggestions and connection presets)
+
+The rest of the Quiet UI plan's permissions and approvals, after which 02 was
+closed
+([FIXED-1360](../plans/FIXED_ITEMS.md#fixed-1360--an-approval-could-only-be-allowed-once-or-forever-qui-p03-qui-p05)
+to [FIXED-1365](../plans/FIXED_ITEMS.md#fixed-1365--approvals-hid-allow-for-this-task-when-accepting-only-records-found-this-round)).
+A fresh workspace served by `raiker-web --port 8765` at 1440×900, Linux; no
+model. Parking an approval needs a model turn, and the round's key had no credit
+left. So each approval was parked by a short script that writes it the way the
+tool broker does (`RAIKER_LIVE_SEED`). Every decision after that was made
+through the product's own controls. Spec:
+`web/e2e/allow-with-limits-live.spec.ts`, **6/6 in one run** on a fresh workspace.
+
+| Case | Check | Result |
+|---|---|---|
+| RT-LIM-01 | On Approvals, **Allow for this task…** opens the limits: *This conversation* chosen, *Sensitive content still asks* and *Attachments still ask* ticked, no *Always allow*; *Future work* with nowhere named is refused before anything is sent; 3 times for 1 hour, then **Allow and keep these limits** reads *Rule kept: Only in the conversation it was allowed in · 3 of 3 uses left · Attachments still ask* | ✅ after a fix found in this round ([FIXED-1365](../plans/FIXED_ITEMS.md#fixed-1365--approvals-hid-allow-for-this-task-when-accepting-only-records-found-this-round)): Approvals hid the button while the relay was off |
+| RT-LIM-02 | Memory › Controls lists the rule in the same words, with **Undo** | ✅ |
+| RT-LIM-03 | The composer's profile menu offers **Within limits** with what it means; choosing it shows *Within limits* on the chip | ✅ |
+| RT-LIM-04 | Three allows of the same send to `#launch` in a week are offered on Approvals as a rule (*You allowed Connector write to launch 3 times this week…*); **Make this a rule** keeps it, and nothing was kept before that | ✅ |
+| RT-LIM-05 | A new GitHub connection reads **Read only**; **Ask before changes** is kept across a reload; **Recent activity** reads *Nothing yet.* | ✅ after a fix found in this round ([FIXED-1363](../plans/FIXED_ITEMS.md#fixed-1363--a-connection-was-on-or-off-with-nothing-between-qui-p04)): overlapping activity reads left *could not be read* |
+| RT-LIM-06 | With Memory › Controls open in one tab, the rule is revoked in Settings › Security in another; it disappears from the first tab without a reload | ✅ |
+| Suites | ruff, mypy (1,280 files), API contract check, secret scan; the affected Python files (failures only where this container cannot enforce the native sandbox, the same on unchanged `main`); the web unit suite (302 files, 2,860 tests), `svelte-check`, ESLint, design tokens, build | ✅ |
+| Visual review | Every capture inspected at original resolution (`output/playwright/2026-11-08-allow-with-limits/`). The Within limits menu was first captured mid-fade; the spec now waits for it | ✅ |
+| Not covered | A rule covering a model's own action, live (no model credit); it is covered end to end by `test_grant_limits.py`, through the real broker and authority | — |
+
 ## Result — 2026-11-08 (Dark attention amber and MCP provenance)
 
 The owner's two decisions of 2026-11-08
@@ -370,7 +395,7 @@ RT-QUI-37 and RT-QUI-43 let the model choose.
 
 ## Result — 2026-10-22 (Quiet UI permissions and approvals, hosted Anthropic Haiku 4.5)
 
-The approvals round of the [Quiet UI plan](../plans/quiet-ui/02_PERMISSIONS_AND_APPROVALS.md#status)
+The approvals round of the Quiet UI plan (02, closed 2026-11-08)
 ([FIXED-1125](../plans/FIXED_ITEMS.md#fixed-1125--an-unanswered-approval-waited-a-day-and-the-wait-could-not-be-set-qui-p06)
 to [FIXED-1135](../plans/FIXED_ITEMS.md#fixed-1135--nothing-checked-that-a-model-could-not-draw-an-approval-card-qui-p05-acceptance)).
 Fresh workspaces served by `raiker-web` at 1440×900 (1680×1000 for the wide
@@ -394,7 +419,7 @@ waiting approval's expiry into the past through the store
 | RT-QUI-33 | **Careful** chosen on Home's composer goes with the message: the chat answers *CAREFUL HANDOFF* and its chip reads Careful | ✅ |
 | RT-QUI-34 | A connected service's detail reads **What Raiker may do with GitHub** (*No activities are registered yet* until a manifest is imported) | ✅ |
 | Suites | Web unit suite, `svelte-check`, ESLint, design tokens, build; `tests/test_approval_timeout.py`, the approval, contract and docs tests; ruff, mypy, SAST | ✅ |
-| Visual review | Inspected at original resolution; the fixes marked above were found from the images. Still seen: the tool row above an expired approval reads *waiting for your decision* ([TO_BE_FIXED](../plans/TO_BE_FIXED.md#2026-10-22-quiet-ui-approvals-round--what-is-still-open)). | ✅ |
+| Visual review | Inspected at original resolution; the fixes marked above were found from the images. Still seen: the tool row above an expired approval reads *waiting for your decision* ([TO_BE_FIXED](../plans/TO_BE_FIXED.md#quiet-ui-permissions-and-approvals--open-items-document-closed-2026-11-08)). | ✅ |
 
 ## Result — 2026-10-21 (Quiet UI layout system and pages, hosted Anthropic Haiku 4.5)
 

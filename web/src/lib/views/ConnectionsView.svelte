@@ -12,6 +12,7 @@
    * session access. Nothing here grants anything; a connection stores a
    * credential and the capability gates in Permissions still decide.
    */
+  import ConnectionPresets from "../components/ConnectionPresets.svelte";
   import { onMount } from "svelte";
   import Icon from "../components/Icon.svelte";
   import PageState from "../components/PageState.svelte";
@@ -409,6 +410,7 @@
                  and whether it asks first. The HTTP detail stays one click
                  away for whoever needs it. -->
             <h3>What Raiker may do with {connector.display_name}</h3>
+            <ConnectionPresets {connector} capability={extension?.capability ?? null} onchanged={load} />
             {#if connector.operations.length > 0}
               <ul class="operations">
                 {#each connector.operations as operation (operation.operation_id)}

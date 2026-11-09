@@ -146,6 +146,7 @@ def build_grant_record(
     risk_ceiling: str,
     reason: str = "",
     ttl_days: float = DEFAULT_GRANT_TTL_DAYS,
+    limits_json: str = "{}",
 ) -> dict[str, Any]:
     """Validate the invariants and build a grant row ready to persist.
 
@@ -162,6 +163,10 @@ def build_grant_record(
         raise GrantValidationError(f"invalid_grant_risk_ceiling:{risk_ceiling}")
     if ttl_days <= 0:
         raise GrantValidationError("grant_ttl_must_be_positive")
+    if ttl_days > DEFAULT_GRANT_TTL_DAYS:
+        # The mandatory-expiry invariant has a ceiling too: no grant outlives a
+        # week, so "until revoked" cannot be spelled as a very large number.
+        raise GrantValidationError("grant_ttl_too_long")
     created = datetime.now(UTC).replace(microsecond=0)
     created_at = created.isoformat().replace("+00:00", "Z")
     expires_at = (created + timedelta(days=ttl_days)).isoformat().replace("+00:00", "Z")
@@ -176,4 +181,5 @@ def build_grant_record(
         "reason": reason,
         "created_at": created_at,
         "expires_at": expires_at,
+        "limits_json": limits_json,
     }

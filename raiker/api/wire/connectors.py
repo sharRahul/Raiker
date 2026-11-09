@@ -43,6 +43,8 @@ class StoreConnector(TypedDict):
     operations: list[ConnectorOperation]
     #: QUI-F07 — the default account first, then any the owner added.
     accounts: list[ConnectorAccount]
+    #: QUI-P04 — what Raiker may do with it: read_only, ask or custom.
+    preset: Literal["read_only", "ask", "custom"]
 
 
 class ConnectorStoreView(TypedDict):
@@ -143,3 +145,22 @@ class OAuthClientsView(TypedDict):
 class OAuthClientSaved(TypedDict):
     ok: bool
     provider: str
+
+
+class ConnectorPresetSet(TypedDict):
+    ok: bool
+    connector_id: str
+    preset: Literal["read_only", "ask", "custom"]
+
+
+class ConnectorActivityItem(TypedDict):
+    operation_id: str
+    status: str
+    started_at: str
+
+
+class ConnectorActivity(TypedDict):
+    """QUI-P04 — recent activity under a connection, newest first."""
+
+    connector_id: str
+    items: list[ConnectorActivityItem]

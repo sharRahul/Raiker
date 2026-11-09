@@ -227,6 +227,8 @@ def _connector_write(_ws: Path, client: TestClient, h: dict[str, str]) -> Call:
     from tests.contract_cases.extensions import MANIFEST
 
     assert client.post("/api/connector-store/github/install", headers=h).status_code == 200
+    # QUI-P04 — a new connection starts Read only; this owner allows changes.
+    assert client.put("/api/connector-store/github/preset", json={"preset": "custom"}, headers=h).status_code == 200
     assert client.put(
         "/api/connector-store/github/credentials", json={"values": {"token": "gho_c"}}, headers=h
     ).status_code == 200

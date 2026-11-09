@@ -75,6 +75,8 @@ def manifest(method: str = "get") -> dict[str, object]:
 
 def setup_connector(client: TestClient, auth: dict[str, str], method: str) -> None:
     assert client.post("/api/connector-store/github/install", headers=auth).status_code == 200
+    # QUI-P04 — a new connection starts Read only; this owner allows changes.
+    assert client.put("/api/connector-store/github/preset", json={"preset": "custom"}, headers=auth).status_code == 200
     assert client.put(
         "/api/connector-store/github/credentials",
         headers=auth,

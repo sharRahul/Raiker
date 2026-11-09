@@ -1,4 +1,6 @@
 <script lang="ts">
+  import { grantSummary } from "../../limitRules";
+  import { announcePermissionsChanged } from "../../permissionSync";
   import { api, auth, getToken, health as runtimeHealth, setToken, ApiError } from "../../api";
   import type { HealthView } from "../../api";
   import type {
@@ -186,6 +188,7 @@
   async function revokeGrant(grantId: string) {
     try {
       await api.revokeStandingGrant(grantId);
+      announcePermissionsChanged("rules");
       await loadGrants();
     } catch (e) {
       notice = { kind: "error", text: message(e, "Could not revoke the grant.") };
@@ -830,7 +833,7 @@
             <span class="grant-desc">
               <strong>{g.action_type}</strong>
               <span class="pill">≤ {g.risk_ceiling}</span>
-              <span class="grant-scope">scope: {g.scope_pattern}</span>
+              <span class="grant-scope">{grantSummary(g)}</span>
               {#if g.revoked}
                 <span class="pill pill-danger">Revoked</span>
               {:else}

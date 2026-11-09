@@ -8,6 +8,11 @@
   import DiffView from "../components/DiffView.svelte";
   import EmptyState from "../components/EmptyState.svelte";
   import Icon from "../components/Icon.svelte";
+  import LimitRuleForm from "../components/LimitRuleForm.svelte";
+  import LimitRuleSuggestions from "../components/LimitRuleSuggestions.svelte";
+  import { limitRuleReason } from "../limitRules";
+  import { announcePermissionsChanged } from "../permissionSync";
+  import type { LimitRuleLimits } from "../generated/apiContract";
   import IdentityChip from "../components/IdentityChip.svelte";
   import ListDetail from "../components/ListDetail.svelte";
   import PageState from "../components/PageState.svelte";
@@ -111,6 +116,27 @@
     text: string;
     link?: { href: string; label: string };
   } | null>(null);
+  // QUI-P05 — Allow for this task, from the queue.
+  let limiting = $state(false);
+
+  async function allowWithLimits(limits: LimitRuleLimits) {
+    if (selected === null) return;
+    const approvalId = selected.approval.approval_id;
+    limiting = false;
+    await resolve(true);
+    if (notice?.kind !== "ok") return;
+    try {
+      const made = await contract.createLimitRule(approvalId, { limits });
+      notice = { ...notice, text: `${notice.text} Rule kept: ${made.grant.limits_words.slice(0, 3).join(" · ")}.` };
+      announcePermissionsChanged("rules");
+    } catch (error) {
+      notice = {
+        ...notice,
+        text: `${notice.text} Allowed once only. ${limitRuleReason(error instanceof ApiError ? error.reasonCode : null)}`,
+      };
+    }
+  }
+
   let criticalDecision = $state<"approve" | "deny" | null>(null);
   let criticalReason = $state("");
   let criticalPassword = $state("");
@@ -745,6 +771,7 @@
     <button type="button" class="btn btn-sm" onclick={() => void load()}>Retry approvals</button>
   </div>
 {/if}
+<LimitRuleSuggestions />
 {#if approvals === null && !loadError}
   <PageState state="loading" title="Loading approvals…" />
 {:else if approvals !== null}
@@ -1053,6 +1080,13 @@
             <button type="button" class="btn btn-primary" onclick={() => void undoSend()}>Undo</button>
             {#if undoError}<p class="error" role="alert">{undoError}</p>{/if}
           {:else}
+          <!-- QUI-P05 — wherever the card offers it: a rule covers later
+               ordinary actions, whether or not accepting this one runs it. -->
+          {#if !selected.approval.critical}
+            <button type="button" class="btn" onclick={() => (limiting = true)} disabled={busy}>
+              Allow for this task…
+            </button>
+          {/if}
           <button type="button" class="btn btn-primary" onclick={() => resolve(true)} disabled={busy}>
             {busy
               ? selected.executes_on_approval
@@ -1064,6 +1098,14 @@
           </button>
           {/if}
         </div>
+        {#if limiting}
+          <LimitRuleForm
+            approvalId={selected.approval.approval_id}
+            {busy}
+            onallow={(limits) => void allowWithLimits(limits)}
+            oncancel={() => (limiting = false)}
+          />
+        {/if}
       {/if}
     {:else if selected.approval.is_expired}
       <p class="resolved-note">Expired before a decision was recorded.</p>

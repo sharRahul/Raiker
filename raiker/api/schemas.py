@@ -187,6 +187,10 @@ class CreateStandingGrantRequest:
     reason: str = ""
     ttl_days: float | None = None
     as_principal: str | None = None
+    #: QUI-P03 — Allow with limits. When present, ``scope`` is ``project`` or
+    #: ``future`` (a rule for one conversation is made from its approval), and
+    #: ``expires_hours`` replaces ``ttl_days``.
+    limits: dict[str, Any] | None = None
 
 
 @dataclass
@@ -217,6 +221,16 @@ class LibraryPinMoveRequest(StrictRequest):
     """QUI-F15 — file a pin in another project, or in none."""
 
     project_id: str | None = None
+
+
+class LimitRuleRequest(StrictRequest):
+    """QUI-P03 — the limits of an Allow-with-limits rule made from an approval.
+
+    Only limits: the action's shape (tool, risk, conversation) is read from the
+    approval on the server. Validated by ``raiker.runtime.authority.grant_limits``.
+    """
+
+    limits: dict[str, Any] = Field(default_factory=dict)
 
 
 class ProjectLimitsRequest(StrictRequest):
@@ -788,7 +802,7 @@ class SetSessionProfileRequest(StrictRequest):
     # QUI-P02 — a conversation's profile. Careful narrows each turn; Standard
     # sends no override. A label only: it grants nothing.
 
-    profile: Literal["careful", "standard"]
+    profile: Literal["careful", "standard", "within_limits"]
 
 
 class SetSessionPinnedRequest(StrictRequest):

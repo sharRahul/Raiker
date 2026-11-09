@@ -58,6 +58,8 @@ def _auth(client: TestClient) -> dict[str, str]:
 
 def _proposed(client: TestClient, auth: dict[str, str], monkeypatch: pytest.MonkeyPatch) -> tuple[str, AsyncMock]:
     assert client.post("/api/connector-store/github/install", headers=auth).status_code == 200
+    # QUI-P04 — a new connection starts Read only; this owner allows changes.
+    assert client.put("/api/connector-store/github/preset", json={"preset": "custom"}, headers=auth).status_code == 200
     client.put("/api/connector-store/github/credentials", headers=auth, json={"values": {"access_token": "t"}})
     client.post("/api/connector-store/github/manifest", headers=auth, json={"manifest": _MANIFEST})
     client.put("/api/connector-store/github/enabled?enabled=true", headers=auth)

@@ -1664,6 +1664,12 @@ file you can open. The two capture sets that remain — `screenshots/pages/` and
 | [FIXED-1357](#fixed-1357--twelve-live-checks-never-waited-and-a-kept-model-could-stop-a-specs-setup-found-this-round) | Low | Live test harness | Fixed 2026-11-08 |
 | [FIXED-1358](#fixed-1358--dark-attention-notices-shared-the-gold-of-a-primary-action) | Low | Brand / dark theme | Fixed 2026-11-08 |
 | [FIXED-1359](#fixed-1359--an-mcp-server-did-not-say-whether-raiker-had-reviewed-it-pl-5) | Low | Connections › MCP servers | Fixed 2026-11-08 |
+| [FIXED-1360](#fixed-1360--an-approval-could-only-be-allowed-once-or-forever-qui-p03-qui-p05) | Medium | Approvals / runtime authority | Fixed 2026-11-08 |
+| [FIXED-1361](#fixed-1361--the-composer-had-no-within-limits-profile-qui-p02) | Low | Chat / composer | Fixed 2026-11-08 |
+| [FIXED-1362](#fixed-1362--the-same-narrow-approval-given-again-and-again-was-never-offered-as-a-rule-qui-p09) | Low | Approvals | Fixed 2026-11-08 |
+| [FIXED-1363](#fixed-1363--a-connection-was-on-or-off-with-nothing-between-qui-p04) | Medium | Connections | Fixed 2026-11-08 |
+| [FIXED-1364](#fixed-1364--a-permission-changed-in-one-place-stayed-stale-elsewhere-until-a-reload-qui-p02-acceptance) | Low | Permissions / every surface | Fixed 2026-11-08 |
+| [FIXED-1365](#fixed-1365--approvals-hid-allow-for-this-task-when-accepting-only-records-found-this-round) | Low | Approvals | Fixed 2026-11-08 |
 
 ---
 
@@ -40346,3 +40352,149 @@ goes through Permissions, which is the consent ChatGPT's warning stands in for.
 
 **Evidence.** `mcpProvenance.test.ts`, `McpView.test.ts`; live RT-MCP-PL5-01
 (`03-mcp-provenance-light.png`, `04-mcp-provenance-dark.png`).
+
+## FIXED-1360 — An approval could only be allowed once, or forever (QUI-P03, QUI-P05)
+
+**Severity: Medium. Area: Approvals / runtime authority. Status: Fixed 2026-11-08.**
+
+**Observed.** The approval card offered **Allow once** and nothing between that
+and a Settings › Security grant with a scope pattern. The plan's **Allow with
+limits**, which *requires* the limits, did not exist, so the same send or write
+was approved again and again.
+
+**Fixed.** A rule is a standing grant that names its limits
+(`raiker/runtime/authority/grant_limits.py`, migration `RAIKER-2131`):
+* **Where it applies:** one conversation, one project, or future work.
+* **Reach:** the recipients, sites, repositories or channels it may reach, and
+  an account.
+* **Uses and expiry:** at most 100 uses and at most a week.
+* **What still asks:** attachments, and credential- or secret-like content.
+
+**Allow for this task…** on the Chat card and on Approvals allows this action
+once, then keeps the rule (`POST /api/approvals/{id}/limit-rule`).
+* The rule's tool, risk ceiling and conversation are read from the stored
+  approval; the request carries only limits.
+* A critical action or a question never offers it.
+
+The tool broker consults rules only for an ordinary approval it was about to
+park, and runs a covered action through the full runtime authority as an
+owner-preauthorised action, spending a use and logging `limit_rule_executed`
+with the rule's id. Every limit fails closed:
+* a target that cannot be read is outside;
+* a look-alike domain is outside;
+* an unreadable rule covers nothing.
+
+Careful still asks, and the older router grant path skips any rule with limits.
+Found this round: no grant had a ceiling on its lifetime, so *Always allow* could
+be spelled as a large `ttl_days`. Every grant now expires within a week
+(`grant_ttl_too_long`).
+
+**Evidence.** `tests/test_grant_limits.py` (12, including a covered write run
+end to end through the authority and Careful still asking), contract cases;
+`LimitRuleForm.test.ts`, `SafetyCard.test.ts`, `limitRules.test.ts`. Live
+RT-LIM-01 and RT-LIM-02. [Threat model](../threat-models/allow-with-limits.md).
+
+## FIXED-1361 — The composer had no Within limits profile (QUI-P02)
+
+**Severity: Low. Area: Chat / composer. Status: Fixed 2026-11-08.**
+
+**Observed.** The profile chip offered Careful and Standard. **Within limits**,
+"Standard plus the owner's Allow-with-limits rules", waited for the rules.
+
+**Fixed.** **Within limits** is the third profile, kept on the conversation. The
+runtime reads it from the conversation itself, so the chip sends no override:
+rules for a project or for future work apply only there, and a rule made for
+one conversation applies in it under Standard too.
+
+**Evidence.** `conversationProfile.test.ts`, `ChatView.profile.test.ts`,
+`test_grant_limits.py`; live RT-LIM-03.
+
+## FIXED-1362 — The same narrow approval, given again and again, was never offered as a rule (QUI-P09)
+
+**Severity: Low. Area: Approvals. Status: Fixed 2026-11-08.**
+
+**Observed.** Following Muse's design against approval fatigue, the plan asks
+Raiker to suggest an Allow-with-limits rule when the owner keeps allowing the
+same narrow action, and never to create one silently. Nothing did.
+
+**Fixed.** `GET /api/limit-rules/suggestions` offers a rule after three allows
+of the same tool to the same targets in a week, none declined, nothing critical,
+and no active rule covering them. **Approvals** shows it with **Make this a
+rule** and **Not now**. Making it is the ordinary human-only create.
+
+Found this round: the API's privacy redactor rewrites every email address in a
+response. An address offered as a target would have come back as
+`[REDACTED_EMAIL]`, a limit nobody can be inside. Drafts and suggestions
+therefore offer sites, repositories and channels; the owner types a recipient
+when the rule should name one.
+
+**Evidence.** `test_grant_limits.py`; live RT-LIM-04.
+
+## FIXED-1363 — A connection was on or off, with nothing between (QUI-P04)
+
+**Severity: Medium. Area: Connections. Status: Fixed 2026-11-08.**
+
+**Observed.** *What Raiker may do with …* listed each activity, but a catalogue
+connection could only be turned on or off for the session. The plan's presets
+and recent activity needed a per-connection policy the runtime did not store.
+
+**Fixed.** `raiker/runtime/connector_policy.py` and migration `RAIKER-2132`:
+* **Read only** is the default for every new connection. A change is refused at
+  the route and again inside the connector invoker, so a write approved before
+  the owner chose Read only still changes nothing.
+* **Ask before changes** sends every change to the owner.
+* **Custom** follows Permissions and opens it at the connection's permission.
+* A connection added before presets reads as Custom, so nothing it already did
+  changes.
+
+**Recent activity** lists the connection's newest ten calls. The tests that
+wrote through a fresh connection now choose Custom first, as an owner would.
+
+Found live: after a preset was saved, the connection refreshed and a second
+activity read overlapped the first, whose failure landed last and read as
+*could not be read*. Only the newest read now sets the list.
+
+**Evidence.** `tests/test_connector_presets.py`, `ConnectionPresets.test.ts`;
+live RT-LIM-05.
+
+## FIXED-1364 — A permission changed in one place stayed stale elsewhere until a reload (QUI-P02 acceptance)
+
+**Severity: Low. Area: Permissions / every surface. Status: Fixed 2026-11-08.**
+
+**Observed.** The plan's acceptance asks that changing a permission in one place
+is reflected everywhere without a reload. Each surface read the server once, so
+these showed what used to be true until reloaded:
+* Build's posture line;
+* a Careful turn's covered capabilities;
+* Memory › Controls;
+* the rule suggestions;
+* another tab.
+
+**Fixed.** `permissionSync.ts` announces a permission change on the page and,
+through a `BroadcastChannel`, to the owner's other tabs. The API client
+announces once the server has kept the write, so no caller is missed:
+* decision modes;
+* gates;
+* standing grants and rules;
+* a conversation's profile;
+* connection presets.
+
+Permissions, Build, Chat, Memory › Controls and the suggestions re-read. The
+signal carries no data; the server stays the only authority.
+
+**Evidence.** `limitRules.test.ts`; live RT-LIM-06: a rule revoked in Settings ›
+Security in one tab left Memory › Controls in the other without a reload.
+
+## FIXED-1365 — Approvals hid Allow for this task when accepting only records (found this round)
+
+**Severity: Low. Area: Approvals. Status: Fixed 2026-11-08.**
+
+**Observed.** On a fresh workspace the approval relay is off, so **Allow once**
+only records the decision. Approvals then hid **Allow for this task…**, while
+the Chat card offered it.
+
+**Fixed.** A rule covers later ordinary actions whether or not accepting this
+one runs it, so Approvals offers it wherever the card does: on every
+non-critical approval.
+
+**Evidence.** Live RT-LIM-01, on a workspace with the relay off.

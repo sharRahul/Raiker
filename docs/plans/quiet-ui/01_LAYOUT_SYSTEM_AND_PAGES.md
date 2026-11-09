@@ -161,7 +161,7 @@ Target: one screen, about 50 controls (from 3,712 px and 294 controls).
 * Bulk select and Group by move into an overflow menu.
 * "Not decided here" and "How your permissions apply" become help articles.
 
-Details of the permission model: [02](02_PERMISSIONS_AND_APPROVALS.md).
+Details of the permission model: [Permissions guide](../../guide/permissions-and-runtime-modes.md) (plan 02, closed 2026-11-08).
 
 ### QUI-L07 — Connections (renamed from Extensions)
 
@@ -177,7 +177,7 @@ Target: one screen (from 4,198 px).
   servers, skills, hooks, plugins as one segmented list). Overview is removed.
 * Channels uses the same pattern: connected channels plus an Add channel dialog.
 * GitHub moves here from Settings, because it is a service you connect.
-* Connection detail: [02, QUI-P04](02_PERMISSIONS_AND_APPROVALS.md#qui-p04--connection-detail).
+* Connection detail: QUI-P04, [FIXED-1363](../FIXED_ITEMS.md#fixed-1363--a-connection-was-on-or-off-with-nothing-between-qui-p04).
 
 ### QUI-L08 — Models
 

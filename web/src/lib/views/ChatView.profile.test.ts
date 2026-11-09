@@ -95,7 +95,9 @@ describe("ChatView — profile chip (QUI-P02)", () => {
     render(ChatView, {});
     await fireEvent.click(await screen.findByRole("button", { name: /without asking: Standard/ }));
     expect(screen.getByText(/Asks before every change, even ones your permissions allow/)).toBeInTheDocument();
-    expect(screen.queryByText(/Within limits/)).not.toBeInTheDocument();
+    // QUI-P03 (2026-11-08): Within limits is offered now that its rules exist.
+    expect(screen.getByRole("radio", { name: /Within limits/ })).toBeInTheDocument();
+    expect(screen.getByText(/plus the rules you made with Allow with limits/)).toBeInTheDocument();
     expect(screen.queryByText(/Skip/)).not.toBeInTheDocument();
     await fireEvent.click(screen.getByRole("radio", { name: /Careful/ }));
     expect(screen.getByRole("button", { name: /without asking: Careful/ })).toBeInTheDocument();

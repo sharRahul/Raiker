@@ -12,7 +12,7 @@ operation answers with, and whether OpenAPI describes it (OPT-01/OPT-02 —
 * **deferred** — the body has no declared type; a test fails while any is.
 * **special** — a stream, a file or another non-JSON transport; hand-written.
 
-**525 operations: 509 verified, 0 eligible, 0 deferred, 16 special.**
+**530 operations: 514 verified, 0 eligible, 0 deferred, 16 special.**
 
 | Method | Path | Request | Response | Status | Why |
 |---|---|---|---|---|---|
@@ -22,6 +22,8 @@ operation answers with, and whether OpenAPI describes it (OPT-01/OPT-02 —
 | GET | `/api/approvals/resumable` |  | ResumableTurns | verified | declared ResumableTurns |
 | GET | `/api/approvals/{approval_id}` |  | ApprovalDetailView | verified | DashboardService.get_approval |
 | POST | `/api/approvals/{approval_id}/answer` | AnswerOwnerQuestionRequest | OwnerQuestionAnswered | verified | declared OwnerQuestionAnswered |
+| GET | `/api/approvals/{approval_id}/limit-rule` |  | LimitRuleDraft | verified | declared LimitRuleDraft |
+| POST | `/api/approvals/{approval_id}/limit-rule` | LimitRuleRequest | LimitRuleCreated | verified | declared LimitRuleCreated |
 | POST | `/api/approvals/{approval_id}/replace` | ReplaceApprovalRequest | ApprovalReplaced | verified | declared by cast |
 | POST | `/api/approvals/{approval_id}/resolve` | ResolveApprovalRequest | ApprovalResolved | verified | declared ApprovalResolved |
 | POST | `/api/approvals/{approval_id}/resolve-critical` | ResolveApprovalRequest | CriticalApprovalResolved | verified | declared CriticalApprovalResolved |
@@ -147,10 +149,12 @@ operation answers with, and whether OpenAPI describes it (OPT-01/OPT-02 —
 | PUT | `/api/connector-store/{connector_id}/accounts/{account_id}` | ConnectorAccountRequest | ConnectorAccountChanged | verified | declared ConnectorAccountChanged |
 | PUT | `/api/connector-store/{connector_id}/accounts/{account_id}/credentials` | CredentialRequest | ConnectorCredentialsSet | verified | declared ConnectorCredentialsSet |
 | POST | `/api/connector-store/{connector_id}/actions` | ConnectorActionRequest | ConnectorActionCompleted \| ConnectorActionQueued | verified | declared by cast \| declared ConnectorActionQueued |
+| GET | `/api/connector-store/{connector_id}/activity` |  | ConnectorActivity | verified | declared ConnectorActivity |
 | PUT | `/api/connector-store/{connector_id}/credentials` | CredentialRequest | ConnectorCredentialsSet | verified | declared ConnectorCredentialsSet |
 | PUT | `/api/connector-store/{connector_id}/enabled` |  | ConnectorEnabledSet | verified | declared ConnectorEnabledSet |
 | POST | `/api/connector-store/{connector_id}/install` |  | ConnectorInstalled | verified | declared ConnectorInstalled |
 | POST | `/api/connector-store/{connector_id}/manifest` | ManifestRequest | ManifestRegistered | verified | declared by cast |
+| PUT | `/api/connector-store/{connector_id}/preset` | ConnectorPresetRequest | ConnectorPresetSet | verified | declared ConnectorPresetSet |
 | GET | `/api/credential-deltas` |  | CredentialDeltaList | verified | declared CredentialDeltaList |
 | POST | `/api/credential-deltas/{run_id}/discard` | dict | CredentialDeltaDiscarded | verified | declared CredentialDeltaDiscarded |
 | POST | `/api/design/assets/import` | DesignImportAssetRequest | DesignImportedAsset | verified | declared DesignImportedAsset |
@@ -274,6 +278,7 @@ operation answers with, and whether OpenAPI describes it (OPT-01/OPT-02 —
 | POST | `/api/library/pins` | LibraryPinRequest | LibraryPinned | verified | declared LibraryPinned |
 | DELETE | `/api/library/pins/{pin_id}` |  | LibraryPinRemoved | verified | declared LibraryPinRemoved |
 | PUT | `/api/library/pins/{pin_id}/project` | LibraryPinMoveRequest | LibraryPinned | verified | declared LibraryPinned |
+| GET | `/api/limit-rules/suggestions` |  | LimitRuleSuggestions | verified | declared LimitRuleSuggestions |
 | GET | `/api/local-runtime/llama-cpp` |  | LlamaRuntimeOverview | verified | _overview |
 | POST | `/api/local-runtime/llama-cpp/install` | LlamaCppInstallRequest | ModelOperationView | verified | declared ModelOperationView |
 | DELETE | `/api/local-runtime/llama-cpp/installation` |  | LlamaRuntimeOverview | verified | _overview |

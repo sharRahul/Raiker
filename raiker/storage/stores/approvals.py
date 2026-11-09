@@ -463,8 +463,8 @@ class ApprovalStore:
             INSERT INTO standing_grants
             (grant_id, principal_id, granted_by, action_type, tool_name,
              scope_pattern, risk_ceiling, reason, created_at, expires_at,
-             revoked, revoked_at, revoked_by, use_count, last_used_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, NULL, NULL, 0, NULL)
+             revoked, revoked_at, revoked_by, use_count, last_used_at, limits_json)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, NULL, NULL, 0, NULL, ?)
             """,
             (
                 record["grant_id"],
@@ -477,6 +477,7 @@ class ApprovalStore:
                 record.get("reason", ""),
                 record["created_at"],
                 record["expires_at"],
+                record.get("limits_json") or "{}",
             ),
         )
 

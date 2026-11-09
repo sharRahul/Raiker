@@ -1027,27 +1027,33 @@ These parts of the same items are not done:
   **Run in background** sits in Tools until it is. The profile chip on both
   composers shipped 2026-10-22 ([FIXED-1130](FIXED_ITEMS.md#fixed-1130--a-conversation-could-not-say-how-careful-raiker-should-be-qui-p02)).
 
-## 2026-10-22 Quiet UI approvals round — what is still open
+## Quiet UI permissions and approvals — open items (document closed 2026-11-08)
 
-The approvals round of [02](quiet-ui/02_PERMISSIONS_AND_APPROVALS.md#status)
-shipped [FIXED-1125](FIXED_ITEMS.md#fixed-1125--an-unanswered-approval-waited-a-day-and-the-wait-could-not-be-set-qui-p06)
-to [FIXED-1135](FIXED_ITEMS.md#fixed-1135--nothing-checked-that-a-model-could-not-draw-an-approval-card-qui-p05-acceptance).
-These parts of the same document are not done:
+The approvals round of Quiet UI plan 02 shipped
+[FIXED-1125](FIXED_ITEMS.md#fixed-1125--an-unanswered-approval-waited-a-day-and-the-wait-could-not-be-set-qui-p06)
+to [FIXED-1135](FIXED_ITEMS.md#fixed-1135--nothing-checked-that-a-model-could-not-draw-an-approval-card-qui-p05-acceptance),
+Allow with limits, Within limits, suggestions, connection presets and
+permissions shown everywhere without a reload shipped
+[FIXED-1360](FIXED_ITEMS.md#fixed-1360--an-approval-could-only-be-allowed-once-or-forever-qui-p03-qui-p05)
+to [FIXED-1365](FIXED_ITEMS.md#fixed-1365--approvals-hid-allow-for-this-task-when-accepting-only-records-found-this-round),
+and the document was deleted. Still open from it:
 
-* **QUI-P03 — Allow with limits.** Permissions offers *Ask me*, *Allow*,
-  *Automatic* and *Never*. A limited allow (account, recipients or domains,
-  attachments, volume, sensitive data still asks, scope, expiry) needs a rule
-  the runtime evaluates; Settings › Security's *Standing approval grants*
-  (action type, risk ceiling, scope, expiry) is the closest existing record and
-  the likely base. Until it exists, **Within limits** (QUI-P02), **Allow for
-  this task** (QUI-P05) and the suggestion in QUI-P09 are not offered.
-* **QUI-P04 — connection presets and accounts.** *Read only* (the default for a
-  new connection), *Ask before changes* and *Custom*, several named accounts per
-  service, and recent activity under the list need a per-connection policy and
-  account record. Today a connection is on or off for the session, and each
-  operation's `requires_confirmation` comes from its manifest.
-* **QUI-P08 — Approvals you've given** in Memory › Controls, with Undo, together
-  with *What Raiker has learned to do* (QUI-F09).
+* **Allow with limits in Permissions' own detail pane.** The plan puts the
+  choice beside *Ask me*, *Allow*, *Automatic* and *Never*. A rule is shaped by
+  an action (its tool, risk and targets), and a Permissions row is a capability
+  that covers many tools, so rules are made where an action is in front of the
+  owner: **Allow for this task…** on an approval, or a suggestion on
+  Approvals. This follows Hermes, whose *Always allow…* sits on the approval
+  card. Permissions links to where rules are listed (Memory › Controls,
+  Settings › Security), but does not make one.
+* **A rule naming an email recipient is shown redacted.** The API's privacy
+  redactor rewrites addresses in every response, so a typed recipient reads as
+  `[REDACTED_EMAIL]` in rule lists; sites, repositories and channels read
+  intact. Showing the owner their own rule's recipients needs an owner-only
+  exception to the redactor, decided against its threat model.
+* **Presets cover catalogue connections.** GitHub writes keep their repository
+  delegations (GH-50); Gmail, Calendar and Outlook only read; MCP servers keep
+  per-tool acceptance.
 
 ## 2026-10-26 storage upgrade — what is still open
 
@@ -1250,7 +1256,7 @@ the Library with 04's **Pin to project**, undo windows, project limits, routine
 results to a channel, corrections made by editing and the task receipt
 ([FIXED-1252](FIXED_ITEMS.md#fixed-1252--the-same-aim-across-conversations-was-never-offered-as-a-goal-qui-f03)
 to [FIXED-1263](FIXED_ITEMS.md#fixed-1263--key-figures-read-1200-where-1200-was-meant-found-this-round)).
-QUI-F08 and QUI-F23 shipped earlier as [02, QUI-P06](quiet-ui/02_PERMISSIONS_AND_APPROVALS.md#status)
+QUI-F08 and QUI-F23 shipped earlier as 02, QUI-P06
 and [03, QUI-H04](quiet-ui/03_WELCOME_HOME_AND_CHAT.md#status).
 
 * **QUI-F14 — a companion on the desktop.** Planned as *Later*: an opt-in, off

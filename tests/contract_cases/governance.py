@@ -92,6 +92,19 @@ def _resolve(ws: Path, _client: TestClient, _h: dict[str, str]) -> Call:
     return f"/api/approvals/{approval_id}/resolve", {"approve": True, "reason": "fine"}
 
 
+def _limit_rule_draft(ws: Path, _client: TestClient, _h: dict[str, str]) -> Call:
+    approval_id = _pending(ws, "write_file", {"path": "notes.txt", "text": "hello\n"})
+    return f"/api/approvals/{approval_id}/limit-rule"
+
+
+def _limit_rule(ws: Path, _client: TestClient, _h: dict[str, str]) -> Call:
+    """QUI-P03 — Allow for this task: a rule for this conversation, three uses."""
+    approval_id = _pending(ws, "write_file", {"path": "notes.txt", "text": "hello\n"})
+    return f"/api/approvals/{approval_id}/limit-rule", {
+        "limits": {"scope": "conversation", "max_uses": 3, "expires_hours": 2}
+    }
+
+
 def _elevated(ws: Path) -> dict[str, str]:
     token, _session = ApiSessionStore(ws).create_session(
         OWNER, scope="elevated", expires_in_seconds=60
@@ -306,6 +319,9 @@ CASES: Cases = {
     ("POST", "/api/approvals/{approval_id}/replace"): _replace,
     ("POST", "/api/approvals/{approval_id}/resolve"): _resolve,
     ("POST", "/api/approvals/{approval_id}/resolve-critical"): _resolve_critical,
+    ("GET", "/api/approvals/{approval_id}/limit-rule"): _limit_rule_draft,
+    ("POST", "/api/approvals/{approval_id}/limit-rule"): _limit_rule,
+    ("GET", "/api/limit-rules/suggestions"): plain("/api/limit-rules/suggestions"),
     ("POST", "/api/runtime-mode/activate"): plain(
         "/api/runtime-mode/activate", {"mode_name": "local_single_user_runtime", "reason": "contract"}
     ),

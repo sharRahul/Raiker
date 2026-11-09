@@ -9,6 +9,7 @@ from typing import Any, Literal, NotRequired
 from typing_extensions import TypedDict
 
 from raiker.control.views.security import BackupView
+from raiker.runtime.authority import grant_limits
 
 DecisionMode = Literal["ask", "allow", "auto", "deny"]
 
@@ -66,6 +67,9 @@ class StandingGrantView(TypedDict):
     revoked_at: str | None
     use_count: int
     last_used_at: str | None
+    #: QUI-P03 — present for an Allow-with-limits rule, ``None`` otherwise.
+    limits: dict[str, Any] | None
+    limits_words: list[str]
 
 
 def standing_grant(row: dict[str, Any]) -> StandingGrantView:
@@ -89,7 +93,18 @@ def standing_grant(row: dict[str, Any]) -> StandingGrantView:
         "revoked_at": row.get("revoked_at"),
         "use_count": int(row.get("use_count") or 0),
         "last_used_at": row.get("last_used_at"),
+        # QUI-P03 — the limits an Allow-with-limits rule carries, and the same
+        # limits in words, so every surface describes a rule identically.
+        "limits": _limits(row),
+        "limits_words": grant_limits.describe(
+            grant_limits.load(row), use_count=int(row.get("use_count") or 0)
+        ),
     }
+
+
+def _limits(row: dict[str, Any]) -> dict[str, Any] | None:
+    loaded = grant_limits.load(row)
+    return dict(loaded) if loaded is not None else None
 
 
 class StandingGrantList(TypedDict):
@@ -282,3 +297,45 @@ class RecoveryRestored(TypedDict):
     quarantine: str
     counts: dict[str, int]
     deletions_applied: dict[str, int]
+
+
+class LimitRuleLimits(TypedDict):
+    """The limits as the owner edits them; ``expires_hours`` instead of a date."""
+
+    scope: Literal["conversation", "project", "future"]
+    targets: list[str]
+    max_uses: int
+    expires_hours: int
+    attachments: bool
+    sensitive_asks: bool
+
+
+class LimitRuleDraft(TypedDict):
+    """What **Allow for this task** starts from. Grants nothing."""
+
+    approval_id: str
+    tool_name: str
+    risk_level: str
+    #: The conversation's project, so the form can offer "this project".
+    project_id: str | None
+    limits: LimitRuleLimits
+
+
+class LimitRuleCreated(TypedDict):
+    ok: bool
+    grant: StandingGrantView
+
+
+class LimitRuleSuggestion(TypedDict):
+    """QUI-P09 — the same narrow action, allowed again and again."""
+
+    tool_name: str
+    targets: list[str]
+    count: int
+    risk_level: str
+    approval_id: str
+    limits: LimitRuleLimits
+
+
+class LimitRuleSuggestions(TypedDict):
+    suggestions: list[LimitRuleSuggestion]

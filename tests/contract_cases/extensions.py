@@ -131,6 +131,17 @@ def _accounts(_ws: Path, client: TestClient, h: dict[str, str]) -> Call:
     return "/api/connector-store/github/accounts"
 
 
+def _preset(_ws: Path, client: TestClient, h: dict[str, str]) -> Call:
+    """QUI-P04 — a new connection starts Read only; the owner chooses Ask before changes."""
+    _installed(client, h)
+    return "/api/connector-store/github/preset", {"preset": "ask"}
+
+
+def _activity(_ws: Path, client: TestClient, h: dict[str, str]) -> Call:
+    _installed(client, h)
+    return "/api/connector-store/github/activity"
+
+
 def _add_account(_ws: Path, client: TestClient, h: dict[str, str]) -> Call:
     _installed(client, h)
     return "/api/connector-store/github/accounts", {"label": "Personal"}
@@ -727,6 +738,8 @@ CASES: Cases = {
     ("POST", "/api/connector-oauth/{connector_id}/start"): patched(_sign_in_started, _vault_and_loopback),
     ("POST", "/api/approvals/{approval_id}/undo-send"): _held_send,
     ("GET", "/api/connector-store/{connector_id}/accounts"): _accounts,
+    ("PUT", "/api/connector-store/{connector_id}/preset"): _preset,
+    ("GET", "/api/connector-store/{connector_id}/activity"): _activity,
     ("POST", "/api/connector-store/{connector_id}/accounts"): _add_account,
     ("PUT", "/api/connector-store/{connector_id}/accounts/{account_id}"): _rename_account,
     ("DELETE", "/api/connector-store/{connector_id}/accounts/{account_id}"): _remove_account,

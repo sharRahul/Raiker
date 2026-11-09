@@ -21,6 +21,7 @@ acknowledging.
 | `telemetry_export` | [Telemetry export](telemetry-export.md) |
 | `image_generation` | [Image generation](image-generation.md) |
 | Critical approvals (human-only, step-up verified) | [Critical approval lifecycle](critical-approval-lifecycle.md) |
+| Allow-with-limits rules and connection presets | [Allow with limits](allow-with-limits.md) |
 | `file_write_execution`, `patch_apply_execution` | [Workspace file mutation](workspace-file-mutation.md) |
 | `checkpoint_restore_execution` | [Checkpoint restore and rewind](checkpoint-restore.md) |
 | `shell_execution` | [Governed command execution](shell-execution.md) |

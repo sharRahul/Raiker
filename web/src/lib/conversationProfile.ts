@@ -12,15 +12,17 @@
  *   (BUG-70): `ask` for each such capability, applied to that turn only. The
  *   runtime accepts only `ask` and `deny` there, so the chip cannot widen
  *   anything, and an `ask` it names also overrides an automatic approval mode.
- * * **Within limits** — Standard plus the owner's Allow-with-limits rules. It is
- *   not offered until those rules exist (QUI-P03).
+ * * **Within limits** — Standard plus the owner's Allow-with-limits rules for a
+ *   project or for future work (QUI-P03, 2026-11-08). The runtime reads the
+ *   profile from the conversation itself, so it sends no override either; a
+ *   rule made for one conversation applies there under Standard too.
  *
  * The global approval mode (Automatically approve, Skip, Decline) is not a
  * composer choice: it lives in Permissions › Advanced.
  */
 import type { CapabilityGate } from "./apiTypes";
 
-export type ConversationProfile = "careful" | "standard";
+export type ConversationProfile = "careful" | "standard" | "within_limits";
 
 export const DEFAULT_PROFILE: ConversationProfile = "standard";
 
@@ -39,6 +41,12 @@ export const CONVERSATION_PROFILES: ReadonlyArray<{
     id: "standard",
     label: "Standard",
     consequence: "Follows your permissions as set: what they allow goes ahead, what they ask about waits for you.",
+  },
+  {
+    id: "within_limits",
+    label: "Within limits",
+    consequence:
+      "Standard, plus the rules you made with Allow with limits: inside their limits it goes ahead; anything outside them still waits for you.",
   },
 ];
 
@@ -86,7 +94,8 @@ export function profileFromSession(
   stored: string | null | undefined,
   save: (sessionId: string, profile: ConversationProfile) => void,
 ): ConversationProfile {
-  const server: ConversationProfile = stored === "careful" ? "careful" : DEFAULT_PROFILE;
+  const server: ConversationProfile =
+    stored === "careful" || stored === "within_limits" ? stored : DEFAULT_PROFILE;
   let legacy: string | null;
   try {
     legacy = localStorage.getItem(`${LEGACY_KEY}${sessionId}`);

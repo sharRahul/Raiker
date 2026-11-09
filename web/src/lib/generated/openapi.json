@@ -7595,6 +7595,51 @@
         "title": "ConnectorActionRequest",
         "type": "object"
       },
+      "ConnectorActivity": {
+        "description": "QUI-P04 — recent activity under a connection, newest first.",
+        "properties": {
+          "connector_id": {
+            "title": "Connector Id",
+            "type": "string"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ConnectorActivityItem"
+            },
+            "title": "Items",
+            "type": "array"
+          }
+        },
+        "required": [
+          "connector_id",
+          "items"
+        ],
+        "title": "ConnectorActivity",
+        "type": "object"
+      },
+      "ConnectorActivityItem": {
+        "properties": {
+          "operation_id": {
+            "title": "Operation Id",
+            "type": "string"
+          },
+          "started_at": {
+            "title": "Started At",
+            "type": "string"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "operation_id",
+          "status",
+          "started_at"
+        ],
+        "title": "ConnectorActivityItem",
+        "type": "object"
+      },
       "ConnectorCompensation": {
         "description": "The operation that undoes a write, and how long it stays possible.",
         "properties": {
@@ -7790,6 +7835,51 @@
           "requires_confirmation"
         ],
         "title": "ConnectorOperation",
+        "type": "object"
+      },
+      "ConnectorPresetRequest": {
+        "additionalProperties": false,
+        "description": "QUI-P04 — Read only, Ask before changes, or Custom.",
+        "properties": {
+          "preset": {
+            "maxLength": 16,
+            "minLength": 1,
+            "title": "Preset",
+            "type": "string"
+          }
+        },
+        "required": [
+          "preset"
+        ],
+        "title": "ConnectorPresetRequest",
+        "type": "object"
+      },
+      "ConnectorPresetSet": {
+        "properties": {
+          "connector_id": {
+            "title": "Connector Id",
+            "type": "string"
+          },
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          },
+          "preset": {
+            "enum": [
+              "read_only",
+              "ask",
+              "custom"
+            ],
+            "title": "Preset",
+            "type": "string"
+          }
+        },
+        "required": [
+          "ok",
+          "connector_id",
+          "preset"
+        ],
+        "title": "ConnectorPresetSet",
         "type": "object"
       },
       "ConnectorSignInStarted": {
@@ -9274,6 +9364,18 @@
               }
             ],
             "title": "As Principal"
+          },
+          "limits": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Limits"
           },
           "reason": {
             "default": "",
@@ -19217,6 +19319,180 @@
           "kinds"
         ],
         "title": "LibraryView",
+        "type": "object"
+      },
+      "LimitRuleCreated": {
+        "properties": {
+          "grant": {
+            "$ref": "#/components/schemas/StandingGrantView"
+          },
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "ok",
+          "grant"
+        ],
+        "title": "LimitRuleCreated",
+        "type": "object"
+      },
+      "LimitRuleDraft": {
+        "description": "What **Allow for this task** starts from. Grants nothing.",
+        "properties": {
+          "approval_id": {
+            "title": "Approval Id",
+            "type": "string"
+          },
+          "limits": {
+            "$ref": "#/components/schemas/LimitRuleLimits"
+          },
+          "project_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Project Id"
+          },
+          "risk_level": {
+            "title": "Risk Level",
+            "type": "string"
+          },
+          "tool_name": {
+            "title": "Tool Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "approval_id",
+          "tool_name",
+          "risk_level",
+          "project_id",
+          "limits"
+        ],
+        "title": "LimitRuleDraft",
+        "type": "object"
+      },
+      "LimitRuleLimits": {
+        "description": "The limits as the owner edits them; ``expires_hours`` instead of a date.",
+        "properties": {
+          "attachments": {
+            "title": "Attachments",
+            "type": "boolean"
+          },
+          "expires_hours": {
+            "title": "Expires Hours",
+            "type": "integer"
+          },
+          "max_uses": {
+            "title": "Max Uses",
+            "type": "integer"
+          },
+          "scope": {
+            "enum": [
+              "conversation",
+              "project",
+              "future"
+            ],
+            "title": "Scope",
+            "type": "string"
+          },
+          "sensitive_asks": {
+            "title": "Sensitive Asks",
+            "type": "boolean"
+          },
+          "targets": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Targets",
+            "type": "array"
+          }
+        },
+        "required": [
+          "scope",
+          "targets",
+          "max_uses",
+          "expires_hours",
+          "attachments",
+          "sensitive_asks"
+        ],
+        "title": "LimitRuleLimits",
+        "type": "object"
+      },
+      "LimitRuleRequest": {
+        "additionalProperties": false,
+        "description": "QUI-P03 — the limits of an Allow-with-limits rule made from an approval.\n\nOnly limits: the action's shape (tool, risk, conversation) is read from the\napproval on the server. Validated by ``raiker.runtime.authority.grant_limits``.",
+        "properties": {
+          "limits": {
+            "additionalProperties": true,
+            "title": "Limits",
+            "type": "object"
+          }
+        },
+        "title": "LimitRuleRequest",
+        "type": "object"
+      },
+      "LimitRuleSuggestion": {
+        "description": "QUI-P09 — the same narrow action, allowed again and again.",
+        "properties": {
+          "approval_id": {
+            "title": "Approval Id",
+            "type": "string"
+          },
+          "count": {
+            "title": "Count",
+            "type": "integer"
+          },
+          "limits": {
+            "$ref": "#/components/schemas/LimitRuleLimits"
+          },
+          "risk_level": {
+            "title": "Risk Level",
+            "type": "string"
+          },
+          "targets": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Targets",
+            "type": "array"
+          },
+          "tool_name": {
+            "title": "Tool Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "tool_name",
+          "targets",
+          "count",
+          "risk_level",
+          "approval_id",
+          "limits"
+        ],
+        "title": "LimitRuleSuggestion",
+        "type": "object"
+      },
+      "LimitRuleSuggestions": {
+        "properties": {
+          "suggestions": {
+            "items": {
+              "$ref": "#/components/schemas/LimitRuleSuggestion"
+            },
+            "title": "Suggestions",
+            "type": "array"
+          }
+        },
+        "required": [
+          "suggestions"
+        ],
+        "title": "LimitRuleSuggestions",
         "type": "object"
       },
       "LimitWindow": {
@@ -31482,7 +31758,8 @@
           "profile": {
             "enum": [
               "careful",
-              "standard"
+              "standard",
+              "within_limits"
             ],
             "title": "Profile",
             "type": "string"
@@ -32926,6 +33203,25 @@
             ],
             "title": "Last Used At"
           },
+          "limits": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Limits"
+          },
+          "limits_words": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Limits Words",
+            "type": "array"
+          },
           "principal_id": {
             "title": "Principal Id",
             "type": "string"
@@ -32980,7 +33276,9 @@
           "revoked",
           "revoked_at",
           "use_count",
-          "last_used_at"
+          "last_used_at",
+          "limits",
+          "limits_words"
         ],
         "title": "StandingGrantView",
         "type": "object"
@@ -33203,6 +33501,15 @@
             "title": "Operations",
             "type": "array"
           },
+          "preset": {
+            "enum": [
+              "read_only",
+              "ask",
+              "custom"
+            ],
+            "title": "Preset",
+            "type": "string"
+          },
           "support_level": {
             "enum": [
               "supported",
@@ -33232,7 +33539,8 @@
           "active_operation",
           "last_invoked_at",
           "operations",
-          "accounts"
+          "accounts",
+          "preset"
         ],
         "title": "StoreConnector",
         "type": "object"
@@ -38225,6 +38533,94 @@
           }
         },
         "summary": "Answer Owner Question"
+      }
+    },
+    "/api/approvals/{approval_id}/limit-rule": {
+      "get": {
+        "description": "The limits **Allow for this task** starts from. Nothing is created.",
+        "operationId": "limit_rule_draft_api_approvals__approval_id__limit_rule_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "approval_id",
+            "required": true,
+            "schema": {
+              "title": "Approval Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LimitRuleDraft"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Limit Rule Draft"
+      },
+      "post": {
+        "description": "**Allow for this task**: a rule shaped exactly like this approval's action.",
+        "operationId": "create_limit_rule_api_approvals__approval_id__limit_rule_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "approval_id",
+            "required": true,
+            "schema": {
+              "title": "Approval Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LimitRuleRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LimitRuleCreated"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Limit Rule"
       }
     },
     "/api/approvals/{approval_id}/replace": {
@@ -43255,6 +43651,46 @@
         "summary": "Invoke Connector Action"
       }
     },
+    "/api/connector-store/{connector_id}/activity": {
+      "get": {
+        "description": "QUI-P04 — what Raiker last did with this connection: the newest ten calls.",
+        "operationId": "connector_activity_api_connector_store__connector_id__activity_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "connector_id",
+            "required": true,
+            "schema": {
+              "title": "Connector Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConnectorActivity"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Connector Activity"
+      }
+    },
     "/api/connector-store/{connector_id}/credentials": {
       "put": {
         "operationId": "set_connector_credentials_api_connector_store__connector_id__credentials_put",
@@ -43438,6 +43874,56 @@
           }
         },
         "summary": "Register Connector Manifest"
+      }
+    },
+    "/api/connector-store/{connector_id}/preset": {
+      "put": {
+        "description": "What Raiker may do with this connection. Applies from the next action.",
+        "operationId": "set_connector_preset_api_connector_store__connector_id__preset_put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "connector_id",
+            "required": true,
+            "schema": {
+              "title": "Connector Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConnectorPresetRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConnectorPresetSet"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Set Connector Preset"
       }
     },
     "/api/credential-deltas": {
@@ -48200,6 +48686,25 @@
           }
         },
         "summary": "Move Pin"
+      }
+    },
+    "/api/limit-rules/suggestions": {
+      "get": {
+        "description": "QUI-P09 — narrow actions the owner keeps allowing, offered as rules.\n\nThree or more allows of the same tool to the same recipients or sites in a\nweek, none declined, no active rule already covering them, and nothing\ncritical. Actions with no target are never suggested: a rule beyond one\nconversation has to name where it may reach.",
+        "operationId": "limit_rule_suggestions_api_limit_rules_suggestions_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LimitRuleSuggestions"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Limit Rule Suggestions"
       }
     },
     "/api/local-runtime/llama-cpp": {

@@ -162,14 +162,20 @@ of order, and the same one sent twice is applied once.
 ### How careful Raiker is in this conversation
 
 Under the prompt, the **profile chip** says how much Raiker does without asking
-in this conversation: **Standard** or **Careful**. Its menu says what each means.
+in this conversation: **Careful**, **Standard** or **Within limits**. Its menu
+says what each means.
 
 - **Standard** (where every new chat starts) follows your Permissions as set:
   what they allow goes ahead, what they ask about waits for you.
 - **Careful** asks before every change, even ones your Permissions allow.
   Reading and searching go ahead. It is sent with each message and the runtime
   applies it to that turn, so it can only make Raiker ask more, never less. It
-  also asks when the account's approval mode would otherwise approve for you.
+  also asks when the account's approval mode would otherwise approve for you,
+  and when a rule you made with **Allow with limits** would cover the action.
+- **Within limits** is Standard plus the rules you made with **Allow with
+  limits** for a project or for future work: inside a rule's limits the action
+  goes ahead; anything outside them still waits for you. A rule you made for
+  one conversation applies there under Standard too.
 
 The chip is kept with the conversation, so opening it on another device shows
 the same choice. Home's composer
@@ -668,7 +674,13 @@ names them:
 5. whether it can be undone, and
 6. the safer alternative, when there is one.
 
-Decide in place with **Decline** or **Allow once**. **Change** opens the same
+Decide in place with **Decline**, **Allow for this task…** or **Allow once**.
+**Allow for this task…** allows this action once and keeps a rule for what
+follows, with the limits you choose: where it applies (this conversation, its
+project, or future work), who or where it may reach, at most how many times, for
+how long (up to a week), and whether attachments and sensitive content still
+ask. The rule's action and risk are read from this approval, never widened, and
+a critical action never offers it. **Change** opens the same
 decision on **Approvals**, where a change can be accepted in part or edited
 first. After you edit Raiker's draft, Approvals asks once whether there is
 anything to remember for next time, in your own words; **Save** adds it to

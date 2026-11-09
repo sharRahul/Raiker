@@ -8,8 +8,8 @@ so.** Shipped so far: the quick fixes and most quality checks in
 [03](03_WELCOME_HOME_AND_CHAT.md#status) (2026-10-21), and the layouts and the
 Permissions, Connections, Models, Settings and help-panel plans in
 [01](01_LAYOUT_SYSTEM_AND_PAGES.md#status) (2026-10-21; L11 to L13 open), and
-the approvals round of [02](02_PERMISSIONS_AND_APPROVALS.md#status)
-(2026-10-22; Allow with limits and its dependants open), the visual answers
+the approvals round of 02 (2026-10-22) and its Allow-with-limits round
+(2026-11-08; 02 is closed and its open note is in [TO_BE_FIXED](../TO_BE_FIXED.md#quiet-ui-permissions-and-approvals--open-items-document-closed-2026-11-08)), the visual answers
 of 04 (2026-10-23, Pin 2026-10-26, diagrams 2026-11-08; 04 is closed and its
 open notes are in [TO_BE_FIXED](../TO_BE_FIXED.md#quiet-ui-visual-answers--open-items-document-closed-2026-11-08)), and the features and improvements of 06 in two rounds (2026-10-24 and
 2026-10-26; 06 is closed and its one remaining item, the desktop companion, is
@@ -65,7 +65,7 @@ companion. It never appears as travel vocabulary in navigation or status
 | Document | Covers | IDs |
 |---|---|---|
 | [01 Layout system and pages](01_LAYOUT_SYSTEM_AND_PAGES.md) | The page audit, five page layouts, screen sizes, a new layout for every long page, size budgets | QUI-L01 – L14 |
-| [02 Permissions and approvals](02_PERMISSIONS_AND_APPROVALS.md) | How permissions are set, asked and audited; the approval card; connection detail | QUI-P01 – P09 |
+| 02 Permissions and approvals (closed 2026-11-08) | How permissions are set, asked and audited; the approval card; connection detail. Shipped as [FIXED-1125](../FIXED_ITEMS.md#fixed-1125--an-unanswered-approval-waited-a-day-and-the-wait-could-not-be-set-qui-p06) to [FIXED-1135](../FIXED_ITEMS.md#fixed-1135--nothing-checked-that-a-model-could-not-draw-an-approval-card-qui-p05-acceptance) and [FIXED-1360](../FIXED_ITEMS.md#fixed-1360--an-approval-could-only-be-allowed-once-or-forever-qui-p03-qui-p05) to [FIXED-1365](../FIXED_ITEMS.md#fixed-1365--approvals-hid-allow-for-this-task-when-accepting-only-records-found-this-round); the rest is in [TO_BE_FIXED](../TO_BE_FIXED.md#quiet-ui-permissions-and-approvals--open-items-document-closed-2026-11-08) | QUI-P01 – P09 |
 | [03 Welcome, Home and Chat](03_WELCOME_HOME_AND_CHAT.md) | First run as a setup conversation, Home, the anatomy of a chat turn | QUI-W01 – W06, QUI-H01 – H05, QUI-C01 – C12 |
 | 04 Visual answers (closed 2026-11-08) | Charts, comparisons, key figures, diagrams and other answer blocks. Shipped as [FIXED-1136](../FIXED_ITEMS.md#fixed-1136--a-turn-could-not-say-these-are-the-headline-numbers-qui-a04) to [FIXED-1149](../FIXED_ITEMS.md#fixed-1149--a-chart-in-a-transcript-bubble-was-too-small-to-read-and-its-legend-had-no-colours-04-screenshot-review), [FIXED-1255](../FIXED_ITEMS.md#fixed-1255--an-answer-block-could-not-be-pinned-to-a-project-04-pin-to-project) and [FIXED-1348](../FIXED_ITEMS.md#fixed-1348--a-flow-or-a-structure-could-only-be-described-in-words-qui-a08); the rest is in [TO_BE_FIXED](../TO_BE_FIXED.md#quiet-ui-visual-answers--open-items-document-closed-2026-11-08) | QUI-A01 – A08 |
 | [05 Raiker Browser](05_RAIKER_BROWSER.md) | A built-in browser in the desktop app, using the Chromium Electron already ships | QUI-B01 – B04 |

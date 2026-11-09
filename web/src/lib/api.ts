@@ -1,3 +1,4 @@
+import { announcePermissionsChanged, type PermissionChange } from "./permissionSync";
 import type {
   ConversionQuantization,
   ApprovalDetailView,
@@ -66,6 +67,17 @@ let controlSequence = 0;
 export function nextControlSequence(): { client_id: string; client_sequence: number } {
   controlSequence += 1;
   return { client_id: CONTROL_CLIENT_ID, client_sequence: controlSequence };
+}
+
+/**
+ * QUI-P02 acceptance — a permission written here is announced once the server
+ * has kept it, so every surface showing it re-reads without a reload
+ * (`permissionSync.ts`). A refused write announces nothing.
+ */
+async function announcing<T>(kind: PermissionChange, write: Promise<T>): Promise<T> {
+  const answer = await write;
+  announcePermissionsChanged(kind);
+  return answer;
 }
 
 export const api = {
@@ -427,8 +439,9 @@ export const api = {
   sendTestNotice: () => contract.sendTestNotice(),
   standingGrants: (includeInactive = true) =>
     contract.listStandingGrants({ include_inactive: includeInactive }),
-  createStandingGrant: (body: CreateStandingGrantRequest) => contract.createStandingGrant(body),
-  revokeStandingGrant: (grantId: string) => contract.revokeStandingGrant(grantId),
+  createStandingGrant: (body: CreateStandingGrantRequest) =>
+    announcing("rules", contract.createStandingGrant(body)),
+  revokeStandingGrant: (grantId: string) => announcing("rules", contract.revokeStandingGrant(grantId)),
   securityCredentials: () => contract.listSecurityCredentials(),
   securityFindings: () => contract.listSecurityFindings(),
   securityHealth: () => contract.listSecurityHealth(),
@@ -1160,7 +1173,8 @@ export const api = {
   setSessionPinned: (id: string, pinned: boolean) => contract.setSessionPinned(id, { pinned }),
   // QUI-P02 — the conversation's profile, kept on the conversation. A label
   // the composer sends as a narrowing override; it grants nothing.
-  setSessionProfile: (id: string, profile: "careful" | "standard") => contract.setSessionProfile(id, { profile }),
+  setSessionProfile: (id: string, profile: "careful" | "standard" | "within_limits") =>
+    announcing("profile", contract.setSessionProfile(id, { profile })),
   // Permanently delete one session and its cascaded rows. Requires the explicit
   // confirmation header (mirrors project deletion). Human-only; an account
   // cannot delete another account's session.
@@ -1271,9 +1285,12 @@ export const api = {
   setCapabilityState: (
     capability: string,
     body: { target_state: string; reason: string; confirmation_token?: string; expected_state?: string },
-  ) => contract.setCapabilityState(capability, body),
+  ) => announcing("gates", contract.setCapabilityState(capability, body)),
   disableCapability: (capability: string, reason: string, expected?: string) =>
-    contract.disableCapability(capability, expected === undefined ? { reason } : { reason, expected_state: expected }),
+    announcing(
+      "gates",
+      contract.disableCapability(capability, expected === undefined ? { reason } : { reason, expected_state: expected }),
+    ),
   // Record a human threat-model acknowledgement (owner/gate-manager only). This
   // is the in-app equivalent of the operator/CLI ack step and only satisfies the
   // acknowledgement precondition — the capability transition still runs after it.
@@ -1287,5 +1304,9 @@ export const api = {
     mode: "ask" | "allow" | "auto" | "deny",
     reason: string,
     expected?: string,
-  ) => SET_DECISION_MODE[mode](capability, expected === undefined ? { reason } : { reason, expected_mode: expected }),
+  ) =>
+    announcing(
+      "modes",
+      SET_DECISION_MODE[mode](capability, expected === undefined ? { reason } : { reason, expected_mode: expected }),
+    ),
 };

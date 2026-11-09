@@ -1,0 +1,12 @@
+{
+  "scope": "focused Electron startup after resolver/resource hardening; local fixture only",
+  "observed_hosts": [
+    "127.0.0.1",
+    "2001:4860:4860::8888"
+  ],
+  "public_destinations": [
+    "2001:4860:4860::8888"
+  ],
+  "raw_trace_sha256": "f40591aec2a106b7fa324aaa41d5131930fd2a85c92b84e8aa17854724180903",
+  "release_audit_approved": false
+}

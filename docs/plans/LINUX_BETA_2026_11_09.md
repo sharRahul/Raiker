@@ -192,3 +192,43 @@ trace ([UI receipt](evidence/linux-beta-2026-11-09/passive-status-ui-8a053a90.js
 It is a short regression check, not MM-5 acceptance.
 
 ![Explicit sign-in and adoption without a background account check](screenshots/linux-beta-2026-11-09/explicit-chatgpt-connection.png)
+
+## Electron network process follow-through
+
+The unsigned exact-commit `0.9.0` candidate from
+`2f0ede1d8d09efe93458369d278dfdbc70d76120` built in all three formats;
+checksums, installed DEB host smoke/restart/setup persistence and local SPDX
+generation passed (`candidate-2f0ede1d/`, `candidate-installed-smoke.txt`,
+`candidate-sbom.log`). It is unsigned and is not an approved release.
+
+A new installed-shell capture includes Electron and its child host, rather
+than only the host. Its startup network process attempted public IPv4 Google
+connections before owner setup. FIXED-1376 disables automatic DoH before the
+default session exists, suppresses external hostname resolution and cancels
+non-loopback renderer HTTP(S)/websocket resource requests. The local host and
+explicit external-browser actions keep their respective roles.
+
+Validation: 36 desktop unit tests and 13 shell UI tests passed. The new
+embedded-resource test first reaches its server outside the shell, then proves
+the renderer request is blocked before it reaches that server. The corrected
+focused startup trace has no corresponding public IPv4 connections;
+[its raw destination report](evidence/linux-beta-2026-11-09/electron-network-focused.json)
+retains `2001:4860:4860::8888`. This is **not claimed as zero public-address
+syscalls**: a separate socket/close trace shows a UDP socket whose connect
+fails with ENETUNREACH and closes without a DNS payload. Chromium documents
+that literal address as its [IPv6 route/reachability heuristic](https://chromium.googlesource.com/chromium/src/+/refs/heads/main/net/dns/README.md#IPv6-and-connectivity).
+Do not equate that non-sending route probe with a completed DoH request, or
+silently omit it from the conservative audit input.
+
+Implementation follows Electron's [resolver API](https://www.electronjs.org/docs/latest/api/app#appconfigurehostresolveroptions)
+and Chromium's [host-resolution remapping](https://chromium.googlesource.com/chromium/src/+/refs/heads/main/net/dns/README.md#Request-remapping).
+A short startup regression is not a replacement for a fresh 30-minute
+installed-candidate audit. The pre-fix full-shell trace remains failed.
+
+The owner started [Release 42642643448](https://github.com/sharRahul/Raiker/actions/runs/42642643448)
+on `2f0ede1d`. Plan correctly refused because that commit's CI had not yet
+finished; packaging/signing did not start. Its macOS native job was cancelled
+while queued, then the failed-job rerun completed successfully: CI, engine/live
+and data-safety workflows on `2f0ede1d` are green. The shell correction changes
+the candidate source again: qualify its own commit and start a new Release run
+for that commit rather than treating the older run as evidence for the fix.

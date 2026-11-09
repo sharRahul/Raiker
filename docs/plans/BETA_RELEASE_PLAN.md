@@ -633,3 +633,10 @@ the signed non-published candidate dispatch with 403 (Actions access). CI-1
 and CI-5 retain the signed candidate/evidence requirement;
 [the run record](LINUX_BETA_2026_11_09.md#github-qualification-and-release-dispatch-access)
 contains the workflow links, access blocker and concrete manual command.
+
+The full installed-shell capture also found Electron startup resolver traffic
+that the host-only trace missed. FIXED-1376 disables automatic DoH and
+non-loopback shell resource requests; 36 unit and 13 UI tests pass. Chromium's
+non-sending IPv6 UDP route probe remains explicitly recorded. A fresh candidate
+with this shell correction needs its own CI, package and egress evidence.
+[Follow-through](LINUX_BETA_2026_11_09.md#electron-network-process-follow-through).

@@ -136,6 +136,41 @@ test("navigation stays on Raiker; web links go to the browser; files are refused
   await app.close();
 });
 
+test("an embedded remote resource is blocked before its server receives a request", async () => {
+  let hits = 0;
+  const target = createServer((_request, response) => {
+    hits += 1;
+    response.writeHead(200, { "content-type": "image/png" }).end(Buffer.from(
+      "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==", "base64",
+    ));
+  });
+  await new Promise<void>((resolve) => target.listen(0, "0.0.0.0", resolve));
+  const address = target.address();
+  if (address === null || typeof address === "string") throw new Error("no target port");
+  const url = `http://127.0.0.2:${address.port}/pixel.png`;
+  const control = await fetch(url);
+  expect(control.ok).toBe(true);
+  await control.arrayBuffer();
+  expect(hits).toBe(1); // Prove the destination actually works outside the shell.
+  const { app, page } = await launch(["--raiker-url", base]);
+  try {
+    await waitForFixture(page);
+    const loaded = await page.evaluate((source) => new Promise<boolean>((resolve) => {
+      const image = new Image();
+      image.onload = () => resolve(true);
+      image.onerror = () => resolve(false);
+      image.src = source;
+      document.body.append(image);
+    }), url);
+    expect(loaded).toBe(false);
+    expect(hits).toBe(1);
+  } finally {
+    await app.close();
+    target.closeAllConnections();
+    await new Promise<void>((resolve) => target.close(() => resolve()));
+  }
+});
+
 test("menu commands reach the page, and only known ones", async () => {
   const { app, page } = await launch(["--raiker-url", base]);
   await waitForFixture(page);

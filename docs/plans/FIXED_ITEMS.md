@@ -1,5 +1,22 @@
 # Fixed items
 
+## FIXED-1376 — Electron performed public resolver requests before setup
+
+The installed-shell capture (unlike the earlier host-only recording) observed
+public Google IPv4 connections from Electron's network process during startup.
+The shell now disables automatic DNS-over-HTTPS before creating its default
+session, maps non-loopback hostnames to NOTFOUND, and cancels non-loopback
+HTTP(S)/websocket resource requests. Explicit external links still open in the
+owner's browser; governed remote provider/connector calls stay in Python.
+The literal loopback addresses and localhost remain exempt from DNS remapping.
+
+All 36 desktop unit tests and 13 shell UI cases pass, including a reachable
+embedded-image server that gets no renderer request. A focused production-style
+startup trace no longer shows the public IPv4 connections. It still records
+Chromium's non-sending IPv6 UDP reachability probe; this is documented, not
+silently removed from evidence or called a DNS query. Full fresh-candidate
+egress acceptance remains open. [Run record](LINUX_BETA_2026_11_09.md#electron-network-process-follow-through).
+
 ## FIXED-1375 — Reading ChatGPT status started an unrequested network-capable sidecar
 
 An unconnected profile's Models status read used to start Codex App Server to
@@ -1745,6 +1762,7 @@ file you can open. The two capture sets that remain — `screenshots/pages/` and
 | [FIXED-1373](#fixed-1373--whisper-models-still-had-no-immutable-download-pins) | High | Linux beta hardening | Fixed 2026-11-09 |
 | [FIXED-1374](#fixed-1374--rpm-used-unbounded-level-9-multithreaded-xz-compression) | High | Linux beta hardening | Fixed 2026-11-09 |
 | [FIXED-1375](#fixed-1375--reading-chatgpt-status-started-an-unrequested-network-capable-sidecar) | High | Local-only egress | Fixed 2026-11-09 |
+| [FIXED-1376](#fixed-1376--electron-performed-public-resolver-requests-before-setup) | High | Desktop local-only traffic | Fixed 2026-11-09 |
 
 ---
 

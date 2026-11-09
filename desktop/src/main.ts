@@ -63,6 +63,7 @@ import {
 } from "./setup";
 import { classifyNavigation, decidePermission, loopbackOrigin } from "./origin";
 import { loadState, MIN_SIZE, saveState } from "./windowState";
+import { isLoopbackNetworkRequest } from "./network";
 
 /** Must match `--topbar-h` in `web/src/app.css`: the overlay sits in the top bar. */
 const TITLE_BAR_HEIGHT = 56;
@@ -95,6 +96,13 @@ let quitting = false;
 let quickEntry: BrowserWindow | null = null;
 
 app.setName("Raiker");
+// Chromium must not perform external DNS discovery before the owner even
+// finishes Setup. The renderer only loads Raiker's loopback host; remote
+// provider and connector traffic belongs to the governed Python host.
+app.commandLine.appendSwitch(
+  "host-resolver-rules",
+  "MAP * ~NOTFOUND, EXCLUDE localhost, EXCLUDE 127.0.0.1, EXCLUDE [::1], EXCLUDE ::1",
+);
 // A separate profile for a second copy of the shell — tests, or an owner who
 // keeps two Raiker installs apart. Window geometry and the one-time notice live
 // there; nothing from the workspace does.
@@ -146,6 +154,10 @@ function originOf(contents: WebContents): string | null {
 
 function hardenSession(): void {
   const defaults = session.defaultSession;
+  defaults.webRequest.onBeforeRequest(
+    { urls: ["http://*/*", "https://*/*", "ws://*/*", "wss://*/*"] },
+    (details, callback) => callback({ cancel: !isLoopbackNetworkRequest(details.url) }),
+  );
   defaults.setPermissionRequestHandler((contents, permission, callback, details) => {
     const origin = originOf(contents);
     const media = "mediaTypes" in details && Array.isArray(details.mediaTypes) ? details.mediaTypes : [];
@@ -601,6 +613,10 @@ async function runSetup(): Promise<void> {
 }
 
 async function start(): Promise<void> {
+  // Must run after app.ready, before creating the default session/window.
+  // Electron defaults to automatic DoH, which can contact public resolvers
+  // independently of the page's request handlers.
+  app.configureHostResolver({ secureDnsMode: "off", enableBuiltInResolver: false });
   hardenSession();
   installMenu();
   installIpc();

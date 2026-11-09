@@ -2425,3 +2425,43 @@ The completed Home screenshot was inspected under
 microphone round trip and packaging of the later fixes remain separate gates.
 The [plan record](../plans/BETA_RELEASE_PLAN.md#2026-11-09--windows-owner-pc-follow-through)
 links the redacted crash and package receipts.
+
+## Result — 2026-11-09 (PC providers, speech engines and streamed stop)
+
+Credentials for the hosted providers were entered through Add model, not an
+API or source fixture. Anthropic Haiku 4.5 passed the earlier smoke. The new
+`windows-saved-providers-live.spec.ts` passes **4/4 in one run** with saved
+connections: OpenAI `gpt-5-nano`, OpenRouter `openai/gpt-4o-mini`, Ollama
+`qwen2.5-coder:7b`, LM Studio `qwen/qwen3-8b`. Each keeps its model via the UI,
+checks readiness, chooses it in Chat, receives the exact validation token and
+waits for the top-bar work count to settle to idle. The initial Gemma 3:1B
+attempt returned `RAKER_LOCAL_OK`, failing the unchanged exact assertion;
+Qwen was selected for the successful Ollama qualification. The shared picker
+needed FIXED-1385 to recognise Choose a model.
+
+All four provider screenshots were inspected under
+`output/playwright/windows-provider-*.png`; Anthropic's separate capture is
+`windows-beta-provider-chat.png`. LM Studio's composer conservatively says
+its execution location is unconfirmed; this is not a full-profile traffic
+capture. These runs qualify Chat paths, not tool-use or the seven journeys.
+
+The real packaged Kokoro worker from `5860a1f6`, controlled by the current
+source VoiceEngines, synthesized a known sentence. The verified Windows CPU
+Whisper build and pinned English base model transcribed all nine words exactly
+(0 word errors), and both engines stopped. The initial download refusal found
+FIXED-1384: missing explicit Hugging Face CDN hosts and redirect validation
+after contact. The corrected voice and llama.cpp installers pass **53 tests,
+2 platform skips**, including denial before contact and bounded malformed/loop
+redirects. [Speech receipt](../plans/evidence/windows-beta-2026-11-09/speech-roundtrip.xml).
+The personal Windows workflow now opts into this real engine round trip.
+This combines the recorded packaged speaker with source orchestration; a new
+frozen candidate must contain the download correction.
+
+`voice-fake-microphone-live.spec.ts` passes **6/6** on Windows Chromium: local
+stand-in setup, permission denial, cancel, device loss, six-minute limit and no
+browser SpeechRecognition. Its backend is explicitly a stand-in; it does not
+prove microphone-to-managed-Whisper acceptance. RT-FIX-01 in
+`qui-a08-diagrams-and-fixes-live.spec.ts` now waits for real streamed text,
+stops only that turn, sees exactly one stop notice and retains the streamed
+prefix. The previously blocked stopped-turn evidence is supplied; the rest
+of the beta journeys retain their own gates.

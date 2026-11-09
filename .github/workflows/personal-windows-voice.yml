@@ -110,6 +110,7 @@ jobs:
         run: |
           python -m raiker.app.desktop_smoke --host "$HOST" --expect-unsigned --report personal-windows/installed-smoke.txt
           export RAIKER_VOICE_PACKAGED_HOST="$HOST"
+          export RAIKER_VOICE_WHISPER_LIVE=1
           python -m pytest tests/test_voice_live.py -vv --junitxml=personal-windows/voice-live.xml
       - name: Verify installed window and onboarding
         working-directory: desktop

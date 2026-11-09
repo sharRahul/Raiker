@@ -1,5 +1,35 @@
 # Fixed items
 
+## FIXED-1385 — The local model helper missed Choose a model
+
+**Severity: Low. Area: Live provider tests. Status: Fixed 2026-11-09.**
+
+The shared model-picker helper matched Choose model but not Ollama's visible
+Choose a model. It opened the overflow and waited for a nonexistent menu item.
+Accept both labels. The corrected live run reaches real Ollama inference.
+
+**Evidence.** `web/e2e/hosted-provider.ts`,
+`web/e2e/windows-saved-providers-live.spec.ts`.
+
+## FIXED-1384 — Model downloads checked redirect hosts after contacting them
+
+**Severity: High. Area: Model and speech downloads. Status: Fixed 2026-11-09.**
+
+The voice and llama.cpp installers let HTTPX follow redirects and checked their
+hosts afterward. Regression transports confirmed contact with a refused host.
+Both now disable automatic redirects, validate each destination before issuing
+its request, close redirect responses, and refuse malformed or excessive chains.
+SHA-256 and byte-count verification still precede installation.
+
+The real Whisper round trip also found the voice allowlist missing the explicit
+`us.aws.cdn.hf.co` CDN. Both US AWS/GCP CDN names are now included based on
+[Hugging Face's download documentation](https://huggingface.co/docs/hub/models-downloading).
+No wildcard domain exception was added. The real Windows CPU Whisper model
+downloads, verifies and transcribes packaged Kokoro audio exactly after this fix.
+
+**Evidence.** `tests/test_voice_v1.py`, `tests/test_llama_cpp_installer.py`,
+`tests/test_voice_live.py::test_packaged_kokoro_audio_round_trips_through_verified_windows_whisper`.
+
 ## FIXED-1383 — Keyboard start evidence depended on retired receipt wording
 
 **Severity: Low. Area: Beta live tests. Status: Fixed 2026-11-09.**
@@ -1871,6 +1901,8 @@ file you can open. The two capture sets that remain — `screenshots/pages/` and
 | [FIXED-1381](#fixed-1381--an-initial-update-read-erased-a-failed-update-check) | Medium | Quiet UI update recovery | Fixed 2026-11-09 |
 | [FIXED-1382](#fixed-1382--linux-filesystem-flags-broke-windows-type-checking) | Low | Platform portability | Fixed 2026-11-09 |
 | [FIXED-1383](#fixed-1383--keyboard-start-evidence-depended-on-retired-receipt-wording) | Low | Beta live tests | Fixed 2026-11-09 |
+| [FIXED-1384](#fixed-1384--model-downloads-checked-redirect-hosts-after-contacting-them) | High | Model and speech downloads | Fixed 2026-11-09 |
+| [FIXED-1385](#fixed-1385--the-local-model-helper-missed-choose-a-model) | Low | Live provider tests | Fixed 2026-11-09 |
 
 ---
 

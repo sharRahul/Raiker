@@ -437,7 +437,7 @@ export async function checkModelReady(page: Page, card: Locator): Promise<void> 
  * became a dialog.
  */
 export async function openModelDialog(page: Page, card: Locator): Promise<Locator> {
-  await pressCardAction(page, card, /Select models|Choose model|Change model/);
+  await pressCardAction(page, card, /Select models|Choose (?:a )?model|Change model/);
   const dialog = page.getByRole("dialog", { name: /models/i });
   await expect(dialog).toBeVisible({ timeout: 60_000 });
   // BUG-295 — visible is not the same as answered.

@@ -14,16 +14,18 @@
  * the small-fixes round"): RT-DGM-01 … RT-DGM-05, RT-FIX-01 … RT-FIX-05.
  */
 import { expect, test, type Locator, type Page } from "@playwright/test";
+import { join } from "node:path";
 
 import { modelName } from "../src/lib/modelPresentation";
+import { capture } from "./capture";
 import { settled } from "./destinations";
-import { chooseModelForTurn, hostedProviderCard, keepModelAvailable, signInAsOwner } from "./hosted-provider";
+import { chooseModelForTurn, hostedProviderCard, keepModelAvailable, refreshHostedReadiness, signInAsOwner } from "./hosted-provider";
 import { ANTHROPIC_KEY as KEY, ANTHROPIC_MODEL as MODEL, LIVE_BASE as BASE } from "./live";
 
 test.describe.configure({ mode: "serial" });
 
 const WORKSPACE_ID = process.env.RAIKER_LIVE_ANTHROPIC_WORKSPACE_ID ?? "";
-const SHOTS = process.env.RAIKER_LIVE_SHOTS ?? "../output/playwright/2026-11-08-qui-a08-diagrams";
+const SHOTS = process.env.RAIKER_LIVE_SHOTS ?? join(import.meta.dirname, "..", "..", "output", "playwright", "2026-11-08-qui-a08-diagrams");
 
 async function open(page: Page, hash: string): Promise<void> {
   await page.goto(`${BASE}/${hash}`);
@@ -31,7 +33,7 @@ async function open(page: Page, hash: string): Promise<void> {
 }
 
 async function shot(page: Page, name: string): Promise<void> {
-  await page.screenshot({ path: `${SHOTS}/${name}.png`, fullPage: false });
+  await capture(page, `${SHOTS}/${name}.png`);
 }
 
 /** Send one prompt in a new chat and return the answer once it has finished. */
@@ -191,18 +193,23 @@ test("RT-FIX-01 — a stopped turn says it was stopped once", async ({ page }) =
   test.setTimeout(360_000);
   await page.setViewportSize({ width: 1440, height: 900 });
   await signInAsOwner(page, BASE);
+  await refreshHostedReadiness(page, BASE, "Anthropic");
   await open(page, "#/new-chat");
   await chooseModelForTurn(page, /Haiku|claude/i);
   await page.getByLabel("Prompt", { exact: true }).fill(
     "Write a detailed 1,500-word essay on the history of the printing press, in plain prose.",
   );
   await page.getByRole("button", { name: "Send", exact: true }).click();
-  const stop = page.getByRole("button", { name: /^Stop/ }).first();
+  const stop = page.getByRole("button", { name: "Stop safely", exact: true });
   await expect(stop).toBeVisible({ timeout: 60_000 });
-  await page.waitForTimeout(2_500);
+  await expect(stop).toBeEnabled({ timeout: 60_000 });
+  const last = page.locator(".message-group-raiker").last();
+  const answer = last.locator(".message-bubble-raiker");
+  await expect(answer).toContainText(/\S/, { timeout: 120_000 });
+  const streamed = await answer.innerText();
   await stop.click();
   await expect(page.locator(".stopped-line")).toHaveCount(1, { timeout: 60_000 });
-  const last = page.locator(".message-group-raiker").last();
+  await expect(answer).toContainText(streamed);
   await expect(last.getByText("Stopped by user at a safe boundary.")).toHaveCount(0);
   await expect(last.getByText("Stopped at your request, at a safe boundary.")).toHaveCount(0);
   await shot(page, "07-stopped-once");

@@ -62,8 +62,8 @@ plugins that need network, and unverified integrations are **Not in beta** or
 
 | # | Area | Beta decision | P0 items left |
 |---|---|---|---|
-| 1 | Native sandbox & security | Ship limited — execution only where measured | Windows ACL gaps, macOS CI evidence, fail-closed audit |
-| 2 | Desktop installation & updates | Ship | Signing identities, clean-machine first launch, signed update |
+| 1 | Native sandbox & security | Ship limited — execution only where measured | Windows ACL/profile gaps, safe promotion, fail-closed audit |
+| 2 | Desktop installation & updates | Ship | Fresh PC installation, update/rollback and exact-candidate evidence |
 | 3 | AI models & local inference | Ship | Live llama.cpp CI evidence, failure-mode tests |
 | 4 | Core autonomous agent | Ship | Restart-recovery scenario, honest-completion tests |
 | 5 | Build & coding agent | Ship limited — disposable copy only | Conflict detection on Apply, iterate-on-failure evidence |
@@ -91,9 +91,9 @@ incomplete*). What exists:
   Job Object limits and ConPTY terminals, measured on Windows 11. Known gaps:
   per-task profile reset, LSA logon-right denials, explicit ACEs under denied
   roots, and AppContainer's `ALL APPLICATION PACKAGES` exposure on `.git`.
-- macOS uses a Seatbelt profile plus a sandbox-account pool, but has **no
-  hosted CI evidence**. `RLIMIT_AS` is not enforced by XNU, so the footprint
-  supervisor replaces it.
+- macOS uses a Seatbelt profile plus a sandbox-account pool. Hosted runner
+  checks have passed (SB-2); owner-hardware qualification waits for beta.2.
+  `RLIMIT_AS` is not enforced by XNU, so the footprint supervisor replaces it.
 - Plugins and local MCP stdio servers run in the native sandbox and are refused
   on hosts without an enforced boundary.
 - Disposable per-session project copies with reviewed Apply are wired in.
@@ -136,8 +136,10 @@ tools refuse with a sentence and a link.
 **Today.** `desktop-package.yml` builds and smoke-tests every target unsigned.
 The installers check requirements before copying files, and the first-run
 setup verifies each component (RELEASE_ACCEPTANCE_MATRIX, run 39327713463: all
-seven jobs green). No release has been published, signing secrets are not
-configured, and runner publisher pins are empty (`runner_publisher.py`).
+seven jobs green). Later signed-candidate evidence for `6c211b60` is recorded
+below; do not infer a public release from it. Commercial publisher identities
+are outside the personal-beta scope. Runner publisher pins remain a separate
+integrity limitation (`runner_publisher.py`).
 
 | ID | Item | State | P | Effort | Work left |
 |---|---|---|---|---|---|
@@ -721,3 +723,29 @@ real-model journey gates remain; this is not release-owner sign-off.
   candidate packaging and required GitHub checks remain required.
 
 See the [Live Test run](../architecture/WEB_APP_LIVE_TEST.md#result--2026-11-09-windows-beta-recovery-twenty-case-round).
+
+### Windows provider and speech follow-through
+
+All five owner-reachable provider Chat paths now have Windows UI evidence:
+Anthropic, OpenAI, OpenRouter, Ollama and LM Studio. The latter four pass in
+one four-case run, including idle work-count read-back. Tool-use and
+exact-final-candidate qualification remain MD-1/E2E work.
+
+The real Windows Kokoro → Whisper engine round trip passes with a verified CPU
+engine and pinned English base model, with zero word errors for its known
+sentence. It found and fixed the missing approved CDN and post-contact
+redirect checks (FIXED-1384). The personal Windows voice workflow now includes
+this opt-in round trip. Six Chromium fake-device cases pass separately; full
+managed Voice UI/microphone acceptance is not inferred from either layer.
+The real streamed-stop retention case passes and removes that specific live
+check from TO_BE_FIXED. Current runs are detailed in
+[Live Test](../architecture/WEB_APP_LIVE_TEST.md#result--2026-11-09-pc-providers-speech-engines-and-streamed-stop).
+
+Still needed for personal sign-off: the remaining durable personal outcome,
+memory correction, issue-to-PR and stop/resume/budget journeys with approved
+fixtures; actual PC install/update/uninstall; safe platform-specific promotion
+and sandbox hardening or measured refusal; full managed speech/microphone;
+a scoped 30-minute full-feature PC traffic capture; applicable connector
+lifecycle and human screen-reader evidence. The connected test instance has no
+approved mail/calendar/GitHub OAuth clients; the owner has been asked which
+instance/accounts to qualify. Existing model keys do not supply those clients.

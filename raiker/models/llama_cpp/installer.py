@@ -159,9 +159,23 @@ def _download_once(
     hasher = hashlib.sha256()
     received = 0
     try:
-        with client.stream("GET", asset.url, headers={"User-Agent": "Raiker"}) as response:
-            for hop in [*response.history, response]:
-                _check_host(str(hop.url))
+        with contextlib.ExitStack() as stack:
+            url = asset.url
+            for _ in range(6):
+                _check_host(url)
+                response = stack.enter_context(client.stream(
+                    "GET", url, headers={"User-Agent": "Raiker"}, follow_redirects=False,
+                ))
+                _check_host(str(response.url))
+                if not response.is_redirect:
+                    break
+                location = response.headers.get("location")
+                if not location:
+                    raise InstallError("llama_cpp_download_failed")
+                url = str(response.url.join(location))
+                response.close()
+            else:
+                raise InstallError("llama_cpp_download_failed")
             if response.status_code >= 500:
                 raise _TransientDownload(f"http_{response.status_code}")
             if response.status_code != 200:

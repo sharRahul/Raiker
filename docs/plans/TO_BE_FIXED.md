@@ -1503,14 +1503,6 @@ use a local model at all.
 The NVIDIA CUDA run passed on 2026-11-07 (RT-GPU-01, RT-GPU-02). Still
 required: the same two checks on an AMD GPU with the Vulkan build.
 
-## A stopped turn — live check owed
-
-The doubled announcement is fixed
-([FIXED-1351](FIXED_ITEMS.md#fixed-1351--a-stopped-turn-was-announced-twice)).
-Its live case, RT-FIX-01 in `qui-a08-diagrams-and-fixes-live.spec.ts`, was
-blocked on 2026-11-08 when the round's Anthropic key ran out of credit. Run it
-with a funded key, and check there that text streamed before the stop is kept.
-
 ## Untested hosted profiles still allow 1,024 output tokens
 
 2026-11-08: Anthropic, OpenAI, OpenRouter, Ollama and LM Studio were measured
@@ -1631,14 +1623,12 @@ it repeats; native Fedora acceptance remains untested.
 
 ## Actions dispatch access — manual candidate workaround verified
 
-This session's workflow dispatch returned **403 Resource not accessible by
+The earlier connected integration's workflow dispatch returned **403 Resource not accessible by
 integration**. The owner manually started Release `42650624663` for runtime
 `6c211b60`, version `0.9.0`, beta, `require-except-macos`, publish disabled.
 It passed; independent checks verify all ten installer manifests/hashes,
 six Linux GPG signatures, signed channel/provenance, SBOM/lock bindings and
-evidence outputs. This candidate is no longer blocked on creation. Direct
-workflow-dispatch access remains unavailable, so future dispatches still need
-an authorized integration or owner start. Beta feature/owner-machine gates
+evidence outputs. This candidate is no longer blocked on creation. The connected integration remains limited, but the Windows owner-PC run on 2026-11-09 successfully dispatched Desktop package through authenticated `gh` (run `42715117417` for `f1c8d1ce`). Direct CLI dispatch is available; an owner start is no longer a general blocker. Beta feature/owner-machine gates
 are separate from artifact creation.
 [Verified candidate and receipts](LINUX_BETA_2026_11_09.md#verified-non-published-signed-candidate).
 

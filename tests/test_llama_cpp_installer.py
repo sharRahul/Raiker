@@ -281,3 +281,32 @@ def test_self_check_refuses_a_binary_that_cannot_run(tmp_path: Path) -> None:
         executable.chmod(0o755)
     with pytest.raises(InstallError, match="llama_cpp_install_unrunnable"):
         installer.self_check(executable, "cpu")
+
+
+def test_redirect_refused_before_unapproved_host_is_contacted(tmp_path: Path) -> None:
+    contacted: list[str] = []
+    def handler(request: httpx.Request) -> httpx.Response:
+        contacted.append(str(request.url.host))
+        if request.url.host == "github.com":
+            return httpx.Response(302, headers={"Location": "https://evil.example/model.zip"})
+        return httpx.Response(200, content=b"data")
+    with (
+        httpx.Client(transport=httpx.MockTransport(handler), follow_redirects=True) as client,
+        pytest.raises(InstallError, match="llama_cpp_download_host_refused"),
+    ):
+        installer.download_asset(_asset("model.zip", b"data"), tmp_path / "model.zip", client=client)
+    assert contacted == ["github.com"]
+
+@pytest.mark.parametrize("location", [None, "/again"])
+def test_installer_redirect_failures_are_bounded(tmp_path: Path, location: str | None) -> None:
+    requests: list[str] = []
+    def handler(request: httpx.Request) -> httpx.Response:
+        requests.append(str(request.url))
+        return httpx.Response(302, headers={} if location is None else {"location": location})
+    with (
+        httpx.Client(transport=httpx.MockTransport(handler)) as client,
+        pytest.raises(InstallError, match="llama_cpp_download_failed"),
+    ):
+        installer.download_asset(_asset("model.zip", b"data"), tmp_path / "model", client=client)
+    assert len(requests) == (1 if location is None else 6)
+    assert not list(tmp_path.iterdir())

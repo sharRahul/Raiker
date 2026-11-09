@@ -88,3 +88,48 @@ def test_packaged_kokoro_worker_uses_verified_assets_and_local_token(tmp_path: P
     finally:
         engines.stop_all()
     assert engines.running("speaker") is None
+
+@pytest.mark.skipif(
+    os.environ.get("RAIKER_VOICE_WHISPER_LIVE") != "1" or os.name != "nt",
+    reason="opt-in Windows CPU Whisper/Kokoro round trip",
+)
+def test_packaged_kokoro_audio_round_trips_through_verified_windows_whisper(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import re
+
+    from raiker.models.engines.resources import ResourceLedger
+    from raiker.models.speech_runtime import SpeechRuntimeSettings, transcribe
+    from raiker.voice import engines as engine_module
+    from raiker.voice import installer
+    from raiker.voice.catalogue import load
+
+    host = Path(os.environ["RAIKER_VOICE_PACKAGED_HOST"]).resolve()
+    assert host.is_file()
+    ws = tmp_path / "roundtrip"
+    ws.mkdir()
+    catalogue = load()
+    paths: dict[str, Path] = {}
+    names = ("kokoro-82m-int8", "kokoro-voices-v1", "whisper-server-windows-x64-cpu", "whisper-base.en-q5_1")
+    with httpx.Client(timeout=httpx.Timeout(30.0, read=300.0)) as client:
+        for name in names:
+            item = catalogue.get(name)
+            installer.install_item(ws, item, client=client)
+            path = installer.installed_path(ws, item)
+            assert path is not None, name
+            paths[name] = path
+    monkeypatch.setattr(engine_module, "worker_argv", lambda: [str(host), "--voice-tts-worker"])
+    engines = engine_module.VoiceEngines(ws, ledger=ResourceLedger())
+    try:
+        engines.ensure_speaker("kokoro", model=paths["kokoro-82m-int8"], voices=paths["kokoro-voices-v1"],
+                               threads=1, ram=450_000_000)
+        spoken = "The quick brown fox jumps over the lazy dog."
+        audio = engines.synthesise(spoken, voice="af_heart", speed=1.0)
+        whisper = engines.ensure_whisper(paths["whisper-server-windows-x64-cpu"], paths["whisper-base.en-q5_1"],
+                                         threads=2, device="cpu", ram=500_000_000, vram=0, gpu=None)
+        heard = transcribe(SpeechRuntimeSettings(endpoint=whisper.endpoint), audio, language="en")
+        assert re.findall(r"[a-z]+", heard.lower()) == re.findall(r"[a-z]+", spoken.lower()), heard
+    finally:
+        engines.stop_all()
+    assert engines.running("speaker") is None
+    assert engines.running("whisper") is None

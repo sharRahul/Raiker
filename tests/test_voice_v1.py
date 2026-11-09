@@ -577,3 +577,41 @@ def test_all_managed_profiles_use_kokoro_and_removed_piper_is_refused() -> None:
 def test_removed_voice_settings_fall_back_to_kokoro_default() -> None:
     assert parse_settings({"profile": "lite", "voice": "en_US-amy-medium"}).voice is None
     assert parse_settings({"profile": "lite", "voice": "af_heart"}).voice == "af_heart"
+
+@pytest.mark.parametrize("host", ["us.aws.cdn.hf.co", "us.gcp.cdn.hf.co"])
+def test_voice_download_accepts_documented_huggingface_cdn(tmp_path: Path, host: str) -> None:
+    payload = b"verified-model"
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.host == "github.com":
+            return httpx.Response(302, headers={"Location": f"https://{host}/model"})
+        return httpx.Response(200, content=payload)
+    with httpx.Client(transport=httpx.MockTransport(handler)) as client:
+        path = installer.install_item(tmp_path, _item(payload), client=client)
+    assert path.read_bytes() == payload
+
+
+def test_voice_redirect_is_refused_before_contacting_destination(tmp_path: Path) -> None:
+    contacted: list[str] = []
+    def handler(request: httpx.Request) -> httpx.Response:
+        contacted.append(str(request.url.host))
+        return httpx.Response(302, headers={"Location": "https://evil.example/private"})
+    with (
+        httpx.Client(transport=httpx.MockTransport(handler)) as client,
+        pytest.raises(installer.VoiceInstallError, match="voice_download_host_refused"),
+    ):
+        installer.install_item(tmp_path, _item(b"data"), client=client)
+    assert contacted == ["github.com"]
+
+@pytest.mark.parametrize("location", [None, "/again"])
+def test_voice_redirect_failures_are_bounded(tmp_path: Path, location: str | None) -> None:
+    requests: list[str] = []
+    def handler(request: httpx.Request) -> httpx.Response:
+        requests.append(str(request.url))
+        return httpx.Response(302, headers={} if location is None else {"location": location})
+    with (
+        httpx.Client(transport=httpx.MockTransport(handler)) as client,
+        pytest.raises(installer.VoiceInstallError, match="voice_download_failed"),
+    ):
+        installer.download(_item(b"data"), tmp_path / "model", client=client)
+    assert len(requests) == (1 if location is None else 6)
+    assert not list(tmp_path.iterdir())

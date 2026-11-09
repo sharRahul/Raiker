@@ -39,6 +39,8 @@ ALLOWED_DOWNLOAD_HOSTS = frozenset({
     "cdn-lfs.huggingface.co",
     "cdn-lfs-us-1.huggingface.co",
     "cas-bridge.xethub.hf.co",
+    "us.aws.cdn.hf.co",
+    "us.gcp.cdn.hf.co",
 })
 
 COMPONENTS = frozenset({

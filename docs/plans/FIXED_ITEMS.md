@@ -1841,6 +1841,9 @@ file you can open. The two capture sets that remain — `screenshots/pages/` and
 | [FIXED-1376](#fixed-1376--electron-performed-public-resolver-requests-before-setup) | High | Desktop local-only traffic | Fixed 2026-11-09 |
 | [FIXED-1377](#fixed-1377--release-matrix-missed-the-completed-onboarding-screenshot) | Low | Release reporting | Fixed 2026-11-09 |
 | [FIXED-1378](#fixed-1378--lite-tts-depended-on-an-unreviewed-piper-voice) | Medium | Personal voice beta | Fixed 2026-11-09 |
+| [FIXED-1379](#fixed-1379--redirected-windows-web-cli-help-crashed-on-cp1252) | Low | Windows CLI | Fixed 2026-11-09 |
+| [FIXED-1380](#fixed-1380--a-late-library-read-erased-a-newer-scan-failure) | Medium | Quiet UI model recovery | Fixed 2026-11-09 |
+| [FIXED-1381](#fixed-1381--an-initial-update-read-erased-a-failed-update-check) | Medium | Quiet UI update recovery | Fixed 2026-11-09 |
 
 ---
 

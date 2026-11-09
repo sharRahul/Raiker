@@ -18,6 +18,7 @@ __pycache__/
 .claude
 project-map.md
 docs/superpowers/
+docs/screenshots
 .superpowers
 build/
 # Build view controllers are source, not build output.

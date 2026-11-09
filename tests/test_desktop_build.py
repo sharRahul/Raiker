@@ -60,3 +60,13 @@ def test_voice_freeze_refuses_unavailable_pinned_runtime(tmp_path: Path, monkeyp
         desktop_build.freeze_host(source_root=tmp_path, web_assets=tmp_path / "web",
                                   out_dir=tmp_path / "out", bundle_voice=True)
     assert not (tmp_path / "out").exists()
+
+
+def test_ordinary_build_excludes_ambient_optional_voice_runtime() -> None:
+    source = Path(__file__).resolve().parents[1]
+    ordinary = pyinstaller_command(source_root=source, web_assets=source / "web/dist", out_dir=source / "desktop-dist")
+    private = pyinstaller_command(source_root=source, web_assets=source / "web/dist", out_dir=source / "desktop-dist",
+                                 bundle_voice=True)
+    for module in ("kokoro_onnx", "onnxruntime", "phonemizer", "espeakng_loader"):
+        assert any(ordinary[i:i + 2] == ["--exclude-module", module] for i in range(len(ordinary) - 1))
+        assert any(private[i:i + 2] == ["--collect-all", module] for i in range(len(private) - 1))

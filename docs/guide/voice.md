@@ -33,9 +33,9 @@ yet says why instead of being hidden. In this build:
 - **Speech recognition** has pinned Whisper models. Windows has a verified
   upstream engine; Linux and macOS engine packaging remains pending.
 - **Kokoro's runtime** is `kokoro-onnx` (tested here with version `0.6.1`). On
-  a source install, `pip install kokoro-onnx==0.6.1` enables it. Frozen runtime
-  packaging still needs verification; *runtime missing* uses the system-voice
-  fallback. Removing Piper does not by itself bundle Kokoro's dependencies.
+  a source install, `pip install kokoro-onnx==0.6.1` enables it. The personal
+  `--bundle-voice` build includes its pinned runtime and has passed frozen-worker
+  synthesis. A build without it uses the local system-voice fallback.
 - The app keeps its memory guard. When available memory is too low, free
   resources or select a smaller profile; it does not start an unsafe workload.
 

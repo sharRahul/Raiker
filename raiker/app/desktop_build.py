@@ -66,7 +66,8 @@ def pyinstaller_command(
             + [arg for name, _ in voice_runtime_pins(source_root)
                for arg in ("--copy-metadata", name)]
             + ["--add-data", f"{source_root / 'docs' / 'licensing' / 'voice'}{separator}docs/licensing/voice"]
-            if bundle_voice else []
+            if bundle_voice else [arg for module in ("kokoro_onnx", "onnxruntime", "phonemizer", "espeakng_loader")
+                                   for arg in ("--exclude-module", module)]
         ),
         "--collect-all",
         "pystray",

@@ -600,7 +600,7 @@ describe("MessagingView", () => {
     render(MessagingView);
     await openAddChannel();
     await fireEvent.input(screen.getByLabelText("Allowed senders"), { target: { value: "owner-42" } });
-    await fireEvent.click(screen.getByRole("button", { name: "Pair", exact: true }));
+    await fireEvent.click(screen.getByRole("button", { name: "Pair" }));
     expect(await screen.findByRole("alert")).toHaveTextContent("Check the profile before pairing again");
     expect(screen.getByLabelText("Allowed senders")).toHaveValue("owner-42");
   });
@@ -615,9 +615,9 @@ describe("MessagingView", () => {
     });
     render(MessagingView);
     await screen.findByRole("option", { name: /Webhooks/ });
-    await fireEvent.click(screen.getByRole("button", { name: button, exact: true }));
+    await fireEvent.click(screen.getByRole("button", { name: button }));
     await fireEvent.input(screen.getByLabelText(label), { target: { value } });
-    await fireEvent.click(screen.getByRole("button", { name: save, exact: true }));
+    await fireEvent.click(screen.getByRole("button", { name: save }));
     expect(await screen.findByRole("alert")).toHaveTextContent("was not confirmed");
     expect(screen.getByLabelText(label)).toHaveValue(value);
   });
@@ -630,7 +630,7 @@ describe("MessagingView", () => {
     stubFetch(routes);
     render(MessagingView);
     await screen.findByRole("option", { name: /Webhooks/ });
-    await fireEvent.click(screen.getByRole("button", { name: "Routing", exact: true }));
+    await fireEvent.click(screen.getByRole("button", { name: "Routing" }));
     expect(await screen.findByRole("alert")).toHaveTextContent("Conversations could not be read");
     routes["GET /api/sessions"] = [{ session_id: "sess_1", title: "Recovered conversation" }];
     await fireEvent.click(screen.getByRole("button", { name: "Retry conversations" }));

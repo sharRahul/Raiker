@@ -822,7 +822,7 @@ describe("the revision strip (QUI-L13)", () => {
 
 describe("Design recovery for beta", () => {
   it("retries model discovery and identifies what is unavailable", async () => {
-    const responses = routes({ "GET /api/models": { __status: 503 } });
+    const responses: Record<string, unknown> = routes({ "GET /api/models": { __status: 503 } });
     stubFetch(responses);
     render(DesignView);
     expect(await screen.findByRole("alert")).toHaveTextContent("Image models could not be read");
@@ -835,12 +835,12 @@ describe("Design recovery for beta", () => {
     stubFetch(routes({ "DELETE /api/images/img_1": { __status: 503 } }));
     render(DesignView);
     await fireEvent.click(await screen.findByRole("button", { name: "Open a maple leaf on the canvas" }));
-    await fireEvent.click(screen.getByRole("button", { name: "Delete", exact: true }));
+    await fireEvent.click(screen.getByRole("button", { name: "Delete" }));
     expect(await screen.findByRole("alert")).toHaveTextContent("Check Recently deleted before deleting again");
     expect(screen.getByRole("alert")).not.toHaveTextContent("Nothing was changed");
   });
   it("keeps known images visible when a later history read fails", async () => {
-    const responses = routes({ "GET /api/models": { __status: 503 } });
+    const responses: Record<string, unknown> = routes({ "GET /api/models": { __status: 503 } });
     stubFetch(responses);
     render(DesignView);
     await screen.findByRole("button", { name: "Retry Design" });

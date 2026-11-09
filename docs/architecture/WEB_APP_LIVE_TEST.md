@@ -2315,3 +2315,28 @@ terminated Svelte check; browser validation was repeated in isolation.
 The corrected pairing case passed its dedicated rerun (**1/1**) and its new
 capture was inspected: the actionable error and retained sender entry are
 visible together inside the dialog.
+
+## Result — 2026-11-09 (Installed Linux test candidate)
+
+Ubuntu 24.04 x86-64 in Codespaces; runtime source base `fa1187ef`;
+unsigned desktop version `0.0.0`. This is a test candidate, not a published or
+signed beta. Release inventory tools and documentation were edited during the
+build; the packaged runtime code was unchanged from that source base.
+
+| Case | Result | Local evidence |
+|---|---|---|
+| Native build and enforcement probe | Available; all mandatory observations enforced | `output/linux-beta/native-probe.json` |
+| AG-4 live goal killed during a step | Pass: failed with `interrupted_by_restart`, no duplicate task or model call | `output/linux-beta/goal-restart.json` |
+| Frozen host smoke | Pass: encrypted store, FTS5, bundled UI/guide, registration, setup, quit/restart/sign-in | Build log; repeated against installed host below |
+| Packaged app launch and onboarding | 2/2 pass under Xvfb | `output/linux-beta/screenshots/` |
+| Ubuntu `.deb` installation | Pass; `raiker 0.0.0` installed at `/opt/Raiker` | Package-manager record |
+| Installed app launch and onboarding | 2/2 pass under Xvfb | `output/linux-beta/installed-screenshots/` |
+| Installed host smoke | Pass | `output/linux-beta/installed-host-smoke.txt` |
+
+Specs: `desktop/e2e/packaged-live.spec.ts` and
+`desktop/e2e/packaged-onboarding-live.spec.ts`. The installed first-run and Home
+captures were visually inspected. Xvfb evidence is not a physical-display,
+accessibility, clean-desktop or signed-update acceptance record. The first
+freeze attempt failed because the workspace Python lacks a shared library;
+an isolated system-Python 3.12 build environment passed. The minimal Codespaces
+image also needed GTK 3 for Electron, and `rpm` for all-format packaging.

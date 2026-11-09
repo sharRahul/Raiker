@@ -1562,3 +1562,16 @@ on this Linux PC. Individual live mutation cases (routing, held-send/review,
 image version restore and purge), committed-write response loss, Design research
 and Documents still need evidence or audit. Native signed-installer, other-OS
 and GPU requirements in the beta plan are not closed by these checks.
+
+## Linux beta sign-off after the 2026-11-09 installed-candidate run
+
+An unsigned `0.0.0` candidate built from runtime base `fa1187ef` is installed
+on this Ubuntu 24.04 Codespaces host. Frozen and installed host smoke checks,
+packaged and installed-window onboarding, native enforcement and live goal
+restart passed; see the [run record](../architecture/WEB_APP_LIVE_TEST.md#result--2026-11-09-installed-linux-test-candidate).
+This does not close beta publication: the 30-minute metadata-only egress
+recording, remaining seven real-model journeys, exact-candidate signed update
+and rollback acceptance, and owner sign-off remain open. The issue-to-PR
+journey needs an explicitly authorized test repository and permission to create
+its issue and draft PR. Do not relabel the unsigned test installation as an
+approved beta release.

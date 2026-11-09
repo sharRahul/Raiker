@@ -95,8 +95,8 @@ def main() -> int:
     parser.add_argument("--scope", choices=("local-only",), required=True)
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
-    if args.minimum_seconds <= 0:
-        parser.error("--minimum-seconds must be positive")
+    if args.minimum_seconds < 1800:
+        parser.error("--minimum-seconds must be at least 1800 for a release audit")
     try:
         observations, capture_sha256 = _load_capture(args.capture)
         allowed_hosts = {_host(host) for host in args.allowed_host}

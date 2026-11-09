@@ -68,9 +68,15 @@ def render(directory: Path, *, version: str, channel: str, signing: str, environ
         "| File | SHA-256 | Manifest signature |",
         "|---|---|---|",
     ]
+    if not installers:
+        lines.append("| **missing** installer | — | — |")
     for path in installers:
-        signed = (directory / f"{path.name}.manifest.json.sig").is_file()
-        lines.append(f"| `{path.name}` | `{_sha256(path)}` | {'yes' if signed else 'no'} |")
+        valid = path.name.startswith(f"Raiker-{version}-") and path.stat().st_size > 0 and not path.is_symlink()
+        signature = directory / f"{path.name}.manifest.json.sig"
+        signed = signature.is_file() and not signature.is_symlink() and signature.stat().st_size > 0
+        if not valid:
+            lines.append(f"| **missing** valid installer for {version}: `{path.name}` | — | — |")
+        lines.append(f"| `{path.name}` | `{_sha256(path)}` | {'yes' if signed else ('**missing**' if signing != 'skip' else 'no')} |")
     extras = [
         (f"desktop-{channel}.json", "Signed update channel index"),
         (f"desktop-{channel}.json.sig", "Its Ed25519 signature"),
@@ -79,9 +85,11 @@ def render(directory: Path, *, version: str, channel: str, signing: str, environ
     ]
     lines += ["", "## Channel, SBOM and provenance", ""]
     for name, what in extras:
-        present = (directory / name).is_file()
+        output = directory / name
+        present = output.is_file() and not output.is_symlink() and output.stat().st_size > 0
         lines.append(f"- {what}: `{name}`{'' if present else ' — **missing**'}")
-    provenance = sorted(path.name for path in directory.glob("*provenance*"))
+    provenance = sorted(path.name for path in directory.glob("*provenance*")
+                        if path.is_file() and not path.is_symlink() and path.stat().st_size > 0)
     lines.append(f"- Signed provenance: {', '.join(f'`{name}`' for name in provenance) or '**missing**'}")
     lines += [
         "",
@@ -103,7 +111,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--dir", type=Path, required=True)
     parser.add_argument("--version", required=True)
     parser.add_argument("--channel", required=True)
-    parser.add_argument("--signing", required=True)
+    parser.add_argument("--signing", required=True, choices=tuple(SIGNING_WORDS))
     parser.add_argument("--out", type=Path, required=True)
     args = parser.parse_args(argv)
     text = render(args.dir, version=args.version, channel=args.channel, signing=args.signing, environ=dict(os.environ))

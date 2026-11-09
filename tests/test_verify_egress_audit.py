@@ -51,3 +51,17 @@ def test_egress_audit_refuses_unexpected_destination_and_short_capture(tmp_path:
     assert report["approved"] is False
     assert report["unexpected_hosts"] == ["example.invalid"]
     assert len(report["reasons"]) == 2
+
+
+def test_release_audit_minimum_cannot_be_shortened(tmp_path: Path) -> None:
+    capture = tmp_path / "capture.jsonl"
+    capture.write_text('{"timestamp":"2026-11-02T10:00:00Z","host":"127.0.0.1"}\n')
+    report = tmp_path / "report.json"
+    result = subprocess.run(
+        [sys.executable, str(SCRIPT), "--capture", str(capture), "--scope", "local-only",
+         "--output", str(report), "--minimum-seconds", "1", "--allowed-host", "127.0.0.1"],
+        capture_output=True, text=True, check=False,
+    )
+    assert result.returncode == 2
+    assert "at least 1800" in result.stderr
+    assert not report.exists()

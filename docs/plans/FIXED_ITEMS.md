@@ -1672,6 +1672,8 @@ file you can open. The two capture sets that remain — `screenshots/pages/` and
 | [FIXED-1365](#fixed-1365--approvals-hid-allow-for-this-task-when-accepting-only-records-found-this-round) | Low | Approvals | Fixed 2026-11-08 |
 | [FIXED-1366](#fixed-1366--skills-goals-rewind-and-github-errors-lacked-safe-recovery-qui-g06) | Medium | Work / Connections / Recovery | Fixed 2026-11-09 |
 | [FIXED-1367](#fixed-1367--messaging-discarded-setup-drafts-and-design-claimed-uncertain-writes-changed-nothing-qui-g06) | Medium | Messaging / Design images | Fixed 2026-11-09 |
+| [FIXED-1368](#fixed-1368--release-evidence-could-approve-a-directory-with-no-installer) | High | Release validation | Fixed 2026-11-09 |
+| [FIXED-1369](#fixed-1369--the-release-egress-audit-could-be-shortened-to-one-second) | High | Data-safety release gate | Fixed 2026-11-09 |
 
 ---
 
@@ -40543,3 +40545,38 @@ claim a real image-provider round trip.
 **Evidence.** `MessagingView.test.ts`, `DesignView.test.ts` and
 `beta-messaging-design-recovery-live.spec.ts`; see
 [Live Test results](../architecture/WEB_APP_LIVE_TEST.md#result--2026-11-09-beta-messaging-and-design-recovery).
+
+## FIXED-1368 — Release evidence could approve a directory with no installer
+
+**Severity: High. Area: Release validation. Status: Fixed 2026-11-09.**
+
+**Observed.** `release_evidence.py` returned success when all metadata filenames
+existed but no installer existed. Empty metadata/provenance and unsigned
+installer manifests could also appear in a successful signed-release record.
+
+**Fixed.** The inventory now refuses absent, empty, wrong-version or symlinked
+installers; required manifest signatures must be nonempty regular files. Metadata
+and provenance must also be nonempty regular files. Explicit `skip` signing
+continues to allow unsigned test builds, and the CLI rejects unknown signing
+modes. This is an inventory gate, not cryptographic signature verification;
+the release workflow's signature/attestation checks remain required.
+
+**Evidence.** `tests/test_release_evidence.py`: six passing cases, including
+metadata-only output, wrong versions, empty metadata and empty required
+signatures. Ruff passes on the changed implementation and tests.
+
+## FIXED-1369 — The release egress audit could be shortened to one second
+
+**Severity: High. Area: Data-safety release gate. Status: Fixed 2026-11-09.**
+
+**Observed.** `verify_egress_audit.py --minimum-seconds 1` could approve a
+one-second capture despite the release requirement for at least 30 minutes.
+
+**Fixed.** The CLI refuses thresholds below 1,800 seconds before writing an
+approval report. A longer observation period is still supported. This enforces
+the existing requirement; it does not supply missing network observations.
+
+**Evidence.** `tests/test_verify_egress_audit.py`: the shortened threshold exits
+with an error and writes no report; real-length fixtures still pass and short
+or unexpected-destination fixtures still fail. Nine combined release-inventory
+and audit-verifier tests pass; Ruff passes.

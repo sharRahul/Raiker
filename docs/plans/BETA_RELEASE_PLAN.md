@@ -574,3 +574,29 @@ product refusing it, rather than delaying the date.
   #246); its Windows, macOS and Linux live jobs passed. GPU-owner and
   signed-installer evidence remain open. PR #247 adds the required data-safety
   drill gate and its formal owner-machine evidence procedure.
+
+## 2026-11-09 — Linux owner-machine readiness run
+
+Target: Ubuntu 24.04 x86-64 in Codespaces. This is a Linux test candidate,
+not a published beta or clean-desktop installation. Decisions for this run:
+
+1. Keep beta scope and release sign-off criteria unchanged; never bypass a
+   failed sandbox or packaging check to obtain a pass.
+2. Validate the release inventory before producing candidate evidence
+   ([FIXED-1368](FIXED_ITEMS.md#fixed-1368--release-evidence-could-approve-a-directory-with-no-installer)).
+3. Run privacy canary, destructive recovery and egress-verifier regressions.
+4. Kill/restart a live goal and confirm honest completion and no duplicate work.
+5. Build and probe the native runner on this host.
+6. Build an unsigned `0.0.0` Linux desktop test package with normal smoke checks.
+   The workspace's Python 3.14 lacks a shared library, so use an isolated system
+   Python 3.12 virtual environment for packaging, not a weakened freeze check.
+7. Keep the required 30-minute metadata-only egress recording, real-model
+   journeys and exact-commit installer acceptance open until actually recorded.
+
+Local artifacts live under `output/linux-beta/`: `data-safety.xml`,
+`goal-restart.json` and `native-probe.json`. The focused safety run passed seven
+tests. The live restart reports `interrupted_by_restart`, one model call before
+and after restart, and the same task id. The native probe reports Bubblewrap
+available with descendant reaping, egress, escape-write denial, masked reads,
+relay and seccomp enforced; runner trust is `package_relative_integrity`.
+These source-tree measurements do not replace frozen/installed-host evidence.

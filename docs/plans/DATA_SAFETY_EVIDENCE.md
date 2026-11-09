@@ -64,3 +64,13 @@ an explanation in the release record before running the audit.
 The release approver must attach the four records above to the exact release
 commit. A passing CI check alone must not convert a pending owner-machine row
 into a pass.
+
+## 2026-11-09 — Linux test-candidate evidence
+
+On Ubuntu 24.04 x86-64 (Codespaces), the privacy canary, destructive recovery
+and audit-verifier regression suite passed: local JUnit artifact
+`output/linux-beta/data-safety.xml`. These are automated regressions run locally,
+not the owner-recorded release-candidate observations required above.
+The verifier now refuses thresholds below the documented 1,800-second minimum
+([FIXED-1369](FIXED_ITEMS.md#fixed-1369--the-release-egress-audit-could-be-shortened-to-one-second)).
+No 30-minute network recording was generated or inferred from these tests.

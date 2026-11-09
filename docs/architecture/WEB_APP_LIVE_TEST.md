@@ -2262,10 +2262,21 @@ Browser result: **3/3 passed**. All three captures were inspected at original
 resolution: readable inline alerts, preserved draft and unchanged navigation.
 Visual review caught a repeated unknown reason code in Skills; it was removed
 from the extra explanation (the diagnostic remains in the HTTP evidence).
-A repeat run follows that correction. The focused suites passed 31/31 before
+The repeat run passed **3/3**, and the corrected captures were inspected. The focused suites passed 31/31 before
 the additional stale-list regression; that regression also passed. A repository
-scan test timed out under concurrent local checks and is rerun independently.
+scan test timed out under concurrent local checks; its independent rerun passed
+all seven helper tests.
 
-Remaining evidence: provider-key entry and funded model turns were not exercised
-by this recovery slice. Full mutation/disconnect scenarios, dark/native platform
-rendering and assistive technology checks remain open in TO_BE_FIXED.
+The existing `models-provider-validation-live.spec.ts` also ran: all three keys
+were entered through the UI from a private temporary file. OpenRouter
+(`openai/gpt-4o-mini`) and OpenAI (`gpt-4o-mini`) completed real turns with the
+exact selected pair. Anthropic saved the connection and reported **No credit**;
+its test records a blocked outcome, not successful inference. Provider captures
+and `outcomes.json` are in `output/playwright/2026-11-06-models-real-providers/`
+(the existing suite retains its original output directory name).
+
+Remaining evidence: funded Anthropic inference, full mutation/disconnect
+scenarios, dark/native platform rendering and assistive technology checks remain
+open in TO_BE_FIXED. GitHub's implementation-commit Web UI, Python 3.11,
+Data safety, Ruff/Mypy validation and platform jobs were monitored after push;
+the final workflow outcome is reported with the delivery summary.

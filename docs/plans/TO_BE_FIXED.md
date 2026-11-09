@@ -1546,3 +1546,7 @@ Messaging and Design still need their error audit. Lost-response writes that
 commit before disconnect, real GitHub authentication failures, and every Goal
 lifecycle refusal still need dedicated running-host evidence. Do not treat
 response-failure injection as proof of those scenarios.
+
+2026-11-09 provider live check: UI entry succeeded for all three supplied keys;
+OpenAI and OpenRouter completed real turns. Anthropic reported **No credit**,
+so its inference and the stopped-turn check still need a funded connection.

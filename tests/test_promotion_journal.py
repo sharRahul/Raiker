@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """SB-5 (beta plan) — an Apply can be undone, and a crash part-way is rolled back.
 
 The kill test runs the Apply in a child process that exits hard (``os._exit``:
@@ -102,9 +103,10 @@ _CHILD = textwrap.dedent(
     copied = {"n": 0}
 
     def dying_copy(source, target):
-        copied["n"] += 1
-        if copied["n"] == 4:
-            os._exit(9)  # the host dies here: no finally, no except
+        if str(target).endswith(".raiker-promote"):
+            copied["n"] += 1
+            if copied["n"] == 4:
+                os._exit(9)  # after project writes, never during backup
         return real_copy(source, target)
 
     workspaces._copy_file = dying_copy

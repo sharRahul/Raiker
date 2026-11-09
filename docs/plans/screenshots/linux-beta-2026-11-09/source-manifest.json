@@ -1,0 +1,74 @@
+{
+  "15-chat-200-percent-zoom.png": {
+    "commit": "304e71ff44207172cb8e1092558382f93d9077a2",
+    "working_tree_changed": true,
+    "viewport": {
+      "width": 640,
+      "height": 400
+    },
+    "theme": "light",
+    "route": "#/new-chat",
+    "test": "quiet-ui-accessibility-live.spec.ts › RT-QUI-15 — at 200% zoom on a 1280×800 screen, Chat's Send stays visible",
+    "captured_at": "2026-11-09T13:52:11.821Z"
+  },
+  "16-setup-hello.png": {
+    "commit": "304e71ff44207172cb8e1092558382f93d9077a2",
+    "working_tree_changed": true,
+    "viewport": {
+      "width": 1440,
+      "height": 1000
+    },
+    "theme": "light",
+    "route": "#/model-setup",
+    "test": "first-launch-live.spec.ts › RT-QUI-16 — first launch is a setup conversation: Hello, Where should I think, How I'll ask, first task",
+    "captured_at": "2026-11-09T13:49:11.534Z"
+  },
+  "16-setup-voice-deferred.png": {
+    "commit": "304e71ff44207172cb8e1092558382f93d9077a2",
+    "working_tree_changed": true,
+    "viewport": {
+      "width": 1440,
+      "height": 1000
+    },
+    "theme": "light",
+    "route": "#/model-setup",
+    "test": "first-launch-live.spec.ts › RT-QUI-16 — first launch is a setup conversation: Hello, Where should I think, How I'll ask, first task",
+    "captured_at": "2026-11-09T13:49:13.137Z"
+  },
+  "17-setup-where-to-think.png": {
+    "commit": "304e71ff44207172cb8e1092558382f93d9077a2",
+    "working_tree_changed": true,
+    "viewport": {
+      "width": 1440,
+      "height": 1000
+    },
+    "theme": "light",
+    "route": "#/model-setup",
+    "test": "first-launch-live.spec.ts › RT-QUI-16 — first launch is a setup conversation: Hello, Where should I think, How I'll ask, first task",
+    "captured_at": "2026-11-09T13:49:14.322Z"
+  },
+  "18-setup-how-i-ask.png": {
+    "commit": "304e71ff44207172cb8e1092558382f93d9077a2",
+    "working_tree_changed": true,
+    "viewport": {
+      "width": 1440,
+      "height": 1000
+    },
+    "theme": "light",
+    "route": "#/model-setup",
+    "test": "first-launch-live.spec.ts › RT-QUI-16 — first launch is a setup conversation: Hello, Where should I think, How I'll ask, first task",
+    "captured_at": "2026-11-09T13:49:15.373Z"
+  },
+  "19-setup-first-task.png": {
+    "commit": "304e71ff44207172cb8e1092558382f93d9077a2",
+    "working_tree_changed": true,
+    "viewport": {
+      "width": 1440,
+      "height": 1000
+    },
+    "theme": "light",
+    "route": "#/model-setup",
+    "test": "first-launch-live.spec.ts › RT-QUI-16 — first launch is a setup conversation: Hello, Where should I think, How I'll ask, first task",
+    "captured_at": "2026-11-09T13:49:16.236Z"
+  }
+}

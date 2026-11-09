@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Disposable task workspaces: snapshot, diff, reviewed promotion, cleanup.
 
 Autonomous code never runs against the owner's project. A task gets a private
@@ -50,6 +51,7 @@ import time
 from collections.abc import Callable, Iterator
 from dataclasses import dataclass, field
 from pathlib import Path, PurePosixPath
+from typing import BinaryIO
 
 EXCLUDED_NAMES = frozenset({".git", ".raiker"})
 #: Folders a toolchain fills: installed dependencies and caches. They are the
@@ -173,22 +175,97 @@ def _is_environment(directory: Path, name: str, *, top: bool) -> bool:
 
 def _hash_file(path: Path) -> str:
     digest = hashlib.sha256()
-    with open(path, "rb") as handle:
+    with _regular_reader(path) as handle:
         for chunk in iter(lambda: handle.read(_CHUNK), b""):
             digest.update(chunk)
     return digest.hexdigest()
 
 
+def _regular_reader(path: Path) -> BinaryIO:
+    """Open the leaf once, refusing links, FIFOs and devices before reading."""
+    flags = os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_BINARY", 0)
+    # A planted FIFO must not hang the host before fstat can reject it.
+    descriptor = os.open(path, flags | getattr(os, "O_NONBLOCK", 0))
+    if not stat.S_ISREG(os.fstat(descriptor).st_mode):
+        os.close(descriptor)
+        raise WorkspaceError("workspace_path_unsafe", str(path))
+    return os.fdopen(descriptor, "rb")
+
+
 def _copy_file(source: Path, target: Path) -> str:
     """Copy bytes (never metadata, never a link) and return their SHA-256."""
     digest = hashlib.sha256()
-    flags = os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_BINARY", 0)
-    descriptor = os.open(source, flags)
-    with os.fdopen(descriptor, "rb") as reader, open(target, "xb") as writer:
+    with _regular_reader(source) as reader, open(target, "xb") as writer:
         for chunk in iter(lambda: reader.read(_CHUNK), b""):
             digest.update(chunk)
             writer.write(chunk)
     return digest.hexdigest()
+
+
+class _PromotionPaths:
+    """Keep Linux Apply's parent directories open until rollback has finished.
+
+    Every component is opened relative to its pinned parent with O_NOFOLLOW.
+    /proc/self/fd names only these already-open directories; swapping a checked
+    directory for a symlink cannot redirect a later read, replace or unlink.
+    Other platforms retain their existing link checks pending native handles.
+    """
+
+    def __init__(self, root: Path) -> None:
+        self.root = root
+        self.handles: dict[tuple[str, ...], int] = {}
+        self.created: list[Path] = []
+        self.created_entries: list[tuple[int, str]] = []
+
+    def __enter__(self) -> _PromotionPaths:
+        if sys.platform == "linux":
+            self.handles[()] = os.open(self.root, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
+        return self
+
+    def path(self, relative: str, *, create: bool = False) -> Path:
+        target = _target(self.root, relative)
+        if not self.handles:
+            return target
+        parts = PurePosixPath(relative).parts
+        for index, part in enumerate(parts[:-1]):
+            key = parts[:index + 1]
+            if key in self.handles:
+                continue
+            parent = self.handles[parts[:index]]
+            try:
+                descriptor = os.open(part, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW, dir_fd=parent)
+            except FileNotFoundError:
+                if not create:
+                    raise
+                try:
+                    os.mkdir(part, dir_fd=parent)
+                    self.created.append(self.root.joinpath(*key))
+                    self.created_entries.append((parent, part))
+                except FileExistsError:
+                    pass  # Still opened with O_NOFOLLOW below.
+                descriptor = os.open(part, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW, dir_fd=parent)
+            self.handles[key] = descriptor
+        return Path(f"/proc/self/fd/{self.handles[parts[:-1]]}") / parts[-1]
+
+    def __exit__(self, exc_type: object, exc: object, traceback: object) -> None:
+        if exc_type is not None:
+            for parent, name in reversed(self.created_entries):
+                with contextlib.suppress(OSError):
+                    os.rmdir(name, dir_fd=parent)
+        for descriptor in reversed(list(self.handles.values())):
+            os.close(descriptor)
+
+
+def _restore_file(backup: Path, target: Path) -> None:
+    # Replacing the directory entry also avoids writing through a planted
+    # hard link or symlink during rollback. Never truncate the existing leaf.
+    staged = target.with_name(f".{target.name}.{secrets.token_hex(12)}.raiker-restore")
+    try:
+        _copy_file(backup, staged)
+        os.replace(staged, target)
+    finally:
+        with contextlib.suppress(FileNotFoundError):
+            staged.unlink()
 
 
 def _new_private_directory(base: Path, prefix: str) -> Path:
@@ -391,8 +468,13 @@ def promote(
     for relative in paths:
         if allowed is not None and not allowed(relative):
             raise WorkspaceError("workspace_promotion_not_permitted", relative)
-    with _promotion_lock(workspace):
-        targets = {relative: _target(workspace.source, relative) for relative in paths}
+    with (
+        _promotion_lock(workspace),
+        _PromotionPaths(workspace.source) as target_paths,
+        _PromotionPaths(workspace.root) as copy_paths,
+    ):
+        targets = {relative: target_paths.path(relative, create=True) for relative in paths}
+        copied = {relative: copy_paths.path(relative) for relative in (*diff.created, *diff.modified)}
         conflicts = _conflicts(workspace, diff, targets)
         for relative in conflicts:
             if relative not in overwrite:
@@ -412,14 +494,15 @@ def promote(
             backups = Path(tempfile.mkdtemp(prefix=".promote-backup-", dir=workspace.root.parent))
         saved: dict[str, Path] = {}
         written: list[Path] = []
-        made_directories: list[Path] = []
+        made_directories: list[Path] = target_paths.created
+        rollback_failed = False
         try:
             for index, relative in enumerate(paths):
                 # Every original that is about to be replaced or removed, the
                 # owner's overwritten edits included, is backed up first.
                 if targets[relative].is_file():
                     backup = backups / str(index)
-                    shutil.copyfile(targets[relative], backup)
+                    _copy_file(targets[relative], backup)
                     saved[relative] = backup
             if journal_dir is not None:
                 # Durable before the first write to the project: if the host
@@ -432,6 +515,7 @@ def promote(
                     "saved": {rel: path.name for rel, path in saved.items()},
                     "created": created_targets,
                     "paths": paths,
+                    "made_directories": [str(d) for d in made_directories],
                     "at": time.time(),
                 })
             for relative in (*diff.created, *diff.modified):
@@ -441,7 +525,7 @@ def promote(
                         parent.mkdir()
                         made_directories.append(parent)
                 staged = target.with_name(f".{target.name}.raiker-promote")
-                _copy_file(workspace.root.joinpath(*PurePosixPath(relative).parts), staged)
+                _copy_file(copied[relative], staged)
                 if relative not in saved:
                     written.append(target)
                 os.replace(staged, target)
@@ -459,23 +543,30 @@ def promote(
         except BaseException:
             for relative, backup in saved.items():
                 # Copied back, not renamed: the backup may be on another volume.
-                with contextlib.suppress(OSError):
-                    shutil.copyfile(backup, targets[relative])
+                try:
+                    _restore_file(backup, targets[relative])
+                except OSError:
+                    rollback_failed = True
             for target in written:
                 with contextlib.suppress(OSError):
                     target.unlink()
             for directory in reversed(made_directories):
-                with contextlib.suppress(OSError):
-                    directory.rmdir()
+                with contextlib.suppress(OSError, WorkspaceError):
+                    relative = directory.relative_to(workspace.source).as_posix()
+                    target_paths.path(relative).rmdir()
             for relative in (*diff.created, *diff.modified):
                 staged = targets[relative].with_name(f".{targets[relative].name}.raiker-promote")
                 with contextlib.suppress(OSError):
                     staged.unlink()
-            if journal_dir is not None:
+            if journal_dir is not None and not rollback_failed:
                 shutil.rmtree(backups, ignore_errors=True)
+            if rollback_failed:
+                # Preserve the originals and applying journal for startup
+                # recovery when the disk can accept writes again.
+                raise WorkspaceError("workspace_rollback_incomplete", str(backups)) from None
             raise
         finally:
-            if journal_dir is None:
+            if journal_dir is None and not rollback_failed:
                 shutil.rmtree(backups, ignore_errors=True)
     if journal_dir is not None:
         _prune_journals(journal_dir)
@@ -521,24 +612,23 @@ def _restore(directory: Path, journal: dict[str, object]) -> None:
     """Put the project back as it was before the Apply in *directory*."""
     source = Path(str(journal["source"]))
     saved = _mapping(journal.get("saved"))
-    for relative, name in saved.items():
-        target = _target(source, str(relative))
-        target.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copyfile(directory / str(name), target)
-    for relative in _strings(journal.get("created")):
-        target = _target(source, str(relative))
-        with contextlib.suppress(FileNotFoundError):
-            target.unlink()
-        staged = target.with_name(f".{target.name}.raiker-promote")
-        with contextlib.suppress(FileNotFoundError):
-            staged.unlink()
-    for relative in _strings(journal.get("paths")):
-        target = _target(source, str(relative))
-        with contextlib.suppress(FileNotFoundError):
-            target.with_name(f".{target.name}.raiker-promote").unlink()
-    for directory_path in reversed(_strings(journal.get("made_directories"))):
-        with contextlib.suppress(OSError):
-            Path(str(directory_path)).rmdir()
+    with _PromotionPaths(source) as pinned:
+        for relative, name in saved.items():
+            target = pinned.path(str(relative), create=True)
+            target.parent.mkdir(parents=True, exist_ok=True)
+            _restore_file(directory / str(name), target)
+        for relative in _strings(journal.get("created")):
+            target = pinned.path(relative, create=True)
+            with contextlib.suppress(FileNotFoundError):
+                target.unlink()
+        for relative in _strings(journal.get("paths")):
+            target = pinned.path(relative, create=True)
+            with contextlib.suppress(FileNotFoundError):
+                target.with_name(f".{target.name}.raiker-promote").unlink()
+        for directory_path in reversed(_strings(journal.get("made_directories"))):
+            relative = Path(directory_path).relative_to(source).as_posix()
+            with contextlib.suppress(OSError):
+                pinned.path(relative).rmdir()
 
 
 def recover_promotions(journal_dir: Path) -> list[str]:

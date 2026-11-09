@@ -1,0 +1,16 @@
+[
+  {
+    "payload": "w9T.xzdio",
+    "address_space_limit_bytes": 536870912,
+    "exit_code": 1,
+    "log": "/tmp/raiker-rpm-pressure-final-u3udskbt/w9T.xzdio/log.txt",
+    "stderr": "error: create archive failed on file /tmp/raiker-rpm-pressure-final-u3udskbt/w9T.xzdio/ROOT/opt/raiker-test/payload: cpio: write failed - No such file or directory\n    create archive failed on file /tmp/raiker-rpm-pressure-final-u3udskbt/w9T.xzdio/ROOT/opt/raiker-test/payload: cpio: write failed - No such file or directory\n"
+  },
+  {
+    "payload": "w6.xzdio",
+    "address_space_limit_bytes": 536870912,
+    "exit_code": 0,
+    "log": "/tmp/raiker-rpm-pressure-final-u3udskbt/w6.xzdio/log.txt",
+    "stderr": "+ umask 022\n+ cd /tmp/raiker-rpm-pressure-final-u3udskbt/w6.xzdio/BUILD\n+ /bin/rm -rf /tmp/raiker-rpm-pressure-final-u3udskbt/w6.xzdio/ROOT\n+ RPM_EC=0\n+ jobs -p\n+ exit 0\n+ umask 022\n+ cd /tmp/raiker-rpm-pressure-final-u3udskbt/w6.xzdio/BUILD\n+ RPM_EC=0\n+ jobs -p\n+ exit 0\n"
+  }
+]

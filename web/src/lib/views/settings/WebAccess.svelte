@@ -196,7 +196,8 @@
         </div>
         <p class="lead">
           Matched on this computer: the address you read is never sent anywhere to be
-          checked. Refreshed daily while Raiker runs.
+          checked. Update now downloads the public lists from URLhaus and OpenPhish.
+          After the first update, stale lists refresh when Raiker starts.
         </p>
         <ul class="feeds">
           {#each feeds.feeds as feed (feed.id)}

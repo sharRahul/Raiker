@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Voice spec V1: catalogue, profiles, placement, install, engines, routes.
 
 Real downloads and real engines are not used here; the live round trip lives in
@@ -84,7 +85,7 @@ def test_the_bundled_voice_activity_model_is_the_file_the_catalogue_names() -> N
 def test_unverified_or_unreviewed_items_are_refused() -> None:
     catalogue = load()
     with pytest.raises(CatalogueError, match="voice_item_pending"):
-        require_installable(catalogue.get("whisper-small-q5_1"))
+        require_installable(replace(catalogue.get("whisper-small-q5_1"), pending_reason="not verified"))
     with pytest.raises(CatalogueError, match="voice_item_pending"):
         require_installable(catalogue.get("piper-voice-en_US-amy-medium"))
     item = catalogue.get("kokoro-82m-int8")
@@ -128,8 +129,10 @@ def test_a_profile_resolves_to_this_machines_builds() -> None:
     lite = resolve(catalogue, "lite", _hardware(memory_gib=8, os_name="linux"), english_only=True)
     assert lite.part("whisper_model").item_id == "whisper-base.en-q5_1"  # type: ignore[union-attr]
     assert lite.part("piper_engine").item_id == "piper-linux-x64"  # type: ignore[union-attr]
-    # Speaking on Balanced is installable today; listening waits on its pins.
-    assert balanced.speaking_installable and not balanced.listening_installable
+    # Windows has a pinned engine and models. Linux still waits on its engine.
+    assert balanced.speaking_installable and balanced.listening_installable
+    linux = resolve(catalogue, "balanced", _hardware(os_name="linux"))
+    assert not linux.listening_installable
 
 
 def test_whisper_goes_on_the_gpu_only_with_headroom_next_to_the_model() -> None:
@@ -366,9 +369,9 @@ def test_status_reports_what_is_offered_and_starts_nothing(tmp_path: Path) -> No
     status = service.status()
     assert status["settings"]["voice"] == "bf_emma"
     assert status["speaking"]["state"] == "not_installed" and status["speaking"]["engine"] == "kokoro"
-    assert status["listening"]["state"] == "unavailable"
-    pending = {c["item_id"]: c["refusal"] for c in status["listening"]["components"]}
-    assert pending["whisper-small-q5_1"] == "voice_item_pending"
+    assert status["listening"]["state"] == "not_installed"
+    components = {c["item_id"]: c["refusal"] for c in status["listening"]["components"]}
+    assert components["whisper-small-q5_1"] is None
     assert "bf_emma" in status["speaking"]["voices"]
     assert spawned == []
 
@@ -452,7 +455,8 @@ def test_the_install_worker_installs_every_installable_component(tmp_path: Path,
     routes_voice.run_voice_install(ws, owner, operation["operation_id"], "balanced")
     row = ModelOperationService(SQLiteStore(ws)).require(owner, operation["operation_id"])
     assert row.state == "complete", (row.error_code, row.error_detail)
-    assert installed == ["kokoro-82m-int8", "kokoro-voices-v1"]
+    assert installed == ["whisper-server-windows-x64-cpu", "whisper-small-q5_1",
+                         "kokoro-82m-int8", "kokoro-voices-v1"]
 
 
 def test_word_error_rate() -> None:
@@ -516,6 +520,9 @@ def test_the_pin_script_fills_digests_from_hugging_face_without_downloading() ->
     from scripts.pin_voice_catalogue import pin
 
     data = json.loads(Path("raiker/config/voice-catalogue.json").read_text(encoding="utf-8"))
+    for item in data["items"]:
+        if item.get("hf_repo"):
+            item["pending_reason"] = "test unpinned entry"
     commit = "a" * 40
     seen: list[str] = []
 

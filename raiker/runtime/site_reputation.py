@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Which sites a web read flags, and which it never does (owner's decision, 2026-10-26).
 
 A flag is an alert on a web read, never a refusal (2026-10-25). Since the
@@ -195,6 +196,8 @@ class ThreatFeeds:
         tmp = self._path(feed).with_suffix(".tmp")
         tmp.write_text(json.dumps(payload), encoding="utf-8")
         tmp.replace(self._path(feed))
+        with self._lock:
+            self._cache.pop(str(self._path(feed)), None)
 
     def status(self) -> list[dict[str, Any]]:
         out = []
@@ -253,9 +256,15 @@ class ThreatFeeds:
 
 def refresh_in_background(workspace_root: str | Path) -> threading.Thread | None:
     """Refresh stale feeds off the request path; ``None`` when there is nothing to do."""
-    if os.environ.get(_DISABLE_ENV, "").strip().lower() in ("off", "0", "false"):
+    preference = os.environ.get(_DISABLE_ENV, "").strip().lower()
+    if preference in ("off", "0", "false"):
         return None
     feeds = ThreatFeeds(workspace_root)
+    # A fresh local-only profile has never asked to download public feeds.
+    # The owner's first Refresh (or explicit environment opt-in) authorizes
+    # subsequent stale refreshes; reading cached reputation stays local.
+    if preference not in ("on", "1", "true") and not any(item["fetched_at"] for item in feeds.status()):
+        return None
     if not feeds.stale():
         return None
     thread = threading.Thread(target=feeds.refresh, name="raiker-threat-feeds", daemon=True)

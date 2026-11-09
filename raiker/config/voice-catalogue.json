@@ -82,15 +82,21 @@
       "tier": "base",
       "english_only": false,
       "licence": "MIT",
-      "languages": ["multilingual"],
+      "languages": [
+        "multilingual"
+      ],
       "source_page": "https://huggingface.co/ggerganov/whisper.cpp",
       "hf_repo": "ggerganov/whisper.cpp",
       "hf_path": "ggml-base-q5_1.bin",
-      "approx_size_bytes": 60000000,
       "memory_bytes_cpu": 200000000,
       "memory_bytes_gpu": 180000000,
-      "profiles": ["lite"],
-      "pending_reason": "Pin the Hugging Face revision and its LFS SHA-256 (scripts/pin_voice_catalogue.py); huggingface.co was unreachable where this catalogue was built."
+      "profiles": [
+        "lite"
+      ],
+      "revision": "5359861c739e955e79d9a303bcbc70fb988958b1",
+      "url": "https://huggingface.co/ggerganov/whisper.cpp/resolve/5359861c739e955e79d9a303bcbc70fb988958b1/ggml-base-q5_1.bin",
+      "sha256": "422f1ae452ade6f30a004d7e5c6a43195e4433bc370bf23fac9cc591f01a8898",
+      "size_bytes": 59707625
     },
     {
       "id": "whisper-base.en-q5_1",
@@ -99,15 +105,21 @@
       "tier": "base",
       "english_only": true,
       "licence": "MIT",
-      "languages": ["en"],
+      "languages": [
+        "en"
+      ],
       "source_page": "https://huggingface.co/ggerganov/whisper.cpp",
       "hf_repo": "ggerganov/whisper.cpp",
       "hf_path": "ggml-base.en-q5_1.bin",
-      "approx_size_bytes": 60000000,
       "memory_bytes_cpu": 200000000,
       "memory_bytes_gpu": 180000000,
-      "profiles": ["lite"],
-      "pending_reason": "Pin the Hugging Face revision and its LFS SHA-256 (scripts/pin_voice_catalogue.py)."
+      "profiles": [
+        "lite"
+      ],
+      "revision": "5359861c739e955e79d9a303bcbc70fb988958b1",
+      "url": "https://huggingface.co/ggerganov/whisper.cpp/resolve/5359861c739e955e79d9a303bcbc70fb988958b1/ggml-base.en-q5_1.bin",
+      "sha256": "4baf70dd0d7c4247ba2b81fafd9c01005ac77c2f9ef064e00dcf195d0e2fdd2f",
+      "size_bytes": 59721011
     },
     {
       "id": "whisper-small-q5_1",
@@ -116,15 +128,21 @@
       "tier": "small",
       "english_only": false,
       "licence": "MIT",
-      "languages": ["multilingual"],
+      "languages": [
+        "multilingual"
+      ],
       "source_page": "https://huggingface.co/ggerganov/whisper.cpp",
       "hf_repo": "ggerganov/whisper.cpp",
       "hf_path": "ggml-small-q5_1.bin",
-      "approx_size_bytes": 190000000,
       "memory_bytes_cpu": 500000000,
       "memory_bytes_gpu": 450000000,
-      "profiles": ["balanced"],
-      "pending_reason": "Pin the Hugging Face revision and its LFS SHA-256 (scripts/pin_voice_catalogue.py)."
+      "profiles": [
+        "balanced"
+      ],
+      "revision": "5359861c739e955e79d9a303bcbc70fb988958b1",
+      "url": "https://huggingface.co/ggerganov/whisper.cpp/resolve/5359861c739e955e79d9a303bcbc70fb988958b1/ggml-small-q5_1.bin",
+      "sha256": "ae85e4a935d7a567bd102fe55afc16bb595bdb618e11b2fc7591bc08120411bb",
+      "size_bytes": 190085487
     },
     {
       "id": "whisper-large-v3-turbo-q5_0",
@@ -133,15 +151,21 @@
       "tier": "large-v3-turbo",
       "english_only": false,
       "licence": "MIT",
-      "languages": ["multilingual"],
+      "languages": [
+        "multilingual"
+      ],
       "source_page": "https://huggingface.co/ggerganov/whisper.cpp",
       "hf_repo": "ggerganov/whisper.cpp",
       "hf_path": "ggml-large-v3-turbo-q5_0.bin",
-      "approx_size_bytes": 550000000,
       "memory_bytes_cpu": 1100000000,
       "memory_bytes_gpu": 900000000,
-      "profiles": ["balanced"],
-      "pending_reason": "Pin the Hugging Face revision and its LFS SHA-256 (scripts/pin_voice_catalogue.py)."
+      "profiles": [
+        "balanced"
+      ],
+      "revision": "5359861c739e955e79d9a303bcbc70fb988958b1",
+      "url": "https://huggingface.co/ggerganov/whisper.cpp/resolve/5359861c739e955e79d9a303bcbc70fb988958b1/ggml-large-v3-turbo-q5_0.bin",
+      "sha256": "394221709cd5ad1f40c46e6031ca61bce88931e6e088c188294c6d5a55ffa7e2",
+      "size_bytes": 574041195
     },
     {
       "id": "whisper-large-v3-turbo-q8_0",
@@ -150,15 +174,21 @@
       "tier": "large-v3-turbo",
       "english_only": false,
       "licence": "MIT",
-      "languages": ["multilingual"],
+      "languages": [
+        "multilingual"
+      ],
       "source_page": "https://huggingface.co/ggerganov/whisper.cpp",
       "hf_repo": "ggerganov/whisper.cpp",
       "hf_path": "ggml-large-v3-turbo-q8_0.bin",
-      "approx_size_bytes": 870000000,
       "memory_bytes_cpu": 1600000000,
       "memory_bytes_gpu": 1300000000,
-      "profiles": ["high"],
-      "pending_reason": "Pin the Hugging Face revision and its LFS SHA-256 (scripts/pin_voice_catalogue.py)."
+      "profiles": [
+        "high"
+      ],
+      "revision": "5359861c739e955e79d9a303bcbc70fb988958b1",
+      "url": "https://huggingface.co/ggerganov/whisper.cpp/resolve/5359861c739e955e79d9a303bcbc70fb988958b1/ggml-large-v3-turbo-q8_0.bin",
+      "sha256": "317eb69c11673c9de1e1f0d459b253999804ec71ac4c23c17ecf5fbe24e259a1",
+      "size_bytes": 874188075
     },
     {
       "id": "kokoro-82m-int8",
@@ -282,15 +312,22 @@
       "component": "piper_voice",
       "name": "Piper voice: Amy (US English, medium)",
       "licence": "unreviewed",
-      "languages": ["en-us"],
+      "languages": [
+        "en-us"
+      ],
       "source_page": "https://huggingface.co/rhasspy/piper-voices",
       "hf_repo": "rhasspy/piper-voices",
       "hf_path": "en/en_US/amy/medium/en_US-amy-medium.onnx",
       "hf_config_path": "en/en_US/amy/medium/en_US-amy-medium.onnx.json",
-      "approx_size_bytes": 63000000,
       "memory_bytes_cpu": 150000000,
-      "profiles": ["lite"],
-      "pending_reason": "Confirm the voice's dataset licence permits this use (voice spec 11) and pin its SHA-256 (scripts/pin_voice_catalogue.py)."
+      "profiles": [
+        "lite"
+      ],
+      "pending_reason": "Digest pinned; the licence still needs review under LICENSING_POLICY.md before this is offered.",
+      "revision": "e7229f7d33a10e145e109b886d661984201ac3c4",
+      "url": "https://huggingface.co/rhasspy/piper-voices/resolve/e7229f7d33a10e145e109b886d661984201ac3c4/en/en_US/amy/medium/en_US-amy-medium.onnx",
+      "sha256": "b3a6e47b57b8c7fbe6a0ce2518161a50f59a9cdd8a50835c02cb02bdd6206c18",
+      "size_bytes": 63201294
     }
   ],
   "profiles": {

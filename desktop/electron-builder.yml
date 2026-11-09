@@ -153,4 +153,7 @@ rpm:
     - at-spi2-core
     - libuuid
     - libsecret
-  fpm: ["--rpm-rpmbuild-define=_build_id_links none", "--before-install", "build-resources/linux-preinstall.sh"]
+  # FPM defaults to level-9 xzmt (w9T.xzdio), whose per-thread dictionary
+  # allocations can exhaust small Linux builders. Bound the compressor to
+  # single-threaded level-6 xz; the installed payload and checks stay identical.
+  fpm: ["--rpm-compression=xz", "--rpm-compression-level=6", "--rpm-rpmbuild-define=_build_id_links none", "--before-install", "build-resources/linux-preinstall.sh"]

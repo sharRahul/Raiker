@@ -1,0 +1,16 @@
+{
+  "scenario": "bounded real tmpfs storage exhaustion",
+  "filesystem_bytes": 16777216,
+  "used_before_apply": 16445440,
+  "fraction_used": 0.980224609375,
+  "injected_errno": false,
+  "apply": "workspace_rollback_incomplete",
+  "error": "workspace_rollback_incomplete:/tmp/raiker-storage-journals/prm_9022425bbe7d4aad22525776",
+  "journals_retained": 1,
+  "recovered": [
+    "prm_9022425bbe7d4aad22525776"
+  ],
+  "originals_restored": true,
+  "staged_files_remaining": [],
+  "passed": true
+}

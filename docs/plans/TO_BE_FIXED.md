@@ -133,7 +133,7 @@ to the host. What still blocks release, by component:
 
 | Blocker | Security impact | Component | Reproduction / evidence | Required remediation | Release-blocking |
 | --- | --- | --- | --- | --- | --- |
-| Native execution depends on measured enforcement per host | Where any mandatory observation is not enforced the sandbox stays unavailable (fail-closed) | `NativeSandboxDriver.probe` | Hosted Windows runners report egress indeterminate, so commands refuse there (hosted Linux runners did too until the probe measured egress against a listener on the host's own address) | Disposable task copies are wired in: file tools and commands share one per-session copy of the project (task tree) and the owner applies reviewed changes. Checkpoints, write-approval previews, Build's explorer, file viewer and Changes pane now read the session's copy, and a commit proposal lists the copy's unapplied edits it leaves out. Remaining: commits and branches act on the project only (after the owner applies the copy); the copy's link check is a path check, not a pinned handle, so a command racing a file tool is a residual risk; measure on each supported host; macOS descendant containment | Yes, per platform |
+| Native execution depends on measured enforcement per host | Where any mandatory observation is not enforced the sandbox stays unavailable (fail-closed) | `NativeSandboxDriver.probe` | Hosted Windows runners report egress indeterminate, so commands refuse there (hosted Linux runners did too until the probe measured egress against a listener on the host's own address) | Disposable task copies are wired in: file tools and commands share one per-session copy of the project (task tree) and the owner applies reviewed changes. Checkpoints, write-approval previews, Build's explorer, file viewer and Changes pane now read the session's copy, and a commit proposal lists the copy's unapplied edits it leaves out. Remaining: commits and branches act on the project only (after the owner applies the copy); Linux Apply now pins parent handles (FIXED-1370); the copy's file-tool link check and Windows/macOS promotion are still path checks, so their concurrent link race remains; measure on each supported host; macOS descendant containment | Yes, per platform |
 | Windows restricted-account sandbox gaps | Loopback is filtered by a WFP filter from this version's setup (measurement pending); explicit allows below a denied drive root stay reachable; the account profile persists between tasks; network/remote logon rights are not yet denied | `account_windows.rs` | See `WINDOWS_RESTRICTED_ACCOUNT_SANDBOX.md` (the account boundary replaced AppContainer for builds after AppContainer blocked Node, Git, MSYS and virtualenv Python) | Per-task profile reset, LSA logon-right denials, explicit-ACE scan under denied roots | Yes |
 | Windows protected paths shared with every AppContainer | A grant to `ALL [RESTRICTED] APPLICATION PACKAGES` on `.git` or `.raiker` let the sandbox write there; capability-SID deny entries do not bind it | `boundary_windows.rs` `granted_to_all_packages` | `appcontainer_denies_protected_and_outside_files_with_a_readable_workspace_control` now expects refusal | Launch now fails closed for the directory itself; explicit grants on files **inside** `.git` are not scanned. Disposable workspaces with a Raiker-built DACL remove the case | Yes, until disposable workspaces |
 | Windows Server 2025 AppContainer denied `\\.\NUL` | Toolchains that open the null device fail inside the sandbox | Hosted `windows-2025` runner | Probe descendant `failed to open NUL device for child stdin: Access is denied` | Probe now uses private pipes; real toolchain compatibility (Python `DEVNULL`, npm) still needs measurement | Yes |
@@ -1592,3 +1592,33 @@ Ubuntu installation. An attempted separate RPM retry lacked the build wrapper's
 target environment and produced no RPM. Do not record the all-format build as
 passing. The two successful artifacts and hashes are retained in
 `output/linux-beta/packages/`.
+
+## Linux hardening follow-through — 2026-11-09
+
+See the [workstream and journey record](LINUX_BETA_2026_11_09.md). Linux Apply
+parent-handle races and loss of backups after failed rollback are fixed
+(FIXED-1370/1371). Windows/macOS promotion handles and TaskTree file-tool
+handles remain open. Fresh-profile unsolicited threat-feed downloads are
+fixed (FIXED-1372); full installed-candidate egress qualification remains open.
+
+Whisper model pinning is complete (FIXED-1373). Voice V1 remains blocked by
+Linux/macOS whisper-server artifacts, Piper dataset/licence review and a
+verified JSON sidecar, Kokoro/espeak-ng distribution review, and actual
+packaged speech validation. Do not promote the catalogue's model pins into
+a cross-platform voice-acceptance claim.
+
+RPM's old FPM compressor failure reproduced; its compression is now bounded
+(FIXED-1374). All-format build and RPM payload/installation results must be
+recorded separately. Live GitHub revocation and issue-to-PR remain blocked:
+the authorized test repository returns 404 to this session. Other supported
+connector sign-in/revocation runs require registered owner clients/accounts.
+The source UI checks (onboarding and keyboard/zoom) do not close the full
+T-01/T-14 journeys or their owner-evaluator requirements.
+
+The all-format wrapper subsequently passed with the compressor correction;
+all three artifact checksums and the RPM payload digests verify. Native RPM
+installation on Fedora remains untested. The corrected-source trace covered
+1,805.76 seconds, but its verifier remains **not approved** (181-second
+connection-activity span and external destinations during the navigation
+sweep). Attribute those calls and define auditable recording boundaries for
+idle periods before closing local-only egress; retain the failed report.

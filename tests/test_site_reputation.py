@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Owner's decision, 2026-10-26: flag only sites registered as malicious; never a known one."""
 
 from __future__ import annotations
@@ -38,6 +39,40 @@ def test_known_and_authenticated_sites_are_trusted() -> None:
     assert trusted_domain("gmail.googleapis.com") == "googleapis.com"
     assert trusted_domain("evil-github.com") == ""
     assert trusted_domain("github.com.evil.net") == ""
+
+
+def test_a_fresh_profile_never_starts_a_feed_download(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from raiker.runtime.site_reputation import refresh_in_background
+
+    monkeypatch.delenv("RAIKER_THREAT_FEEDS", raising=False)
+    calls: list[object] = []
+    monkeypatch.setattr(ThreatFeeds, "refresh", lambda self: calls.append(self))
+    assert refresh_in_background(tmp_path) is None
+    assert calls == []
+
+
+@pytest.mark.parametrize("preference", ["on", "off", ""])
+def test_background_refresh_requires_prior_use_or_explicit_opt_in(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, preference: str,
+) -> None:
+    from raiker.runtime.site_reputation import refresh_in_background
+
+    monkeypatch.setenv("RAIKER_THREAT_FEEDS", preference)
+    # A successful owner-requested download authorizes refreshing stale lists.
+    feeds = ThreatFeeds(tmp_path)
+    feeds.refresh(fetch=_fetch)
+    monkeypatch.setattr(ThreatFeeds, "stale", lambda self: True)
+    calls: list[object] = []
+    monkeypatch.setattr(ThreatFeeds, "refresh", lambda self: calls.append(self))
+    thread = refresh_in_background(tmp_path)
+    if preference == "off":
+        assert thread is None and calls == []
+    else:
+        assert thread is not None
+        thread.join(timeout=5)
+        assert len(calls) == 1
 
 
 def test_feeds_parse_hosts_and_pages() -> None:

@@ -1,0 +1,38 @@
+{
+  "after_restart": {
+    "status": "failed",
+    "steps": [
+      {
+        "reason": "interrupted_by_restart",
+        "state": "failed"
+      }
+    ]
+  },
+  "before_kill": {
+    "status": "running",
+    "steps": [
+      "running"
+    ]
+  },
+  "host_log_tail": "INFO:     Uvicorn running on http://127.0.0.1:45351 (Press CTRL+C to quit)\nINFO:     Started server process [21217]\nINFO:     Waiting for application startup.\nINFO:     Application startup complete.\nINFO:     127.0.0.1:55656 - \"GET /api/health HTTP/1.1\" 200 OK\nINFO:     127.0.0.1:55658 - \"POST /api/auth/register HTTP/1.1\" 200 OK\nINFO:     127.0.0.1:55666 - \"POST /api/execution-profiles HTTP/1.1\" 201 Created\nINFO:     127.0.0.1:55676 - \"PUT /api/models/anthropic-hosted/connection HTTP/1.1\" 200 OK\nINFO:     127.0.0.1:55690 - \"PUT /api/model-selection HTTP/1.1\" 200 OK\nINFO:     127.0.0.1:55692 - \"POST /api/goals HTTP/1.1\" 201 Created\nINFO:     127.0.0.1:37978 - \"POST /api/goals/goal_5db029423bda4b48b9844cc4b02797bc/accept HTTP/1.1\" 200 OK\nINFO:     127.0.0.1:37994 - \"POST /api/goals/goal_5db029423bda4b48b9844cc4b02797bc/start HTTP/1.1\" 200 OK\nINFO:     127.0.0.1:38000 - \"GET /api/goals/goal_5db029423bda4b48b9844cc4b02797bc HTTP/1.1\" 200 OK\nINFO:     Uvicorn running on http://127.0.0.1:45351 (Press CTRL+C to quit)\nINFO:     Started server process [23013]\nINFO:     Waiting for application startup.\nINFO:     Application startup complete.\nINFO:     127.0.0.1:37464 - \"GET /api/health HTTP/1.1\" 200 OK\nINFO:     127.0.0.1:37478 - \"POST /api/auth/login HTTP/1.1\" 200 OK\nINFO:     127.0.0.1:48288 - \"GET /api/goals/goal_5db029423bda4b48b9844cc4b02797bc HTTP/1.1\" 200 OK\nINFO:     127.0.0.1:48298 - \"GET /api/goals/goal_5db029423bda4b48b9844cc4b02797bc HTTP/1.1\" 200 OK\nINFO:     Shutting down\nINFO:     Waiting for application shutdown.\nINFO:     Application shutdown complete.\nINFO:     Finished server process [23013]\n",
+  "killed": true,
+  "model_calls_after_restart": 1,
+  "model_calls_before_kill": 1,
+  "result": "pass",
+  "scenario": "AG-4 host killed mid-goal-step",
+  "started": {
+    "status": "running",
+    "steps": [
+      "running"
+    ]
+  },
+  "tasks": {
+    "after": [
+      "task_2d562d03c8ab4f438f6b3c618ee9a13d"
+    ],
+    "before": [
+      "task_2d562d03c8ab4f438f6b3c618ee9a13d"
+    ]
+  },
+  "workspace": "/tmp/raiker-goal-restart-fault-t56x3zxs"
+}

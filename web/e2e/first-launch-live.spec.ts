@@ -78,6 +78,11 @@ test("RT-QUI-16 — first launch is a setup conversation: Hello, Where should I 
   if ((await title.textContent())?.startsWith("What this computer can run")) {
     await page.getByRole("button", { name: "Continue", exact: true }).click();
   }
+  // Voice V1 adds an optional step between Name/This device and Model.
+  await expect(title).toHaveText(/listen and answer aloud/, { timeout: 30_000 });
+  await page.getByRole("radio", { name: "Not now", exact: true }).check();
+  await capture(page, `${SHOTS}/16-setup-voice-deferred.png`);
+  await page.getByRole("button", { name: "Continue", exact: true }).click();
   // QUI-W03 — three answers to "Where should I think?".
   await expect(title).toHaveText("Where should I think?", { timeout: 30_000 });
   const sofar = page.getByRole("list", { name: "Setup so far" });

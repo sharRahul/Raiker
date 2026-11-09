@@ -74,3 +74,14 @@ not the owner-recorded release-candidate observations required above.
 The verifier now refuses thresholds below the documented 1,800-second minimum
 ([FIXED-1369](FIXED_ITEMS.md#fixed-1369--the-release-egress-audit-could-be-shortened-to-one-second)).
 No 30-minute network recording was generated or inferred from these tests.
+
+## Installed-host egress finding — 2026-11-09 follow-through
+
+The timed connection trace found public threat-feed downloads at startup on
+a fresh profile. FIXED-1372 makes the first download owner-requested (or an
+explicit environment opt-in); local matching still uses cached lists. The
+[run record](LINUX_BETA_2026_11_09.md#egress-findings-and-interpretation) records
+the finding and separates installed pre-fix evidence from the corrected-source
+recording. A corrected-source recording cannot close exact-candidate MM-5.
+`strace_egress_metadata.py` extracts only actual destination/timing observations
+and keeps failed attempts; the verifier's 1,800-second minimum is unchanged.

@@ -141,3 +141,29 @@ first commit:
 | Failed-update recovery | PASS (unit) | `.previous` rollback for AppImage; NSIS installer is transactional |
 | API keys not written to logs | Unchanged existing redaction | Existing log redaction tests; the smoke test sends no key |
 | Installer privileges minimised | PASS (config + CI) | `perMachine: false`, `allowElevation: false`; CI installs without elevation |
+
+## Linux hardening qualification — 2026-11-09
+
+[Detailed run record and limits](LINUX_BETA_2026_11_09.md). The source-host
+onboarding test passed after explicitly deferring Voice, and keyboard traversal
+and 200% zoom passed 2/2 with inspected screenshots. Real llama.cpp b12223 CPU
+inference and slot lifecycle passed; fifteen native containment/resource tests
+passed. Real ENOSPC on a 98.02%-full dedicated tmpfs retained the Apply journal
+and restored every original after space returned. These are not clean-machine
+or signed installed-candidate acceptance.
+
+The RPM failure reproduced with FPM's level-9 multithreaded compressor; a
+512 MiB controlled comparison passes with the newly selected level-6
+single-threaded compressor. Accept AppImage, DEB and RPM together only after
+the full wrapper and artifact checks succeed. Keep signed update/rollback,
+packaged managed speech, all seven real-model journeys, full local-only
+egress qualification and exact-commit release evidence open until measured.
+
+**Local all-format follow-through:** Python 3.12 freeze and frozen smoke passed;
+the complete wrapper now produced AppImage, DEB and RPM. All three SHA-256
+checks pass, and RPM's header confirms `xz 6`; payload digests pass. These
+unsigned `0.0.0` working-tree artifacts have no exact-commit provenance claim.
+RPM's extracted frozen host/window checks and native Fedora installation are
+separate from successful package creation. The corrected-source 1,805.76-second
+trace retains a **not approved** verifier result and does not close MM-5; see
+the [receipts](LINUX_BETA_2026_11_09.md#artifact-and-audit-receipts).

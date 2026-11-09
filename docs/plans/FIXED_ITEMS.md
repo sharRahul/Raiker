@@ -1,5 +1,57 @@
 # Fixed items
 
+## FIXED-1370 — Linux Apply could follow a parent swapped after its link check
+
+Apply now holds no-follow directory handles for both project and task copy
+through validation, staging, replacement and rollback. A swapped parent cannot
+redirect those operations. Reads open and validate a regular leaf once; FIFO
+substitution refuses without blocking. Rollback replaces the entry atomically,
+so a planted symlink or hard link cannot make it truncate another file.
+`tests/test_promotion_link_races.py` exercises both parent swaps and both leaf
+link types. Windows/macOS handles and TaskTree file-tool operations still need
+their own hardening; SB-5 is not closed globally.
+
+## FIXED-1371 — Failed Apply rollback discarded the only recovery backups
+
+When restoring originals also fails (for example, persistent ENOSPC), Apply
+now reports `workspace_rollback_incomplete` and retains its applying journal
+and backups. Startup recovery can restore the originals after space returns.
+The journal records newly created directories before project writes. Tested
+with deterministic ENOSPC and a real dedicated 16 MiB tmpfs filled to 98.02%
+(`tests/test_storage_exhaustion_live.py`); originals restored exactly.
+The hard-kill regression still kills after actual project writes, independently
+of how many backup copies precede them. [Run record](LINUX_BETA_2026_11_09.md).
+
+## FIXED-1372 — A fresh local-only profile downloaded public feeds at startup
+
+The installed-host connection trace found unsolicited URLhaus/OpenPhish
+downloads. Background refresh now requires a previous owner-requested feed
+update or explicit `RAIKER_THREAT_FEEDS=on`. Cached matching remains local;
+Settings explains what Update now downloads and when later refreshes occur.
+Feed writes invalidate their cache, so a rapid failed refresh cannot keep
+showing an old success because of an equal filesystem timestamp.
+Covered by `tests/test_site_reputation.py`. Full exact-candidate 30-minute
+egress qualification remains open. [Run record](LINUX_BETA_2026_11_09.md).
+
+## FIXED-1373 — Whisper models still had no immutable download pins
+
+Five Whisper models now carry revision-pinned URLs, exact LFS SHA-256 digests
+and sizes resolved from Hugging Face. The voice suite passes with Windows
+listening installability and Linux's missing-engine refusal tested separately.
+Amy's ONNX digest is pinned but its licence remains unreviewed, so it stays
+refused. This closes model pinning only, not managed Voice V1, Piper's JSON
+sidecar or packaged speech qualification. [Review](LINUX_BETA_2026_11_09.md#voice-licence-and-distribution-review).
+
+## FIXED-1374 — RPM used unbounded level-9 multithreaded xz compression
+
+The original `rpmbuild failed (exit code )` reproduced with FPM's
+`w9T.xzdio`. It exceeded 1.9 GiB RSS. Under a controlled 512 MiB address-space
+ceiling that compressor fails while single-threaded `w6.xzdio` succeeds.
+RPM configuration now explicitly selects xz level 6. The historical terminating
+signal is unproved; this is a verified resource-bound correction, not a claim
+of a kernel OOM diagnosis. All-format and installed-candidate acceptance are
+tracked separately in the [run record](LINUX_BETA_2026_11_09.md).
+
 ## Windows sandboxed runs were one at a time, so background runs were impossible
 
 The restricted account's grant covered one copy for one run behind a
@@ -1674,6 +1726,11 @@ file you can open. The two capture sets that remain — `screenshots/pages/` and
 | [FIXED-1367](#fixed-1367--messaging-discarded-setup-drafts-and-design-claimed-uncertain-writes-changed-nothing-qui-g06) | Medium | Messaging / Design images | Fixed 2026-11-09 |
 | [FIXED-1368](#fixed-1368--release-evidence-could-approve-a-directory-with-no-installer) | High | Release validation | Fixed 2026-11-09 |
 | [FIXED-1369](#fixed-1369--the-release-egress-audit-could-be-shortened-to-one-second) | High | Data-safety release gate | Fixed 2026-11-09 |
+| [FIXED-1370](#fixed-1370--linux-apply-could-follow-a-parent-swapped-after-its-link-check) | High | Linux beta hardening | Fixed 2026-11-09 |
+| [FIXED-1371](#fixed-1371--failed-apply-rollback-discarded-the-only-recovery-backups) | High | Linux beta hardening | Fixed 2026-11-09 |
+| [FIXED-1372](#fixed-1372--a-fresh-local-only-profile-downloaded-public-feeds-at-startup) | High | Linux beta hardening | Fixed 2026-11-09 |
+| [FIXED-1373](#fixed-1373--whisper-models-still-had-no-immutable-download-pins) | High | Linux beta hardening | Fixed 2026-11-09 |
+| [FIXED-1374](#fixed-1374--rpm-used-unbounded-level-9-multithreaded-xz-compression) | High | Linux beta hardening | Fixed 2026-11-09 |
 
 ---
 

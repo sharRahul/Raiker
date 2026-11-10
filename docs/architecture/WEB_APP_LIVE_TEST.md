@@ -2499,6 +2499,21 @@ installation/update/uninstallation and microphone-to-managed-engine testing
 remain open: Voice's built-in test uses generated audio, while the separate
 six fake-device cases use a stand-in backend.
 
+**Additional real capture-path check, 2026-11-10.** The managed Voice spec now
+uses full Chromium and its file-backed fake microphone. The shipped Preview
+control produces a real 119,852-byte Kokoro WAV; the test saves the Blob used by
+the UI, records it through `getUserMedia`/MediaRecorder, and sends the recording
+to the installed managed Whisper engine through normal dictation controls.
+Pass in 36.4 seconds (engines already installed): the draft reads
+“Hello, this is how I sound on this computer.” No prompt was submitted, all
+capture tracks ended, and Remove returned to 0 B. The new
+`04-dictated.png` capture was inspected. No transcription response is replaced.
+The initial harness used Playwright's response body, which reported zero bytes
+for this media response despite a valid server WAV. That failure is retained;
+reading the UI's actual audio Blob supplied the valid input. This qualifies the
+browser capture-to-managed-engine path with synthetic input, not a physical
+microphone, acoustic/noisy-room accuracy or hands-free conversation.
+
 The redacted [Windows](../plans/evidence/windows-beta-2026-11-09/native-probe.json)
 and [WSL](../plans/evidence/windows-beta-2026-11-09/wsl-probe.json) probes refuse
 availability for an ordinary scratch directory with

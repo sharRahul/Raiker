@@ -766,6 +766,10 @@ instance/accounts to qualify. Existing model keys do not supply those clients.
   engines through Settings, speaks/hears with 89% word match and removes files
   to 0 B on this PC. Its workflow passes all three real frozen voice tests.
   Actual microphone routing and owner-PC install/update/uninstall remain open.
+  Follow-up: Chromium's file-backed fake microphone now passes real managed
+  dictation, using the WAV from the shipped Preview control. The expected
+  sentence appears in the draft, no prompt is submitted, capture tracks end,
+  and removal returns to 0 B. Physical microphone/acoustic qualification remains.
 - **AG-3/UX-3:** seven real Anthropic goal/profile cases pass on a fresh instance.
   These do not substitute for an approved durable calendar/mail outcome.
 - **SB-1/SB-2:** ten current-source Windows disposable-account integration tests

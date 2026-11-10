@@ -1,35 +1,19 @@
 ## Release blocker: native sandbox migration incomplete
 
-## BUG-360 — Legacy answers copied from stale history have no memory provenance
-
-**Severity: High. Area: Memory privacy. Status: Open 2026-11-10. Beta blocker.**
-
-FIXED-1387 excludes source conversations and answers linked by `turn_recalls`.
-An older diagnostic workspace still reproduces a third answer that had already
-copied a forgotten fact from ambient history before this fix. That answer has
-no direct memory recall row; historical `context_gathered` events record source
-types, not the contributing session IDs. Reusing it can revive the copied fact.
-The fresh-workspace T-04 slice passes, but does not qualify this legacy case.
-
-Needed: safe handling of untracked historical context and transitive provenance
-for newly recalled conversations, with a regression that preserves unrelated
-owner history and prevents copied facts from returning. Do not silently erase
-transcripts or label full forgetting qualified. Reproducer retained in
-`output/beta-memory-final`; failed Playwright read-back retained in the run log.
-Deleting the affected conversations through the owner UI is an explicit
-workaround, not an automatic migration or acceptance result.
-
 **Windows continuation, 2026-11-10.** FIXED-1386/1387 close nested Escape and
 stale ambient-memory recall. The real UI correction/forget slice, managed
 Voice setup/test/removal and ten native account tests now have
 [dated procedures and limits](../architecture/WEB_APP_LIVE_TEST.md#result--2026-11-10-windows-memory-correction-and-managed-voice).
 Still unqualified on the owner's PC: actual candidate install/update/uninstall,
-microphone-to-managed-engine routing, the full durable-outcome/issue-to-PR and
+physical microphone/acoustic qualification, the full durable-outcome/issue-to-PR and
 stop/resume/budget journeys, a full-feature 30-minute egress capture, approved
 OAuth connector lifecycle, human NVDA evaluation, and the native hardening and
 promotion races listed below. Existing model credentials do not register
 mail/calendar/GitHub OAuth clients. These remain release evidence or engineering
 gaps, not completed gates inferred from component tests.
+The browser capture-to-managed-engine path now passes with Chromium's
+file-backed fake microphone and real Kokoro/Whisper; no stand-in backend is used
+for that additional case. The physical microphone gate is still separate.
 
 **Reconciled 2026-11-02.** The managed llama.cpp release-selection defect is
 closed in [FIXED-1283](FIXED_ITEMS.md#fixed-1283--managed-llamacpp-selected-a-source-only-release-as-a-runtime-download)
@@ -337,6 +321,25 @@ Evidence: `screenshots/not-working/` (defects),
 The open defects below retain their original reproductions and remediation contracts. Closed defect evidence is in [`FIXED_ITEMS.md`](FIXED_ITEMS.md); previously removed topic-review rationale remains in Git history.
 
 ---
+
+## BUG-360 — Legacy answers copied from stale history have no memory provenance
+
+**Severity: High. Area: Memory privacy. Status: Open 2026-11-10. Beta blocker.**
+
+FIXED-1387 excludes source conversations and answers linked by `turn_recalls`.
+An older diagnostic workspace still reproduces a third answer that had already
+copied a forgotten fact from ambient history before this fix. That answer has
+no direct memory recall row; historical `context_gathered` events record source
+types, not the contributing session IDs. Reusing it can revive the copied fact.
+The fresh-workspace T-04 slice passes, but does not qualify this legacy case.
+
+Needed: safe handling of untracked historical context and transitive provenance
+for newly recalled conversations, with a regression that preserves unrelated
+owner history and prevents copied facts from returning. Do not silently erase
+transcripts or label full forgetting qualified. Reproducer retained in
+`output/beta-memory-final`; failed Playwright read-back retained in the run log.
+Deleting the affected conversations through the owner UI is an explicit
+workaround, not an automatic migration or acceptance result.
 
 ## BUG-194 — The governed shell has an OS boundary, but no interactive, background or remote execution
 

@@ -328,7 +328,7 @@ record's history and here.
 |---|---|---|---|
 | Archive | Excluded from recall | Record and evidence retained | Yes — **Restore** |
 | Review expiry | Excluded from recall once the date passes | Record retained, listed as **Expired** | Yes — set a later date or none |
-| Forget | Excluded from all recall | Words erased; tombstone and purge work retained | No |
+| Forget | Excluded from direct memory recall; historical limits below | Markdown text removed; encrypted database record, suppression checksum and purge work retained | No |
 | Delete permanently | Unavailable | Primary data and projections removed; disposition recorded | No |
 
 Archived and expired records stay on the **Memories** tab under their own

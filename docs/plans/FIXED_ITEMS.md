@@ -26,6 +26,9 @@ withdrawn; it is not acceptance evidence.
 **Limit.** Historical answers that already copied a fact indirectly without a
 memory link remain [BUG-360](TO_BE_FIXED.md#bug-360--legacy-answers-copied-from-stale-history-have-no-memory-provenance).
 This fix closes linked-source recall, not the full forgetting acceptance gate.
+The guide also now distinguishes the content-free Markdown tombstone from the
+encrypted database record retained until permanent deletion; it no longer
+claims Forget erases all stored words.
 
 ## FIXED-1386 — Escape from a nested overflow closed its enclosing dialog
 

@@ -1,8 +1,8 @@
 # RAIKER.md global and nested instructions: design for owner review
 
-**Status:** expanded proposal; implementation not yet approved.
+**Status:** approved design; implementation not started.
 **Date:** 2026-11-10. The owner requested global and nested scope, replacing
-our earlier root-only proposal. The review-on-change policy below is proposed.
+our earlier root-only proposal, and approved the reviewed-revision design below.
 
 ## Recommended behavior and alternatives
 
@@ -159,6 +159,6 @@ instruction scopes and guidance from enforced configuration.
 named Markdown context convention. These are examples, not claims that Raiker
 matches every loading algorithm or permission behavior of another product.
 
-The owner requested the expanded scope. The detailed reviewed-revision policy,
-account-scoped global location and nested activation contract above are ready
-for approval; no implementation is claimed by this proposal.
+The owner requested the expanded scope and on 2026-11-10 approved the
+reviewed-revision policy, account-scoped global location and nested activation
+contract above. No implementation is claimed yet; work follows the plan above.

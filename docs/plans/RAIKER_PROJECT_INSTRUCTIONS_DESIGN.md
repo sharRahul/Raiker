@@ -1,8 +1,8 @@
-# RAIKER.md global and nested instructions: design for owner review
+# RAIKER.md global and project instructions: design for owner review
 
 **Status:** approved design; implementation not started.
-**Date:** 2026-11-10. The owner requested global and nested scope, replacing
-our earlier root-only proposal, and approved the reviewed-revision design below.
+**Date:** 2026-11-10. The owner approved global plus project-root scope with the
+reviewed-revision design below, then removed nested (subdirectory) files.
 
 ## Recommended behavior and alternatives
 
@@ -13,9 +13,9 @@ Existing encrypted owner/project instructions remain supported.
 
 | Approach | Benefit | Tradeoff |
 |---|---|---|
-| **Reviewed global/root/nested hierarchy (recommended)** | Portable files and automatic reuse; repository/agent edits cannot activate standing rules by themselves | Each new or changed revision needs owner review |
+| **Reviewed global + project-root files (approved)** | Portable files and automatic reuse; repository/agent edits cannot activate standing rules by themselves | Each new or changed revision needs owner review |
 | Enabled hierarchy with automatic live reload | Fewer interruptions and familiar edit/reload workflow | Pulls, dependencies and agent edits can alter future instructions without review |
-| Root-only files | Smaller feature | Does not meet the requested global/nested scope; superseded |
+| Nested subdirectory files too | Closer to Claude Code's per-folder files | Removed by the owner: more files to review and scoped-conflict rules; may return as a later design |
 
 This changes [the earlier repository-file decision](../architecture/REFERENCE_PLATFORM_COMPATIBILITY.md#37-project-instructions-are-owner-records-not-repository-files),
 while preserving the rule that instruction text never grants capabilities.
@@ -26,7 +26,6 @@ while preserving the rule that instruction text never grants capabilities.
 |---|---|---|
 | Global | `<Raiker data folder>/.raiker/user-instructions/<resolved user id>/RAIKER.md` | That Raiker account's Build projects in this data folder |
 | Project | `<resolved project root>/RAIKER.md` | All paths in that project |
-| Nested | `<resolved project root>/<subdirectory>/RAIKER.md` | That directory and descendants |
 
 Global means account-wide, not shared across users or all data folders on a PC.
 Settings shows the signed-in owner's actual path and can create/open a starter
@@ -34,8 +33,8 @@ file. Ordinary repository tools cannot edit this protected application folder.
 Only the exact filename `RAIKER.md` is recognized, including on Windows.
 File-based discovery is enabled by the owner per project; global rules apply
 to those enabled projects. Existing projects stay unchanged until the owner
-chooses **Use file instructions**, which can also enable nested discovery when
-there is no root file. Discovering a file does not approve its contents.
+chooses **Use file instructions**. Only the global file and the project-root
+file are read; a `RAIKER.md` in any subdirectory is ignored. Discovering a file does not approve its contents.
 
 Project ownership, session binding, canonical root and live attached-folder
 grants are checked through `resolve_project_root`. Unknown owner mappings fail
@@ -49,17 +48,12 @@ Remote-only/rootless projects cannot acquire local repository rules by guessing.
 ## Hierarchy, discovery and precedence
 
 1. At the beginning of a Build turn, discover the global and project-root files.
-2. For an explicit working directory or a file action, inspect only the chain
-   from project root to the directory/file's parent; never recursively scan siblings.
-3. Before the first action in a new subtree, reconcile that chain. Unreviewed
-   rules pause the affected action with a review route. Newly applicable
-   approved rules must reach the model before it replans work in that scope;
-   do not execute an action planned without them or create an endless retry loop.
-4. File guidance applies global, project root, then outer-to-inner directories.
-   Nearest rules win conflicts only within their scope. For multi-file work,
-   keep each target's applicable chain labelled; do not apply one sibling's rules
-   to another or merge conflicting scoped rules as universal instructions.
-5. Read the authorized source project, not a disposable task copy. Agent-proposed
+   Never scan subdirectories for further `RAIKER.md` files.
+2. An unreviewed or changed revision pauses the turn's actions with a review
+   route; do not execute work planned without it or create an endless retry loop.
+3. File guidance applies global, then project root; the project file wins
+   conflicts for that project.
+4. Read the authorized source project, not a disposable task copy. Agent-proposed
    RAIKER.md changes activate only after Apply changes the source and the owner
    reviews the new revision. Applying code is not approval of standing rules.
 
@@ -101,7 +95,7 @@ assistant preferences remain in owner settings; this is not full product parity.
 
 ## Owner review, reload and lifecycle
 
-Settings manages the global file; Project settings manages project/nested rules.
+Settings manages the global file; Project settings manages the project file.
 Show each scope, redacted preview, counts, digest and state. Review/use and
 Disable are authenticated owner actions, never model tools.
 
@@ -115,10 +109,9 @@ At each new turn, safely reread and compare. Changed, missing, disabled,
 revoked, unsafe or invalid files do not fall back to stale copied rules. Disable
 clears review; restoring bytes after Disable does not automatically reactivate.
 Loaded instructions are fixed snapshots for that turn, not rewritten mid-call.
-Live tool/root revocation still applies separately to each action. New subtrees
-follow the reconciliation rule above.
+Live tool/root revocation still applies separately to each action.
 
-Project deletion removes project/nested review records but not global rules.
+Project deletion removes project review records but not global rules.
 Backup/restore respects existing disabled/revoked-state contracts. No restoration
 may give another account copied instruction authority.
 
@@ -141,11 +134,14 @@ reported as loaded. Discovery/review/disable require no provider call.
 2. Owner-scoped review persistence, authenticated preview/review/disable, no
    model-facing activation tool and no authority expansion.
 3. Explicit instruction/data prompt boundaries across provider adapters,
-   context budgeting, compaction and metadata-only disclosure.
+   context budgeting, compaction and metadata-only disclosure. Context
+   compression already exists (`ConversationCompactor`: automatic at the
+   context threshold, plus owner-guided compaction). Reviewed RAIKER.md text is
+   re-applied after every compaction and never summarised away; if compression
+   is reworked later, this guarantee is part of its contract.
 4. Settings/Project review controls and Build visibility with accessible
    changed/unsafe/oversized states and useful recovery actions.
-5. Regressions for global account separation, nested/sibling/multi-target
-   scope, grant revocation, edits/moves/delete/disable, review races, task-copy
+5. Regressions for global account separation, ignored subdirectory files, grant revocation, edits/moves/delete/disable, review races, task-copy
    proposals, unsafe paths/hardlinks, limits, budgets and prompt precedence.
 6. Real UI/model test of an approved hierarchy, changed revision, harmless
    output convention and absent unreviewed/revoked text. Update guides,
@@ -160,5 +156,6 @@ named Markdown context convention. These are examples, not claims that Raiker
 matches every loading algorithm or permission behavior of another product.
 
 The owner requested the expanded scope and on 2026-11-10 approved the
-reviewed-revision policy, account-scoped global location and nested activation
-contract above. No implementation is claimed yet; work follows the plan above.
+reviewed-revision policy, account-scoped global location and project-root
+activation above; nested files were then removed from scope. No
+implementation is claimed yet; work follows the plan above.

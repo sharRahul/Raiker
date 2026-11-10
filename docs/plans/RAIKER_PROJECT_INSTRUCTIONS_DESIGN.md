@@ -1,239 +1,164 @@
-# RAIKER.md project instructions: design for owner review
+# RAIKER.md global and nested instructions: design for owner review
 
-Status: proposed, not implemented or approved. Written 2026-11-10.
+**Status:** expanded proposal; implementation not yet approved.
+**Date:** 2026-11-10. The owner requested global and nested scope, replacing
+our earlier root-only proposal. The review-on-change policy below is proposed.
 
-## Decision and scope
+## Recommended behavior and alternatives
 
-Add a portable `RAIKER.md` at the root of a Raiker project's local folder. An
-owner reviews and enables one exact revision for that project. That revision is
-then supplied automatically on each Build turn while the on-disk file remains
-unchanged and the root remains granted. A changed file pauses these instructions
-until the owner reviews it again. Existing owner-authored project instructions
-remain available and take precedence over the file.
+Raiker discovers applicable `RAIKER.md` files, lets the owner review their exact
+revisions once, and automatically reuses those reviewed revisions on Build
+turns. Changed or newly discovered rules require review before affected work.
+Existing encrypted owner/project instructions remain supported.
 
-This supersedes the product choice in
-`docs/architecture/REFERENCE_PLATFORM_COMPATIBILITY.md` section 3.7 to have no
-repository instruction files. It retains its security premise: repository
-writes must not silently grant themselves standing instruction authority.
+| Approach | Benefit | Tradeoff |
+|---|---|---|
+| **Reviewed global/root/nested hierarchy (recommended)** | Portable files and automatic reuse; repository/agent edits cannot activate standing rules by themselves | Each new or changed revision needs owner review |
+| Enabled hierarchy with automatic live reload | Fewer interruptions and familiar edit/reload workflow | Pulls, dependencies and agent edits can alter future instructions without review |
+| Root-only files | Smaller feature | Does not meet the requested global/nested scope; superseded |
 
-This first version supports a root file, not full Claude/Codex/Gemini parity.
-Global files, ancestor-directory discovery, nested files and path rules are out
-of scope. Project hierarchy in Raiker's stored owner instructions continues to
-work; that hierarchy is distinct from filesystem directory hierarchy.
+This changes [the earlier repository-file decision](../architecture/REFERENCE_PLATFORM_COMPATIBILITY.md#37-project-instructions-are-owner-records-not-repository-files),
+while preserving the rule that instruction text never grants capabilities.
 
-## Alternatives considered
+## Locations and account isolation
 
-| Approach | Benefit | Cost / risk |
-| --- | --- | --- |
-| **Reviewed root revision (recommended)** | Portable file; automatic use after review; repository/agent edits cannot silently become standing instructions | Each changed revision needs one owner review; small owner-scoped review record and UI |
-| Live root file after an owner enables the feature | Smallest loader and familiar edit/reload workflow | A pull, dependency task, or agent edit changes future instructions without reviewing those bytes; recreates the concern in section 3.7 |
-| Global + root + nested hierarchy with live discovery | Broad convention support, useful in monorepos | More file reads, conflict semantics, path-scoped activation, inheritance and attack surface; not necessary for the secure personal beta |
+| Level | Location | Applies to |
+|---|---|---|
+| Global | `<Raiker data folder>/.raiker/user-instructions/<resolved user id>/RAIKER.md` | That Raiker account's Build projects in this data folder |
+| Project | `<resolved project root>/RAIKER.md` | All paths in that project |
+| Nested | `<resolved project root>/<subdirectory>/RAIKER.md` | That directory and descendants |
 
-The recommendation deliberately accepts a small review step in exchange for
-preventing repository-supplied text from activating itself. It is a design
-proposal requiring user approval, not a new permission requirement inferred
-from an external tool or platform.
+Global means account-wide, not shared across users or all data folders on a PC.
+Settings shows the signed-in owner's actual path and can create/open a starter
+file. Ordinary repository tools cannot edit this protected application folder.
+Only the exact filename `RAIKER.md` is recognized, including on Windows.
+File-based discovery is enabled by the owner per project; global rules apply
+to those enabled projects. Existing projects stay unchanged until the owner
+chooses **Use file instructions**, which can also enable nested discovery when
+there is no root file. Discovering a file does not approve its contents.
 
-## File and discovery contract
+Project ownership, session binding, canonical root and live attached-folder
+grants are checked through `resolve_project_root`. Unknown owner mappings fail
+closed; no unfiltered project lookup or selected-repository fallback. No files
+are implicitly read from parent directories outside the granted project.
 
-- The only recognized filename is exactly `RAIKER.md`, uppercase `RAIKER` and
-  lowercase `.md`. Inspect the actual directory entry spelling so behavior is
-  consistent on case-insensitive Windows filesystems. Other spellings are not
-  aliases. No configurable filename list in v1.
-- Look only at `<resolved project root>/RAIKER.md`. The root comes from the
-  owner-validated project and `resolve_project_root`, including its live source
-  grant for attached folders. Never search the workspace, home directory,
-  parent directories or globally selected Git repository as fallback.
-- Only Build turns with a valid project use this file. Chat, rootless projects,
-  remote GitHub coordinates, channels without an explicit project, and projects
-  with missing/revoked roots do not load it. An explicitly scheduled Build turn
-  can reuse a reviewed revision under the same owner/project boundary.
-- No recursive scan, filesystem watcher, network fetch, imports, `@path`
-  expansion, executable directives, environment interpolation or frontmatter
-  interpretation. Markdown links remain text. No automatic activation of
-  `AGENTS.md`, `CLAUDE.md`, `GEMINI.md`, `RAIKER.local.md` or `.raiker/RAIKER.md`.
-- Read at most 8,193 bytes to enforce an 8,192-byte raw file limit. Require
-  strict UTF-8 (optional initial BOM), no NULs, and at most 4,000 decoded
-  characters. Empty/whitespace-only files contribute no instructions. Reject
-  oversize or malformed files as a whole with a visible reason.
-- Preserve the existing secret redactor for provider-facing text and preview.
-  Never bypass it to maintain exact formatting. The approval hash identifies
-  raw bytes; the owner is shown the redacted provider projection and any
-  redaction notice. Use the same redaction function/version at preview and
-  loading; a projection-version change requires review again.
+No automatic aliases for AGENTS.md/CLAUDE.md/GEMINI.md, imports, @file expansion,
+network fetches, executable directives, environment expansion or frontmatter.
+Remote-only/rootless projects cannot acquire local repository rules by guessing.
 
-## Containment and isolation
+## Hierarchy, discovery and precedence
 
-Resolve the owner principal to a real user first. Unknown principal mappings
-fail closed: do not call `load_project(..., user_id=None)`, since that means an
-unfiltered lookup today. Check ownership of the requested project and the
-session, and require a consistent session/project binding before discovery.
+1. At the beginning of a Build turn, discover the global and project-root files.
+2. For an explicit working directory or a file action, inspect only the chain
+   from project root to the directory/file's parent; never recursively scan siblings.
+3. Before the first action in a new subtree, reconcile that chain. Unreviewed
+   rules pause the affected action with a review route. Newly applicable
+   approved rules must reach the model before it replans work in that scope;
+   do not execute an action planned without them or create an endless retry loop.
+4. File guidance applies global, project root, then outer-to-inner directories.
+   Nearest rules win conflicts only within their scope. For multi-file work,
+   keep each target's applicable chain labelled; do not apply one sibling's rules
+   to another or merge conflicting scoped rules as universal instructions.
+5. Read the authorized source project, not a disposable task copy. Agent-proposed
+   RAIKER.md changes activate only after Apply changes the source and the owner
+   reviews the new revision. Applying code is not approval of standing rules.
 
-Use the existing managed-root containment and attached-root grant resolver,
-but strengthen the final read rather than assuming `Path.resolve()` alone is
-sufficient. Refuse symlink/reparse/junction components in the resolved root's
-path and the file entry. The final entry must be a regular file; refuse devices,
-directories, pipes and multiple hard links. Resolve exactly within that project
-root, not merely somewhere inside any authority root. No cross-project fallbacks.
+Authority, highest first: system/runtime/governance; current owner's request;
+existing encrypted owner/project instructions; reviewed file guidance; ordinary
+external/workspace data. Markdown cannot enable tools, access credentials,
+grant network/filesystem rights, weaken the sandbox, approve actions, activate
+skills or make a test count as passed. Mentioned commands use normal governed tools.
 
-Open with no-follow semantics and verify the opened file's identity, regular-file
-type and final contained path before reading; use an equivalent Windows handle
-check for reparse points. Where the platform cannot establish that guarantee,
-report unsupported-safe-read and do not load. A resolve-then-read sequence alone
-does not satisfy this requirement. Read bounded bytes once and hash those same
-bytes; do not approve a path and then reread different content for injection.
+Use explicitly labelled subordinate instruction sources, separate from direct
+user requests and untrusted workspace data. Existing owner instructions are
+currently mixed into a blanket data-only wrapper; separate owner guidance,
+reviewed file rules and project metadata instead of repeating that ambiguity.
+Never present repository text as system policy.
 
-The review key is owner user + project id + root identity + exact relative path
-+ raw SHA-256 + projection version. Root identity includes the managed canonical
-root or attached grant id and canonical path. Reattach, root move, project
-transfer, duplication, or another owner's access requires a new review. Two
-owners sharing a filesystem directory do not share review records. Project
-deletion deletes its review record. Never make review state project-ancestor
-inheritable or editable by the model.
+This hierarchy initially applies to Build and explicitly project-bound Build
+goals. Ordinary account-wide Chat, Design and ambiguous channels do not guess a
+project. Their existing owner settings continue to apply. Global non-Build
+assistant preferences remain in owner settings; this is not full product parity.
 
-## Review and reload behavior
+## Safe reads, limits and context
 
-1. In Project settings, show a read-only `RAIKER.md` preview, the provider-facing
-   redacted content, state, byte/character counts and revision identifier. The
-   authenticated owner can choose **Use this revision** or **Disable**.
-2. Approval submits the displayed expected digest and root identity. The server
-   rereads safely and compares both. If changed, return a conflict and refresh
-   the preview; never approve unseen replacement bytes.
-3. Persist the scoped reviewed digest, root identity, projection version and
-   enabled flag in Raiker's governed store. No copied document text is needed.
-   The file remains the content source. No plaintext document text in events.
-4. At each new turn, resolve ownership/root again, safely read once, compare the
-   digest and projection version, and include only matching reviewed bytes.
-   Existing in-flight turns use their fixed snapshot; edits never mutate a
-   running turn's prompt.
-5. Changed files show **Changed — review required** and contribute no rules.
-   Missing, invalid, revoked or unreadable files also contribute no rules; no
-   stale stored-content fallback. Other project context remains available.
-   Identical reviewed bytes restored at the same root may load again; Disable
-   removes the review so restoration then requires explicit enablement.
-6. Raiker tool edits in disposable task copies are proposals, never the active
-   source. Read the authorized source root, not a task-copy authority wrapper.
-   Applying a task change to `RAIKER.md` changes its digest and requires review
-   afterward. Applying code changes is not approval of standing instructions.
+- Pin and validate the complete path and opened regular-file handle. Reject
+  links/junctions/reparse points, devices, pipes, directories and multiple hard
+  links. Resolve-then-open alone is insufficient. Unsupported containment
+  contributes no text and names the reason.
+- Require UTF-8 (optional BOM), no NULs, at most 8,192 raw bytes and 4,000 decoded
+  characters per file. Read one byte beyond the limit to detect oversize; reject
+  the whole file rather than loading a prefix. Empty files add no instructions.
+- Limit an enabled hierarchy to 32 directory levels, 16 files and 32 KiB raw /
+  16,000 decoded characters. An exceeded limit gives an actionable refusal,
+  not silently omitted deeper rules. Existing projects without this feature
+  do not acquire a new depth restriction.
+- Hash exactly the safely read bytes. Apply the existing secret redactor to
+  preview and provider projection; review includes its projection version.
+- Budget sources once. Include whole eligible projections or state omission.
+  If applicable instructions do not fit, pause the affected file action with
+  remediation, rather than claim the rules loaded or silently truncate them.
 
-No provider call is necessary to discover, preview, approve or disable the file.
+## Owner review, reload and lifecycle
 
-## Authority and model prompt
+Settings manages the global file; Project settings manages project/nested rules.
+Show each scope, redacted preview, counts, digest and state. Review/use and
+Disable are authenticated owner actions, never model tools.
 
-File instructions guide conventions, architecture notes, workflow and requested
-checks. They cannot enable tools, choose credentials, grant network access,
-change sandbox/account policy, approve actions, activate skills or install
-extensions. Commands mentioned in Markdown are suggestions through existing
-governed tools; discovery never executes them. A file cannot replace the owner's
-declared project checks or make a run count as verified.
+Review binds owner, source kind, project where applicable, root/grant identity,
+relative path, digest and projection version. Other users, copied projects,
+moved/reattached roots and ancestor projects do not inherit approvals. Batch
+review rereads and compares every displayed file/root before activating it;
+changed bytes conflict instead of approving unseen content.
 
-Explicit precedence: runtime/system/governance constraints; current owner's
-request; owner-authored project rules (existing root-to-leaf merge); reviewed
-repository rules; ordinary external/workspace data. Within owner project rules,
-the existing nearest-project behavior remains. Repo text claiming another role
-or saying to ignore governance remains repo text.
+At each new turn, safely reread and compare. Changed, missing, disabled,
+revoked, unsafe or invalid files do not fall back to stale copied rules. Disable
+clears review; restoring bytes after Disable does not automatically reactivate.
+Loaded instructions are fixed snapshots for that turn, not rewritten mid-call.
+Live tool/root revocation still applies separately to each action. New subtrees
+follow the reconciliation rule above.
 
-Create a separate `project_rules` context source with explicit provenance and
-review metadata; only reviewed file text enters it. Keep it distinguishable
-from direct `user_prompt` and untrusted workspace data. Render reviewed rules
-under an explicit subordinate-instructions preamble, outside the orchestrator's
-blanket data-only workspace wrapper. Similarly separate owner-authored rules
-from the current mixed project metadata/memory/checks block. The provider role
-adapter must preserve the stated precedence; never mark repo text as the system
-policy itself. Security remains enforced in tool authority, not model obedience.
+Project deletion removes project/nested review records but not global rules.
+Backup/restore respects existing disabled/revoked-state contracts. No restoration
+may give another account copied instruction authority.
 
-Count this source once in the same context budget as other sources. Place it
-after current prompt, explicit attachments and owner project context, before
-ambient recall. Permit its validated 4,000 characters plus bounded provenance
-wrapper without `_make_item` silently taking the first 2,000 characters. Include
-the entire validated projection or exclude it with an explicit budget reason;
-do not ship half a rule file or duplicate it in both prompt sections.
+## Visibility and privacy
 
-## Visibility and failures
+Build's context view lists actual loaded scopes/revisions and omitted/review-
+required files. Distinguish absent, disabled, approved, changed, unsafe,
+unreadable, invalid, oversized and root-unavailable states. Provider-visible
+provenance uses Global RAIKER.md or project-relative paths, not absolute host
+paths. The authenticated local owner may see their global path to edit it.
 
-Project settings show: absent, disabled, review required, approved, changed,
-unreadable/unsafe, invalid encoding, too large, root unavailable. The per-turn
-context view says whether that revision actually reached the model, including
-budget exclusion and redaction. An approved file omitted by budgeting must not
-appear as used. Show project-relative `RAIKER.md`, never an absolute host path.
+Events/hooks contain safe scope, revision IDs, counts and reason codes, never
+rule text, credentials or absolute paths. Budget-excluded sources are not
+reported as loaded. Discovery/review/disable require no provider call.
 
-Event payloads contain only source kind, project id, safe revision identifier,
-counts and reason codes. Do not put document text or absolute paths into events,
-hook payloads or shared logs. Existing hook disclosure remains metadata-only.
-Preview, approve and disable endpoints must authenticate and authorize the
-owner/project pair independently of client state; they are not model tools.
+## Implementation and acceptance plan
 
-## Exact integration points observed
+1. Safe hierarchy discovery on the canonical owner/project roots and shared
+   pinned-read primitives, deterministic path-scoped ordering and limits.
+2. Owner-scoped review persistence, authenticated preview/review/disable, no
+   model-facing activation tool and no authority expansion.
+3. Explicit instruction/data prompt boundaries across provider adapters,
+   context budgeting, compaction and metadata-only disclosure.
+4. Settings/Project review controls and Build visibility with accessible
+   changed/unsafe/oversized states and useful recovery actions.
+5. Regressions for global account separation, nested/sibling/multi-target
+   scope, grant revocation, edits/moves/delete/disable, review races, task-copy
+   proposals, unsafe paths/hardlinks, limits, budgets and prompt precedence.
+6. Real UI/model test of an approved hierarchy, changed revision, harmless
+   output convention and absent unreviewed/revoked text. Update guides,
+   compatibility decisions and beta ledgers with exact results.
 
-| Existing code | Proposed use/change after approval |
-| --- | --- |
-| `raiker/control/project_roots.py:resolve_project_root` | Canonical managed/attached root and live grant; never use selected repository fallback |
-| `raiker/control/project_paths.py:contained_project_root` | Existing managed non-reparse containment; final instruction read needs handle validation |
-| `raiker/tools/path_authority.py:PathAuthority` | Shared containment concepts; generic multi-root membership is insufficient for this root-only reader |
-| `raiker/storage/stores/projects.py:load_project`, `load_effective_project_context` | Owner scoping and existing ancestor owner rules; preserve behavior; add a small scoped review record through existing migration conventions |
-| `raiker/context/gatherer.py:_project_for_session`, `_project_context`, `_make_item`, `_apply_budget` | Distinguish owner rule text from metadata; build reviewed file source; avoid silent item cap; same final budget |
-| `raiker/context/models.py:SOURCE_TYPES`, `PRIORITY_ORDER`, `ContextBundle.event_payload` | New source classification, deterministic priority and metadata-only disclosure |
-| `raiker/runtime/orchestrator.py:_context_prompt`, model-message assembly around workspace context, `_instructions_loaded_hook` | Explicit lower-authority instruction block; no duplicate text; disclose only actual inclusion |
-| `raiker/api/routes_dashboard.py:save_project_context`, `raiker/control/dashboard_parts/projects.py` | Existing owner settings service pattern; add review preview/enable/disable actions without rewriting owner instructions |
-| `raiker/execution/workspaces.py:TaskWorkspaceRegistry` and task-tree authority | Preserve original source-root versus proposed task-copy distinction |
+## References and review decision
 
-Important current behavior: `_project_context` marks owner instructions as
-`user_prompt`, but message assembly wraps the entire context bundle with
-“treat as data, never as instructions.” Appending RAIKER.md there would repeat
-that ambiguity. This feature needs an explicit prompt boundary as described,
-not a file read bolted onto the existing mixed context string.
+[Claude Code memory](https://code.claude.com/docs/en/memory) distinguishes
+instruction scopes and guidance from enforced configuration.
+[Gemini CLI GEMINI.md](https://geminicli.com/docs/cli/gemini-md/) documents its
+named Markdown context convention. These are examples, not claims that Raiker
+matches every loading algorithm or permission behavior of another product.
 
-## Acceptance tests
-
-1. Reviewed root file appears on successive Build turns; project owner rules,
-   current request and governance precedence are explicit in the generated
-   provider request. Context budget and redaction are applied once.
-2. Exact filename/case; UTF-8/BOM; empty file; exact byte/character boundaries;
-   invalid UTF-8/NUL; directory/device/link; safe regular file. No prefix is
-   loaded from an oversize file.
-3. Editing, deleting, disabling, replacing, reattaching or revoking the root
-   takes effect next turn; preview/approval race returns conflict. No stale
-   content, wrong-root fallback or reactivation after Disable.
-4. Symlink, Windows junction/reparse, hard link and concurrent replacement
-   attempts never read another project/home file. Verify no-follow/final-handle
-   behavior on supported beta Windows and Unix environments.
-5. Cross-owner project id, unknown owner mapping, mismatched session/project,
-   same-directory different project, copied project and ancestor review state
-   cannot cross the review boundary. Authenticated API tests cover all actions.
-6. Chat, remote-only projects, nested/global files, imports and frontmatter do
-   not activate. Background Build turns use only their scoped reviewed source.
-7. Agent edits in task copies do not activate; Apply changing the source file
-   causes review-required. A textual request to enable tools or expose secrets
-   changes neither broker capabilities nor authority/approval decisions.
-8. Tight budget produces a visible excluded source, never a false loaded badge;
-   reload/compaction regathers the same eligible revision. Events and hook
-   payloads contain neither instruction text nor absolute paths.
-
-## Reference behavior checked
-
-Primary documentation verified on 2026-11-10, used as examples rather than a
-promise of matching every behavior:
-
-- [Claude Code memory documentation](https://code.claude.com/docs/en/memory)
-  describes project/user/org instruction scopes and subdirectory instruction
-  loading when files there are accessed. It explicitly distinguishes guidance
-  from enforced configuration. Raiker v1 intentionally omits that nested/global
-  discovery and adds exact-revision owner review.
-- [Gemini CLI GEMINI.md documentation](https://geminicli.com/docs/cli/gemini-md/)
-  establishes the product's named Markdown project-context convention. Raiker
-  adopts the portable named-file idea, not a claim of matching Gemini's loading
-  algorithm.
-
-No unresolved implementation decision required speculative Meta Muse or Hermes
-behavior, and no unsupported parity claims are made for those systems or Codex.
-Once approved, update architecture section 3.7 and its matrix row to describe
-reviewed repository revisions alongside existing owner project records.
-
-## Review conclusion
-
-The proposal is limited to one root file and one review record per owner/project
-root. It introduces no execution path, capabilities or global filesystem scan.
-The substantive tradeoff for owner approval is automatic live edits versus
-reviewing changed revisions; the recommendation is review on change for beta.
-No implementation work or changes to existing architecture decisions have been
-made by this design document.
+The owner requested the expanded scope. The detailed reviewed-revision policy,
+account-scoped global location and nested activation contract above are ready
+for approval; no implementation is claimed by this proposal.

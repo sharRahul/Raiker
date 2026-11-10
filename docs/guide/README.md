@@ -24,6 +24,9 @@ If this is your first time using Raiker, read these pages in order:
    launch, and the local owner account. Testing the beta? Read
    [The Raiker beta](beta.md) for what it covers, known issues and how to send
    feedback.
+   Human testers can follow the standalone
+   [Human beta tester guide](human-beta-testing.md) for physical voice,
+   screen-reader, consent and usability checks that need a person.
 2. [Connecting a model](connecting-a-model.md) — connect a local, home-lab, or
    hosted model and confirm it is ready.
 3. [Permissions and the runtime](permissions-and-runtime-modes.md) — decide

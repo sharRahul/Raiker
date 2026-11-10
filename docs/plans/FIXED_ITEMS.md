@@ -1,5 +1,23 @@
 # Fixed items
 
+## FIXED-1388 — Empty list/detail states stayed inside the old list column
+
+**Severity: Low. Area: Quiet UI alignment. Status: Fixed 2026-11-10.**
+
+The owner identified the Approvals message in `kb-05-approvals.png` as
+off-center. ListDetail still allocated its three-column grid when empty,
+placing the message in the narrow first column. A saved divider width also
+overrode the narrow-screen layout. Empty lists now use one full-width column
+and do not apply the saved split until there are items again.
+
+**Evidence.** `web/e2e/approvals-empty-layout-live.spec.ts` first failed at
+1280/1440/390 pixels with center offsets of 316/412/23 pixels. All three cases
+now pass for both Pending and History, including a saved 320-pixel split,
+with no horizontal overflow. The 52 existing list/detail and approvals
+component tests pass. Updated screenshots are under
+`output/playwright/approvals-empty-centered/`; the original keyboard capture
+is retained there as `kb-05-before.png` before the KB-05 rerun.
+
 ## FIXED-1387 — Forgotten memory returned through ambient conversation recall
 
 **Severity: High. Area: Memory privacy and correction. Status: Fixed 2026-11-10.**
@@ -1946,6 +1964,7 @@ file you can open. The two capture sets that remain — `screenshots/pages/` and
 | [FIXED-1382](#fixed-1382--linux-filesystem-flags-broke-windows-type-checking) | Low | Platform portability | Fixed 2026-11-09 |
 | [FIXED-1383](#fixed-1383--keyboard-start-evidence-depended-on-retired-receipt-wording) | Low | Beta live tests | Fixed 2026-11-09 |
 | [FIXED-1384](#fixed-1384--model-downloads-checked-redirect-hosts-after-contacting-them) | High | Model and speech downloads | Fixed 2026-11-09 |
+| [FIXED-1388](#fixed-1388--empty-listdetail-states-stayed-inside-the-old-list-column) | Low | Quiet UI alignment | Fixed 2026-11-10 |
 | [FIXED-1387](#fixed-1387--forgotten-memory-returned-through-ambient-conversation-recall) | High | Memory privacy and correction | Fixed 2026-11-10 |
 | [FIXED-1386](#fixed-1386--escape-from-a-nested-overflow-closed-its-enclosing-dialog) | Medium | Quiet UI keyboard recovery | Fixed 2026-11-10 |
 | [FIXED-1385](#fixed-1385--the-local-model-helper-missed-choose-a-model) | Low | Live provider tests | Fixed 2026-11-09 |

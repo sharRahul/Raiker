@@ -778,3 +778,19 @@ instance/accounts to qualify. Existing model keys do not supply those clients.
   retain their existing gates.
 
 [Scenario procedures, screenshots and limitations](../architecture/WEB_APP_LIVE_TEST.md#result--2026-11-10-windows-memory-correction-and-managed-voice).
+
+### Human tester handoff and empty-state alignment
+
+The [standalone human tester guide](../guide/human-beta-testing.md) now gives
+novices a coordinator-prepared test pack, numbered steps, expected results and
+a report template for first-use understanding, real NVDA speech, physical
+audio, account-owner consent, display readability and personal acceptance.
+It distinguishes these human observations from engineering work the agent can
+test; missing connector setup is a preparation blocker, not a human-only test.
+No human case is qualified by the guide's creation. Personal scope remains at
+most five users, PC first, without a new mandatory multi-person study.
+
+FIXED-1388 centers empty list/detail states across the content width, including
+Approvals with a remembered divider width. Pending/History pass live geometry
+checks at desktop and narrow widths. This is an automated layout correction,
+not a replacement for human readability or NVDA acceptance.

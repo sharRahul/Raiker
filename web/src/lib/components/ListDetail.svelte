@@ -177,8 +177,9 @@
 
 <div
   class="list-detail"
+  class:empty={items.length === 0}
   bind:this={container}
-  style:grid-template-columns={listWidth === null ? undefined : `${listWidth}px auto minmax(20rem, 1fr)`}
+  style:grid-template-columns={items.length === 0 || listWidth === null ? undefined : `${listWidth}px auto minmax(20rem, 1fr)`}
 >
   <div class="list-column" bind:this={listColumn}>
     {#if matches !== undefined && items.length > 0}
@@ -259,6 +260,9 @@
     align-items: start;
     gap: 0;
     min-height: 0;
+  }
+  .list-detail.empty {
+    grid-template-columns: minmax(0, 1fr);
   }
   .list-column {
     display: grid;

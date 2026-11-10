@@ -2519,3 +2519,21 @@ and [WSL](../plans/evidence/windows-beta-2026-11-09/wsl-probe.json) probes refus
 availability for an ordinary scratch directory with
 `native_disposable_workspace_required`. They do not close profile reset, LSA
 logon restrictions, explicit ACE review or platform promotion races.
+
+## Result — 2026-11-10 (Approvals empty-state alignment)
+
+The owner's `output/playwright/2026-11-08-keyboard/kb-05-approvals.png` showed
+the empty queue centered in ListDetail's narrow first column. The live
+`approvals-empty-layout-live.spec.ts` first failed at 1280/1440/390 pixels,
+including remembered divider widths, then passed all three cases after
+FIXED-1388. Each checks Pending and History, center alignment to within one
+pixel of the content grid, no horizontal overflow and no empty resize handle.
+The six resulting captures are in `output/playwright/approvals-empty-centered/`.
+Desktop and narrow captures were visually inspected. The 52 existing
+ListDetail/Approvals component tests pass. KB-05 passes its separate rerun
+(1/1), retaining the keyboard route and refreshing the originally named capture; its old image
+is preserved as `approvals-empty-centered/kb-05-before.png`.
+
+The [human tester guide](../guide/human-beta-testing.md) is a handoff artifact,
+not a passing human run. Physical microphone, real NVDA, consent and subjective
+readability results remain **not run** until a tester returns their report.

@@ -16,6 +16,16 @@ remain in [TO_BE_FIXED.md](TO_BE_FIXED.md); historic verified closure remains in
 
 ## Common run record
 
+For the remaining human observations, send testers the standalone
+[Human beta tester guide](../guide/human-beta-testing.md). It includes a
+coordinator-prepared test pack, exact steps, expected observations, blocked/fail
+rules and a report template for novices. Its cases cover first-use
+understanding, real NVDA use, physical audio, account-owner consent, actual
+display readability and personal acceptance. Mechanical installer tests,
+memory provenance, sandbox hardening and other automatable engineering gates
+remain here and in the defect ledger; they are not delegated as human-only
+work. No human case is passed merely by writing the guide.
+
 Every scenario records: candidate revision/artifact, run ID/date/operator,
 owner profile and grants, operating system/hardware, host and model/provider,
 fixture/version hashes, budget/time limit, steps/approvals/interventions,

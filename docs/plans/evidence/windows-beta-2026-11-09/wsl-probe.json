@@ -1,0 +1,21 @@
+﻿{
+    "available":  false,
+    "boundary":  "wsl_bubblewrap",
+    "concurrent_runs":  false,
+    "network":  "enforced",
+    "observations":  {
+                         "descendant_reaped":  "enforced",
+                         "egress":  "enforced",
+                         "escape_write":  "enforced",
+                         "masked_read":  "enforced",
+                         "relay":  "enforced",
+                         "seccomp":  "enforced",
+                         "windows_interop":  "enforced",
+                         "workspace_write":  "enforced"
+                     },
+    "platform":  "windows",
+    "process_tree_stop":  true,
+    "pty":  false,
+    "reason":  "native_disposable_workspace_required",
+    "resource_limits":  "rlimit"
+}

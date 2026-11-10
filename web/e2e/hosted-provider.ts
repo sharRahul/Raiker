@@ -395,7 +395,15 @@ export async function pressCardAction(page: Page, card: Locator, name: RegExp): 
     return;
   }
   await card.getByRole("button", { name: /More actions/ }).click();
-  await page.getByRole("menuitem", { name }).first().click();
+  const item = page.getByRole("menuitem", { name }).first();
+  // Local detection can replace the primary action after the menu opens.
+  await expect.poll(async () => await direct.isVisible() || await item.isVisible(), { timeout: 30_000 }).toBe(true);
+  if (await direct.isVisible()) {
+    await page.keyboard.press("Escape");
+    await direct.click();
+  } else {
+    await item.click();
+  }
 }
 
 /**

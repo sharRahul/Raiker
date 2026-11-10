@@ -547,7 +547,8 @@ class ContextGatherer:
         user_id = store.principal_user_id(owner_principal_id)
         memories = self._recalled_memories(store, query, owner_principal_id, scope, query_embedder)
         sessions = self._recalled_sessions(
-            store, query, session_id, user_id, project_id=scope.project_id
+            store, query, session_id, user_id, project_id=scope.project_id,
+            owner_principal_id=owner_principal_id,
         )
         files = self._recalled_files(
             store, query, owner_principal_id, scope, query_embedder=query_embedder
@@ -710,6 +711,7 @@ class ContextGatherer:
         *,
         limit: int = 8,
         project_id: str | None = None,
+        owner_principal_id: str | None = None,
     ) -> list[dict[str, object]]:
         """Prior conversations worth naming: relevant first, then recent.
 
@@ -718,11 +720,19 @@ class ContextGatherer:
         ambient context never grows with the owner's history.
         """
         recalled: dict[str, dict[str, object]] = {}
-        for row in store.search_conversation_turns(
+        hits = store.search_conversation_turns(
             query, user_id=user_id, limit=limit * 3, project_id=project_id
-        ):
+        )
+        recent = store.list_sessions(
+            limit=limit, user_id=user_id, include_archived=True, project_id=project_id
+        )
+        stale = store.sessions_with_stale_memory_context(
+            [str(row["session_id"]) for row in [*hits, *recent]],
+            owner_principal_id=owner_principal_id,
+        )
+        for row in hits:
             key = str(row.get("session_id"))
-            if key == session_id or key in recalled:
+            if key == session_id or key in recalled or key in stale:
                 continue
             recalled[key] = {
                 "session_id": key,
@@ -733,13 +743,11 @@ class ContextGatherer:
             }
             if len(recalled) >= limit:
                 break
-        for row in store.list_sessions(
-            limit=limit, user_id=user_id, include_archived=True, project_id=project_id
-        ):
+        for row in recent:
             key = str(row.get("session_id"))
             if len(recalled) >= limit:
                 break
-            if key != session_id and key not in recalled:
+            if key != session_id and key not in recalled and key not in stale:
                 recalled[key] = dict(row)
         return list(recalled.values())
 

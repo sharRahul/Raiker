@@ -8,6 +8,7 @@ unreachable from a turn however exactly it held the answer.
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -219,3 +220,90 @@ def test_ambient_recall_never_returns_the_current_conversation(store: SQLiteStor
     _history(store)
     recalled = ContextGatherer()._recalled_sessions(store, "SQLCipher", "sess_old", None)
     assert all(str(row["session_id"]) != "sess_old" for row in recalled)
+
+@pytest.mark.parametrize("change", ["forgotten", "corrected", "archived", "expired", "search_disabled", "superseded"])
+def test_ambient_history_cannot_reintroduce_stale_recalled_memory(store: SQLiteStore, tmp_path: Path, change: str) -> None:
+    from dataclasses import replace
+
+    from raiker.memory.store import MemoryGovernance, write_memory
+
+    entry = write_memory(
+        "My trial tea is jasmine green tea.", workspace_root=tmp_path, scope="account", store=store,
+        governance=MemoryGovernance("event", "", None, "user_ui", 1.0, 1.0, "until_forget", "approved", "principal_owner"),
+        owner_principal_id="principal_owner",
+    )
+    store.create_session("sess_memory", "/w", title="Trial tea")
+    _exchange(store, "sess_memory", "turn_memory", "What is my trial tea?", "Your trial tea is jasmine green tea.")
+    store.record_turn_recall(session_id="sess_memory", turn_id="turn_memory", principal_id="principal_owner", memory_ids=[entry.memory_id])
+    assert any(row["session_id"] == "sess_memory" for row in ContextGatherer()._recalled_sessions(store, "trial tea", "current", None))
+    changes: dict[str, dict[str, Any]] = {
+        "forgotten": {"deleted_at": "2100-01-01T00:00:00Z", "approval_state": "forgotten"},
+        "corrected": {"text": "My trial tea is roasted barley tea.", "updated_at": "2100-01-01T00:00:00Z"},
+        "archived": {"archived_at": "2100-01-01T00:00:00Z"},
+        "expired": {"expires_at": "2000-01-01T00:00:00Z"},
+        "search_disabled": {"search_enabled": False},
+        "superseded": {"superseded_at": "2100-01-01T00:00:00Z"},
+    }
+    if change == "forgotten":
+        store.mark_approved_memory_forgotten(entry.memory_id, deleted_at="2100-01-01T00:00:00Z", updated_at="2100-01-01T00:00:00Z")
+    elif change == "archived":
+        store.set_approved_memory_archived(entry.memory_id, archived_at="2100-01-01T00:00:00Z", updated_at="2100-01-01T00:00:00Z")
+    else:
+        store.update_approved_memory(replace(entry, **changes[change]))
+    recalled = ContextGatherer()._recalled_sessions(store, "trial tea", "current", None)
+    assert all(row["session_id"] != "sess_memory" for row in recalled)
+    # Forgetting memory does not silently delete an owner's historical transcript.
+    assert store.search_conversation_turns("trial tea")
+
+
+def test_ambient_history_omits_the_source_of_a_forgotten_memory(store: SQLiteStore, tmp_path: Path) -> None:
+    from raiker.memory.store import MemoryGovernance, write_memory
+
+    store.create_session("source", "/w", title="My trial tea is jasmine green tea")
+    _exchange(store, "source", "source_turn", "Remember my trial tea is jasmine green tea", "Noted")
+    entry = write_memory(
+        "My trial tea is jasmine green tea.", workspace_root=tmp_path, scope="account", store=store,
+        governance=MemoryGovernance("event", "source", "source_turn", "user_ui", 1.0, 1.0, "until_forget", "approved", "principal_owner"),
+        owner_principal_id="principal_owner",
+    )
+    store.mark_approved_memory_forgotten(entry.memory_id, deleted_at="2100-01-01T00:00:00Z", updated_at="2100-01-01T00:00:00Z")
+    assert ContextGatherer()._recalled_sessions(store, "trial tea", "current", None) == []
+
+
+def test_stale_memory_filter_does_not_use_another_owners_provenance(store: SQLiteStore, tmp_path: Path) -> None:
+    from raiker.memory.store import MemoryGovernance, write_memory
+
+    store.create_session("owner_chat", "/w", title="Trial tea")
+    _exchange(store, "owner_chat", "owner_turn", "trial tea", "A discussion about tea")
+    entry = write_memory(
+        "Other account's tea", workspace_root=tmp_path, scope="account", store=store,
+        governance=MemoryGovernance("event", "owner_chat", None, "user_ui", 1.0, 1.0, "until_forget", "approved", "other_owner"),
+        owner_principal_id="other_owner",
+    )
+    store.mark_approved_memory_forgotten(entry.memory_id, deleted_at="2100-01-01T00:00:00Z", updated_at="2100-01-01T00:00:00Z")
+    recalled = ContextGatherer()._recalled_sessions(store, "trial tea", "current", None, owner_principal_id="principal_owner")
+    assert [row["session_id"] for row in recalled] == ["owner_chat"]
+
+
+@pytest.mark.parametrize("source", [False, True])
+def test_ambient_history_respects_an_edit_within_the_same_clock_second(store: SQLiteStore, tmp_path: Path, source: bool, monkeypatch: pytest.MonkeyPatch) -> None:
+    from dataclasses import replace
+
+    from raiker.memory.store import MemoryGovernance, write_memory
+
+    store.create_session("tea", "/w", title="Trial tea")
+    _exchange(store, "tea", "tea_turn", "trial tea", "Jasmine green tea")
+    entry = write_memory(
+        "Jasmine green tea", workspace_root=tmp_path, scope="account", store=store,
+        governance=MemoryGovernance("event", "tea" if source else "", None, "user_ui", 1.0, 1.0, "until_forget", "approved", "principal_owner"),
+        owner_principal_id="principal_owner",
+    )
+    monkeypatch.setattr("raiker.storage.stores.memory.utc_now", lambda: entry.created_at)
+    monkeypatch.setattr("raiker.storage.stores.conversations.utc_now", lambda: entry.created_at)
+    if not source:
+        store.record_turn_recall(session_id="tea", turn_id="tea_turn", principal_id="principal_owner", memory_ids=[entry.memory_id])
+    # The public edit route records an immutable lifecycle event. Timestamps
+    # have second precision, so neither updated_at comparison can order this.
+    store.update_approved_memory(replace(entry, text="Roasted barley tea", updated_at=entry.created_at))
+    store.record_memory_lifecycle_event(entry.memory_id, "edit", "principal_owner")
+    assert ContextGatherer()._recalled_sessions(store, "trial tea", "current", None, owner_principal_id="principal_owner") == []

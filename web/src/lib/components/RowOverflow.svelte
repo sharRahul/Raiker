@@ -77,14 +77,16 @@
     };
     const onKey = (event: KeyboardEvent) => {
       if (event.key !== "Escape") return;
+      event.preventDefault();
+      event.stopImmediatePropagation();
       open = false;
       trigger?.focus();
     };
     window.addEventListener("pointerdown", onPointerDown);
-    window.addEventListener("keydown", onKey);
+    window.addEventListener("keydown", onKey, true);
     return () => {
       window.removeEventListener("pointerdown", onPointerDown);
-      window.removeEventListener("keydown", onKey);
+      window.removeEventListener("keydown", onKey, true);
     };
   });
 </script>

@@ -742,10 +742,35 @@ check from TO_BE_FIXED. Current runs are detailed in
 [Live Test](../architecture/WEB_APP_LIVE_TEST.md#result--2026-11-09-pc-providers-speech-engines-and-streamed-stop).
 
 Still needed for personal sign-off: the remaining durable personal outcome,
-memory correction, issue-to-PR and stop/resume/budget journeys with approved
+full memory journey, issue-to-PR and stop/resume/budget journeys with approved
 fixtures; actual PC install/update/uninstall; safe platform-specific promotion
 and sandbox hardening or measured refusal; full managed speech/microphone;
 a scoped 30-minute full-feature PC traffic capture; applicable connector
 lifecycle and human screen-reader evidence. The connected test instance has no
 approved mail/calendar/GitHub OAuth clients; the owner has been asked which
 instance/accounts to qualify. Existing model keys do not supply those clients.
+
+## 2026-11-10 — Continued Windows qualification
+
+- **MM-2/T-04:** real Qwen UI import, correction and forgetting pass across
+  three distinct completed conversations after FIXED-1387. The first strict
+  run found forgotten facts returning through ambient historical snippets;
+  both matching and recent-history fallback now exclude stale memory sources
+  and answers. Explicit transcript search is retained. This slice does not
+  close every T-04 mode. FIXED-1386 repairs nested Escape handling discovered
+  during fresh local-model setup.
+  Reusing an old diagnostic workspace exposed BUG-360: answers that already
+  copied a fact indirectly have no contributing-session provenance. This is
+  an open privacy blocker; the fresh-workspace pass does not close it.
+- **VD-1:** exact personal frozen package `63dcdc53` installs verified managed
+  engines through Settings, speaks/hears with 89% word match and removes files
+  to 0 B on this PC. Its workflow passes all three real frozen voice tests.
+  Actual microphone routing and owner-PC install/update/uninstall remain open.
+- **AG-3/UX-3:** seven real Anthropic goal/profile cases pass on a fresh instance.
+  These do not substitute for an approved durable calendar/mail outcome.
+- **SB-1/SB-2:** ten current-source Windows disposable-account integration tests
+  pass using the existing pool. Ordinary-directory native/WSL probes correctly
+  refuse availability; unresolved account/profile/ACL and promotion hardening
+  retain their existing gates.
+
+[Scenario procedures, screenshots and limitations](../architecture/WEB_APP_LIVE_TEST.md#result--2026-11-10-windows-memory-correction-and-managed-voice).

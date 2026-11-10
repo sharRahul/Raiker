@@ -334,6 +334,16 @@ record's history and here.
 Archived and expired records stay on the **Memories** tab under their own
 filters, so you can restore or extend them. They are listed, never recalled.
 
+Automatic conversation recall also excludes older chats that supplied or used
+a memory after you edit, forget, archive or otherwise restrict that memory.
+This keeps an old answer from silently bringing the previous fact back into a
+new chat. Your transcripts remain available through explicit conversation
+search. To remove the words from a conversation too, delete that conversation;
+forgetting a memory does not erase an existing chat or its current context.
+An older answer that already copied a fact indirectly may lack the link needed
+for this exclusion. Full legacy-history forgetting remains under qualification;
+delete affected conversations explicitly if they also need to be removed.
+
 Purge is not a plain row deletion. Its preview and exact-target confirmation
 cover the primary record, text index, vectors, graph edges, artifacts, exports,
 and known backups. A completed purge can still report a backup as pending its

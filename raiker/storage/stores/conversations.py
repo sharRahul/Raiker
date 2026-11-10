@@ -1108,6 +1108,52 @@ class ConversationStore:
                 ],
             )
 
+    def sessions_with_stale_memory_context(
+        self: SQLiteStore, session_ids: Sequence[str], *, owner_principal_id: str | None = None,
+    ) -> set[str]:
+        """Ambient history must not revive a memory through its source or answers.
+
+        The candidate ids have already been owner/project scoped by recall.
+        Transcripts remain intact for explicit, governed conversation search.
+        """
+        ids = list(dict.fromkeys(session_ids))
+        if not ids:
+            return set()
+        marks = ",".join("?" for _ in ids)
+        unavailable = """m.deleted_at IS NOT NULL OR m.archived_at IS NOT NULL
+            OR m.approval_state != 'approved' OR m.search_enabled = 0
+            OR m.sensitivity IN ('secret_like', 'credential_like')
+            OR m.superseded_at IS NOT NULL
+            OR (m.expires_at IS NOT NULL AND m.expires_at <= ?)
+            OR (m.valid_from IS NOT NULL AND m.valid_from > ?)
+            OR (m.valid_until IS NOT NULL AND m.valid_until <= ?)"""
+        provenance = "CASE WHEN json_valid(m.provenance_json) THEN m.provenance_json ELSE '{}' END"
+        source_session = f"json_extract({provenance}, '$.source_session_id')"
+        # Clock seconds cannot order an edit against a recall in the same
+        # second. Treat an equal-time edit as stale rather than revive it.
+        edit = """EXISTS (SELECT 1 FROM memory_lifecycle_audit a
+            WHERE a.memory_id = m.memory_id AND a.action IN ('edit', 'correct')"""
+        recall_owner = " AND r.principal_id = ?" if owner_principal_id else ""
+        source_owner = " AND m.owner_principal_id = ?" if owner_principal_id else ""
+        owner_params = (owner_principal_id,) if owner_principal_id else ()
+        now = utc_now()
+        rows = self._rows(
+            f"""SELECT DISTINCT r.session_id FROM turn_recalls r
+                LEFT JOIN approved_memory m ON m.memory_id = r.memory_id
+                    AND m.owner_principal_id = r.principal_id
+                WHERE r.session_id IN ({marks}){recall_owner} AND (
+                    m.memory_id IS NULL OR {unavailable}
+                    OR COALESCE(m.updated_at, m.created_at) > r.created_at
+                    OR {edit} AND a.created_at >= r.created_at))
+                UNION
+                SELECT {source_session} AS session_id FROM approved_memory m
+                WHERE {source_session} IN ({marks}){source_owner} AND (
+                    {unavailable} OR COALESCE(m.updated_at, m.created_at) > m.created_at
+                    OR {edit}))""",
+            (*ids, *owner_params, now, now, now, *ids, *owner_params, now, now, now),
+        )
+        return {str(row["session_id"]) for row in rows}
+
     def load_turn_recall(
         self: SQLiteStore, session_id: str, principal_id: str, turn_id: str | None = None
     ) -> list[dict[str, Any]]:

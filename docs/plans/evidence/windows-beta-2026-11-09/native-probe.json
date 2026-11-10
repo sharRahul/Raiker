@@ -1,0 +1,23 @@
+﻿{
+    "available":  false,
+    "boundary":  "restricted_account",
+    "concurrent_runs":  false,
+    "descendant_start":  {
+                             "state":  "started"
+                         },
+    "network":  "enforced",
+    "observations":  {
+                         "descendant_reaped":  "enforced",
+                         "egress":  "enforced",
+                         "escape_write":  "enforced",
+                         "loopback":  "enforced",
+                         "masked_read":  "enforced",
+                         "relay":  "enforced",
+                         "workspace_write":  "enforced"
+                     },
+    "own_loopback":  true,
+    "platform":  "windows",
+    "process_tree_stop":  true,
+    "pty":  false,
+    "reason":  "native_disposable_workspace_required"
+}

@@ -18,7 +18,7 @@ import { expect, test, type Page } from "@playwright/test";
 
 import { capture } from "./capture";
 import { settled } from "./destinations";
-import { chooseModelForTurn, hostedProviderCard, keepModelAvailable, signInAsOwner } from "./hosted-provider";
+import { chooseModelForTurn, hostedProviderCard, keepModelAvailable, refreshHostedReadiness, signInAsOwner } from "./hosted-provider";
 import { ANTHROPIC_KEY as KEY, ANTHROPIC_MODEL as MODEL, LIVE_BASE as BASE, sendTurn } from "./live";
 
 test.describe.configure({ mode: "serial" });
@@ -80,6 +80,7 @@ test("RT-GOAL-01 — Anthropic connects through the UI and a turn chooses its mo
   }
   await expect(card.getByText("Connection saved")).toBeVisible({ timeout: 60_000 });
   await keepModelAvailable(page, card, MODEL);
+  await refreshHostedReadiness(page, BASE, "Anthropic");
   // A goal step runs on the owner's selected model, so one turn selects it.
   await page.goto(`${BASE}/#/new-chat`);
   await chooseModelForTurn(page, /Haiku|claude/i);

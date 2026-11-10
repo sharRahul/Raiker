@@ -1,5 +1,46 @@
 # Fixed items
 
+## FIXED-1387 — Forgotten memory returned through ambient conversation recall
+
+**Severity: High. Area: Memory privacy and correction. Status: Fixed 2026-11-10.**
+
+The strict Windows T-04 run used a new conversation after each operation and
+waited for each answer to finish. After Forget, the model still repeated the
+old tea preference: ambient conversation search injected an earlier answer's
+matching snippet even though direct memory recall correctly excluded the fact.
+
+Ambient recall now excludes candidate conversations containing recalled or
+source memories that have been forgotten, archived, expired, superseded,
+restricted or edited since their use. Both relevant matches and recent-chat
+fallback apply the exclusion, scoped to the requesting owner. Explicit governed
+transcript search remains available; forgetting a memory does not delete chats.
+Lifecycle edit evidence covers same-second edits that timestamps cannot order.
+
+**Evidence.** `tests/test_conversation_recall.py` covers stale recall, source
+provenance, owner isolation and same-second edits. The corrected real Qwen UI
+scenario passes import → recall → edit → new-chat recall → forget → new-chat
+recall. Screenshots show the corrected fact and then an answer without either
+tea preference. The earlier diagnostic pass reused a conversation and was
+withdrawn; it is not acceptance evidence.
+
+**Limit.** Historical answers that already copied a fact indirectly without a
+memory link remain [BUG-360](TO_BE_FIXED.md#bug-360--legacy-answers-copied-from-stale-history-have-no-memory-provenance).
+This fix closes linked-source recall, not the full forgetting acceptance gate.
+
+## FIXED-1386 — Escape from a nested overflow closed its enclosing dialog
+
+**Severity: Medium. Area: Quiet UI keyboard recovery. Status: Fixed 2026-11-10.**
+
+Escape from the Ollama overflow also reached Add model's dialog handler,
+closing the whole dialog. An open RowOverflow now handles Escape in capture,
+stops propagation and returns focus to its trigger. The shared live helper also
+waits for either the direct action or overflow action after local detection.
+
+**Evidence.** `web/src/lib/components/RowOverflow.test.ts` failed before the
+change and passes afterward, including an enclosing handler registered first.
+The full component suite passes 2,873 tests; the fresh local-model memory
+journey passes through the corrected helper.
+
 ## FIXED-1385 — The local model helper missed Choose a model
 
 **Severity: Low. Area: Live provider tests. Status: Fixed 2026-11-09.**
@@ -1902,6 +1943,8 @@ file you can open. The two capture sets that remain — `screenshots/pages/` and
 | [FIXED-1382](#fixed-1382--linux-filesystem-flags-broke-windows-type-checking) | Low | Platform portability | Fixed 2026-11-09 |
 | [FIXED-1383](#fixed-1383--keyboard-start-evidence-depended-on-retired-receipt-wording) | Low | Beta live tests | Fixed 2026-11-09 |
 | [FIXED-1384](#fixed-1384--model-downloads-checked-redirect-hosts-after-contacting-them) | High | Model and speech downloads | Fixed 2026-11-09 |
+| [FIXED-1387](#fixed-1387--forgotten-memory-returned-through-ambient-conversation-recall) | High | Memory privacy and correction | Fixed 2026-11-10 |
+| [FIXED-1386](#fixed-1386--escape-from-a-nested-overflow-closed-its-enclosing-dialog) | Medium | Quiet UI keyboard recovery | Fixed 2026-11-10 |
 | [FIXED-1385](#fixed-1385--the-local-model-helper-missed-choose-a-model) | Low | Live provider tests | Fixed 2026-11-09 |
 
 ---

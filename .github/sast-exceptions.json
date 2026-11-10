@@ -2,6 +2,14 @@
   "_comment": "DEC-24 step 7 — static-analysis findings that were read and are not defects. Each names an owner, a reason and an expiry; an expired or unused entry fails scripts/scan_sast.py. Renew by re-reading the code.",
   "exceptions": [
     {
+      "path": "raiker/storage/stores/conversations.py",
+      "rule": "S608",
+      "fingerprint": "c1a0ceb843c8c00f",
+      "owner": "Raiker maintainers",
+      "reason": "Stale-memory recall SQL interpolates only fixed SQL fragments and a count-derived list of question-mark placeholders; session IDs, owner ID and all timestamps are bound parameters",
+      "expires": "2027-04-10"
+    },
+    {
       "path": "raiker/api/sessions.py",
       "rule": "S608",
       "fingerprint": "17227917c4bc5a88",

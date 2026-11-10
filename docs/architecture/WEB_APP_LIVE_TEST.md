@@ -2465,3 +2465,42 @@ prove microphone-to-managed-Whisper acceptance. RT-FIX-01 in
 stops only that turn, sees exactly one stop notice and retains the streamed
 prefix. The previously blocked stopped-turn evidence is supplied; the rest
 of the beta journeys retain their own gates.
+
+## Result — 2026-11-10 (Windows memory correction and managed Voice)
+
+The continued run goes beyond the initial twenty-item checklist. Evidence is
+split by exact runtime; none of these partial checks is release sign-off.
+
+| Case | Procedure and result | Evidence |
+|---|---|---|
+| T-04 correction/forget slice | Disposable source host; enable Memory store, import a synthetic tea preference through Controls, recall using real Ollama Qwen 2.5 coder 7B, edit through Memory, start a new chat and verify the replacement, Forget, start a third chat and verify neither preference is supplied or repeated. Pass after FIXED-1387. Wait for completed response actions, not an old receipt. | `web/e2e/memory-correction-forget-live.spec.ts`; inspected `output/playwright/windows-memory/{01-recalled,02-corrected,03-forgotten}.png` |
+| VD-1 managed setup/test/removal | Exact frozen Windows package `63dcdc53`, MSI administratively extracted on this PC. Choose Lite, CPU and English base in Settings → Voice; install verified engines; Test reports spoke/heard in 13 seconds with 89% word match; Remove reports 0 B. Pass. | `web/e2e/managed-voice-roundtrip-live.spec.ts`, opt-in `RAIKER_LIVE_MANAGED_VOICE=1`; all three `output/playwright/windows-managed-voice/` captures inspected |
+| AG profiles | Fresh disposable source host, Anthropic credentials entered through UI; real model work, balanced memory withholding, owner confirmation, stop and profile version change. 7/7 pass. This is not the calendar/mail T-03 journey. | `web/e2e/goals-execution-profiles-live.spec.ts`; inspected `output/playwright/2026-10-20-goals-execution-profiles/` captures |
+| Windows native accounts | Existing configured disposable accounts; real current-source integration suite with `RAIKER_REQUIRE_ACCOUNT_SANDBOX=1`. 10/10 pass: isolation, concurrency, revocation, owner-profile/local-network refusal and Job limits. | [Test receipt](../plans/evidence/windows-beta-2026-11-09/windows-account-tests.txt) |
+
+The T-04 diagnostic first appeared to pass but screenshot review found that
+it reused the conversation and an earlier receipt. That result was withdrawn.
+The corrected test then reproduced stale ambient-history disclosure, before
+passing with the fix. Transcripts remain explicitly searchable; this test does
+not claim transcript deletion, every memory mode or full T-04 qualification.
+FIXED-1386 also prevents Escape from closing the enclosing Add model dialog.
+The next-day fresh run passes again in 17.7 seconds. An attempted rerun against
+`output/beta-memory-final` first failed at startup before readiness, then failed
+forgetting: that directory already held the previous night's diagnostic chats.
+An indirectly copied old answer lacks a memory link and remains
+[BUG-360](../plans/TO_BE_FIXED.md#bug-360--legacy-answers-copied-from-stale-history-have-no-memory-provenance).
+No failed run is replaced by the successful fresh-workspace result.
+
+Package `63dcdc53` has verified NSIS/MSI hashes and all three real frozen voice
+tests passing in personal Windows workflow `42717576193`. Desktop packaging
+`42717576271`, CI, data safety and llama.cpp workflows all passed on that SHA.
+These builds precede FIXED-1386/1387 and require a new candidate. Owner-PC
+installation/update/uninstallation and microphone-to-managed-engine testing
+remain open: Voice's built-in test uses generated audio, while the separate
+six fake-device cases use a stand-in backend.
+
+The redacted [Windows](../plans/evidence/windows-beta-2026-11-09/native-probe.json)
+and [WSL](../plans/evidence/windows-beta-2026-11-09/wsl-probe.json) probes refuse
+availability for an ordinary scratch directory with
+`native_disposable_workspace_required`. They do not close profile reset, LSA
+logon restrictions, explicit ACE review or platform promotion races.

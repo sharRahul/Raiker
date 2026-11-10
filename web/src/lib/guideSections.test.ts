@@ -85,6 +85,9 @@ describe("every page the product navigates to can reach the guide", () => {
     const GENERAL = new Set([
       "beta",
       "getting-started",
+      // Cross-surface human acceptance instructions, reached from the guide
+      // index and sent to testers separately; not one page's inline manual.
+      "human-beta-testing",
       "known-limits",
       "managing-the-host",
       "releasing",

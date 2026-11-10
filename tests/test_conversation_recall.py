@@ -307,3 +307,205 @@ def test_ambient_history_respects_an_edit_within_the_same_clock_second(store: SQ
     store.update_approved_memory(replace(entry, text="Roasted barley tea", updated_at=entry.created_at))
     store.record_memory_lifecycle_event(entry.memory_id, "edit", "principal_owner")
     assert ContextGatherer()._recalled_sessions(store, "trial tea", "current", None, owner_principal_id="principal_owner") == []
+
+
+@pytest.mark.parametrize("linked_by", ["source", "recall"])
+@pytest.mark.parametrize("change", ["forgotten", "corrected", "archived", "expired", "purged"])
+def test_ambient_history_tracks_memory_across_two_indirect_copies(
+    store: SQLiteStore, tmp_path: Path, linked_by: str, change: str,
+) -> None:
+    from dataclasses import replace
+
+    from raiker.memory.store import MemoryGovernance, write_memory
+
+    store.create_session("original", "/w", title="Trial tea")
+    _exchange(store, "original", "original_turn", "trial tea", "Jasmine green tea")
+    entry = write_memory(
+        "My trial tea is jasmine green tea.", workspace_root=tmp_path, scope="account", store=store,
+        governance=MemoryGovernance("event", "original" if linked_by == "source" else "", None, "user_ui", 1.0, 1.0, "until_forget", "approved", "principal_owner"),
+        owner_principal_id="principal_owner",
+    )
+    if linked_by == "recall":
+        store.record_turn_recall(session_id="original", turn_id="original_turn", principal_id="principal_owner", memory_ids=[entry.memory_id])
+    for index, parent in enumerate(["original", "copy_0"]):
+        child = f"copy_{index}"
+        store.create_session(child, "/w", title="Trial tea")
+        _exchange(store, child, f"turn_{index}", "trial tea", "Jasmine green tea")
+        item = ContextGatherer()._memory_recall(store, "trial tea", child, "principal_owner")
+        assert item is not None
+        # Isolate ambient history: the direct memory search can miss this fact.
+        item.metadata["memory_ids"] = []
+        bundle = ContextGatherer()._apply_budget([item], session_id=child, turn_id=f"turn_{index}", max_items=20, max_chars=12000)
+        recalled_sessions = bundle.event_payload()["recalled_session_ids"]
+        assert isinstance(recalled_sessions, list)
+        assert parent in recalled_sessions
+        assert entry.memory_id in bundle.recalled_memory_ids()
+        store.record_turn_recall(session_id=child, turn_id=f"turn_{index}", principal_id="principal_owner", memory_ids=bundle.recalled_memory_ids())
+        if index == 0:
+            store.delete_session("original")
+    if change == "forgotten":
+        store.mark_approved_memory_forgotten(entry.memory_id, deleted_at=entry.created_at, updated_at=entry.created_at)
+    elif change == "corrected":
+        store.record_memory_lifecycle_event(entry.memory_id, "edit", "principal_owner")
+    elif change == "archived":
+        store.set_approved_memory_archived(entry.memory_id, archived_at=entry.created_at, updated_at=entry.created_at)
+    elif change == "expired":
+        store.update_approved_memory(replace(entry, expires_at="2000-01-01T00:00:00Z"))
+    else:
+        store.delete_approved_memory(entry.memory_id, owner_principal_id="principal_owner")
+    assert ContextGatherer()._recalled_sessions(store, "trial tea", "current", None, owner_principal_id="principal_owner") == []
+    assert store.search_conversation_turns("jasmine")
+
+
+def test_indirect_memory_provenance_is_owner_scoped(store: SQLiteStore, tmp_path: Path) -> None:
+    from raiker.memory.store import MemoryGovernance, write_memory
+
+    store.create_session("chat", "/w", title="Trial tea")
+    _exchange(store, "chat", "turn", "trial tea", "A discussion about tea")
+    entry = write_memory(
+        "Other account's tea", workspace_root=tmp_path, scope="account", store=store,
+        governance=MemoryGovernance("event", "chat", None, "user_ui", 1.0, 1.0, "until_forget", "approved", "other_owner"),
+        owner_principal_id="other_owner",
+    )
+    store.record_turn_recall(session_id="chat", turn_id="turn", principal_id="other_owner", memory_ids=[entry.memory_id])
+    assert store.memory_context_ids_for_sessions(["chat"], owner_principal_id="principal_owner") == []
+
+
+def _context_event(store: SQLiteStore, session: str, payload: dict[str, Any]) -> None:
+    from raiker.contracts.ids import new_id, utc_now
+    from raiker.contracts.models import AgentEvent
+    from raiker.events.writer import EventLogWriter
+
+    EventLogWriter(store).append(AgentEvent(new_id("evt_"), utc_now(), session, session + "_turn", "context_gathered", "runtime", payload))
+
+
+@pytest.mark.parametrize("change", ["forgotten", "corrected", "archived", "expired", "purged"])
+def test_legacy_unknown_memory_context_is_withheld_but_clean_history_survives(
+    store: SQLiteStore, tmp_path: Path, change: str,
+) -> None:
+    from dataclasses import replace
+
+    from raiker.memory.store import MemoryGovernance, write_memory
+
+    for session in ["legacy_copy", "clean", "tracked_clean"]:
+        store.create_session(session, "/w", title="Trial tea")
+        _exchange(store, session, session + "_turn", "trial tea", "Jasmine green tea" if session == "legacy_copy" else "An unrelated discussion")
+    _context_event(store, "legacy_copy", {"source_types": ["current_prompt", "memory_recall"], "recalled_memory_ids": []})
+    _context_event(store, "clean", {"source_types": ["current_prompt"]})
+    _context_event(store, "tracked_clean", {"source_types": ["memory_recall"], "recalled_memory_ids": [], "recalled_session_ids": [], "memory_provenance_version": 1, "memory_provenance_complete": True})
+    entry = write_memory(
+        "My trial tea is jasmine green tea.", workspace_root=tmp_path, scope="account", store=store,
+        governance=MemoryGovernance("event", "", None, "user_ui", 1.0, 1.0, "until_forget", "approved", "principal_owner"),
+        owner_principal_id="principal_owner",
+    )
+    assert len(ContextGatherer()._recalled_sessions(store, "trial tea", "current", None, owner_principal_id="principal_owner")) == 3
+    if change == "forgotten":
+        store.mark_approved_memory_forgotten(entry.memory_id, deleted_at=entry.created_at, updated_at=entry.created_at, owner_principal_id="principal_owner")
+    elif change == "corrected":
+        store.record_memory_lifecycle_event(entry.memory_id, "edit", "principal_owner")
+    elif change == "purged":
+        store.delete_approved_memory(entry.memory_id, owner_principal_id="principal_owner")
+    elif change == "archived":
+        store.set_approved_memory_archived(entry.memory_id, archived_at=entry.created_at, updated_at=entry.created_at)
+    else:
+        store.update_approved_memory(replace(entry, expires_at="2000-01-01T00:00:00Z"))
+    recalled = ContextGatherer()._recalled_sessions(store, "trial tea", "current", None, owner_principal_id="principal_owner")
+    assert {row["session_id"] for row in recalled} == {"clean", "tracked_clean"}
+    item = ContextGatherer()._memory_recall(store, "trial tea", "current", "principal_owner")
+    assert item is not None
+    assert item.metadata["history_withheld_count"] == 1
+    assert store.search_conversation_turns("jasmine")
+    # This account's uncertain past never narrows another account's history.
+    assert len(ContextGatherer()._recalled_sessions(store, "trial tea", "current", None, owner_principal_id="other_owner")) == 3
+
+
+def test_legacy_unknown_provenance_survives_copying_before_forget(store: SQLiteStore) -> None:
+    store.create_session("legacy", "/w", title="Trial tea")
+    _exchange(store, "legacy", "legacy_turn", "trial tea", "Jasmine green tea")
+    _context_event(store, "legacy", {"source_types": ["memory_recall"], "recalled_memory_ids": []})
+    item = ContextGatherer()._memory_recall(store, "trial tea", "copy", "principal_owner")
+    assert item is not None
+    bundle = ContextGatherer()._apply_budget([item], session_id="copy", turn_id="copy_turn", max_items=20, max_chars=12000)
+    assert bundle.event_payload()["memory_provenance_complete"] is False
+    store.create_session("copy", "/w")
+    _context_event(store, "copy", bundle.event_payload())
+    store.delete_session("legacy")
+    assert store.sessions_with_untracked_memory_context(["copy"]) == {"copy"}
+
+
+@pytest.mark.parametrize("damage", ["path", "offset", "hash", "missing_ledger", "limit", "size"])
+def test_indeterminate_context_provenance_fails_closed(store: SQLiteStore, tmp_path: Path, damage: str) -> None:
+    store.create_session("chat", "/w")
+    payload = {"source_types": ["memory_recall"], "recalled_memory_ids": [], "recalled_session_ids": [], "memory_provenance_version": 1, "memory_provenance_complete": True}
+    if damage == "missing_ledger":
+        payload["recalled_memory_ids"] = ["purged_memory"]
+    elif damage == "size":
+        payload["oversize"] = "x" * 65536
+    _context_event(store, "chat", payload)
+    if damage in {"path", "offset", "hash"}:
+        column, value = {"path": ("jsonl_path", str(tmp_path / "outside.jsonl")), "offset": ("jsonl_offset", -1), "hash": ("payload_sha256", "bad")}[damage]
+        with store.connect() as connection:
+            connection.execute(f"UPDATE events_index SET {column} = ? WHERE session_id = ?", (value, "chat"))
+    elif damage == "limit":
+        for _ in range(64):
+            _context_event(store, "chat", payload)
+    assert store.sessions_with_untracked_memory_context(["chat"]) == {"chat"}
+
+
+def test_indirect_provenance_only_follows_sessions_inside_the_build_project(store: SQLiteStore, tmp_path: Path) -> None:
+    from raiker.context.gatherer import RetrievalScope
+    from raiker.memory.store import MemoryGovernance, write_memory
+
+    for project in ["alpha", "beta"]:
+        store.create_project(project, project, project)
+        store.create_session(project + "_chat", "/w", title="Trial tea")
+        assert store.set_session_project(project + "_chat", project)
+        _exchange(store, project + "_chat", project + "_turn", "trial tea", "An unrelated discussion")
+    entry = write_memory(
+        "A beta project preference", workspace_root=tmp_path, scope="project:beta", store=store,
+        governance=MemoryGovernance("event", "beta_chat", None, "user_ui", 1.0, 1.0, "until_forget", "approved", "principal_owner"),
+        owner_principal_id="principal_owner",
+    )
+    item = ContextGatherer()._memory_recall(store, "trial tea", "current", "principal_owner", RetrievalScope("build", "alpha"))
+    assert item is not None
+    assert item.metadata["session_ids"] == ["alpha_chat"]
+    inherited = item.metadata["inherited_memory_ids"]
+    assert isinstance(inherited, list)
+    assert entry.memory_id not in inherited
+
+
+@pytest.mark.parametrize("change", ["forgotten", "corrected", "purged"])
+@pytest.mark.parametrize("depth", [1, 3])
+def test_known_session_edges_reach_memory_created_only_after_copying(
+    store: SQLiteStore, tmp_path: Path, change: str, depth: int,
+) -> None:
+    from raiker.memory.store import MemoryGovernance, write_memory
+
+    store.create_session("source_late", "/w", title="Trial tea")
+    _exchange(store, "source_late", "source_turn", "trial tea", "Jasmine green tea")
+    parent = "source_late"
+    for index in range(depth):
+        child = f"child_late_{index}"
+        store.create_session(child, "/w", title="Trial tea")
+        _exchange(store, child, child + "_turn", "trial tea", "Jasmine green tea")
+        _context_event(store, child, {"source_types": ["memory_recall"], "recalled_memory_ids": [], "recalled_session_ids": [parent], "memory_provenance_version": 1, "memory_provenance_complete": True, "recalled_session_scope": {"surface": "chat", "project_id": ""}})
+        parent = child
+    store.create_session("unrelated_late", "/w", title="Trial tea")
+    _exchange(store, "unrelated_late", "unrelated_late_turn", "trial tea", "An unrelated discussion")
+    entry = write_memory(
+        "My trial tea is jasmine green tea.", workspace_root=tmp_path, scope="account", store=store,
+        governance=MemoryGovernance("event", "source_late", None, "user_ui", 1.0, 1.0, "until_forget", "approved", "principal_owner"),
+        owner_principal_id="principal_owner",
+    )
+    if change == "forgotten":
+        store.mark_approved_memory_forgotten(entry.memory_id, deleted_at=entry.created_at, updated_at=entry.created_at, owner_principal_id="principal_owner")
+    elif change == "corrected":
+        store.record_memory_lifecycle_event(entry.memory_id, "edit", "principal_owner")
+    else:
+        store.delete_approved_memory(entry.memory_id, owner_principal_id="principal_owner")
+    # Restrict candidates to the final child: source sessions need not match
+    # the current search/recent budget for their dependency to remain binding.
+    assert store.sessions_with_stale_memory_context([parent], owner_principal_id="principal_owner") == {parent}
+    recalled = ContextGatherer()._recalled_sessions(store, "trial tea", "current", None, owner_principal_id="principal_owner")
+    assert {row["session_id"] for row in recalled} == {"unrelated_late"}
+    assert store.search_conversation_turns("jasmine")

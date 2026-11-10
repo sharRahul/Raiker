@@ -20,6 +20,7 @@ from raiker.checkpoints.service import (
 )
 from raiker.execution.task_tree import authority_for_action
 from raiker.runtime.executors.base import ExecutionResult
+from raiker.tools import task_tree_io
 from raiker.tools.filesystem import FilesystemSafetyError
 from raiker.tools.path_authority import PathAuthority, decode_root_path
 
@@ -64,6 +65,7 @@ class CheckpointRestoreExecutor:
         restored = 0
         deleted = 0
         skipped = 0
+        refused: list[str] = []
         for entry in files:
             path = str(entry["workspace_path"])
             op = str(entry["op"])
@@ -98,6 +100,7 @@ class CheckpointRestoreExecutor:
 
             # Write our own pre-image FIRST so the restore is reversible, tagging
             # it with this restore's action id (capability = checkpoint restore).
+            capture.authority = authority
             pre = capture.snapshot_path(path, self.capability, session_id=session_id)
             if pre is not None:
                 # BUG-235 — file this restore's own pre-image under the
@@ -114,8 +117,11 @@ class CheckpointRestoreExecutor:
                 )
 
             if op == RESTORE_OP_DELETE:
-                if resolved.exists():
-                    resolved.unlink()
+                try:
+                    task_tree_io.unlink(resolved, authority, missing_ok=True)
+                except (OSError, FilesystemSafetyError):
+                    refused.append(path)
+                    continue
                 deleted += 1
                 continue
 
@@ -127,12 +133,16 @@ class CheckpointRestoreExecutor:
                 # rather than restore corrupt content.
                 skipped += 1
                 continue
-            resolved.parent.mkdir(parents=True, exist_ok=True)
-            resolved.write_bytes(data)
+            try:
+                task_tree_io.write_bytes(resolved, data, authority)
+            except (OSError, FilesystemSafetyError):
+                refused.append(path)
+                continue
             restored += 1
 
         return ExecutionResult(
-            ok=True, capability=self.capability, action_id=action.action_id,
+            ok=not refused, capability=self.capability, action_id=action.action_id,
+            reason_code="restore_file_unsafe" if refused else None,
             summary=(
                 f"Restored checkpoint {checkpoint_id}: "
                 f"{restored} rewritten, {deleted} deleted, {skipped} skipped."
@@ -142,5 +152,6 @@ class CheckpointRestoreExecutor:
                 "restored": restored,
                 "deleted": deleted,
                 "skipped": skipped,
+                "refused": refused,
             },
         )

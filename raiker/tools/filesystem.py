@@ -3,10 +3,13 @@ from __future__ import annotations
 import fnmatch
 import json
 import re
+import stat
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
+
+from raiker.tools import task_tree_io as _io
 
 
 class FilesystemSafetyError(ValueError):
@@ -106,10 +109,11 @@ def _read_pdf(
         from pypdf.errors import PyPdfError
     except ImportError:
         return _failure("pdf_extraction_unavailable")
-    if resolved.stat().st_size > MAX_READ_PDF_BYTES:
+    data = _io.read_bytes(resolved, authority, MAX_READ_PDF_BYTES + 1)
+    if len(data) > MAX_READ_PDF_BYTES:
         return _failure("pdf_too_large", limit=MAX_READ_PDF_BYTES)
     try:
-        reader = PdfReader(io.BytesIO(resolved.read_bytes()))
+        reader = PdfReader(io.BytesIO(data))
         page_count = len(reader.pages)
     except (PyPdfError, ValueError, OSError):
         return _failure("pdf_unreadable")
@@ -184,20 +188,21 @@ def read_file(
     (``"3"`` or ``"1-5"``). Without them a call returns what it always did.
     """
     resolved = resolve_workspace_path(workspace_root, path, authority=authority)
-    if not resolved.exists():
+    if not _io.exists(resolved, authority):
         return {"status": "failed", "error": {"type": "not_found", "path": str(path)}}
-    if not resolved.is_file():
+    if not _io.is_file(resolved, authority):
         return {"status": "failed", "error": {"type": "not_file", "path": str(path)}}
-    with resolved.open("rb") as handle:
-        head = handle.read(5)
+    head = _io.read_bytes(resolved, authority, 5)
     if head == b"%PDF-":
         return _read_pdf(workspace_root, resolved, pages, max_bytes=max_bytes, authority=authority)
     if pages:
         return _failure("pages_only_for_pdf")
     ranged = offset is not None or limit is not None
-    if ranged and resolved.stat().st_size > MAX_LINE_RANGE_SOURCE_BYTES:
+    if ranged and _io.stat_info(resolved, authority).st_size > MAX_LINE_RANGE_SOURCE_BYTES:
         return _failure("file_too_large_for_line_range", limit=MAX_LINE_RANGE_SOURCE_BYTES)
-    data = resolved.read_bytes() if ranged else resolved.read_bytes()[: max_bytes + 1]
+    data = _io.read_bytes(resolved, authority, MAX_LINE_RANGE_SOURCE_BYTES + 1 if ranged else max_bytes + 1)
+    if ranged and len(data) > MAX_LINE_RANGE_SOURCE_BYTES:
+        return _failure("file_too_large_for_line_range", limit=MAX_LINE_RANGE_SOURCE_BYTES)
     if _is_binary_bytes(data):
         return {"status": "failed", "error": {"type": "binary_file", "path": str(path)}}
     try:
@@ -212,6 +217,8 @@ def read_file(
     if not ranged:
         return {"status": "success", "path": relative, "text": text, "truncated": len(data) > max_bytes}
     lines = text.splitlines(keepends=True)
+    if ranged:
+        lines = [line.replace("\r\n", "\n").replace("\r", "\n") for line in lines]
     start = max(1, offset or 1)
     if start > max(len(lines), 1):
         return _failure("offset_out_of_range", line_count=len(lines))
@@ -232,11 +239,11 @@ def list_directory(
     workspace_root: str | Path, path: str | Path = ".", *, authority: Any = None
 ) -> dict[str, Any]:
     resolved = resolve_workspace_path(workspace_root, path, authority=authority)
-    if not resolved.exists():
+    if not _io.exists(resolved, authority):
         return {"status": "failed", "error": {"type": "not_found", "path": str(path)}}
-    if not resolved.is_dir():
+    if not _io.is_dir(resolved, authority):
         return {"status": "failed", "error": {"type": "not_directory", "path": str(path)}}
-    entries = sorted(child.name + ("/" if child.is_dir() else "") for child in resolved.iterdir())
+    entries = sorted(name + ("/" if is_dir else "") for name, is_dir in _io.entries(resolved, authority))
     return {"status": "success", "path": str(path), "entries": entries}
 
 
@@ -266,10 +273,10 @@ def glob_paths(
     }
 
 
-def is_text_file(path: Path, sample_size: int = 4096) -> bool:
+def is_text_file(path: Path, sample_size: int = 4096, *, authority: Any = None) -> bool:
     try:
-        sample = path.read_bytes()[:sample_size]
-    except OSError:
+        sample = _io.read_bytes(path, authority, sample_size)
+    except (OSError, FilesystemSafetyError):
         return False
     if _is_binary_bytes(sample):
         return False
@@ -337,19 +344,26 @@ def grep_files(
     span = max(0, min(int(context), MAX_GREP_CONTEXT))
     root = Path(workspace_root).resolve()
     base = resolve_workspace_path(root, path, authority=authority)
-    if not base.exists():
+    if not _io.exists(base, authority):
         return {"status": "failed", "error": {"type": "not_found", "path": str(path)}}
-    files = [base] if base.is_file() else [p for p in base.rglob("*") if p.is_file()]
-    if base.is_dir():
+    files = ([base] if _io.is_file(base, authority) else _io.walk(base, authority)
+             if _io.copy_root(base, authority) is not None else [p for p in base.rglob("*") if p.is_file()])
+    if _io.is_dir(base, authority):
         # A session's task copy answers for the subtree it holds (task_tree).
         from raiker.execution.task_tree import overlay_files
 
         files = overlay_files(authority, base, files)
     results: list[dict[str, Any]] = []
     for file_path in sorted(files):
-        if not fnmatch.fnmatch(file_path.name, include) or not is_text_file(file_path):
+        if not fnmatch.fnmatch(file_path.name, include):
             continue
-        lines = file_path.read_text(encoding="utf-8", errors="replace").splitlines()
+        try:
+            data = _io.read_bytes(file_path, authority)
+        except (OSError, FilesystemSafetyError):
+            continue
+        if _is_binary_bytes(data):
+            continue
+        lines = data.decode("utf-8", errors="replace").splitlines()
         for index, line in enumerate(lines):
             if not matcher(line):
                 continue
@@ -375,14 +389,15 @@ def stat_path(
     workspace_root: str | Path, path: str | Path, *, authority: Any = None
 ) -> dict[str, Any]:
     resolved = resolve_workspace_path(workspace_root, path, authority=authority)
-    if not resolved.exists():
+    if not _io.exists(resolved, authority):
         return {"status": "failed", "error": {"type": "not_found", "path": str(path)}}
+    info = _io.stat_info(resolved, authority)
     return {
         "status": "success",
         "path": _relative_path(workspace_root, resolved, authority=authority),
-        "is_file": resolved.is_file(),
-        "is_dir": resolved.is_dir(),
-        "size_bytes": resolved.stat().st_size,
+        "is_file": stat.S_ISREG(info.st_mode),
+        "is_dir": stat.S_ISDIR(info.st_mode),
+        "size_bytes": info.st_size,
     }
 
 
@@ -422,8 +437,8 @@ def proposed_write_snapshot(
     # than sitting in the Approvals inbox looking actionable.
     resolved = resolve_writable_workspace_path(workspace_root, path, authority=authority)
     before = (
-        resolved.read_text(encoding="utf-8")
-        if resolved.exists() and resolved.is_file() and is_text_file(resolved)
+        _io.read_text(resolved, authority)
+        if _io.exists(resolved, authority) and _io.is_file(resolved, authority) and is_text_file(resolved, authority=authority)
         else None
     )
     return {
@@ -439,12 +454,11 @@ def write_file_content(
     workspace_root: str | Path, path: str | Path, text: str, *, authority: Any = None
 ) -> dict[str, Any]:
     resolved = resolve_writable_workspace_path(workspace_root, path, authority=authority)
-    resolved.parent.mkdir(parents=True, exist_ok=True)
-    resolved.write_text(text, encoding="utf-8")
+    size = _io.write_text(resolved, text, authority)
     return {
         "status": "success",
         "path": _relative_path(workspace_root, resolved, authority=authority),
-        "size_bytes": resolved.stat().st_size,
+        "size_bytes": size,
     }
 
 
@@ -463,12 +477,12 @@ def _existing_text_target(
     workspace_root: str | Path, path: str | Path, *, authority: Any = None
 ) -> tuple[Path, str] | dict[str, Any]:
     resolved = resolve_writable_workspace_path(workspace_root, path, authority=authority)
-    if not resolved.exists() or not resolved.is_file():
+    if not _io.exists(resolved, authority) or not _io.is_file(resolved, authority):
         return _failure("not_found")
-    if not is_text_file(resolved):
+    if not is_text_file(resolved, authority=authority):
         return _failure("binary_file")
     try:
-        return resolved, resolved.read_text(encoding="utf-8")
+        return resolved, _io.read_text(resolved, authority)
     except UnicodeDecodeError:
         return _failure("binary_file")
     except OSError as exc:
@@ -850,11 +864,11 @@ def _patch_candidate(
         return parsed
     operation, hunks = parsed
     if operation == "create":
-        if resolved.exists():
+        if _io.exists(resolved, authority):
             return _failure("target_exists")
         before = ""
     else:
-        target = _existing_text_target(workspace_root, path)
+        target = _existing_text_target(workspace_root, path, authority=authority)
         if isinstance(target, dict):
             return target
         resolved, before = target
@@ -1021,12 +1035,14 @@ def _write_candidate(
         resolved, _before, proposed_text = candidate
         operation = "update"
     if operation == "delete":
-        resolved.unlink()
+        _io.unlink(resolved, authority)
         size_bytes = 0
     else:
-        resolved.parent.mkdir(parents=True, exist_ok=True)
-        resolved.write_text(proposed_text, encoding="utf-8")
-        size_bytes = resolved.stat().st_size
+        before = candidate.before if isinstance(candidate, _PatchCandidate) else candidate[1]
+        size_bytes = _io.write_text(
+            resolved, proposed_text, authority,
+            expected=before if operation == "update" else None,
+        )
     return {
         "status": "success",
         "path": _relative_path(workspace_root, resolved, authority=authority),
@@ -1069,36 +1085,38 @@ def apply_patch_content(
     if isinstance(candidates, dict):
         return candidates
     completed: list[_PatchCandidate] = []
+    receipts: list[dict[str, Any]] = []
     try:
         for candidate in candidates:
             result = _write_candidate(workspace_root, candidate, authority=authority)
             if result["status"] != "success":
                 raise OSError(str(result.get("error", {})))
             completed.append(candidate)
+            receipts.append(result)
     except Exception as exc:
+        rollback_failed: list[str] = []
         for candidate in reversed(completed):
-            if candidate.operation == "create":
-                candidate.path.unlink(missing_ok=True)
-            else:
-                candidate.path.parent.mkdir(parents=True, exist_ok=True)
-                candidate.path.write_text(candidate.before, encoding="utf-8")
-        return _failure("transaction_write_failed", message=str(exc))
+            try:
+                if candidate.operation == "create":
+                    _io.unlink(candidate.path, authority, missing_ok=True)
+                else:
+                    _io.write_text(candidate.path, candidate.before, authority)
+            except (OSError, FilesystemSafetyError):
+                rollback_failed.append(str(candidate.path))
+        return _failure("transaction_write_failed", message=str(exc), rollback_failed=rollback_failed)
     changes = [
         {
-            "path": _relative_path(workspace_root, item.path),
-            "size_bytes": 0 if item.operation == "delete" else item.path.stat().st_size,
+            "path": _relative_path(workspace_root, item.path, authority=authority),
+            "size_bytes": receipt["size_bytes"],
             "operation": item.operation,
         }
-        for item in candidates
+        for item, receipt in zip(candidates, receipts, strict=True)
     ]
     return {
         "status": "success",
         "path": changes[0]["path"],
         "paths": [item["path"] for item in changes],
-        "size_bytes": sum(
-            0 if item.operation == "delete" else item.path.stat().st_size
-            for item in candidates
-        ),
+        "size_bytes": sum(item["size_bytes"] for item in changes),
         "operation": changes[0]["operation"],
         "changes": changes,
     }

@@ -1325,6 +1325,7 @@ class PromoteTaskWorkspaceRequest(StrictRequest):
     created: list[str]
     modified: list[str]
     deleted: list[str]
+    review_revision: str = Field(min_length=64, max_length=64, pattern=r"^[0-9a-f]{64}$")
     #: BD-4 — conflicting paths the owner chose to overwrite after seeing both
     #: versions. Each must be a current conflict; any other conflict refuses.
     overwrite: list[str] = Field(default_factory=list)

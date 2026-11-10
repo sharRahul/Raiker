@@ -223,3 +223,65 @@ def test_failed_probe_grant_revocation_never_reports_available(tmp_path: Path) -
     proof = driver.probe()
     assert not proof.available
     assert proof.reason_code == "native_sandbox_probe_failed"
+
+
+@pytest.mark.parametrize(
+    "reason,boundary,expected",
+    [
+        ("native_sandbox_account_profile_isolation_unavailable", "restricted_account", "native_sandbox_account_profile_isolation_unavailable"),
+        ("attacker-controlled prose or secret", "restricted_account", "native_sandbox_not_enforced"),
+        (["native_sandbox_account_profile_isolation_unavailable"], "restricted_account", "native_sandbox_not_enforced"),
+        ("native_sandbox_account_profile_isolation_unavailable", "wsl_bubblewrap", "native_sandbox_not_enforced"),
+    ],
+)
+def test_probe_preserves_only_known_boundary_specific_refusals(
+    tmp_path: Path, reason: object, boundary: str, expected: str
+) -> None:
+    from tests.test_command_backends import _installed_runner
+
+    report = {"available": False, "boundary": boundary, "reason": reason, "observations": {}}
+    driver = NativeSandboxDriver(
+        tmp_path, helper_root=_installed_runner(tmp_path),
+        run_probe=lambda argv: subprocess.CompletedProcess(argv, 0, json.dumps(report), ""),
+    )
+    proof = driver.probe()
+    assert not proof.available
+    assert proof.reason_code == expected
+
+
+@pytest.mark.parametrize("headline_available", [False, True])
+def test_known_account_isolation_refusal_cannot_be_overruled_by_partial_measurements(
+    tmp_path: Path, headline_available: bool
+) -> None:
+    from tests.test_command_backends import _installed_runner
+
+    report = {
+        "available": headline_available, "boundary": "restricted_account",
+        "reason": "native_sandbox_account_profile_isolation_unavailable",
+        "observations": {name: "enforced" for name in (
+            "relay", "workspace_write", "escape_write", "masked_read", "egress",
+            "descendant_reaped", "loopback", "seccomp",
+        )},
+    }
+    driver = NativeSandboxDriver(
+        tmp_path, helper_root=_installed_runner(tmp_path),
+        run_probe=lambda argv: subprocess.CompletedProcess(argv, 0, json.dumps(report), ""),
+    )
+    proof = driver.probe()
+    assert not proof.available
+    assert proof.reason_code == "native_sandbox_account_profile_isolation_unavailable"
+    assert not proof.features.process_tree_stop
+
+
+@pytest.mark.parametrize("execution_available", [False, None, "true", True])
+def test_windows_account_setup_does_not_imply_execution_readiness(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, execution_available: object
+) -> None:
+    from raiker.execution.commands.backends import native as native_backend
+
+    monkeypatch.setattr(native_backend, "_on_windows", lambda: True)
+    report = {"configured": True, "execution_available": execution_available, "base": str(tmp_path / "copies")}
+    driver = NativeSandboxDriver(tmp_path, run_probe=lambda argv: subprocess.CompletedProcess(argv, 0, json.dumps(report), ""))
+    assert driver._account_base_uncached(tmp_path / "runner") == (
+        tmp_path / "copies" if execution_available is True else None
+    )

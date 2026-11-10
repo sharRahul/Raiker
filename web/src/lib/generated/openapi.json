@@ -27665,12 +27665,20 @@
             },
             "title": "Overwrite",
             "type": "array"
+          },
+          "review_revision": {
+            "maxLength": 64,
+            "minLength": 64,
+            "pattern": "^[0-9a-f]{64}$",
+            "title": "Review Revision",
+            "type": "string"
           }
         },
         "required": [
           "created",
           "modified",
-          "deleted"
+          "deleted",
+          "review_revision"
         ],
         "title": "PromoteTaskWorkspaceRequest",
         "type": "object"
@@ -34702,6 +34710,10 @@
             "title": "Path",
             "type": "string"
           },
+          "review_revision": {
+            "title": "Review Revision",
+            "type": "string"
+          },
           "status": {
             "enum": [
               "created",
@@ -34722,6 +34734,7 @@
         },
         "required": [
           "workspace_id",
+          "review_revision",
           "path",
           "status",
           "diff",
@@ -34888,6 +34901,10 @@
             "title": "Rejected",
             "type": "array"
           },
+          "review_revision": {
+            "title": "Review Revision",
+            "type": "string"
+          },
           "session_id": {
             "title": "Session Id",
             "type": "string"
@@ -34903,6 +34920,7 @@
         },
         "required": [
           "workspace_id",
+          "review_revision",
           "session_id",
           "source",
           "created_at",
@@ -42971,6 +42989,18 @@
               "maxLength": 4096,
               "minLength": 1,
               "title": "Path",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "review_revision",
+            "required": true,
+            "schema": {
+              "maxLength": 64,
+              "minLength": 64,
+              "pattern": "^[0-9a-f]{64}$",
+              "title": "Review Revision",
               "type": "string"
             }
           }

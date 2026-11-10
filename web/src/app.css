@@ -1772,9 +1772,9 @@ dialog li { font-size: var(--text-sm); line-height: 1.5; }
    Build ended up with two `.bar-select` definitions that had already drifted.
    One definition here, and every composer's controls read as the same control.
 
-   Each setting is a pill so a control reads as a control. Borderless, at body
-   weight, they ran the whole bar together as one line of prose; and a fixed
-   max-width stretched a select so its chevron floated far from its own label. */
+   Standalone selects retain their normal surface. Composer toolbars use the
+   quieter owner-requested treatment below; labels, weight and chevrons still
+   identify each control without a separate capsule around every one. */
 .bar-select {
   border: 1px solid var(--neutral-border);
   background: var(--surface);
@@ -1809,6 +1809,59 @@ dialog li { font-size: var(--text-sm); line-height: 1.5; }
   align-items: center;
   gap: 0.25rem;
   min-width: 0;
+}
+
+/* Owner decision, 2026-11-10: secondary composer controls have no resting
+   capsule. Transparent borders preserve their geometry and touch targets.
+   This is deliberately scoped to the toolbar: popup panels, primary actions,
+   attachment chips and controls elsewhere in the app keep their own grammar. */
+:is(.composer-card .composer-bar, .home-composer-tools, .quick-entry .row)
+  :is(.action-trigger, .mode-trigger, .profile > .chip, .model-trigger,
+      .approval-trigger, .composer-attach > .round-btn, .voice-button,
+      .bar-select, .talk-button, .composer-control, .model-scope, .send-to select) {
+  border-color: transparent;
+  background: transparent;
+  box-shadow: none;
+}
+:is(.composer-card .composer-bar, .home-composer-tools, .quick-entry .row)
+  :is(.action-trigger, .mode-trigger, .profile > .chip, .model-trigger,
+      .approval-trigger, .composer-attach > .round-btn, .voice-button,
+      .bar-select, .talk-button, .composer-control, .model-scope, .send-to select):hover:not(:disabled) {
+  background: var(--sunken);
+}
+:is(.composer-card .composer-bar, .home-composer-tools, .quick-entry .row)
+  :is(.action-trigger, .mode-trigger, .profile > .chip, .model-trigger,
+      .approval-trigger, .composer-attach > .round-btn, .voice-button,
+      .bar-select, .talk-button, .composer-control, .model-scope, .send-to select):is([aria-expanded="true"], .active) {
+  background: var(--accent-soft);
+}
+:is(.composer-card .composer-bar, .home-composer-tools, .quick-entry .row)
+  .approval-trigger.skip-mode {
+  background: var(--warn-soft);
+}
+:is(.composer-card .composer-bar, .home-composer-tools, .quick-entry .row)
+  :is(.action-trigger, .mode-trigger, .profile > .chip, .model-trigger,
+      .approval-trigger, .composer-attach > .round-btn, .voice-button,
+      .bar-select, .talk-button, .composer-control, .model-scope, .send-to select):focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+/* Match the compact composer's intended icon targets even when a lazy-loaded
+   picker's own minimum width would otherwise win the cascade. */
+@media (max-width: 63.9rem) {
+  .composer-card .composer-bar .model-trigger,
+  .composer-card .composer-bar .profile > .chip {
+    width: 2.75rem;
+    min-width: 2.75rem;
+    height: 2.75rem;
+    padding: 0;
+    justify-content: center;
+  }
+  .composer-card .composer-bar .profile > .chip > span,
+  .composer-card .composer-bar .profile > .chip > svg:last-child {
+    display: none;
+  }
 }
 
 /* ── Desktop window chrome (DESK-06) ──

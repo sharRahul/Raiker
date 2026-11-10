@@ -133,6 +133,7 @@ class TaskWorkspaceView(TypedDict):
     """
 
     workspace_id: str
+    review_revision: str
     session_id: str
     source: str
     created_at: float
@@ -158,6 +159,7 @@ class TaskWorkspaceFileDiff(TypedDict):
     """
 
     workspace_id: str
+    review_revision: str
     path: str
     status: Literal["created", "modified", "deleted"]
     diff: str

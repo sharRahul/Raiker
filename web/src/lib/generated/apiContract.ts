@@ -5332,6 +5332,7 @@ export type PromoteTaskWorkspaceRequest = {
   created: string[];
   modified: string[];
   deleted: string[];
+  review_revision: string;
   overwrite?: string[];
 };
 
@@ -6683,6 +6684,7 @@ export type TaskWorkspaceDiscarded = {
 /** One changed file of a copy, as a unified diff against the project. */
 export type TaskWorkspaceFileDiff = {
   workspace_id: string;
+  review_revision: string;
   path: string;
   status: "created" | "modified" | "deleted";
   diff: string;
@@ -6718,6 +6720,7 @@ export type TaskWorkspaceUndone = {
 /** A session's disposable copy and what its commands changed in it. */
 export type TaskWorkspaceView = {
   workspace_id: string;
+  review_revision: string;
   session_id: string;
   source: string;
   created_at: number;
@@ -7583,7 +7586,7 @@ export const contract = {
     call<CommandSandboxView>("POST", "/api/command-sandbox/wsl/setup", { body }),
   listTaskWorkspaces: () =>
     request<TaskWorkspaceList>("/api/command-workspaces"),
-  taskWorkspaceFileDiff: (workspaceId: string, query: { path: string }) =>
+  taskWorkspaceFileDiff: (workspaceId: string, query: { path: string; review_revision: string }) =>
     request<TaskWorkspaceFileDiff>(withQuery(`/api/command-workspaces/${encodeURIComponent(workspaceId)}/diff`, query)),
   discardTaskWorkspace: (workspaceId: string) =>
     call<TaskWorkspaceDiscarded>("POST", `/api/command-workspaces/${encodeURIComponent(workspaceId)}/discard`),

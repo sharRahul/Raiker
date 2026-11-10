@@ -29,6 +29,7 @@ Design invariants:
 from __future__ import annotations
 
 import hashlib
+import os
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -145,6 +146,20 @@ class CheckpointCaptureService:
         # else is qualified by its root, because a relative path is not an
         # address once there is more than one.
         rel = encode_root_path(resolved_path)
+        from raiker.tools import task_tree_io
+
+        if task_tree_io.copy_root(resolved, authority) is not None:
+            try:
+                with task_tree_io.reader(resolved, authority) as handle:
+                    size = os.fstat(handle.fileno()).st_size
+                    data = handle.read(self.max_bytes + 1) if size <= self.max_bytes else None
+            except FileNotFoundError:
+                return PreImage(capability, rel, False, 0, None, STATUS_ABSENT)
+            except (OSError, FilesystemSafetyError):
+                return None
+            if data is None or len(data) > self.max_bytes:
+                return PreImage(capability, rel, True, size, None, STATUS_OVERSIZE)
+            return PreImage(capability, rel, True, len(data), data, STATUS_CAPTURED)
         io_resolved = internal_io_path(resolved)
 
         if not (io_resolved.exists() and io_resolved.is_file()):

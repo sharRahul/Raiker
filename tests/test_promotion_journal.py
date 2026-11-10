@@ -102,12 +102,12 @@ _CHILD = textwrap.dedent(
     real_copy = workspaces._copy_file
     copied = {"n": 0}
 
-    def dying_copy(source, target):
+    def dying_copy(source, target, **kwargs):
         if str(target).endswith(".raiker-promote"):
             copied["n"] += 1
             if copied["n"] == 4:
                 os._exit(9)  # after project writes, never during backup
-        return real_copy(source, target)
+        return real_copy(source, target, **kwargs)
 
     workspaces._copy_file = dying_copy
     workspaces.promote(workspace, workspaces.diff_workspace(workspace), journal_dir=journal)

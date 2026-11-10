@@ -15,6 +15,8 @@ import contextlib
 import hashlib
 import json
 from collections.abc import Sequence
+from datetime import datetime
+from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from sqlcipher3 import dbapi2 as sqlite3  # type: ignore[import-untyped]
@@ -1108,9 +1110,62 @@ class ConversationStore:
                 ],
             )
 
+    def memory_context_ids_for_sessions(
+        self: SQLiteStore, session_ids: Sequence[str], *, owner_principal_id: str,
+    ) -> list[str]:
+        """Dependencies of recalled history, including earlier indirect recall.
+
+        IDs are provenance, never additional memory text to expose. Keep absent
+        memory rows too: a purge must not break the dependency chain.
+        """
+        ids = list(dict.fromkeys(session_ids))
+        found: set[str] = set()
+        for start in range(0, len(ids), 200):
+            chunk = ids[start:start + 200]
+            marks = ",".join("?" for _ in chunk)
+            rows = self._rows(
+                f"""SELECT memory_id FROM turn_recalls
+                    WHERE principal_id = ? AND session_id IN ({marks})
+                    UNION SELECT memory_id FROM approved_memory
+                    WHERE owner_principal_id = ? AND json_extract(
+                        CASE WHEN json_valid(provenance_json) THEN provenance_json ELSE '{{}}' END,
+                        '$.source_session_id') IN ({marks})""",
+                (owner_principal_id, *chunk, owner_principal_id, *chunk),
+            )
+            found.update(str(row["memory_id"]) for row in rows)
+        return sorted(found)
+
     def sessions_with_stale_memory_context(
         self: SQLiteStore, session_ids: Sequence[str], *, owner_principal_id: str | None = None,
+        diagnostics: dict[str, object] | None = None,
     ) -> set[str]:
+        ids = list(dict.fromkeys(session_ids))
+        stale, restricted = self._direct_stale_memory_context(ids, owner_principal_id=owner_principal_id)
+        journal_restricted, deleted_sources, legacy_cutoff, indeterminate = self._memory_deletion_evidence(owner_principal_id)
+        restricted = restricted or journal_restricted
+        if not restricted and not stale:
+            return stale
+        graph, uncertain = self._memory_context_graph(ids, owner_principal_id=owner_principal_id)
+        direct, _ = self._direct_stale_memory_context(list(graph), owner_principal_id=owner_principal_id)
+        direct.update(deleted_sources & graph.keys())
+        if indeterminate:
+            uncertain.update(graph)
+        elif legacy_cutoff is not None:
+            for key in graph:
+                session = self.load_session(key)
+                created = self._memory_context_time(session.get("created_at")) if session else None
+                if created is None or created <= legacy_cutoff:
+                    uncertain.add(key)
+        affected = stale | self._affected_memory_context_roots(ids, graph, direct | uncertain)
+        if diagnostics is not None and affected and (indeterminate or legacy_cutoff is not None):
+            diagnostics["history_withheld_reason"] = (
+                "memory_deletion_provenance_unreadable" if indeterminate else "untraceable_legacy_memory_purge"
+            )
+        return affected
+
+    def _direct_stale_memory_context(
+        self: SQLiteStore, session_ids: Sequence[str], *, owner_principal_id: str | None = None,
+    ) -> tuple[set[str], bool]:
         """Ambient history must not revive a memory through its source or answers.
 
         The candidate ids have already been owner/project scoped by recall.
@@ -1118,7 +1173,7 @@ class ConversationStore:
         """
         ids = list(dict.fromkeys(session_ids))
         if not ids:
-            return set()
+            return set(), False
         marks = ",".join("?" for _ in ids)
         unavailable = """m.deleted_at IS NOT NULL OR m.archived_at IS NOT NULL
             OR m.approval_state != 'approved' OR m.search_enabled = 0
@@ -1152,7 +1207,207 @@ class ConversationStore:
                     OR {edit}))""",
             (*ids, *owner_params, now, now, now, *ids, *owner_params, now, now, now),
         )
-        return {str(row["session_id"]) for row in rows}
+        stale = {str(row["session_id"]) for row in rows}
+        # A legacy answer may already have copied memory through ambient
+        # history without a turn_recalls row. We cannot reconstruct those
+        # absent edges. Restriction evidence activates a conservative barrier
+        # for that positively identified, untracked context only.
+        restriction = self._row(
+            f"""SELECT 1 FROM approved_memory m WHERE 1=1{source_owner}
+                AND ({unavailable} OR COALESCE(m.updated_at, m.created_at) > m.created_at
+                     OR {edit})) LIMIT 1""",
+            (*owner_params, now, now, now),
+        )
+        return stale, restriction is not None
+
+    @staticmethod
+    def _memory_context_time(value: object) -> datetime | None:
+        try:
+            parsed = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+            return parsed if parsed.tzinfo is not None else None
+        except ValueError:
+            return None
+
+    def _memory_deletion_evidence(self: SQLiteStore, owner: str | None) -> tuple[bool, set[str], datetime | None, bool]:
+        """Purge removes the row; its content-free deletion journal survives.
+
+        Bounded reads. A damaged/oversized journal cannot certify old unknown
+        context as safe. Ownerless old tombstones cannot establish ownership.
+        """
+        from raiker.storage.deletion_journal import journal_path
+
+        # Typed content-free purge audits are written in the same transaction
+        # as row removal, covering a failed external journal append locally.
+        audits = self._rows(
+            "SELECT details_json,created_at FROM memory_lifecycle_audit WHERE action='purge' "
+            "AND json_extract(CASE WHEN json_valid(details_json) THEN details_json ELSE '{}' END, '$.memory_provenance_version')=1"
+            + (" AND (actor_id=? OR actor_id='')" if owner else "") + " LIMIT 4097",
+            (owner,) if owner else (),
+        )
+        sources: set[str] = set()
+        cutoff: datetime | None = None
+        restricted = bool(audits)
+        if len(audits) > 4096:
+            return True, sources, cutoff, True
+        for row in audits:
+            details = json.loads(row["details_json"])
+            source = details.get("source_session_id")
+            if isinstance(source, str):
+                if source:
+                    sources.add(source)
+            else:
+                at = self._memory_context_time(row["created_at"])
+                if at is None:
+                    return True, sources, cutoff, True
+                cutoff = max(cutoff, at) if cutoff is not None else at
+        try:
+            with journal_path(self.paths.workspace_root).open("rb") as handle:
+                raw = handle.read(1024 * 1024 + 1)
+        except FileNotFoundError:
+            return restricted, sources, cutoff, False
+        except OSError:
+            return True, set(), None, True
+        if len(raw) > 1024 * 1024:
+            return True, set(), None, True
+        for line in raw.splitlines():
+            try:
+                entry = json.loads(line)
+                if not isinstance(entry, dict):
+                    return True, sources, cutoff, True
+                if entry.get("kind") in {"memory_forget", "memory_purge"} and (
+                    not owner or not entry.get("owner") or entry.get("owner") == owner
+                ):
+                    restricted = True
+                    source = entry.get("source_session_id")
+                    if isinstance(source, str):
+                        if source:
+                            sources.add(source)
+                    elif entry.get("kind") == "memory_purge":
+                        at = self._memory_context_time(entry.get("at"))
+                        if at is None:
+                            return True, sources, cutoff, True
+                        cutoff = max(cutoff, at) if cutoff is not None else at
+            except (ValueError, UnicodeError):
+                return True, sources, cutoff, True
+        return restricted, sources, cutoff, False
+
+    def sessions_with_untracked_memory_context(
+        self: SQLiteStore, ids: Sequence[str], *, owner_principal_id: str | None = None,
+    ) -> set[str]:
+        graph, uncertain = self._memory_context_graph(ids, owner_principal_id=owner_principal_id)
+        return self._affected_memory_context_roots(ids, graph, uncertain)
+
+    @staticmethod
+    def _affected_memory_context_roots(ids: Sequence[str], graph: dict[str, set[str]], unsafe: set[str]) -> set[str]:
+        """Evaluate the cached graph once; cycles are indeterminate provenance."""
+        active: set[str] = set()
+        memo: dict[str, bool] = {}
+
+        def affected(key: str) -> bool:
+            if key in unsafe or key in active:
+                return True
+            if key in memo:
+                return memo[key]
+            active.add(key)
+            result = any(affected(child) for child in graph.get(key, set()))
+            active.remove(key)
+            memo[key] = result
+            return result
+
+        return {key for key in ids if affected(key)}
+
+    def _memory_context_graph(
+        self: SQLiteStore, ids: Sequence[str], *, owner_principal_id: str | None = None,
+    ) -> tuple[dict[str, set[str]], set[str]]:
+        """At most 128 graph nodes, 64 events/node, 64 KiB/line, 4 MiB total.
+
+        Only the expected local event file is opened; index metadata, line
+        hash and event identity must agree. Missing/corrupt provenance fails
+        closed. Sessions with no context event or no ambient-memory source
+        remain available, as do complete new events backed by the recall ledger.
+        """
+        uncertain: set[str] = set()
+        graph: dict[str, set[str]] = {}
+        pending = list(dict.fromkeys(ids))
+        scheduled = set(pending)
+        events_root = self.paths.events_dir.resolve()
+        remaining_bytes = 4 * 1024 * 1024
+        owner_user = self.principal_user_id(owner_principal_id) if owner_principal_id else None
+        while pending:
+            session_id = pending.pop()
+            graph[session_id] = set()
+            session = self.load_session(session_id)
+            if len(graph) > 128 or session is None or (owner_user and session.get("user_id") != owner_user):
+                uncertain.add(session_id)
+                continue
+            rows = self._rows(
+                "SELECT * FROM events_index WHERE session_id = ? AND event_type = 'context_gathered' LIMIT 65",
+                (session_id,),
+            )
+            if len(rows) > 64:
+                uncertain.add(session_id)
+                continue
+            for row in rows:
+                try:
+                    expected = (events_root / f"{session_id}.jsonl").resolve()
+                    path = Path(str(row["jsonl_path"])).resolve()
+                    if expected.parent != events_root or path != expected:
+                        raise ValueError("context_event_path")
+                    offset = row["jsonl_offset"]
+                    if not isinstance(offset, int) or offset < 0:
+                        raise ValueError("context_event_offset")
+                    if remaining_bytes <= 0:
+                        raise ValueError("context_event_read_budget")
+                    with path.open("rb") as handle:
+                        handle.seek(offset)
+                        raw = handle.readline(min(65537, remaining_bytes))
+                    remaining_bytes -= len(raw)
+                    if len(raw) > 65536 or not raw.endswith(b"\n"):
+                        raise ValueError("context_event_size")
+                    if hashlib.sha256(raw.strip()).hexdigest() != row["payload_sha256"]:
+                        raise ValueError("context_event_hash")
+                    event = json.loads(raw)
+                    if any(event.get(key) != row[key] for key in ("event_id", "session_id", "turn_id", "event_type")):
+                        raise ValueError("context_event_identity")
+                    payload = event["payload"]
+                    if "memory_recall" not in payload.get("source_types", []):
+                        continue
+                    if (payload.get("memory_provenance_version") != 1
+                        or payload.get("memory_provenance_complete") is not True
+                        or not isinstance(payload.get("recalled_session_ids"), list)):
+                        raise ValueError("legacy_memory_provenance")
+                    memory_ids = payload.get("recalled_memory_ids")
+                    if not isinstance(memory_ids, list):
+                        raise ValueError("memory_provenance_ids")
+                    recorded = self._rows(
+                        "SELECT memory_id FROM turn_recalls WHERE session_id = ? AND turn_id = ?"
+                        + (" AND principal_id = ?" if owner_principal_id else ""),
+                        (session_id, row["turn_id"], *((owner_principal_id,) if owner_principal_id else ())),
+                    )
+                    if not set(memory_ids) <= {r["memory_id"] for r in recorded}:
+                        raise ValueError("missing_memory_ledger")
+                    dependencies = payload["recalled_session_ids"]
+                    scope = payload.get("recalled_session_scope", {})
+                    if len(dependencies) > 128 or (dependencies and scope.get("surface") not in {"chat", "build"}):
+                        raise ValueError("context_dependency_scope")
+                    for dependency in dependencies:
+                        if not isinstance(dependency, str) or not dependency:
+                            raise ValueError("context_dependency_id")
+                        source = self.load_session(dependency)
+                        if source is None or source.get("user_id") != session.get("user_id"):
+                            raise ValueError("context_dependency_owner")
+                        if scope.get("surface") == "build" and (not scope.get("project_id") or source.get("project_id") != scope["project_id"]):
+                            raise ValueError("context_dependency_project")
+                        if dependency not in scheduled:
+                            if len(scheduled) >= 128:
+                                raise ValueError("context_dependency_budget")
+                            scheduled.add(dependency)
+                            pending.append(dependency)
+                        graph[session_id].add(dependency)
+                except (OSError, ValueError, TypeError, KeyError, AttributeError):
+                    uncertain.add(session_id)
+                    break
+        return graph, uncertain
 
     def load_turn_recall(
         self: SQLiteStore, session_id: str, principal_id: str, turn_id: str | None = None

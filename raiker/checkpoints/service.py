@@ -76,6 +76,7 @@ class CheckpointService:
         edits live; the project file has not changed.
         """
         resolved = self.store.paths.workspace_root / workspace_path
+        authority = None
         if session_id and ":" not in workspace_path:
             from raiker.execution.task_tree import authority_for_action
             from raiker.tools.filesystem import FilesystemSafetyError
@@ -90,7 +91,12 @@ class CheckpointService:
                     return (False, None, 0)
         if not (resolved.exists() and resolved.is_file()):
             return (False, None, 0)
-        data = resolved.read_bytes()
+        from raiker.tools.task_tree_io import read_bytes
+
+        try:
+            data = read_bytes(resolved, authority)
+        except (OSError, ValueError):
+            return (False, None, 0)
         return (True, hashlib.sha256(data).hexdigest(), len(data))
 
     def compute_restore_plan(

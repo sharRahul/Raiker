@@ -27,6 +27,7 @@ from __future__ import annotations
 import contextlib
 import json
 import os
+import re
 from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
@@ -75,15 +76,18 @@ def journal_path(workspace_root: str | Path) -> Path:
 
 
 def record_deletion(
-    workspace_root: str | Path, kind: str, object_id: str, owner_principal_id: str | None = None
+    workspace_root: str | Path, kind: str, object_id: str, owner_principal_id: str | None = None,
+    *, source_session_id: str | None = None,
 ) -> None:
     """Append one deletion. Never raises: the deletion itself has already happened."""
     if kind not in KINDS or not object_id:
         return
-    line = json.dumps(
-        {"kind": kind, "id": object_id, "owner": owner_principal_id or "", "at": utc_now()},
-        separators=(",", ":"),
-    )
+    entry = {"kind": kind, "id": object_id, "owner": owner_principal_id or "", "at": utc_now()}
+    if kind in {MEMORY_FORGET, MEMORY_PURGE} and source_session_id is not None and re.fullmatch(r"[A-Za-z0-9_.-]{0,200}", source_session_id) and source_session_id not in {".", ".."}:
+        # Content-free causal identity only. Empty means known no source;
+        # missing means a legacy deletion did not preserve provenance.
+        entry["source_session_id"] = source_session_id
+    line = json.dumps(entry, separators=(",", ":"))
     with contextlib.suppress(OSError):
         path = journal_path(workspace_root)
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -99,6 +103,7 @@ class Deletion:
     object_id: str
     owner: str
     at: str
+    source_session_id: str | None = None
 
 
 def read_deletions(workspace_root: str | Path, *, after: str = "") -> list[Deletion]:
@@ -114,7 +119,8 @@ def read_deletions(workspace_root: str | Path, *, after: str = "") -> list[Delet
     for raw in path.read_text(encoding="utf-8", errors="replace").splitlines():
         try:
             data: dict[str, Any] = json.loads(raw)
-            entry = Deletion(str(data["kind"]), str(data["id"]), str(data.get("owner", "")), str(data["at"]))
+            source = data.get("source_session_id")
+            entry = Deletion(str(data["kind"]), str(data["id"]), str(data.get("owner", "")), str(data["at"]), source if isinstance(source, str) else None)
         except (ValueError, KeyError, TypeError):
             continue
         # At or after: a deletion in the same instant as the backup may or may

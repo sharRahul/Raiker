@@ -936,6 +936,46 @@
       "owner": "Raiker maintainers",
       "reason": "A provider's public OAuth token endpoint, its host or the name of an environment variable, not a credential",
       "expires": "2027-05-08"
+    },
+    {
+      "path": "raiker/storage/stores/conversations.py",
+      "rule": "S608",
+      "fingerprint": "450d6a8128b918dc",
+      "owner": "Raiker maintainers",
+      "reason": "Recall-graph lookup interpolates only a count-derived list of question-mark placeholders; the principal and session IDs are bound parameters",
+      "expires": "2027-05-10"
+    },
+    {
+      "path": "raiker/storage/stores/conversations.py",
+      "rule": "S608",
+      "fingerprint": "88f0b755c4b581c7",
+      "owner": "Raiker maintainers",
+      "reason": "Legacy-context restriction check interpolates only fixed SQL fragments (provenance, lifecycle-audit EXISTS, optional owner clause); the owner ID and timestamps are bound parameters",
+      "expires": "2027-05-10"
+    },
+    {
+      "path": "raiker/storage/stores/conversations.py",
+      "rule": "S608",
+      "fingerprint": "e7c877e904dd040c",
+      "owner": "Raiker maintainers",
+      "reason": "Purge-audit query appends only a fixed owner clause; the owner ID is a bound parameter",
+      "expires": "2027-05-10"
+    },
+    {
+      "path": "raiker/storage/stores/conversations.py",
+      "rule": "S608",
+      "fingerprint": "2bf7011079f7556d",
+      "owner": "Raiker maintainers",
+      "reason": "Turn-recall verification appends only a fixed principal clause; session, turn and principal IDs are bound parameters",
+      "expires": "2027-05-10"
+    },
+    {
+      "path": "raiker/storage/stores/memory.py",
+      "rule": "S608",
+      "fingerprint": "d7e81a5ff1f9de05",
+      "owner": "Raiker maintainers",
+      "reason": "Memory deletion/purge source lookup appends only a fixed owner clause; the memory and owner IDs are bound parameters",
+      "expires": "2027-05-10"
     }
   ]
 }

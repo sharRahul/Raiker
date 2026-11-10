@@ -60,9 +60,20 @@
       return;
     }
     try {
-      workspaces = (await api.taskWorkspaces()).workspaces;
-    } catch {
+      const next = (await api.taskWorkspaces()).workspaces;
+      const previous = new Map(workspaces.map((item) => [item.workspace_id, item.review_revision]));
+      overwrite = Object.fromEntries(next.map((item) => [item.workspace_id,
+        previous.get(item.workspace_id) === item.review_revision ? (overwrite[item.workspace_id] ?? []) : [],
+      ]));
+      if (shown && !next.some((item) => item.workspace_id === shown?.workspace_id && item.review_revision === shown?.review_revision)) {
+        open = null;
+        shown = null;
+      }
+      workspaces = next;
+    } catch (e) {
       workspaces = [];
+      const reason = e instanceof ApiError ? (e.reasonCode ?? "") : "";
+      notice = { kind: "error", text: REFUSALS[reason] ?? "The sandbox changes could not be read. Try refreshing the review." };
     }
   }
 
@@ -90,9 +101,14 @@
   });
 
   const REFUSALS: Record<string, string> = {
-    workspace_review_stale: "The copy changed after you looked. Review the new list and apply again.",
+    workspace_review_stale: "The copy or project changed after you looked. Review the new changes and apply again.",
+    workspace_review_required: "Refresh the sandbox changes to review their current revision before applying.",
     workspace_promotion_conflict: "A file changed in your project since the copy was made. Nothing was applied. Compare it below and choose Overwrite, or Discard the copy.",
     workspace_in_use: "A command is still running in this copy. Wait for it to finish.",
+    workspace_path_busy: "A file or folder is in use. Close the other program using it, then review and try again.",
+    workspace_path_unsafe: "A file or folder is an unsafe link or special file. Review or discard the copy before trying again.",
+    workspace_promotion_handles_unavailable: "Safe sandbox review, Apply and Undo are unavailable on this platform. Keep the copy and use a supported Windows or Linux host.",
+    workspace_rollback_incomplete: "Apply stopped and restoration could not finish. Recovery backups are kept. Free space or release locked files, then restart Raiker to recover.",
   };
 
   async function toggle(item: TaskWorkspaceView, path: string) {
@@ -105,10 +121,12 @@
     shown = null;
     diffError = "";
     try {
-      const answer = await api.taskWorkspaceFileDiff(item.workspace_id, path);
-      if (open === key) shown = answer;
-    } catch {
-      if (open === key) diffError = "This file's changes could not be read.";
+      const answer = await api.taskWorkspaceFileDiff(item.workspace_id, path, item.review_revision);
+      if (open === key && answer.review_revision === item.review_revision) shown = answer;
+    } catch (e) {
+      const reason = e instanceof ApiError ? (e.reasonCode ?? "") : "";
+      if (open === key) diffError = REFUSALS[reason] ?? "This file's changes could not be read.";
+      if (reason === "workspace_review_stale") await load();
     }
   }
 
@@ -145,6 +163,7 @@
         created: item.created,
         modified: item.modified,
         deleted: item.deleted,
+        review_revision: item.review_revision,
         overwrite: replaced,
       });
       notice = { kind: "ok", text: `Applied to ${item.source}.` };
@@ -182,7 +201,7 @@
         text:
           reason === "workspace_undo_conflict"
             ? "A file the Apply wrote has changed since, so nothing was undone. Your later edits are kept."
-            : "The Apply could not be undone. Your project is unchanged.",
+            : (REFUSALS[reason] ?? "The Apply could not be undone. Refresh the review and try again."),
       };
       if (reason === "workspace_undo_conflict" || reason === "workspace_promotion_not_undoable") lastApply = null;
     } finally {

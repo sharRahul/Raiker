@@ -128,11 +128,29 @@ class ContextBundle(View):
             # key contributes nothing instead of raising mid-turn.
             recalled = item.metadata.get("memory_ids")
             if not isinstance(recalled, list):
-                continue
+                recalled = []
+            inherited = item.metadata.get("inherited_memory_ids")
+            if isinstance(inherited, list):
+                recalled = [*recalled, *inherited]
             for memory_id in recalled:
                 text = str(memory_id)
                 if text and text not in ids:
                     ids.append(text)
+        return ids
+
+    def recalled_session_ids(self) -> list[str]:
+        """Session dependencies of the ambient context that survived budgeting."""
+        ids: list[str] = []
+        for item in self.included_items:
+            if item.source.source_type != "memory_recall":
+                continue
+            sessions = item.metadata.get("session_ids")
+            if not isinstance(sessions, list):
+                continue
+            for session_id in sessions:
+                value = str(session_id)
+                if value and value not in ids:
+                    ids.append(value)
         return ids
 
     def event_payload(self) -> dict[str, object]:
@@ -140,6 +158,19 @@ class ContextBundle(View):
 
         included = self.included_items
         return {
+            "history_withheld_count": self.history_withheld_count(),
+            "history_withheld_reason": self.history_withheld_reason(),
+            "memory_provenance_version": 1,
+            "memory_provenance_complete": all(
+                item.metadata.get("memory_provenance_complete") is True
+                for item in included if item.source.source_type == "memory_recall"
+            ),
+            "recalled_session_ids": self.recalled_session_ids(),
+            "recalled_session_scope": next((
+                {"surface": str(item.metadata.get("surface") or "chat"),
+                 "project_id": str(item.metadata.get("project_id") or "")}
+                for item in included if item.source.source_type == "memory_recall"
+            ), {}),
             "recalled_memory_ids": self.recalled_memory_ids(),
             "bundle_id": self.bundle_id,
             "context_bundle_id": self.bundle_id,
@@ -152,6 +183,24 @@ class ContextBundle(View):
             "sources": list(self.sources),
             "memory_disclosure": self.disclosure(),
         }
+
+    def history_withheld_count(self) -> int:
+        count = 0
+        for item in self.included_items:
+            value = item.metadata.get("history_withheld_count")
+            if item.source.source_type == "memory_recall" and isinstance(value, int):
+                count += max(0, value)
+        return count
+
+    def history_withheld_reason(self) -> str:
+        if not self.history_withheld_count():
+            return ""
+        for item in self.included_items:
+            if item.source.source_type == "memory_recall":
+                reason = item.metadata.get("history_withheld_reason")
+                if isinstance(reason, str) and reason:
+                    return reason
+        return "stale_or_unverified_memory_context"
 
     def disclosure(self) -> dict[str, object]:
         """The disclosure, with counts taken from what the budget let in.
@@ -169,6 +218,8 @@ class ContextBundle(View):
                 counts[kind] = len(ids) if isinstance(ids, list) else 0
         return {
             **self.memory_disclosure,
+            "history_withheld_count": self.history_withheld_count(),
+            "history_withheld_reason": self.history_withheld_reason(),
             "brief_count": counts["memory_brief"],
             "recall_count": counts["memory_recall"],
         }

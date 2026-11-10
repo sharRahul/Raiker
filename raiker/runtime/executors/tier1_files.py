@@ -5,14 +5,12 @@ from typing import TYPE_CHECKING, Any
 
 from raiker.execution.task_tree import authority_for_action
 from raiker.runtime.executors.base import ExecutionResult
-from raiker.storage.internal_paths import internal_io_path
 from raiker.tools.filesystem import (
     apply_patch_content,
     edit_options,
     replace_text_content,
-    resolve_writable_workspace_path,
+    write_file_content,
 )
-from raiker.tools.path_authority import PathAuthority
 
 if TYPE_CHECKING:
     from raiker.runtime.authority.models import Principal
@@ -65,23 +63,16 @@ class FileWriteExecutor:
                     artifacts={"path": result["path"], "size_bytes": result["size_bytes"]},
                 )
             text = str(action.arguments.get("text", ""))
-            resolved = resolve_writable_workspace_path(
-                self._workspace_root, path, authority=authority
-            )
-            io_resolved = internal_io_path(resolved)
-            io_resolved.parent.mkdir(parents=True, exist_ok=True)
-            io_resolved.write_text(text, encoding="utf-8")
+            result = write_file_content(self._workspace_root, path, text, authority=authority)
             # `relative_to(self._workspace_root)` raises for a path in an
             # attached root, which would turn a successful write into a crash
             # while it reported itself. Ask the authority what the file is
             # called instead; for a workspace file that is the same string.
-            rel = (
-                authority or PathAuthority(self._workspace_root)
-            ).resolve_read(resolved).display
+            rel = result["path"]
             return ExecutionResult(
                 ok=True, capability=self.capability, action_id=action.action_id,
-                summary=f"Wrote {io_resolved.stat().st_size} bytes to {rel}.",
-                artifacts={"path": rel, "size_bytes": io_resolved.stat().st_size},
+                summary=f"Wrote {result['size_bytes']} bytes to {rel}.",
+                artifacts={"path": rel, "size_bytes": result["size_bytes"]},
             )
         except Exception as exc:
             return ExecutionResult(

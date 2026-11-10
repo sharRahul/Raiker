@@ -762,11 +762,11 @@ export const api = {
     contract.discardCredentialDelta(runId, { decision_id: decisionId }),
   // Sandbox copies: nothing a command wrote is in the project until promoted.
   taskWorkspaces: () => contract.listTaskWorkspaces(),
-  taskWorkspaceFileDiff: (workspaceId: string, path: string) =>
-    contract.taskWorkspaceFileDiff(workspaceId, { path }),
+  taskWorkspaceFileDiff: (workspaceId: string, path: string, reviewRevision: string) =>
+    contract.taskWorkspaceFileDiff(workspaceId, { path, review_revision: reviewRevision }),
   promoteTaskWorkspace: (
     workspaceId: string,
-    reviewed: { created: string[]; modified: string[]; deleted: string[]; overwrite?: string[] },
+    reviewed: { created: string[]; modified: string[]; deleted: string[]; review_revision: string; overwrite?: string[] },
   ) => contract.promoteTaskWorkspace(workspaceId, { overwrite: [], ...reviewed }),
   discardTaskWorkspace: (workspaceId: string) => contract.discardTaskWorkspace(workspaceId),
   // SB-5 — put the project back as it was before an Apply.

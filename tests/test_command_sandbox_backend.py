@@ -7,6 +7,7 @@ closed: the probe measures WSL2 and commands refuse.
 
 from __future__ import annotations
 
+import hashlib
 import json
 import subprocess
 from pathlib import Path
@@ -53,11 +54,13 @@ def _driver(
     monkeypatch.setattr(native_backend, "_on_windows", lambda: True)
     workspace = tmp_path / "ws"
     workspace.mkdir(exist_ok=True)
+    helper = _bundled(tmp_path)
+    linux_digest = hashlib.sha256((helper.parent / "wsl-x86_64" / "raiker-command-runner").read_bytes()).hexdigest()
 
     def run(argv: list[str]) -> subprocess.CompletedProcess[str]:
         seen.append(argv)
         if "--wsl-status" in argv:
-            body: dict[str, Any] = {"configured": True, "base": str(tmp_path / "wsl-copies")}
+            body: dict[str, Any] = {"configured": True, "base": str(tmp_path / "wsl-copies"), "runner_sha256": linux_digest}
         elif "--account-status" in argv:
             body = {"configured": True, "base": str(tmp_path / "account-copies")}
         elif "--probe" in argv:
@@ -68,7 +71,7 @@ def _driver(
 
     native_backend._ACCOUNT_BASE_CACHE.clear()
     return native_backend.NativeSandboxDriver(
-        workspace, helper_root=_installed_runner(tmp_path), run_probe=run
+        workspace, helper_root=helper, run_probe=run
     )
 
 
@@ -106,6 +109,68 @@ def test_wsl_requires_seccomp_and_no_windows_interop(
     assert not proof.available
     assert proof.reason_code == "native_sandbox_not_enforced"
     native_backend._ACCOUNT_BASE_CACHE.clear()
+
+
+@pytest.mark.parametrize("installed_digest", [None, "0" * 64])
+def test_wsl_runtime_refuses_an_installed_runner_without_the_packaged_pin(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, installed_digest: str | None
+) -> None:
+    seen: list[list[str]] = []
+    driver = _driver(tmp_path, monkeypatch, seen, ACCOUNT_REPORT)
+    save_windows_backend(driver.workspace_root, "wsl")
+    original = driver._run_probe
+
+    def changed_runner(argv: list[str]) -> subprocess.CompletedProcess[str]:
+        if "--wsl-status" in argv:
+            seen.append(argv)
+            return subprocess.CompletedProcess(argv, 0, json.dumps({"configured": True, "runner_sha256": installed_digest}), "")
+        return original(argv)
+
+    driver._run_probe = changed_runner
+    proof = driver.probe()
+    assert not proof.available
+    assert proof.reason_code == "native_sandbox_wsl_runner_mismatch"
+    assert not any("--probe" in argv for argv in seen)
+
+
+def test_wsl_runtime_refuses_a_missing_bundled_runner(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    seen: list[list[str]] = []
+    driver = _driver(tmp_path, monkeypatch, seen, ACCOUNT_REPORT)
+    save_windows_backend(driver.workspace_root, "wsl")
+    (driver.helper_root.parent / "wsl-x86_64" / "digest.json").unlink()
+    proof = driver.probe()
+    assert not proof.available
+    assert proof.reason_code == "native_sandbox_wsl_runner_missing"
+    assert not any("--probe" in argv for argv in seen)
+
+
+@pytest.mark.parametrize("change", ["installed", "packaged"])
+def test_cached_wsl_proof_does_not_license_a_changed_runner_at_launch(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, change: str
+) -> None:
+    from raiker.execution.commands.backends.base import CommandBackendError
+
+    driver = _driver(tmp_path, monkeypatch, [], ACCOUNT_REPORT)
+    save_windows_backend(driver.workspace_root, "wsl")
+    proof = driver.probe()
+    assert proof.available
+    if change == "packaged":
+        (driver.helper_root.parent / "wsl-x86_64" / "digest.json").unlink()
+        expected = "native_sandbox_wsl_runner_missing"
+    else:
+        monkeypatch.setattr(driver, "wsl_status", lambda: {"configured": True, "runner_sha256": "0" * 64})
+        expected = "native_sandbox_wsl_runner_mismatch"
+    launched: list[object] = []
+    backend = native_backend.NativeSandboxBackend(
+        driver=driver, proof=proof, workspaces=TaskWorkspaceRegistry(tmp_path / "copies"),
+        runner=lambda *args, **kwargs: launched.append(args),
+    )
+    with pytest.raises(CommandBackendError, match=expected):
+        backend.start(request(driver.workspace_root, argv_template=("cat", "seed.txt")), MemoryCommandSink())
+    assert not launched
+    assert not (tmp_path / "copies").exists()
 
 
 def test_with_the_account_chosen_nothing_asks_wsl(
@@ -149,6 +214,7 @@ def test_a_wsl_run_passes_linux_argv_through_without_mounts_or_downloads(
     assert run["argv"][run["argv"].index("--") + 1 :] == ["python3", "-m", "pytest"]
     assert run["policy"]["toolchain_paths"] == []
     assert run["policy"]["network"] == "none"
+    assert run["policy"]["wsl_runner_sha256"] == hashlib.sha256(b"\x7fELF linux runner").hexdigest()
     native_backend._ACCOUNT_BASE_CACHE.clear()
 
 
@@ -231,7 +297,8 @@ def test_setup_reports_the_runners_own_refusal_and_needs_the_bundled_runner(
     assert bare.setup_wsl(rootfs) == (False, "native_sandbox_wsl_runner_missing")
 
 
-def test_setup_is_refused_off_windows(tmp_path: Path) -> None:
+def test_setup_is_refused_off_windows(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(native_backend, "_on_windows", lambda: False)
     driver = native_backend.NativeSandboxDriver(tmp_path, helper_root=_bundled(tmp_path))
     assert driver.setup_wsl(tmp_path / "base.tar") == (False, "native_sandbox_wsl_unavailable")
     assert driver.reset_wsl() == (False, "native_sandbox_wsl_unavailable")

@@ -49,9 +49,12 @@ import tempfile
 import threading
 import time
 from collections.abc import Callable, Iterator
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from pathlib import Path, PurePosixPath
-from typing import BinaryIO
+from typing import TYPE_CHECKING, BinaryIO
+
+if TYPE_CHECKING:
+    from raiker.execution.windows_file_handles import DirectoryPins
 
 EXCLUDED_NAMES = frozenset({".git", ".raiker"})
 #: Folders a toolchain fills: installed dependencies and caches. They are the
@@ -105,6 +108,8 @@ class WorkspaceDiff:
     #: Paths the task produced that can never be promoted (links, special
     #: files, protected names), with the reason for each.
     rejected: tuple[tuple[str, str], ...]
+    copy_hashes: tuple[tuple[str, str], ...] = ()
+    source_hashes: tuple[tuple[str, str | None], ...] = ()
 
     @property
     def empty(self) -> bool:
@@ -140,7 +145,9 @@ def _path_is_link_like(path: Path) -> bool:
     return bool(getattr(info, "st_file_attributes", 0) & _REPARSE_POINT)
 
 
-def _walk(root: Path) -> Iterator[tuple[str, os.DirEntry[str] | None, str | None]]:
+def _walk(
+    root: Path, *, pinned: _PromotionPaths | None = None,
+) -> Iterator[tuple[str, os.DirEntry[str] | None, str | None]]:
     """Yield ``(relative, entry, problem)`` for every entry under ``root``.
 
     Never follows a link. ``problem`` names why an entry is not a plain file;
@@ -149,6 +156,8 @@ def _walk(root: Path) -> Iterator[tuple[str, os.DirEntry[str] | None, str | None
     pending: list[tuple[Path, PurePosixPath]] = [(root, PurePosixPath())]
     while pending:
         directory, prefix = pending.pop()
+        if pinned is not None:
+            directory = pinned.path((prefix / "__raiker_scan__").as_posix(), scan=True).parent
         with os.scandir(directory) as entries:
             for entry in entries:
                 relative = prefix / entry.name
@@ -173,29 +182,47 @@ def _is_environment(directory: Path, name: str, *, top: bool) -> bool:
     return name == "target" and (directory / "Cargo.toml").is_file()
 
 
-def _hash_file(path: Path) -> str:
+def _hash_file(path: Path, *, single_link: bool = False) -> str:
     digest = hashlib.sha256()
-    with _regular_reader(path) as handle:
+    with _regular_reader(path, single_link=single_link) as handle:
         for chunk in iter(lambda: handle.read(_CHUNK), b""):
             digest.update(chunk)
     return digest.hexdigest()
 
 
-def _regular_reader(path: Path) -> BinaryIO:
+def _regular_reader(path: Path, *, single_link: bool = False) -> BinaryIO:
     """Open the leaf once, refusing links, FIFOs and devices before reading."""
+    if sys.platform == "win32":
+        from raiker.execution.windows_file_handles import regular_reader
+
+        try:
+            handle = regular_reader(path)
+            if single_link and os.fstat(handle.fileno()).st_nlink != 1:
+                handle.close()
+                raise WorkspaceError("workspace_path_unsafe", "hardlink")
+            return handle
+        except OSError as exc:
+            if getattr(exc, "winerror", None) == 1920:
+                raise WorkspaceError("workspace_path_unsafe", str(path)) from None
+            if getattr(exc, "winerror", None) in {32, 33}:
+                raise WorkspaceError("workspace_path_busy") from None
+            raise
     flags = os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_BINARY", 0)
     # A planted FIFO must not hang the host before fstat can reject it.
     descriptor = os.open(path, flags | getattr(os, "O_NONBLOCK", 0))
     if not stat.S_ISREG(os.fstat(descriptor).st_mode):
         os.close(descriptor)
         raise WorkspaceError("workspace_path_unsafe", str(path))
+    if single_link and os.fstat(descriptor).st_nlink != 1:
+        os.close(descriptor)
+        raise WorkspaceError("workspace_path_unsafe", "hardlink")
     return os.fdopen(descriptor, "rb")
 
 
-def _copy_file(source: Path, target: Path) -> str:
+def _copy_file(source: Path, target: Path, *, single_link: bool = False) -> str:
     """Copy bytes (never metadata, never a link) and return their SHA-256."""
     digest = hashlib.sha256()
-    with _regular_reader(source) as reader, open(target, "xb") as writer:
+    with _regular_reader(source, single_link=single_link) as reader, open(target, "xb") as writer:
         for chunk in iter(lambda: reader.read(_CHUNK), b""):
             digest.update(chunk)
             writer.write(chunk)
@@ -203,12 +230,13 @@ def _copy_file(source: Path, target: Path) -> str:
 
 
 class _PromotionPaths:
-    """Keep Linux Apply's parent directories open until rollback has finished.
+    """Keep Apply's parent directories pinned until rollback has finished.
 
     Every component is opened relative to its pinned parent with O_NOFOLLOW.
     /proc/self/fd names only these already-open directories; swapping a checked
     directory for a symlink cannot redirect a later read, replace or unlink.
-    Other platforms retain their existing link checks pending native handles.
+    Windows pins absolute ancestors against rename and in-place reparse edits.
+    Platforms without a pinned implementation refuse before filesystem effects.
     """
 
     def __init__(self, root: Path) -> None:
@@ -216,16 +244,48 @@ class _PromotionPaths:
         self.handles: dict[tuple[str, ...], int] = {}
         self.created: list[Path] = []
         self.created_entries: list[tuple[int, str]] = []
+        self.windows_pins: DirectoryPins | None = None
 
     def __enter__(self) -> _PromotionPaths:
         if sys.platform == "linux":
             self.handles[()] = os.open(self.root, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
+        elif sys.platform == "win32":
+            from raiker.execution.windows_file_handles import DirectoryPins
+
+            self.windows_pins = DirectoryPins()
+            try:
+                self.windows_pins.pin(self.root)
+            except BaseException as exc:
+                self.windows_pins.close()
+                if isinstance(exc, OSError):
+                    self._windows_error(exc)
+                raise
+        else:
+            raise WorkspaceError("workspace_promotion_handles_unavailable")
         return self
 
-    def path(self, relative: str, *, create: bool = False) -> Path:
-        target = _target(self.root, relative)
-        if sys.platform != "linux" or not self.handles:
+    def path(self, relative: str, *, create: bool = False, scan: bool = False) -> Path:
+        target = _target(self.root, relative, allow_protected=scan)
+        if self.windows_pins is not None:
+            try:
+                current = self.root
+                for part in PurePosixPath(relative).parts[:-1]:
+                    current = current / part
+                    if create:
+                        try:
+                            current.mkdir()
+                            self.created.append(current)
+                        except FileExistsError:
+                            pass
+                    self.windows_pins.pin(current)
+                if create:
+                    self.windows_pins.allow_children(target.parent)
+            except OSError as exc:
+                self._windows_error(exc, relative)
+                raise
             return target
+        if not self.handles:
+            raise WorkspaceError("workspace_promotion_handles_unavailable")
         parts = PurePosixPath(relative).parts
         for index, part in enumerate(parts[:-1]):
             key = parts[:index + 1]
@@ -233,7 +293,7 @@ class _PromotionPaths:
                 continue
             parent = self.handles[parts[:index]]
             try:
-                descriptor = os.open(part, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW, dir_fd=parent)
+                descriptor = os.open(part, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW, dir_fd=parent)  # type: ignore[attr-defined]
             except FileNotFoundError:
                 if not create:
                     raise
@@ -243,11 +303,35 @@ class _PromotionPaths:
                     self.created_entries.append((parent, part))
                 except FileExistsError:
                     pass  # Still opened with O_NOFOLLOW below.
-                descriptor = os.open(part, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW, dir_fd=parent)
+                descriptor = os.open(part, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW, dir_fd=parent)  # type: ignore[attr-defined]
             self.handles[key] = descriptor
         return Path(f"/proc/self/fd/{self.handles[parts[:-1]]}") / parts[-1]
 
+    @staticmethod
+    def _windows_error(exc: OSError, relative: str | None = None) -> None:
+        if getattr(exc, "winerror", None) in {32, 33}:
+            raise WorkspaceError("workspace_path_busy", relative) from None
+        if getattr(exc, "winerror", None) == 1920:
+            raise WorkspaceError("workspace_path_unsafe", relative) from None
+
+    def rmdir(self, relative: str) -> None:
+        target = self.path(relative)
+        if self.windows_pins is not None:
+            # Its parent remains pinned; release this directory's own guard
+            # and no-delete handle so an empty created directory can be undone.
+            self.windows_pins.release(target)
+        target.rmdir()
+
     def __exit__(self, exc_type: object, exc: object, traceback: object) -> None:
+        if self.windows_pins is not None:
+            try:
+                if exc_type is not None:
+                    for directory in reversed(self.created):
+                        self.windows_pins.release(directory)
+                        with contextlib.suppress(OSError):
+                            directory.rmdir()
+            finally:
+                self.windows_pins.close()
         if exc_type is not None:
             for parent, name in reversed(self.created_entries):
                 with contextlib.suppress(OSError):
@@ -343,7 +427,8 @@ def diff_workspace(workspace: TaskWorkspace) -> WorkspaceDiff:
     created: list[str] = []
     modified: list[str] = []
     rejected: list[tuple[str, str]] = []
-    for relative, entry, problem in _walk(workspace.root):
+    hashes: dict[str, str] = {}
+    for relative, entry, problem in _copy_entries(workspace):
         if problem is not None or entry is None:
             rejected.append((relative, problem or "special_file"))
             continue
@@ -352,11 +437,18 @@ def diff_workspace(workspace: TaskWorkspace) -> WorkspaceDiff:
             rejected.append((relative, reason))
             continue
         seen.add(relative)
+        try:
+            digest = _hash_file(Path(entry.path), single_link=True)
+        except WorkspaceError as exc:
+            rejected.append((relative, "hardlink" if exc.detail == "hardlink" else "unsafe_file"))
+            continue
         original = workspace.manifest.get(relative)
         if original is None:
             created.append(relative)
-        elif _hash_file(Path(entry.path)) != original.sha256:
+            hashes[relative] = digest
+        elif digest != original.sha256:
             modified.append(relative)
+            hashes[relative] = digest
     for name in EXCLUDED_NAMES:
         if (workspace.root / name).exists() or _path_is_link_like(workspace.root / name):
             rejected.append((name, "protected_path"))
@@ -366,7 +458,45 @@ def diff_workspace(workspace: TaskWorkspace) -> WorkspaceDiff:
         tuple(sorted(modified)),
         tuple(sorted(deleted)),
         tuple(sorted(rejected)),
+        tuple(sorted(hashes.items())),
     )
+
+
+def _copy_entries(workspace: TaskWorkspace) -> Iterator[tuple[str, os.DirEntry[str] | None, str | None]]:
+    with _PromotionPaths(workspace.root) as pinned:
+        yield from _walk(workspace.root, pinned=pinned)
+
+
+def review_workspace(
+    workspace: TaskWorkspace, *, owner: str, workspace_id: str,
+) -> tuple[WorkspaceDiff, str]:
+    """Bind an owner/workspace review to relevant source and copy bytes."""
+    diff = diff_workspace(workspace)
+    source: dict[str, str | None] = {}
+    with _PromotionPaths(workspace.source) as pinned:
+        for relative in (*diff.created, *diff.modified, *diff.deleted):
+            try:
+                target = pinned.path(relative)
+                source[relative] = _hash_file(target) if target.is_file() else (
+                    "not_file" if target.exists() else None
+                )
+            except FileNotFoundError:
+                source[relative] = None
+            except WorkspaceError as exc:
+                # Keep an unsafe/busy source visible in the review so the
+                # owner can discard the copy. No source bytes were read, and
+                # Apply still rechecks and refuses the unsafe target.
+                source[relative] = f"unsafe:{exc.reason_code}"
+    diff = replace(diff, source_hashes=tuple(sorted(source.items())))
+    document = {
+        "version": 1, "owner": owner, "workspace_id": workspace_id,
+        "source": str(workspace.source), "copy": str(workspace.root),
+        "created": diff.created, "modified": diff.modified, "deleted": diff.deleted,
+        "rejected": diff.rejected, "copy_hashes": diff.copy_hashes,
+        "source_hashes": diff.source_hashes,
+    }
+    revision = hashlib.sha256(json.dumps(document, sort_keys=True).encode("utf-8")).hexdigest()
+    return diff, revision
 
 
 def _unsafe_relative(relative: str) -> str | None:
@@ -382,10 +512,10 @@ def _unsafe_relative(relative: str) -> str | None:
     return None
 
 
-def _target(source: Path, relative: str) -> Path:
+def _target(source: Path, relative: str, *, allow_protected: bool = False) -> Path:
     """The project path for ``relative``, refusing any route through a link."""
     reason = _unsafe_relative(relative)
-    if reason:
+    if reason and not (allow_protected and reason == "protected_path"):
         raise WorkspaceError("workspace_path_unsafe", relative)
     target = source.joinpath(*PurePosixPath(relative).parts)
     current = source
@@ -436,8 +566,22 @@ def promotion_conflicts(workspace: TaskWorkspace, diff: WorkspaceDiff) -> tuple[
     these unless the owner chooses to overwrite it.
     """
     paths = [*diff.created, *diff.modified, *diff.deleted]
-    targets = {relative: _target(workspace.source, relative) for relative in paths}
-    return _conflicts(workspace, diff, targets)
+    with _PromotionPaths(workspace.source) as pinned:
+        targets: dict[str, Path] = {}
+        missing: set[str] = set()
+        for relative in paths:
+            try:
+                targets[relative] = pinned.path(relative)
+            except FileNotFoundError:
+                missing.add(relative)
+        existing = WorkspaceDiff(
+            tuple(rel for rel in diff.created if rel not in missing),
+            tuple(rel for rel in diff.modified if rel not in missing),
+            tuple(rel for rel in diff.deleted if rel not in missing), diff.rejected,
+        )
+        conflicts = set(_conflicts(workspace, existing, targets))
+        conflicts.update(missing.intersection((*diff.modified, *diff.deleted)))
+        return tuple(sorted(conflicts))
 
 
 def promote(
@@ -496,14 +640,19 @@ def promote(
         written: list[Path] = []
         made_directories: list[Path] = target_paths.created
         rollback_failed = False
+        mutation_started = False
         try:
             for index, relative in enumerate(paths):
                 # Every original that is about to be replaced or removed, the
                 # owner's overwritten edits included, is backed up first.
                 if targets[relative].is_file():
                     backup = backups / str(index)
-                    _copy_file(targets[relative], backup)
+                    digest = _copy_file(targets[relative], backup)
                     saved[relative] = backup
+                    if diff.source_hashes and dict(diff.source_hashes).get(relative) != digest:
+                        raise WorkspaceError("workspace_review_stale", relative)
+                elif diff.source_hashes and dict(diff.source_hashes).get(relative) is not None:
+                    raise WorkspaceError("workspace_review_stale", relative)
             if journal_dir is not None:
                 # Durable before the first write to the project: if the host
                 # dies from here on, the next start knows exactly what to undo.
@@ -525,12 +674,22 @@ def promote(
                         parent.mkdir()
                         made_directories.append(parent)
                 staged = target.with_name(f".{target.name}.raiker-promote")
-                _copy_file(copied[relative], staged)
+                try:
+                    digest = _copy_file(copied[relative], staged, single_link=True)
+                except FileNotFoundError:
+                    raise WorkspaceError("workspace_review_stale", relative) from None
+                expected = dict(diff.copy_hashes).get(relative)
+                if expected is None:
+                    raise WorkspaceError("workspace_review_required", relative)
+                if digest != expected:
+                    raise WorkspaceError("workspace_review_stale", relative)
                 if relative not in saved:
                     written.append(target)
+                mutation_started = True
                 os.replace(staged, target)
             for relative in diff.deleted:
                 with contextlib.suppress(FileNotFoundError):
+                    mutation_started = True
                     targets[relative].unlink()
             if journal_dir is not None:
                 journal = _read_journal(backups)
@@ -542,6 +701,8 @@ def promote(
                 _write_journal(backups, journal)
         except BaseException:
             for relative, backup in saved.items():
+                if not mutation_started:
+                    continue
                 # Copied back, not renamed: the backup may be on another volume.
                 try:
                     _restore_file(backup, targets[relative])
@@ -553,7 +714,7 @@ def promote(
             for directory in reversed(made_directories):
                 with contextlib.suppress(OSError, WorkspaceError):
                     relative = directory.relative_to(workspace.source).as_posix()
-                    target_paths.path(relative).rmdir()
+                    target_paths.rmdir(relative)
             for relative in (*diff.created, *diff.modified):
                 staged = targets[relative].with_name(f".{targets[relative].name}.raiker-promote")
                 with contextlib.suppress(OSError):
@@ -608,11 +769,13 @@ def _mapping(value: object) -> dict[str, object]:
     return {str(key): item for key, item in value.items()} if isinstance(value, dict) else {}
 
 
-def _restore(directory: Path, journal: dict[str, object]) -> None:
+def _restore(
+    directory: Path, journal: dict[str, object], *, pinned: _PromotionPaths | None = None,
+) -> None:
     """Put the project back as it was before the Apply in *directory*."""
     source = Path(str(journal["source"]))
     saved = _mapping(journal.get("saved"))
-    with _PromotionPaths(source) as pinned:
+    with (contextlib.nullcontext(pinned) if pinned is not None else _PromotionPaths(source)) as pinned:
         for relative, name in saved.items():
             target = pinned.path(str(relative), create=True)
             target.parent.mkdir(parents=True, exist_ok=True)
@@ -628,7 +791,7 @@ def _restore(directory: Path, journal: dict[str, object]) -> None:
         for directory_path in reversed(_strings(journal.get("made_directories"))):
             relative = Path(directory_path).relative_to(source).as_posix()
             with contextlib.suppress(OSError):
-                pinned.path(relative).rmdir()
+                pinned.rmdir(relative)
 
 
 def recover_promotions(journal_dir: Path) -> list[str]:
@@ -674,14 +837,18 @@ def undo_promotion(journal_dir: Path, promotion_id: str, *, owner: str = "") -> 
         raise WorkspaceError("workspace_promotion_not_undoable")
     source = Path(str(journal["source"]))
     after = _mapping(journal.get("after"))
-    for relative, digest in after.items():
-        target = _target(source, str(relative))
-        now = _hash_file(target) if target.is_file() else None
-        if now != digest:
-            # The owner (or something else) changed it after the Apply: undoing
-            # would destroy that work, so nothing is touched.
-            raise WorkspaceError("workspace_undo_conflict", str(relative))
-    _restore(directory, journal)
+    with _PromotionPaths(source) as pinned:
+        for relative, digest in after.items():
+            try:
+                target = pinned.path(str(relative))
+                now = _hash_file(target) if target.is_file() else None
+            except FileNotFoundError:
+                now = None
+            if now != digest:
+                # Keep these same parent pins through restoration: a conflict
+                # check followed by a separately resolved write is racy.
+                raise WorkspaceError("workspace_undo_conflict", str(relative))
+        _restore(directory, journal, pinned=pinned)
     journal["state"] = "undone"
     _write_journal(directory, journal)
     created = tuple(_strings(journal.get("created")))
@@ -1011,12 +1178,24 @@ class FileDiff:
     truncated: bool
 
 
-def _diff_side(path: Path) -> tuple[str, bool]:
+def _diff_side(
+    path: Path, *, single_link: bool = False, expected_digest: str | None = None,
+    verify: bool = False,
+) -> tuple[str, bool]:
     """A file's text for a diff, or ``("", True)`` when it is not text."""
     if _path_is_link_like(path) or not path.is_file():
+        if verify and expected_digest is not None:
+            raise WorkspaceError("workspace_review_stale")
         return "", False
-    with path.open("rb") as handle:
-        data = handle.read(FILE_DIFF_MAX_BYTES * 4)
+    with _regular_reader(path, single_link=single_link) as handle:
+        digest = hashlib.sha256()
+        data = b""
+        for chunk in iter(lambda: handle.read(_CHUNK), b""):
+            digest.update(chunk)
+            if len(data) < FILE_DIFF_MAX_BYTES * 4:
+                data += chunk[: FILE_DIFF_MAX_BYTES * 4 - len(data)]
+        if verify and digest.hexdigest() != expected_digest:
+            raise WorkspaceError("workspace_review_stale")
     if b"\0" in data:
         return "", True
     return data.decode("utf-8", errors="replace"), False
@@ -1038,12 +1217,15 @@ def file_diff(workspace: TaskWorkspace, diff: WorkspaceDiff, path: str) -> FileD
         status = "deleted"
     else:
         return None
-    before, before_binary = ("", False) if status == "created" else _diff_side(
-        _target(workspace.source, path)
-    )
-    after, after_binary = ("", False) if status == "deleted" else _diff_side(
-        workspace.root / path
-    )
+    with _PromotionPaths(workspace.source) as before_paths, _PromotionPaths(workspace.root) as after_paths:
+        before, before_binary = ("", False) if status == "created" else _diff_side(
+            before_paths.path(path), expected_digest=dict(diff.source_hashes).get(path),
+            verify=bool(diff.source_hashes),
+        )
+        after, after_binary = ("", False) if status == "deleted" else _diff_side(
+            after_paths.path(path), single_link=True,
+            expected_digest=dict(diff.copy_hashes).get(path), verify=bool(diff.copy_hashes),
+        )
     binary = before_binary or after_binary
     text = "" if binary else "".join(
         difflib.unified_diff(

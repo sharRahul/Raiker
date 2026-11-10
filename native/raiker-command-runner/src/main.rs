@@ -173,6 +173,14 @@ fn dispatch(arguments: &[String]) -> Result<i32, String> {
             return Ok(0);
         }
         #[cfg(windows)]
+        Some("--harden-account-logon") => {
+            if arguments.len() != 1 {
+                return Err("runner_arguments_invalid".into());
+            }
+            println!("{}", boundary::account::harden_logon()?);
+            return Ok(0);
+        }
+        #[cfg(windows)]
         Some("--reset-account") => {
             boundary::account::reset()?;
             return Ok(0);

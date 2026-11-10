@@ -79,6 +79,11 @@ PROTECTED_DENY_PATHS = (".raiker",)
 _ACCOUNT_BASE_TTL_SECONDS = 30.0
 #: The boundary the runner reports for Raiker's WSL2 distribution.
 WSL_BOUNDARY = "wsl_bubblewrap"
+# Only known boundary-specific blockers may be surfaced from runner reports.
+# Measured subsets cannot override these missing mandatory isolation controls.
+ACTIONABLE_PROBE_REFUSALS = frozenset({
+    ("restricted_account", "native_sandbox_account_profile_isolation_unavailable"),
+})
 
 
 #: Importing the distribution and installing Bubblewrap in it.
@@ -142,7 +147,7 @@ class NativeSandboxProof:
         stops with it (`macos_account`) and runs in different copies overlap;
         plain Seatbelt cannot contain a detached descendant.
         """
-        tree_stop = self.observations.get("descendant_reaped") == ENFORCED
+        tree_stop = self.available and self.observations.get("descendant_reaped") == ENFORCED
         # WSL2 runs Bubblewrap in Raiker's distribution: the same tree stop,
         # and the Linux runner opens the terminal itself over `wsl.exe`'s pipes.
         terminal = tree_stop and self.boundary in {
@@ -346,6 +351,10 @@ class NativeSandboxDriver:
         binary, reason = self.locate()
         if binary is None:
             return NativeSandboxProof(False, reason, "none", checked_at)
+        if boundary_flag:
+            _, reason = self.wsl_execution_pin()
+            if reason is not None:
+                return NativeSandboxProof(False, reason, WSL_BOUNDARY, checked_at)
         try:
             # Windows probing grants ACLs and modifies protected DACLs. Probe a
             # private temporary directory and its own runner copy, never the
@@ -413,10 +422,18 @@ class NativeSandboxDriver:
         # backend runs every command in a disposable task copy, which is what
         # keeps the owner's project out of reach. Every mandatory observation
         # must be enforced; an indeterminate control arm is not evidence.
-        available = all(observations.get(name) == ENFORCED for name in required)
+        boundary = report.get("boundary")
+        reason = report.get("reason")
+        refusal = (
+            reason
+            if isinstance(boundary, str) and isinstance(reason, str)
+            and (boundary, reason) in ACTIONABLE_PROBE_REFUSALS
+            else None
+        )
+        available = refusal is None and all(observations.get(name) == ENFORCED for name in required)
         return NativeSandboxProof(
             available=available,
-            reason_code=None if available else "native_sandbox_not_enforced",
+            reason_code=None if available else refusal or "native_sandbox_not_enforced",
             boundary=str(report.get("boundary") or "none"),
             checked_at=checked_at,
             observations=observations,
@@ -538,6 +555,26 @@ class NativeSandboxDriver:
             return None
         return status if isinstance(status, dict) else None
 
+    def wsl_execution_pin(self) -> tuple[str | None, str | None]:
+        """Require the installed distro runner to match the verified package.
+
+        Called for both probing and every launch: cached enforcement evidence
+        cannot license a changed/missing executable in the distribution.
+        """
+        runner = self.wsl_runner()
+        if runner is None:
+            return None, "native_sandbox_wsl_runner_missing"
+        try:
+            expected = hashlib.sha256(runner.read_bytes()).hexdigest()
+        except OSError:
+            return None, "native_sandbox_wsl_runner_missing"
+        status = self.wsl_status()
+        if status is None or status.get("configured") is not True:
+            return None, "native_sandbox_wsl_unconfigured"
+        if status.get("runner_sha256") != expected:
+            return None, "native_sandbox_wsl_runner_mismatch"
+        return expected, None
+
     def _status_base(self, argv: list[str]) -> Path | None:
         try:
             completed = self._run_probe(argv)
@@ -556,6 +593,11 @@ class NativeSandboxDriver:
         except (OSError, ValueError, subprocess.SubprocessError):
             return None
         if completed.returncode != 0 or status.get("configured") is not True:
+            return None
+        # Setup/credential readiness is separate from the account boundary's
+        # ability to isolate a task. Older/macOS status contracts omit this
+        # field; a Windows report that supplies it must explicitly permit use.
+        if _on_windows() and "execution_available" in status and status["execution_available"] is not True:
             return None
         base = status.get("base")
         return Path(base) if isinstance(base, str) and base else None
@@ -619,6 +661,11 @@ class NativeSandboxBackend:
             raise CommandBackendError("selected_environment_credential_unsupported")
         if self.workspaces is None:
             raise CommandBackendError("native_disposable_workspace_required")
+        wsl_pin = None
+        if self.proof.boundary == WSL_BOUNDARY:
+            wsl_pin, reason = self.driver.wsl_execution_pin()
+            if reason is not None:
+                raise CommandBackendError(reason)
         original = request
         request = self._in_task_copy(request)
 
@@ -673,6 +720,8 @@ class NativeSandboxBackend:
             # answer.
             raise CommandBackendError("native_sandbox_executable_unreachable")
         document = self.driver.policy_document(request)
+        if wsl_pin is not None:
+            document["wsl_runner_sha256"] = wsl_pin
         document["toolchain_paths"] = (
             [] if in_wsl else toolchain_mounts(executable, request.workspace_root)
         )

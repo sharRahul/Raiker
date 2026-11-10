@@ -36,6 +36,7 @@ machine to walk, and saying so is the honest answer rather than an empty tree.
 
 from __future__ import annotations
 
+import stat
 from pathlib import Path, PurePosixPath, PureWindowsPath
 from typing import Any, Literal, cast
 
@@ -215,17 +216,18 @@ async def browse_code_repo(
     tree = _session_tree(request, auth_data[0].principal_id, session_id)
     target = _resolved_target(request, root, path)
     listed = _in_tree(tree, target)
-    if not listed.is_dir():
+    authority = None if tree is None else TaskTreeAuthority(PathAuthority(_ws(request)), tree)
+    from raiker.tools import task_tree_io
+    if not task_tree_io.is_dir(listed, authority):
         raise _not_found("directory_not_found")
     # Entries are named by their real twins, so a path the explorer sends back
     # resolves against the repository like any other.
-    children = [
-        target / child.name
-        for child in sorted(
-            listed.iterdir(), key=lambda item: (not item.is_dir(), item.name.lower())
-        )
-        if child.name not in IGNORED_DIRECTORY_NAMES
-    ]
+    try:
+        children = [target / name for name, _ in sorted(
+            task_tree_io.entries(listed, authority), key=lambda item: (not item[1], item[0].lower())
+        ) if name not in IGNORED_DIRECTORY_NAMES]
+    except (OSError, FilesystemSafetyError) as exc:
+        raise _bad_request("task_copy_unsafe_entry") from exc
     relative = target.relative_to(root).as_posix() if target != root else ""
     answer: CodeRepoBrowseView = {
         "path": relative,
@@ -233,7 +235,7 @@ async def browse_code_repo(
             Path(relative).parent.as_posix().replace(".", "") if relative else None
         ),
         "entries": [
-            _entry(child, root, _in_tree(tree, child)) for child in children[:MAX_BROWSE_ENTRIES]
+            _entry(child, root, _in_tree(tree, child), authority=authority) for child in children[:MAX_BROWSE_ENTRIES]
         ],
         "truncated": len(children) > MAX_BROWSE_ENTRIES,
         "root_kind": cast(Literal["local", "github"], str(repo.get("kind", "local"))),
@@ -243,15 +245,21 @@ async def browse_code_repo(
     return serialize_dto(answer)
 
 
-def _entry(child: Path, root: Path, on_disk: Path | None = None) -> ProjectBrowseEntry:
+def _entry(child: Path, root: Path, on_disk: Path | None = None, *, authority: Any = None) -> ProjectBrowseEntry:
     """*child* named against *root*; *on_disk* is where it is read (its copy)."""
     disk = on_disk or child
-    is_directory = disk.is_dir()
+    from raiker.tools import task_tree_io
+
+    try:
+        info = task_tree_io.stat_info(disk, authority)
+    except (OSError, FilesystemSafetyError) as exc:
+        raise _bad_request("task_copy_unsafe_entry") from exc
+    is_directory = stat.S_ISDIR(info.st_mode)
     answer: ProjectBrowseEntry = {
         "name": child.name,
         "relative_path": child.relative_to(root).as_posix(),
         "is_directory": is_directory,
-        "size_bytes": 0 if is_directory else _size(disk),
+        "size_bytes": 0 if is_directory else info.st_size,
         "media_type": (
             ""
             if is_directory
@@ -265,10 +273,12 @@ def _entry(child: Path, root: Path, on_disk: Path | None = None) -> ProjectBrows
     return answer
 
 
-def _size(child: Path) -> int:
+def _size(child: Path, authority: Any = None) -> int:
+    from raiker.tools.task_tree_io import stat_info
+
     try:
-        return int(child.stat().st_size)
-    except OSError:
+        return int(stat_info(child, authority).st_size)
+    except (OSError, FilesystemSafetyError):
         return 0
 
 
@@ -296,15 +306,17 @@ async def read_code_repo_file(
             else "repo_folder_missing"
         )
     tree = _session_tree(request, auth_data[0].principal_id, session_id)
+    authority = None if tree is None else TaskTreeAuthority(PathAuthority(_ws(request)), tree)
     target = _resolved_target(request, root, path)
     on_disk = _in_tree(tree, target)
+    from raiker.tools import task_tree_io
     source: Literal["project", "task_copy"] = "project" if on_disk == target else "task_copy"
-    if not on_disk.exists():
+    if not task_tree_io.exists(on_disk, authority):
         raise _not_found("file_not_found")
-    if not on_disk.is_file():
+    if not task_tree_io.is_file(on_disk, authority):
         raise _bad_request("not_a_file")
     relative = target.relative_to(root).as_posix()
-    size = _size(on_disk)
+    size = _size(on_disk, authority)
     if size > MAX_VIEW_BYTES:
         # Refused with the number in it. "Too large" without the size is a dead
         # end; the size is what tells the owner whether to open it elsewhere.
@@ -318,8 +330,10 @@ async def read_code_repo_file(
             "source": source,
         }
         return serialize_dto(answer_0)
-    authority = None if tree is None else TaskTreeAuthority(PathAuthority(_ws(request)), tree)
-    result = read_file(_ws(request), target, max_bytes=MAX_VIEW_BYTES, authority=authority)
+    try:
+        result = read_file(_ws(request), target, max_bytes=MAX_VIEW_BYTES, authority=authority)
+    except (OSError, FilesystemSafetyError):
+        result = {"status": "failed", "error": {"type": "task_copy_unsafe_entry"}}
     if result.get("status") != "success":
         error = result.get("error") or {}
         answer_1: CodeRepoFileView = {

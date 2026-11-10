@@ -111,6 +111,18 @@ pub fn status() -> Value {
         )
         .is_ok();
     let bubblewrap = present && in_distro("root", "test -x /usr/bin/bwrap", None).is_ok();
+    let runner_sha256 = if runner {
+        in_distro("root", &format!("/usr/bin/sha256sum {LINUX_RUNNER}"), None)
+            .ok()
+            .and_then(|bytes| {
+                let text = String::from_utf8(bytes).ok()?;
+                let digest = text.split_whitespace().next()?;
+                (digest.len() == 64 && digest.bytes().all(|byte| byte.is_ascii_hexdigit()))
+                    .then(|| digest.to_owned())
+            })
+    } else {
+        None
+    };
     json!({
         "configured": present && conf && runner && bubblewrap,
         "distribution": DISTRO,
@@ -118,6 +130,7 @@ pub fn status() -> Value {
         "distribution_present": present,
         "wsl_conf_current": conf,
         "runner_installed": runner,
+        "runner_sha256": runner_sha256,
         "bubblewrap_present": bubblewrap,
     })
 }
@@ -236,8 +249,19 @@ impl Drop for PolicyFile {
 /// A terminal run passes through: the Linux runner sees pipes from `wsl.exe`
 /// and opens the terminal itself inside the distribution.
 pub fn launch(policy: &LaunchPolicy, policy_text: &str, argv: &[String]) -> Result<i32, String> {
-    if status()["configured"] != true {
+    let installed = status();
+    if installed["configured"] != true {
         return Err("native_sandbox_wsl_unconfigured".into());
+    }
+    let document: Value =
+        serde_json::from_str(policy_text).map_err(|_| "runner_policy_invalid_json")?;
+    let expected = document.get("wsl_runner_sha256").and_then(Value::as_str);
+    if !expected.is_some_and(|digest| {
+        digest.len() == 64
+            && digest.bytes().all(|byte| byte.is_ascii_hexdigit())
+            && installed["runner_sha256"].as_str() == Some(digest)
+    }) {
+        return Err("native_sandbox_wsl_runner_mismatch".into());
     }
     let translated = wsl_paths::translate_policy(policy_text)?;
     let file = PolicyFile::write(&translated)?;

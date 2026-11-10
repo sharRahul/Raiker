@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 from collections.abc import Sequence
 from typing import TYPE_CHECKING, Any
 
@@ -1217,6 +1218,11 @@ class MemoryStore:
         journal: bool = True,
     ) -> bool:
         with self.connect() as connection:
+            source = connection.execute(
+                "SELECT owner_principal_id, provenance_json FROM approved_memory WHERE memory_id = ?"
+                + (" AND owner_principal_id = ?" if owner_principal_id else ""),
+                (memory_id, *([owner_principal_id] if owner_principal_id else [])),
+            ).fetchone()
             cursor = connection.execute(
                 """
                 UPDATE approved_memory
@@ -1235,7 +1241,8 @@ class MemoryStore:
             self._sync_memory_projection_eligibility(connection, memory_id)
         if journal and cursor.rowcount > 0:
             # DEC-24 step 5 — outside the database, so a restore honours it.
-            record_deletion(self.paths.workspace_root, MEMORY_FORGET, memory_id, owner_principal_id)
+            owner, source_session = self._memory_deletion_source(source)
+            record_deletion(self.paths.workspace_root, MEMORY_FORGET, memory_id, owner, source_session_id=source_session)
         return cursor.rowcount > 0
 
     def set_approved_memory_archived(
@@ -1539,14 +1546,45 @@ class MemoryStore:
         journal: bool = True,
     ) -> None:
         with self.connect() as connection:
-            connection.execute("DELETE FROM approved_memory_fts WHERE memory_id = ?", (memory_id,))
+            source = connection.execute(
+                "SELECT owner_principal_id, provenance_json FROM approved_memory WHERE memory_id = ?"
+                + (" AND owner_principal_id = ?" if owner_principal_id else ""),
+                (memory_id, *([owner_principal_id] if owner_principal_id else [])),
+            ).fetchone()
             cursor = connection.execute(
                 "DELETE FROM approved_memory WHERE memory_id = ?"
                 + (" AND owner_principal_id = ?" if owner_principal_id else ""),
                 (memory_id, *([owner_principal_id] if owner_principal_id else [])),
             )
+            if cursor.rowcount > 0:
+                connection.execute("DELETE FROM approved_memory_fts WHERE memory_id = ?", (memory_id,))
+                owner, source_session = self._memory_deletion_source(source)
+                details: dict[str, Any] = {"memory_provenance_version": 1}
+                if source_session is not None:
+                    details["source_session_id"] = source_session
+                # The external restore journal is best-effort. Retain the same
+                # content-free causal identity transactionally before its row
+                # disappears, so a failed journal append cannot revive copies.
+                connection.execute(
+                    "INSERT INTO memory_lifecycle_audit VALUES (?, ?, ?, ?, ?, ?)",
+                    (new_id("mla_"), memory_id, "purge", owner or "", json.dumps(details, sort_keys=True), utc_now()),
+                )
         if journal and cursor.rowcount > 0:
-            record_deletion(self.paths.workspace_root, MEMORY_PURGE, memory_id, owner_principal_id)
+            owner, source_session = self._memory_deletion_source(source)
+            record_deletion(self.paths.workspace_root, MEMORY_PURGE, memory_id, owner, source_session_id=source_session)
+
+    @staticmethod
+    def _memory_deletion_source(row: Any) -> tuple[str | None, str | None]:
+        if row is None:
+            return None, None
+        owner = str(row["owner_principal_id"] or "") or None
+        try:
+            provenance = json.loads(row["provenance_json"])
+            source = provenance.get("source_session_id", "")
+            valid = isinstance(source, str) and re.fullmatch(r"[A-Za-z0-9_.-]{0,200}", source) and source not in {".", ".."}
+            return owner, source if valid else None
+        except (ValueError, TypeError, AttributeError):
+            return owner, None
 
     def list_approved_memory(
         self: SQLiteStore,

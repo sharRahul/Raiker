@@ -54,6 +54,7 @@ from raiker.execution.workspaces import (
     promote,
     promotion_conflicts,
     promotion_journal_dir,
+    review_workspace,
     undo_promotion,
 )
 from raiker.runtime.authority.models import Principal
@@ -417,9 +418,9 @@ def _workspaces(request: Request) -> TaskWorkspaceRegistry:
 
 
 def _workspace_view(
-    request: Request, key: str, session_id: str, workspace: TaskWorkspace
+    request: Request, key: str, session_id: str, workspace: TaskWorkspace, owner: str,
 ) -> TaskWorkspaceView:
-    diff = diff_workspace(workspace)
+    diff, revision = review_workspace(workspace, owner=owner, workspace_id=key)
     root = Path(request.app.state.workspace_root).resolve()
     try:
         source = workspace.source.relative_to(root).as_posix() or "."
@@ -427,6 +428,7 @@ def _workspace_view(
         source = workspace.source.name
     return {
         "workspace_id": key,
+        "review_revision": revision,
         "session_id": session_id,
         "source": source,
         "created_at": workspace.created_at,
@@ -483,12 +485,15 @@ def list_task_workspaces(
     auth_data: tuple[ApiSession, Principal] = Depends(_auth),
 ) -> dict[str, Any]:
     owner = auth_data[0].principal_id
-    listed: TaskWorkspaceList = {
-        "workspaces": [
-            _workspace_view(request, key, session_id, workspace)
-            for key, session_id, workspace in _workspaces(request).entries(owner)
-        ]
-    }
+    try:
+        listed: TaskWorkspaceList = {
+            "workspaces": [
+                _workspace_view(request, key, session_id, workspace, owner)
+                for key, session_id, workspace in _workspaces(request).entries(owner)
+            ]
+        }
+    except WorkspaceError as exc:
+        raise refusal(status.HTTP_409_CONFLICT, exc.reason_code) from exc
     return serialize_dto(listed)
 
 
@@ -497,6 +502,7 @@ def task_workspace_file_diff(
     workspace_id: str,
     request: Request,
     path: str = Query(..., min_length=1, max_length=4096),
+    review_revision: str = Query(..., min_length=64, max_length=64, pattern=r"^[0-9a-f]{64}$"),
     auth_data: tuple[ApiSession, Principal] = Depends(_auth),
 ) -> dict[str, Any]:
     """One changed file's unified diff, project against copy, for review.
@@ -509,13 +515,18 @@ def task_workspace_file_diff(
     owner = auth_data[0].principal_id
     try:
         workspace = _workspaces(request).load(owner, workspace_id)
-        changed = file_diff(workspace, diff_workspace(workspace), path)
+        diff, revision = review_workspace(workspace, owner=owner, workspace_id=workspace_id)
+        if revision != review_revision:
+            raise WorkspaceError("workspace_review_stale")
+        changed = file_diff(workspace, diff, path)
     except WorkspaceError as exc:
-        raise refusal(status.HTTP_404_NOT_FOUND, exc.reason_code) from exc
+        code = status.HTTP_409_CONFLICT if exc.reason_code == "workspace_review_stale" else status.HTTP_404_NOT_FOUND
+        raise refusal(code, exc.reason_code) from exc
     if changed is None:
         raise refusal(status.HTTP_404_NOT_FOUND, "workspace_path_unchanged")
     answer: TaskWorkspaceFileDiff = {
         "workspace_id": workspace_id,
+        "review_revision": revision,
         "path": changed.path,
         "status": cast(Literal["created", "modified", "deleted"], changed.status),
         "diff": changed.text,
@@ -543,7 +554,12 @@ def promote_task_workspace(
         (session for key, session, _ in registry.entries(owner) if key == workspace_id), ""
     )
     _refuse_while_running(request, owner, session_id)
-    diff = diff_workspace(workspace)
+    try:
+        diff, revision = review_workspace(workspace, owner=owner, workspace_id=workspace_id)
+    except WorkspaceError as exc:
+        raise refusal(status.HTTP_409_CONFLICT, exc.reason_code) from exc
+    if revision != body.review_revision:
+        raise refusal(status.HTTP_409_CONFLICT, "workspace_review_stale")
     reviewed = (sorted(body.created), sorted(body.modified), sorted(body.deleted))
     if reviewed != (list(diff.created), list(diff.modified), list(diff.deleted)):
         raise refusal(status.HTTP_409_CONFLICT, "workspace_review_stale")

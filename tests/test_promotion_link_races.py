@@ -98,10 +98,10 @@ def test_persistent_enospc_retains_journal_and_recovers_after_space_returns(
     journal = tmp_path / "journals"
     original = workspaces._copy_file
 
-    def full_disk(source: Path, target: Path) -> str:
+    def full_disk(source: Path, target: Path, *, single_link: bool = False) -> str:
         if target.name == ".app.py.raiker-promote" or target.name.endswith(".raiker-restore"):
             raise OSError(errno.ENOSPC, "No space left on device")
-        return original(source, target)
+        return original(source, target, single_link=single_link)
 
     with monkeypatch.context() as patch:
         patch.setattr(workspaces, "_copy_file", full_disk)

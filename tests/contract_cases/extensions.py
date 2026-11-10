@@ -377,12 +377,23 @@ def _task_copies(ws: Path, _client: TestClient, _h: dict[str, str]) -> Call:
 
 
 def _task_copy_diff(ws: Path, _client: TestClient, _h: dict[str, str]) -> Call:
-    return f"/api/command-workspaces/{_task_copy(ws)}/diff?path=main.py"
+    key = _task_copy(ws)
+    from raiker.execution.commands.backends.native import task_workspace_registry
+    from raiker.execution.workspaces import review_workspace
+
+    _, revision = review_workspace(task_workspace_registry(ws).load(OWNER, key), owner=OWNER, workspace_id=key)
+    return f"/api/command-workspaces/{key}/diff?path=main.py&review_revision={revision}"
 
 
 def _task_copy_promoted(ws: Path, _client: TestClient, _h: dict[str, str]) -> Call:
-    return f"/api/command-workspaces/{_task_copy(ws)}/promote", {
+    key = _task_copy(ws)
+    from raiker.execution.commands.backends.native import task_workspace_registry
+    from raiker.execution.workspaces import review_workspace
+
+    _, revision = review_workspace(task_workspace_registry(ws).load(OWNER, key), owner=OWNER, workspace_id=key)
+    return f"/api/command-workspaces/{key}/promote", {
         "created": [], "modified": ["main.py"], "deleted": [],
+        "review_revision": revision,
     }
 
 

@@ -27,9 +27,15 @@
 use super::*;
 use std::fs;
 use windows_sys::Win32::NetworkManagement::NetManagement::{
-    LOCALGROUP_INFO_1, LOCALGROUP_MEMBERS_INFO_3, NetLocalGroupAdd, NetLocalGroupAddMembers,
-    NetLocalGroupDel, NetUserAdd, NetUserDel, UF_DONT_EXPIRE_PASSWD, UF_PASSWD_CANT_CHANGE,
-    UF_SCRIPT, USER_INFO_1, USER_PRIV_USER,
+    LOCALGROUP_INFO_1, LOCALGROUP_MEMBERS_INFO_3, NetApiBufferFree, NetLocalGroupAdd,
+    NetLocalGroupAddMembers, NetLocalGroupDel, NetUserAdd, NetUserDel, NetUserGetInfo,
+    UF_DONT_EXPIRE_PASSWD, UF_PASSWD_CANT_CHANGE, UF_SCRIPT, USER_INFO_1, USER_PRIV_GUEST,
+    USER_PRIV_USER,
+};
+use windows_sys::Win32::Security::Authentication::Identity::{
+    LSA_HANDLE, LSA_OBJECT_ATTRIBUTES, LSA_UNICODE_STRING, LsaAddAccountRights, LsaClose,
+    LsaEnumerateAccountRights, LsaFreeMemory, LsaNtStatusToWinError, LsaOpenPolicy,
+    POLICY_CREATE_ACCOUNT, POLICY_LOOKUP_NAMES,
 };
 use windows_sys::Win32::Security::Cryptography::{
     BCRYPT_USE_SYSTEM_PREFERRED_RNG, BCryptGenRandom, CRYPT_INTEGER_BLOB,
@@ -78,6 +84,30 @@ const ERROR_MEMBER_IN_ALIAS: u32 = 1378;
 const NERR_USER_NOT_FOUND: u32 = 2221;
 const NERR_GROUP_NOT_FOUND: u32 = 2220;
 const ERROR_NO_SUCH_ALIAS: u32 = 1376;
+const ACCOUNT_COMMENT: &str = "Runs Raiker's sandboxed build commands. Not for sign-in.";
+// Local interactive logon must stay available: CreateProcessWithLogonW requires it.
+const DENIED_LOGON_RIGHTS: [&str; 2] = [
+    "SeDenyNetworkLogonRight",
+    "SeDenyRemoteInteractiveLogonRight",
+];
+const ISOLATION_UNAVAILABLE: &str = "native_sandbox_account_profile_isolation_unavailable";
+
+/// A standard account's persistent profile and task-owned explicit descendant
+/// ACLs are shared across reuse. Root-only ACL revocation does not contain
+/// them. No policy or environment variable may bypass this production gate.
+fn require_task_isolation() -> Result<(), String> {
+    // Only the non-shipped Rust unit-test binary can exercise the historical
+    // mechanisms. The production executable has no diagnostic execution opt-in.
+    #[cfg(test)]
+    if std::env::var_os("RAIKER_ACCOUNT_TEST_DIAGNOSTIC").is_some() {
+        return Ok(());
+    }
+    Err(ISOLATION_UNAVAILABLE.into())
+}
+
+#[cfg(test)]
+#[path = "account_windows_diagnostic_tests.rs"]
+mod diagnostic_tests;
 
 /// `C:\` — the drive Windows itself is on, where the task copies live.
 fn system_drive() -> Result<PathBuf, String> {
@@ -122,6 +152,10 @@ pub fn status() -> Value {
         "base": base.map(|path| path.to_string_lossy().into_owned()),
         "group_present": sid.is_some(),
         "credential_readable": password,
+        "logon_policy": logon_policy_status(),
+        "execution_available": false,
+        "execution_reason": ISOLATION_UNAVAILABLE,
+        "isolation_gaps": ["persistent_account_profile", "explicit_descendant_acl", "explicit_allow_below_denied_drive", "loopback_port_approximation"],
     })
 }
 
@@ -152,6 +186,11 @@ pub fn setup() -> Result<Value, String> {
         return Err("native_sandbox_account_setup_requires_elevation".into());
     }
     let owner = current_user_sid_text()?;
+    // Validate every existing account before changing passwords or rights. Never
+    // adopt an unrelated local account merely because its name matches the pool.
+    for index in 0..POOL_SIZE {
+        verify_dedicated_account(&member_name(index), true)?;
+    }
     ensure_group()?;
     for index in 0..POOL_SIZE {
         let name = member_name(index);
@@ -166,6 +205,8 @@ pub fn setup() -> Result<Value, String> {
             store_credential(index, &password, &owner)?;
         }
         add_member(&name)?;
+        let sid = verify_dedicated_account(&name, false)?;
+        install_logon_denies(sid.as_ptr() as PSID)?;
     }
     let group = account_sid(GROUP)?;
     // Everything that is the same for every pool account names the group:
@@ -182,11 +223,31 @@ pub fn setup() -> Result<Value, String> {
         "denied_drives": denied,
         "firewall_rule": FIREWALL_RULE,
         "pool_size": POOL_SIZE,
+        "logon_policy": logon_policy_status(),
         "loopback_filter": {
             "proxy_ports": [super::wfp::PROXY_PORT_LOW, super::wfp::PROXY_PORT_HIGH],
             "dynamic_ports": [dynamic.0, dynamic.1],
         },
     }))
+}
+
+/// A deliberately narrow repair path for existing installations. Unlike setup,
+/// this changes only the two logon rights, never credentials, profiles or ACLs.
+pub fn harden_logon() -> Result<Value, String> {
+    if !elevated() {
+        return Err("native_sandbox_account_setup_requires_elevation".into());
+    }
+    let sids: Vec<Vec<u8>> = (0..POOL_SIZE)
+        .map(|index| verify_dedicated_account(&member_name(index), false))
+        .collect::<Result<_, _>>()?;
+    for sid in &sids {
+        install_logon_denies(sid.as_ptr() as PSID)?;
+    }
+    let status = logon_policy_status();
+    if status["verified"] != true {
+        return Err("native_sandbox_account_logon_policy_not_enforced".into());
+    }
+    Ok(status)
 }
 
 /// Undo everything setup did. Elevated; best effort per step, all attempted.
@@ -256,7 +317,7 @@ fn ensure_group() -> Result<(), String> {
 fn ensure_user(account: &str, password: &str) -> Result<bool, String> {
     let mut name = wide(account);
     let mut secret = wide(password);
-    let mut comment = wide("Runs Raiker's sandboxed build commands. Not for sign-in.");
+    let mut comment = wide(ACCOUNT_COMMENT);
     let info = USER_INFO_1 {
         usri1_name: name.as_mut_ptr(),
         usri1_password: secret.as_mut_ptr(),
@@ -271,7 +332,12 @@ fn ensure_user(account: &str, password: &str) -> Result<bool, String> {
     secret.iter_mut().for_each(|unit| *unit = 0);
     match code {
         NERR_SUCCESS => Ok(true),
-        NERR_USER_EXISTS => Ok(false),
+        NERR_USER_EXISTS => {
+            // Recheck here as well as the setup preflight: a local account
+            // created between the two must never be adopted or rekeyed.
+            verify_dedicated_account(account, false)?;
+            Ok(false)
+        }
         other => Err(format!("native_sandbox_account_user_failed:{other}")),
     }
 }
@@ -309,6 +375,153 @@ fn add_member(account: &str) -> Result<(), String> {
         NERR_SUCCESS | ERROR_MEMBER_IN_ALIAS => Ok(()),
         other => Err(format!("native_sandbox_account_membership_failed:{other}")),
     }
+}
+
+/// Only accounts created for this runner may be targets of account-policy
+/// changes. NetUserGetInfo's null server confines this lookup to the local SAM.
+fn verify_dedicated_account(account: &str, allow_missing: bool) -> Result<Vec<u8>, String> {
+    if !(0..POOL_SIZE).any(|index| member_name(index) == account) {
+        return Err("native_sandbox_account_not_dedicated".into());
+    }
+    let name = wide(account);
+    let mut buffer = null_mut();
+    let code = unsafe { NetUserGetInfo(null(), name.as_ptr(), 1, &mut buffer) };
+    if code == NERR_USER_NOT_FOUND && allow_missing {
+        return Ok(Vec::new());
+    }
+    if code != NERR_SUCCESS || buffer.is_null() {
+        return Err(format!("native_sandbox_account_identity_failed:{code}"));
+    }
+    let info = unsafe { &*(buffer as *const USER_INFO_1) };
+    // Accounts with only the dedicated sandbox group are reported as GUEST,
+    // even though they are ordinary (non-built-in-Guest) local SAM accounts.
+    let dedicated = matches!(info.usri1_priv, USER_PRIV_USER | USER_PRIV_GUEST)
+        && !info.usri1_comment.is_null()
+        && {
+            let expected = wide(ACCOUNT_COMMENT);
+            // Compare only the known marker, including its terminator.
+            expected
+                .iter()
+                .enumerate()
+                .all(|(offset, unit)| unsafe { *info.usri1_comment.add(offset) == *unit })
+        };
+    unsafe { NetApiBufferFree(buffer.cast()) };
+    let sid = account_sid(account)?;
+    if !dedicated || sid_text(sid.as_ptr() as PSID)? == current_user_sid_text()? {
+        return Err("native_sandbox_account_not_dedicated".into());
+    }
+    Ok(sid)
+}
+
+struct AccountPolicy(LSA_HANDLE);
+
+impl AccountPolicy {
+    fn open(writable: bool) -> Result<Self, String> {
+        let mut attributes: LSA_OBJECT_ATTRIBUTES = unsafe { std::mem::zeroed() };
+        attributes.Length = size_of::<LSA_OBJECT_ATTRIBUTES>() as u32;
+        let mut handle = 0;
+        let access = POLICY_LOOKUP_NAMES | if writable { POLICY_CREATE_ACCOUNT } else { 0 };
+        let code = unsafe { LsaOpenPolicy(null(), &attributes, access as u32, &mut handle) };
+        if code != 0 {
+            return Err(policy_error(code));
+        }
+        Ok(Self(handle))
+    }
+
+    fn rights(&self, sid: PSID) -> Result<Vec<String>, String> {
+        let mut rights: *mut LSA_UNICODE_STRING = null_mut();
+        let mut count = 0;
+        let code = unsafe { LsaEnumerateAccountRights(self.0, sid, &mut rights, &mut count) };
+        // An account with no assigned rights has no LSA policy entry yet.
+        if code != 0 {
+            return if unsafe { LsaNtStatusToWinError(code) } == 2 {
+                Ok(Vec::new())
+            } else {
+                Err(policy_error(code))
+            };
+        }
+        let entries = if count == 0 {
+            Vec::new()
+        } else if rights.is_null() {
+            return Err("native_sandbox_account_logon_policy_invalid".into());
+        } else {
+            unsafe { std::slice::from_raw_parts(rights, count as usize) }
+                .iter()
+                .map(|entry| {
+                    String::from_utf16_lossy(unsafe {
+                        std::slice::from_raw_parts(entry.Buffer, entry.Length as usize / 2)
+                    })
+                })
+                .collect()
+        };
+        if !rights.is_null() {
+            unsafe { LsaFreeMemory(rights.cast()) };
+        }
+        Ok(entries)
+    }
+}
+
+impl Drop for AccountPolicy {
+    fn drop(&mut self) {
+        unsafe { LsaClose(self.0) };
+    }
+}
+
+fn policy_error(code: i32) -> String {
+    format!("native_sandbox_account_logon_policy_failed:{}", unsafe {
+        LsaNtStatusToWinError(code)
+    })
+}
+
+fn install_logon_denies(sid: PSID) -> Result<(), String> {
+    let policy = AccountPolicy::open(true)?;
+    let mut names: Vec<Vec<u16>> = DENIED_LOGON_RIGHTS.iter().map(|name| wide(name)).collect();
+    let rights: Vec<LSA_UNICODE_STRING> = names
+        .iter_mut()
+        .map(|name| LSA_UNICODE_STRING {
+            Length: ((name.len() - 1) * 2) as u16,
+            MaximumLength: (name.len() * 2) as u16,
+            Buffer: name.as_mut_ptr(),
+        })
+        .collect();
+    let code = unsafe { LsaAddAccountRights(policy.0, sid, rights.as_ptr(), rights.len() as u32) };
+    if code != 0 {
+        return Err(policy_error(code));
+    }
+    if !logon_denies_present(&policy.rights(sid)?) {
+        return Err("native_sandbox_account_logon_policy_not_enforced".into());
+    }
+    Ok(())
+}
+
+fn logon_denies_present(rights: &[String]) -> bool {
+    DENIED_LOGON_RIGHTS
+        .iter()
+        .all(|required| rights.iter().any(|right| right == required))
+}
+
+/// Policy evidence is separate from credential readiness: an access-denied
+/// read is indeterminate, never evidence that a logon denial was installed.
+fn logon_policy_status() -> Value {
+    let policy = AccountPolicy::open(false);
+    let accounts: Vec<Value> = (0..POOL_SIZE).map(|index| {
+        let name = member_name(index);
+        let identity = verify_dedicated_account(&name, false);
+        let rights = identity.as_ref().map_err(Clone::clone).and_then(|sid| {
+            policy.as_ref().map_err(Clone::clone)?.rights(sid.as_ptr() as PSID)
+        });
+        let observed = rights.as_ref().ok();
+        json!({
+            "account": name,
+            "sid": identity.as_ref().ok().and_then(|sid| sid_text(sid.as_ptr() as PSID).ok()),
+            "dedicated": identity.is_ok(),
+            "network_denied": observed.map(|rights| rights.iter().any(|right| right == DENIED_LOGON_RIGHTS[0])),
+            "remote_interactive_denied": observed.map(|rights| rights.iter().any(|right| right == DENIED_LOGON_RIGHTS[1])),
+            "verified": observed.is_some_and(|rights| logon_denies_present(rights)),
+            "reason": rights.err(),
+        })
+    }).collect();
+    json!({"verified": accounts.iter().all(|account| account["verified"] == true), "accounts": accounts})
 }
 
 /// A SID buffer for a local account or group name.
@@ -817,6 +1030,7 @@ fn deny_other_drives(group: PSID) -> Result<Vec<String>, String> {
 
 /// Run one governed command as the sandbox account.
 pub fn launch(policy: &LaunchPolicy, argv: &[String]) -> Result<i32, String> {
+    require_task_isolation()?;
     let base = base()?;
     let root = strip_verbatim(
         &policy
@@ -1160,9 +1374,14 @@ fn restrict_ui(job: HANDLE) -> Result<(), String> {
 /// Measure this boundary the way the AppContainer probe does: every
 /// observation twice, inside as the sandbox account and outside as the owner.
 pub fn probe() -> Value {
-    match measure() {
+    match require_task_isolation().and_then(|_| measure()) {
         Ok(value) => value,
-        Err(reason) => unavailable(&reason),
+        Err(reason) => {
+            let mut report = unavailable(&reason);
+            report["boundary"] = json!("restricted_account");
+            report["account_status"] = status();
+            report
+        }
     }
 }
 

@@ -10,6 +10,7 @@ afterEach(() => {
 
 const copy = {
   workspace_id: "a".repeat(32),
+  review_revision: "c".repeat(64),
   session_id: "sess_build",
   source: "app",
   created_at: 0,
@@ -35,7 +36,7 @@ it("lists the session's sandbox changes and applies exactly what was shown", asy
 
   await waitFor(() =>
     expect(promote).toHaveBeenCalledWith(copy.workspace_id, {
-      created: ["new.py"], modified: ["main.py"], deleted: ["old.txt"], overwrite: [],
+      created: ["new.py"], modified: ["main.py"], deleted: ["old.txt"], overwrite: [], review_revision: copy.review_revision,
     }),
   );
 });
@@ -59,10 +60,29 @@ it("holds Apply until each conflicting file is chosen for overwrite (BD-4)", asy
 
   await waitFor(() =>
     expect(promote).toHaveBeenCalledWith(copy.workspace_id, {
-      created: ["new.py"], modified: ["main.py"], deleted: ["old.txt"], overwrite: ["main.py"],
+      created: ["new.py"], modified: ["main.py"], deleted: ["old.txt"], overwrite: ["main.py"], review_revision: copy.review_revision,
     }),
   );
   expect(confirm.mock.calls[0][0]).toMatch(/replaces your own edits to main.py/);
+});
+
+it("clears an open diff and overwrite consent when the reviewed revision changes", async () => {
+  const list = vi.spyOn(api, "taskWorkspaces").mockResolvedValue({ workspaces: [{ ...copy, conflicts: ["main.py"] }] });
+  vi.spyOn(api, "taskWorkspaceFileDiff").mockResolvedValue({
+    workspace_id: copy.workspace_id, review_revision: copy.review_revision, path: "main.py",
+    status: "modified", diff: "+reviewed", binary: false, truncated: false,
+  });
+  render(TaskWorkspaceReview, { sessionId: copy.session_id });
+  const checkbox = await screen.findByRole("checkbox", { name: /Overwrite with the copy's version/ });
+  await fireEvent.click(checkbox);
+  await fireEvent.click(screen.getByRole("button", { name: /Changed main\.py/ }));
+  expect(await screen.findByLabelText("Changes to main.py")).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "Apply to project" })).toBeEnabled();
+  list.mockResolvedValue({ workspaces: [{ ...copy, review_revision: "d".repeat(64), conflicts: ["main.py"] }] });
+  window.dispatchEvent(new Event("focus"));
+  await waitFor(() => expect(checkbox).not.toBeChecked());
+  expect(screen.queryByLabelText("Changes to main.py")).not.toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "Apply to project" })).toBeDisabled();
 });
 
 it("says a stale review was refused and nothing was applied", async () => {
@@ -75,7 +95,7 @@ it("says a stale review was refused and nothing was applied", async () => {
 
   await fireEvent.click(await screen.findByRole("button", { name: "Apply to project" }));
 
-  expect(await screen.findByText(/The copy changed after you looked/)).toBeInTheDocument();
+  expect(await screen.findByText(/The copy or project changed after you looked/)).toBeInTheDocument();
 });
 
 it("shows nothing when the session has no sandbox changes", async () => {
@@ -102,7 +122,7 @@ it("rereads the copy when a turn ends", async () => {
 it("opens one changed file's diff from the review, and closes it again", async () => {
   vi.spyOn(api, "taskWorkspaces").mockResolvedValue({ workspaces: [copy] });
   const read = vi.spyOn(api, "taskWorkspaceFileDiff").mockResolvedValue({
-    workspace_id: copy.workspace_id, path: "main.py", status: "modified",
+    workspace_id: copy.workspace_id, review_revision: copy.review_revision, path: "main.py", status: "modified",
     diff: "--- a/main.py\n+++ b/main.py\n@@ -1 +1 @@\n-print('a')\n+print('b')\n",
     binary: false, truncated: false,
   });
@@ -112,7 +132,7 @@ it("opens one changed file's diff from the review, and closes it again", async (
   await fireEvent.click(file);
 
   const diff = await screen.findByLabelText("Changes to main.py");
-  expect(read).toHaveBeenCalledWith(copy.workspace_id, "main.py");
+  expect(read).toHaveBeenCalledWith(copy.workspace_id, "main.py", copy.review_revision);
   expect(diff).toHaveTextContent("+print('b')");
   expect(file).toHaveAttribute("aria-expanded", "true");
   await fireEvent.click(file);
@@ -122,7 +142,7 @@ it("opens one changed file's diff from the review, and closes it again", async (
 it("says a binary file has no line-by-line view", async () => {
   vi.spyOn(api, "taskWorkspaces").mockResolvedValue({ workspaces: [copy] });
   vi.spyOn(api, "taskWorkspaceFileDiff").mockResolvedValue({
-    workspace_id: copy.workspace_id, path: "new.py", status: "created", diff: "", binary: true, truncated: false,
+    workspace_id: copy.workspace_id, review_revision: copy.review_revision, path: "new.py", status: "created", diff: "", binary: true, truncated: false,
   });
   render(TaskWorkspaceReview, { sessionId: "sess_build" });
   await fireEvent.click(await screen.findByRole("button", { name: /Added new\.py/ }));

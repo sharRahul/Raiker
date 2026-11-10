@@ -17,13 +17,14 @@ translated to its real twin first, so it is confined by the same rules.
 The copy is writable by sandboxed commands, so it may hold links a command
 planted. A file tool never follows one: every component between the copy root
 and the target is checked, and a link or reparse point refuses the call
-(``task_copy_link``). This is a path check, not a pinned handle; a command
-racing the tool could still swap a component between the check and the open.
+(``task_copy_link``). Mapping is preliminary authorization; file tools then
+perform I/O through task_tree_io's pinned directories and validated handles.
 """
 
 from __future__ import annotations
 
 import dataclasses
+import os
 import re
 from pathlib import Path
 from typing import Any
@@ -85,7 +86,7 @@ class TaskTree:
 
     def to_real(self, path: Path) -> Path:
         """The real twin of a path inside one of this session's copies."""
-        resolved = path.resolve(strict=False)
+        resolved = Path(os.path.abspath(path))
         for workspace in self._copies():
             root = workspace.root.resolve()
             if _within(root, resolved):
@@ -147,26 +148,11 @@ def authority_for_action(
     return wrap_authority(authority, tree, workspace_root)
 
 
-def _copy_files(copy_root: Path, *, directories: bool = False) -> list[Path]:
+def _copy_files(copy_root: Path, authority: Any = None, *, directories: bool = False) -> list[Path]:
     """Regular files (and folders, if asked) under *copy_root*, never through a link."""
-    found: list[Path] = []
-    pending = [copy_root]
-    while pending:
-        directory = pending.pop()
-        try:
-            children = list(directory.iterdir())
-        except OSError:
-            continue
-        for child in children:
-            if _path_is_link_like(child):
-                continue
-            if child.is_dir():
-                pending.append(child)
-                if directories:
-                    found.append(child)
-            elif child.is_file():
-                found.append(child)
-    return found
+    from raiker.tools.task_tree_io import walk
+
+    return walk(copy_root, authority, directories=directories, root=copy_root)
 
 
 def overlay_files(authority: Any, base: Path, real_files: list[Path]) -> list[Path]:
@@ -181,13 +167,13 @@ def overlay_files(authority: Any, base: Path, real_files: list[Path]) -> list[Pa
     real_base = authority.tree.to_real(base).resolve()
     if real_base != base.resolve():
         # *base* is inside a copy: list it without following planted links.
-        return _copy_files(base)
+        return _copy_files(base, authority)
     files = list(real_files)
     for source, copy_root in authority.tree.copy_roots():
         if source == real_base or not _within(real_base, source):
             continue
         files = [path for path in files if not _within(source, path.resolve())]
-        files.extend(_copy_files(copy_root))
+        files.extend(_copy_files(copy_root, authority))
     return files
 
 
@@ -207,7 +193,7 @@ def overlay_glob(
             name: path for name, path in matches.items() if not _within(source, path.resolve())
         }
         prefix = source.relative_to(workspace_root).as_posix()
-        for path in _copy_files(copy_root, directories=True):
+        for path in _copy_files(copy_root, authority, directories=True):
             relative = path.relative_to(copy_root).as_posix()
             display = relative if prefix == "." else f"{prefix}/{relative}"
             if matcher.fullmatch(display):

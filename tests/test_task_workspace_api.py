@@ -47,6 +47,75 @@ def _task_copy(workspace: Path, owner: str = OWNER) -> tuple[str, Path]:
     return key, copy.root
 
 
+def _review(client: TestClient, headers: dict[str, str]) -> str:
+    [view] = client.get("/api/command-workspaces", headers=headers).json()["workspaces"]
+    return str(view["review_revision"])
+
+
+@pytest.mark.parametrize("side", ["copy", "project"])
+def test_same_paths_with_changed_bytes_require_a_new_review(
+    client: TestClient, headers: dict[str, str], workspace: Path, side: str,
+) -> None:
+    key, root = _task_copy(workspace)
+    revision = _review(client, headers)
+    target = root if side == "copy" else workspace / "app"
+    (target / "main.py").write_text("different unseen bytes\n", encoding="utf-8")
+    refused = client.post(
+        f"/api/command-workspaces/{key}/promote",
+        json={"created": ["new.py"], "modified": ["main.py"], "deleted": ["old.txt"],
+              "review_revision": revision, "overwrite": ["main.py"] if side == "project" else []},
+        headers=headers,
+    )
+    assert refused.status_code == 409, refused.text
+    assert refused.json()["detail"]["reason_code"] == "workspace_review_stale"
+    assert not (workspace / "app/new.py").exists()
+    assert root.exists()
+
+
+def test_apply_without_a_revision_is_refused(
+    client: TestClient, headers: dict[str, str], workspace: Path,
+) -> None:
+    key, _ = _task_copy(workspace)
+    refused = client.post(
+        f"/api/command-workspaces/{key}/promote",
+        json={"created": ["new.py"], "modified": ["main.py"], "deleted": ["old.txt"]},
+        headers=headers,
+    )
+    assert refused.status_code == 422
+    assert (workspace / "app/main.py").read_text() == "print('v1')\n"
+
+
+def test_review_revision_cannot_be_reused_for_another_copy(
+    client: TestClient, headers: dict[str, str], workspace: Path,
+) -> None:
+    _task_copy(workspace)
+    revision = _review(client, headers)
+    key, second = task_workspace_registry(workspace).acquire(OWNER, "other_session", workspace / "app")
+    (second.root / "main.py").write_text("print('v2')\n")
+    (second.root / "old.txt").unlink()
+    (second.root / "new.py").write_text("x = 1\n")
+    refused = client.post(
+        f"/api/command-workspaces/{key}/promote",
+        json={"created": ["new.py"], "modified": ["main.py"], "deleted": ["old.txt"],
+              "review_revision": revision}, headers=headers,
+    )
+    assert refused.status_code == 409
+    assert refused.json()["detail"]["reason_code"] == "workspace_review_stale"
+    assert (workspace / "app/main.py").read_text() == "print('v1')\n"
+
+
+def test_opening_a_diff_from_an_old_revision_requires_refresh(
+    client: TestClient, headers: dict[str, str], workspace: Path,
+) -> None:
+    key, root = _task_copy(workspace)
+    revision = _review(client, headers)
+    (root / "main.py").write_text("new unseen text\n")
+    refused = client.get(f"/api/command-workspaces/{key}/diff",
+                         params={"path": "main.py", "review_revision": revision}, headers=headers)
+    assert refused.status_code == 409
+    assert refused.json()["detail"]["reason_code"] == "workspace_review_stale"
+
+
 def test_the_owner_sees_what_the_task_changed_before_anything_reaches_the_project(
     client: TestClient, headers: dict[str, str], workspace: Path
 ) -> None:
@@ -72,7 +141,8 @@ def test_promotion_applies_exactly_the_reviewed_change_set_and_audits_it(
 
     promoted = client.post(
         f"/api/command-workspaces/{key}/promote",
-        json={"created": ["new.py"], "modified": ["main.py"], "deleted": ["old.txt"]},
+        json={"created": ["new.py"], "modified": ["main.py"], "deleted": ["old.txt"],
+              "review_revision": _review(client, headers)},
         headers=headers,
     )
 
@@ -91,11 +161,13 @@ def test_a_change_made_after_the_review_makes_the_review_stale(
     client: TestClient, headers: dict[str, str], workspace: Path
 ) -> None:
     key, root = _task_copy(workspace)
+    revision = _review(client, headers)
     (root / "late.py").write_text("unreviewed\n", encoding="utf-8")
 
     refused = client.post(
         f"/api/command-workspaces/{key}/promote",
-        json={"created": ["new.py"], "modified": ["main.py"], "deleted": ["old.txt"]},
+        json={"created": ["new.py"], "modified": ["main.py"], "deleted": ["old.txt"],
+              "review_revision": revision},
         headers=headers,
     )
 
@@ -113,7 +185,8 @@ def test_an_owner_edit_after_the_snapshot_is_a_conflict_and_nothing_is_written(
 
     refused = client.post(
         f"/api/command-workspaces/{key}/promote",
-        json={"created": ["new.py"], "modified": ["main.py"], "deleted": ["old.txt"]},
+        json={"created": ["new.py"], "modified": ["main.py"], "deleted": ["old.txt"],
+              "review_revision": _review(client, headers)},
         headers=headers,
     )
 
@@ -131,7 +204,8 @@ def test_the_listing_names_conflicts_and_an_overwrite_applies_them(
     (workspace / "app" / "main.py").write_text("owner edit\n", encoding="utf-8")
     [view] = client.get("/api/command-workspaces", headers=headers).json()["workspaces"]
     assert view["conflicts"] == ["main.py"]
-    body = {"created": ["new.py"], "modified": ["main.py"], "deleted": ["old.txt"]}
+    body = {"created": ["new.py"], "modified": ["main.py"], "deleted": ["old.txt"],
+            "review_revision": view["review_revision"]}
 
     unseen = client.post(
         f"/api/command-workspaces/{key}/promote",
@@ -184,10 +258,12 @@ def test_each_changed_file_reads_as_a_unified_diff_against_the_project(
 ) -> None:
     key, root = _task_copy(workspace)
     (root / "blob.bin").write_bytes(b"\x00\x01")
+    revision = _review(client, headers)
 
     def diff(path: str) -> dict[str, object]:
         answer = client.get(
-            f"/api/command-workspaces/{key}/diff", params={"path": path}, headers=headers
+            f"/api/command-workspaces/{key}/diff",
+            params={"path": path, "review_revision": revision}, headers=headers
         )
         assert answer.status_code == 200, answer.text
         return dict(answer.json())
@@ -201,6 +277,7 @@ def test_each_changed_file_reads_as_a_unified_diff_against_the_project(
     # Only what the review lists: an unchanged file, or a way out, reads as missing.
     for path in ("unchanged.txt", "../outside.txt"):
         refused = client.get(
-            f"/api/command-workspaces/{key}/diff", params={"path": path}, headers=headers
+            f"/api/command-workspaces/{key}/diff",
+            params={"path": path, "review_revision": revision}, headers=headers
         )
         assert refused.status_code == 404

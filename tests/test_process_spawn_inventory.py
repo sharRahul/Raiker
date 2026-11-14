@@ -69,6 +69,7 @@ REVIEWED: dict[str, tuple[str, str]] = {
     "raiker/app/desktop_smoke.py": (LIFECYCLE, "Packaging smoke test, CI only"),
     "raiker/app/desktop_update.py": (LIFECYCLE, "Hands a verified update to the platform installer"),
     "raiker/app/update_handoff.py": (LIFECYCLE, "The verified update helper"),
+    "raiker/voice/runtime.py": (LIFECYCLE, "Owner-pressed voice Install: pip or uv with --require-hashes on requirements/voice.txt, source runs only"),
     "raiker/tools/git.py": (OWNER, "Git on the owner's repository after Apply; filter drivers, fsmonitor and foreign credential helpers disabled"),
     "raiker/github/local_methods.py": (OWNER, "Discovers the owner's own gh sign-in and credential helper when selected"),
     "raiker/notify/approval_notifier.py": (OWNER, "The owner's own RAIKER_OS_NOTIFY_CMD, off by default, redacted arguments only"),

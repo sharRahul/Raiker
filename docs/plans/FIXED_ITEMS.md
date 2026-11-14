@@ -1,5 +1,125 @@
 # Fixed items
 
+## FIXED-1425 — Raiker had no embedding model of its own, so semantic recall waited on a button
+
+**Severity: Medium. Area: Memory / built-in models. Status: Fixed 2026-11-14 (first slice; see [TO_BE_FIXED](TO_BE_FIXED.md#built-in-embedding-model--what-the-first-slice-did-not-do)).**
+
+**Observed.** A default install held no semantic space, so Memory searched with the labelled hashing fallback and a paraphrase missed the memory it meant. The governed `index_memories` batch existed but ran only when the owner pressed **Index**, so new memories and newly added files stayed invisible to semantic recall.
+
+**Decision.** `nomic-embed-text` v1.5 (Apache-2.0, 137M parameters, 768 dimensions, 8,192-token context) fits Raiker: it is local, small enough to run beside a chat model on a laptop processor, and good enough to be the default space. It is reached through the owner's local Ollama, which verifies the model's digest, so Raiker downloads nothing on a hope.
+
+**Fixed.** The Ollama profile declares `nomic-embed-text` as its embedding model, so Memory offers `ollama:nomic-embed-text` as a local space. Raiker adds the task prefixes the model was trained with (`search_document:` for what is stored, `search_query:` for a search; `raiker/models/builtin_embedding.py`). A background worker (`raiker/memory/background_index.py`) asks Ollama for the model when it is missing and runs the same governed `index_memories` action every ten minutes — only where `model_provider_runtime` is on and set to **Always allow** or **Auto**, so it never parks an approval nobody asked for. `RAIKER_BACKGROUND_INDEX=off` turns it off; its last outcome is kept at `logs/background-index.json`.
+
+**Evidence.** `tests/test_builtin_embedding.py` (prefixes, Ollama's model list and pull, the permission rule, the fetch-then-index pass, the off switch). Not qualified live: this sandbox's network refuses `ollama.com` and `huggingface.co`.
+
+## FIXED-1424 — Voice Install, Test and Preview did not work
+
+**Severity: High. Area: Voice. Status: Fixed 2026-11-14.**
+
+**Observed (live, Linux).** **Install** reported success after downloading only the speaking files. **Test** and **▶ Preview** then failed with `voice_kokoro_runtime_missing` — "Kokoro's runtime is not part of this Raiker build yet" — because a source run lacks `kokoro-onnx` and `onnxruntime`, and nothing on the page could add them. Listening stayed "Not available yet": upstream publishes `whisper-server` for Windows only. A failed install showed the generic `voice install failed`.
+
+**Fixed.** Install now installs the hash-locked `requirements/voice.txt` (`--require-hashes --no-deps`, pip or `uv pip`) into the interpreter running Raiker when a side's packages are missing (`raiker/voice/runtime.py`); a packaged build never installs and reports a missing package as a build defect. Where no verified `whisper-server` exists, Raiker listens with its own worker (`raiker/voice/stt_worker.py`): the same whisper.cpp through the MIT `pywhispercpp` binding, on the catalogue's verified GGML model, answering whisper-server's `/inference` route on loopback. Settings › Voice names it ("whisper.cpp, built into Raiker"), offers **Install** when files are present but the runtime is not, says "Installing the voice runtime…" while it does, and reads the operation's real reason on failure.
+
+**Evidence.** Live: Install added the runtime and Kokoro; **▶ Preview** returned `audio/wav`; **Test** spoke its phrase (RT-1114B-07). `tests/test_voice_v1.py` covers the built-in listener's route and resampling, the Linux profile choosing it, and runtime install success and failure; `Voice.test.ts` the Install offer and the listener label. The Whisper model could not be downloaded here (`huggingface.co` refused by the sandbox), so a spoken round trip on Linux is still open.
+
+## FIXED-1423 — Answers carried three lines of metadata and rendered as grey chips
+
+**Severity: Medium. Area: Chat / response presentation. Status: Fixed 2026-11-14.**
+
+**Observed.** Under every answer: an icon row, "▸ Haiku 4.5 · ≈ $0.0130 · nothing else left this computer", "Memory: Brief + search · nothing recalled · searched sqlite-fts5 + raiker-local-hash-v1", then **Evidence** on its own line. A one-word answer sat in a shrink-wrapped grey bubble and a long one in a boxed card. Streaming showed a bare "Working…".
+
+**Fixed.** Following ChatGPT, Claude and Cursor: Raiker's answer is page text, not a bubble (the owner's message keeps its bubble). The receipt and Evidence share one quiet line, shown for the newest answer and on hover or focus for earlier ones. The receipt's summary keeps the model, a priced cost and anything unusual; "no charge", "cost not known" and "nothing else left this computer" moved into its rows. The memory line appears only when memory was held back (off or Incognito) or used. While Raiker works: a bouncing three-dot "Thinking…" shimmer, the newest block fading in and a soft caret; all honour reduced motion.
+
+**Evidence.** RT-1114B-05 (live answer: transparent background, model in the meta line, no "nothing recalled"); `turnReceipt.test.ts`, `RecallStrip.test.ts`, `ChatView.test.ts`.
+
+## FIXED-1422 — Context and cost were wrong for every provider
+
+**Severity: High. Area: Models / usage accounting. Status: Fixed 2026-11-14.**
+
+**Observed.** The context meter read `session_usage(...)[-1].input_tokens`: the **sum** of every request's input in the conversation, for whichever model sorted last alphabetically, so a long chat read as many times its window. It counted only uncached input, so an Anthropic conversation whose prompt is mostly a cache read showed **0% context** with 10,000 tokens in play. Cost and window were resolved against the *global* model, so a conversation answered by a surface default showed no window and no cost. OpenAI's `cached_tokens` is a subset of `prompt_tokens`; Raiker billed those tokens twice. The popover's compaction arrow rendered as `â†’`.
+
+**Fixed.** `ModelUsageLedger.latest_request` reads the newest request on its own; the meter shows its whole prompt (uncached input + cache reads + cache writes + the answer carried into the next request). Usage normalisation makes `input_tokens` the uncached part for every provider (`prompt_tokens_details` and `input_tokens_details` subtracted once). Each ledger row is priced at the profile that served it; local rows are never billed. The popover says "tokens in context", splits "This chat: input · cached · output" (`session_cache_read_tokens`), and shows `→`.
+
+**Evidence.** `tests/test_context_usage_latest_request.py`, `tests/test_prompt_cache_metrics.py` (OpenAI Chat and Responses shapes); live: the composer moved from "0% context" to "5% context" for the same Haiku conversation, and RT-1114B-05 asserts a non-zero figure.
+
+## FIXED-1421 — Tasks put its composer above the work it files
+
+**Severity: Medium. Area: Quiet UI / Tasks. Status: Fixed 2026-11-14.**
+
+**Observed.** The plan composer sat at the top of Tasks with the board below it, the reverse of Chat, Build and Design. On a phone, every page toolbar stacked Refresh and the guide icon on separate centred lines.
+
+**Fixed.** The board reads top-down and the composer docks at the bottom of the page (sticky, over a fade), with the templates directly above it as Chat's starters are; on a phone the templates are one scrolling strip. `.head-row.page-toolbar` stays one row at every width.
+
+**Evidence.** RT-1114B-02 (live geometry: composer below the summary, templates above the composer); captured at 1440 px and 390 px.
+
+## FIXED-1420 — Threads rows showed Task detail and Evidence as captions
+
+**Severity: Low. Area: Quiet UI / Work › Threads. Status: Fixed 2026-11-14.**
+
+**Observed.** *Task detail* and *Evidence* were small grey text tucked under the title, and **Organise** was smaller still.
+
+**Fixed.** The row's actions sit at its right edge, centred on the row, as quiet buttons with a hover surface; on a phone they drop under the title. **Organise** shares the same style.
+
+**Evidence.** RT-1114B-04 (live: padded actions in the row's right half).
+
+## FIXED-1419 — Build's Terminal panel set its facts in two narrow columns
+
+**Severity: Low. Area: Quiet UI / Build. Status: Fixed 2026-11-14.**
+
+**Observed.** In the side panel the boundary and its posture sat side by side and wrapped every three words; the notice's shield icon shrank to a dot.
+
+**Fixed.** One fact per line, icons kept at their size, and the receipt's facts flow to the panel's width.
+
+**Evidence.** RT-1114B-06 (live: the posture list is a single-column grid).
+
+## FIXED-1418 — Approvals kept its toolbar above its filters
+
+**Severity: Low. Area: Quiet UI / Approvals. Status: Fixed 2026-11-14.**
+
+**Observed.** Refresh and the guide formed a row of their own above Pending/History — the only page with two control rows before its content.
+
+**Fixed.** One row: the queue filters lead, the sort follows, and Refresh and the guide end it.
+
+**Evidence.** RT-1114B-03 (live: filters and Refresh share a centre line).
+
+## FIXED-1417 — Goals was the only Work tab with its own title, and offered New goal twice
+
+**Severity: Low. Area: Quiet UI / Work › Goals. Status: Fixed 2026-11-14.**
+
+**Fixed.** Goals carries the shared page toolbar (Refresh, New goal, guide) and no second title. While empty, only the empty state offers **New goal**. Page toolbars centre their guide icon on the action row.
+
+**Evidence.** RT-1114B-03 (live: no `Goals` heading; one New goal when empty).
+
+## FIXED-1416 — The content area's focus frame came back
+
+**Severity: Low. Area: Quiet UI focus. Status: Fixed 2026-11-14.**
+
+**Observed.** A blue frame round the whole content area on every page reached by link or reload, despite [FIXED-1396](#fixed-1396--the-content-area-drew-a-focus-frame-after-navigation).
+
+**Fixed.** A scoped `.content:focus-visible` rule in `App.svelte` outranked the global one; the landmark now draws no ring as a focus target. Controls keep theirs.
+
+**Evidence.** RT-1114B-06 (live: `main#main` outline is `none` after reload).
+
+## FIXED-1415 — The notice dock re-docked on every page and covered a phone's heading
+
+**Severity: Medium. Area: Quiet UI / notifications. Status: Fixed 2026-11-14.**
+
+**Observed.** "Background task finished" folded into the bell after six seconds, but the fold lived in component state, so each reload or link brought it back over the page's top-right actions; on a phone it covered the heading.
+
+**Fixed.** Folded notices are remembered for the browser session, fold after five seconds, enter with a short animation, and on a phone dock at the bottom edge instead of over the heading. The bell keeps counting them.
+
+**Evidence.** `QuietHours.test.ts` (fold on any page, with storage reset between tests).
+
+## FIXED-1414 — Models said "No default model is chosen" beside "Chat default"
+
+**Severity: Medium. Area: Models. Status: Fixed 2026-11-14.**
+
+**Observed (live).** Choosing Haiku in Chat saved a Chat default only. Models was headed *No default model is chosen* while the same page marked Haiku *Chat default*, and Build and Tasks said *No model is chosen*.
+
+**Fixed.** The first model an owner chooses in any surface also becomes the global default when none exists, as ChatGPT, Claude and Cursor carry one choice everywhere; a later surface choice stays an override and never moves the global default. When no global default exists, the header reads from the same decisions as the marks ("Only Chat has a model of its own").
+
+**Evidence.** `tests/test_surface_model_defaults.py::test_the_first_surface_choice_becomes_the_global_default`; RT-1114B-01 (live: Models names Haiku 4.5; Tasks has no "No model is chosen").
+
 ## FIXED-1413 — On a phone, Build's Mode menu ran off-screen and Settings opened on its navigation
 
 **Severity: Medium. Area: Quiet UI / phone layout. Status: Fixed 2026-11-14.**
@@ -2313,6 +2433,18 @@ file you can open. The two capture sets that remain — `screenshots/pages/` and
 | [FIXED-1382](#fixed-1382--linux-filesystem-flags-broke-windows-type-checking) | Low | Platform portability | Fixed 2026-11-09 |
 | [FIXED-1383](#fixed-1383--keyboard-start-evidence-depended-on-retired-receipt-wording) | Low | Beta live tests | Fixed 2026-11-09 |
 | [FIXED-1384](#fixed-1384--model-downloads-checked-redirect-hosts-after-contacting-them) | High | Model and speech downloads | Fixed 2026-11-09 |
+| [FIXED-1425](#fixed-1425--raiker-had-no-embedding-model-of-its-own-so-semantic-recall-waited-on-a-button) | Medium | Memory / built-in models | Fixed 2026-11-14 |
+| [FIXED-1424](#fixed-1424--voice-install-test-and-preview-did-not-work) | High | Voice | Fixed 2026-11-14 |
+| [FIXED-1423](#fixed-1423--answers-carried-three-lines-of-metadata-and-rendered-as-grey-chips) | Medium | Chat / response presentation | Fixed 2026-11-14 |
+| [FIXED-1422](#fixed-1422--context-and-cost-were-wrong-for-every-provider) | High | Models / usage accounting | Fixed 2026-11-14 |
+| [FIXED-1421](#fixed-1421--tasks-put-its-composer-above-the-work-it-files) | Medium | Quiet UI / Tasks | Fixed 2026-11-14 |
+| [FIXED-1420](#fixed-1420--threads-rows-showed-task-detail-and-evidence-as-captions) | Low | Quiet UI / Work › Threads | Fixed 2026-11-14 |
+| [FIXED-1419](#fixed-1419--builds-terminal-panel-set-its-facts-in-two-narrow-columns) | Low | Quiet UI / Build | Fixed 2026-11-14 |
+| [FIXED-1418](#fixed-1418--approvals-kept-its-toolbar-above-its-filters) | Low | Quiet UI / Approvals | Fixed 2026-11-14 |
+| [FIXED-1417](#fixed-1417--goals-was-the-only-work-tab-with-its-own-title-and-offered-new-goal-twice) | Low | Quiet UI / Work › Goals | Fixed 2026-11-14 |
+| [FIXED-1416](#fixed-1416--the-content-areas-focus-frame-came-back) | Low | Quiet UI focus | Fixed 2026-11-14 |
+| [FIXED-1415](#fixed-1415--the-notice-dock-re-docked-on-every-page-and-covered-a-phones-heading) | Medium | Quiet UI / notifications | Fixed 2026-11-14 |
+| [FIXED-1414](#fixed-1414--models-said-no-default-model-is-chosen-beside-chat-default) | Medium | Models | Fixed 2026-11-14 |
 | [FIXED-1413](#fixed-1413--on-a-phone-builds-mode-menu-ran-off-screen-and-settings-opened-on-its-navigation) | Medium | Quiet UI / phone layout | Fixed 2026-11-14 |
 | [FIXED-1412](#fixed-1412--short-table-and-list-values-wrapped-while-wide-columns-stayed-empty) | Low | Quiet UI tables | Fixed 2026-11-14 |
 | [FIXED-1411](#fixed-1411--diagnostics--overview-was-capped-at-half-the-page) | Low | Quiet UI / Diagnostics | Fixed 2026-11-14 |

@@ -16,6 +16,8 @@
   import { onDestroy, onMount } from "svelte";
   import Badge from "../components/Badge.svelte";
   import EmptyState from "../components/EmptyState.svelte";
+  import GuideLink from "../components/GuideLink.svelte";
+  import Icon from "../components/Icon.svelte";
   import ModelPicker from "../components/ModelPicker.svelte";
   import PageState from "../components/PageState.svelte";
   import { chatProfiles, modelCatalogues, refreshModels } from "../models.svelte";
@@ -282,12 +284,16 @@
 </script>
 
 <div class="goals">
-  <header class="goals-head">
-    <div>
-      <h2>Goals</h2>
-      <p class="muted">An outcome Raiker works toward across sessions. Each step runs as an ordinary task, under the same permissions and approvals.</p>
-    </div>
-    <button type="button" class="btn btn-primary btn-sm" onclick={startNew} disabled={busy}>New goal</button>
+  <!-- Goals reads like its sibling Work tabs: the Work hub names the page, so
+       this tab carries the toolbar (actions left, guide right) rather than a
+       second title. New goal is offered here only once the empty state, which
+       carries its own New goal, has gone. -->
+  <header class="head-row page-toolbar">
+    <button type="button" class="btn btn-ghost btn-sm" onclick={() => void load()}><Icon name="refresh" size="sm" /> Refresh</button>
+    {#if list !== null && (list.goals.length > 0 || composing)}
+      <button type="button" class="btn btn-primary btn-sm" onclick={startNew} disabled={busy}><Icon name="plus" size="sm" /> New goal</button>
+    {/if}
+    <GuideLink route="work" />
   </header>
 
   <p class="profile-line" data-testid="goal-profile-line">
@@ -511,8 +517,6 @@
     font-size: var(--text-sm);
   }
   .goals { display: grid; gap: var(--space-4); }
-  .goals-head { display: flex; justify-content: space-between; gap: 1rem; align-items: flex-start; flex-wrap: wrap; }
-  .goals-head h2 { margin: 0; }
   .profile-line { margin: 0; display: flex; flex-wrap: wrap; gap: 0.4rem; align-items: baseline; }
   .goal-form { display: grid; gap: 0.75rem; }
   .goal-form label { display: grid; gap: 0.25rem; }

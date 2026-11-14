@@ -91,7 +91,12 @@
       </ul>
     {/if}
   </section>
-{:else if disclosure}
+{:else if disclosure && disclosure.effective_mode === "off"}
+  <!-- Said only when memory was held back (off, or Incognito), which is a
+       choice the owner should be reminded of. A turn that searched and found
+       nothing shows nothing: "Memory: Brief + search · nothing recalled ·
+       searched sqlite-fts5 ..." under every answer was the engine describing
+       itself. How recall is configured is in Memory. -->
   <p class="recall-mode recall-quiet">
     <Icon name="spark" size="sm" />
     <span>{quietDisclosure(disclosure)}</span>
@@ -99,6 +104,12 @@
 {/if}
 
 <style>
+  .recall-quiet {
+    margin-top: 0.35rem;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+  }
   .recall {
     margin: 0.35rem 0 0;
     display: grid;
@@ -125,14 +136,6 @@
     font-size: var(--text-2xs);
     color: var(--text-3);
     line-height: 1.5;
-  }
-  .recall-quiet {
-    margin-top: 0.35rem;
-    display: inline-flex;
-    align-items: center;
-    gap: 0.3rem;
-    font-weight: 650;
-    letter-spacing: 0.02em;
   }
   .recall-toggle:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
   .recall-list {

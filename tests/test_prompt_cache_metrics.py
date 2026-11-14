@@ -55,11 +55,20 @@ class TestSummarizeUsage:
         out = summarize_model_usage(
             {"prompt_tokens": 100, "completion_tokens": 20, "prompt_tokens_details": {"cached_tokens": 64}}
         )
-        assert out["input_tokens"] == 100
+        # OpenAI's cached tokens are a subset of prompt_tokens: the uncached
+        # part is the canonical input, so a cached token is never billed twice.
+        assert out["input_tokens"] == 36
         assert out["output_tokens"] == 20
         assert out["cache_read_tokens"] == 64
         assert out["cache_hit"] == 1
         assert "cache_write_tokens" not in out  # OpenAI reports no write metric
+
+    def test_openai_responses_shape_subtracts_cached_input(self) -> None:
+        out = summarize_model_usage(
+            {"input_tokens": 1000, "output_tokens": 50, "input_tokens_details": {"cached_tokens": 900}}
+        )
+        assert out["input_tokens"] == 100
+        assert out["cache_read_tokens"] == 900
 
     def test_no_cache_hit_is_zero(self) -> None:
         out = summarize_model_usage({"input_tokens": 10, "output_tokens": 2, "cache_read_input_tokens": 0})

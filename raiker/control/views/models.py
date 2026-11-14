@@ -235,6 +235,10 @@ class ContextUsageView(View):
     session_turns: int = 0
     session_input_tokens: int = 0
     session_output_tokens: int = 0
+    # Prompt tokens served from the provider's cache in this conversation. Kept
+    # apart from ``session_input_tokens`` (the uncached part) so the popover can
+    # say how much of what was sent cost the cache rate.
+    session_cache_read_tokens: int = 0
     # BUG-21 — the individual rate components behind `session_cost`, read from
     # the normalised registry. All four are optional and independently sourced:
     # a provider that publishes no cache rate leaves those None rather than

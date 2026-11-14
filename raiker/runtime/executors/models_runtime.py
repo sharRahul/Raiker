@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 from urllib.parse import urlparse
 
+from raiker.models.builtin_embedding import task_text
 from raiker.runtime.authority.routed import current_routed_authority
 from raiker.runtime.executors.base import ExecutionResult
 from raiker.runtime.executors.sandbox import SandboxError
@@ -342,7 +343,11 @@ class ModelProviderExecutor:
 
         embedder = self._embedder or self._default_embedder(principal.principal_id)
         try:
-            response = embedder(provider, model, text)
+            response = embedder(
+                provider,
+                model,
+                task_text(model, text, "query" if operation == "embed_query" else "document"),
+            )
         except SandboxError as exc:
             return self._fail(action.action_id, str(exc))
         except Exception as exc:  # noqa: BLE001 - map every failure to a fail-closed code
@@ -505,7 +510,7 @@ class ModelProviderExecutor:
                 )
                 continue
             try:
-                response = embedder(provider, model, text)
+                response = embedder(provider, model, task_text(model, text, "document"))
             except SandboxError as exc:
                 return self._batch_stop(
                     action.action_id, str(exc), indexed, failures, embedding_model
@@ -562,7 +567,7 @@ class ModelProviderExecutor:
                 failures.append({"chunk_id": chunk_id, "reason_code": "text_not_embeddable"})
                 continue
             try:
-                response = embedder(provider, model, text)
+                response = embedder(provider, model, task_text(model, text, "document"))
             except SandboxError as exc:
                 return self._batch_stop(
                     action.action_id,

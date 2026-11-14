@@ -157,6 +157,16 @@
    * exact-pair check here; every other action opens what owns the fix.
    */
   const chatDecision = $derived(decisions?.chat ?? null);
+  /**
+   * Surfaces that hold their own model while no global default exists. The
+   * header and the row's "Chat default" mark read the same decisions, so the
+   * page can no longer say "No default model" without saying where one is.
+   */
+  const surfaceOnlyDefaults = $derived(
+    Object.entries(decisions ?? {})
+      .filter(([, decision]) => decision.selected.source === "surface_default")
+      .map(([surface]) => surface.charAt(0).toUpperCase() + surface.slice(1)),
+  );
   const showReadiness = $derived(
     chatDecision !== null &&
       (chatDecision.steps ?? []).length > 0 &&
@@ -1243,8 +1253,15 @@
         <div class="profile-copy">
           <h2 id="profile-card-title">No default model is chosen</h2>
           <p class="profile-tradeoff">
-            Chat and Build need a model before they can answer. Add one that runs on this computer
-            or connect an account you have.
+            {#if surfaceOnlyDefaults.length > 0}
+              {surfaceOnlyDefaults.length === 1
+                ? `Only ${surfaceOnlyDefaults[0]} has a model of its own.`
+                : `Only ${surfaceOnlyDefaults.join(" and ")} have models of their own.`}
+              Everything else waits for a default; choose one with Change.
+            {:else}
+              Chat and Build need a model before they can answer. Add one that runs on this computer
+              or connect an account you have.
+            {/if}
           </p>
           {#if showReadiness && chatDecision !== null}
             <div class="profile-readiness">

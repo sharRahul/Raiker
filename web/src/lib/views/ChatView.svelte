@@ -907,7 +907,7 @@
       ? [
           {
             label: "Conversation",
-            value: `${usedTokens.toLocaleString()} tokens so far`,
+            value: `${usedTokens.toLocaleString()} tokens in context`,
             short: contextPercent === null ? `${compactTokens(usedTokens)} tokens` : undefined,
           },
         ]
@@ -2488,8 +2488,8 @@
 
           {#if turn.streaming && answer === "" && reasoning === "" && toolRows.length === 0}
             <p class="streaming-label" role="status">
-              <span class="pulse" aria-hidden="true"></span>
-              Working…
+              <span class="thinking-dots" aria-hidden="true"><i></i><i></i><i></i></span>
+              <span class="shimmer-text">Thinking…</span>
             </p>
           {:else if turn.streaming && answer === "" && hasRunningTool(toolRows)}
             <span class="sr-only" role="status">Running a tool.</span>
@@ -2532,7 +2532,7 @@
             <!-- QUI-F02 — a turn parked on a question shows its card below;
                  the parked notice ("Waiting for your decision") is not said
                  a second time, and not in the wrong words. -->
-            <div class="message-bubble message-bubble-raiker">
+            <div class="message-bubble message-bubble-raiker" class:is-streaming={turn.streaming}>
               <!-- C6 — `[s1]` becomes a chip only when this turn's ledger has an
                    s1. A marker the model invented stays the characters it is. -->
               <!-- BUG-288 — the answer's declared parts, when it declared
@@ -2634,9 +2634,6 @@
             />
           {/if}
           {#if !turn.streaming && sessionId !== null && turn.response?.turn_id && turn.response.status !== "needs_approval"}
-            <!-- QUI-F16 — the receipt at the end of the task: model, cost, what
-                 was read, changed or sent, and what left this computer. -->
-            <TurnReceipt {sessionId} turnId={turn.response.turn_id} />
             {@const correction = turn.response.status === "completed" ? correctionToRemember(turn.prompt) : null}
             {#if correction !== null}
               <!-- QUI-F20 — the owner corrected Raiker: offer to remember it. -->
@@ -2715,13 +2712,23 @@
                asked for keep the primary reading order; it reads nothing until
                it is opened. -->
           {#if !turn.streaming && turn.response?.turn_id}
-            <TurnEvidence
-              sessionId={sessionId}
-              turnId={turn.response.turn_id}
-              rows={toolRows}
-              sources={turnSourceList.length}
-              approvals={turn.response?.approval ? 1 : 0}
-            />
+            <!-- One quiet line under the answer, the way ChatGPT and Claude keep
+                 theirs: the receipt (model and cost; QUI-F16) and the turn's
+                 evidence (REM-CHAT-01) side by side. Shown for the newest answer
+                 and on hover or focus for earlier ones, so a conversation reads
+                 as answers rather than as answers interleaved with metadata. -->
+            <div class="turn-meta" class:turn-meta-latest={shownIndex === shownTurns.length - 1}>
+              {#if sessionId !== null && turn.response.status !== "needs_approval"}
+                <TurnReceipt {sessionId} turnId={turn.response.turn_id} />
+              {/if}
+              <TurnEvidence
+                sessionId={sessionId}
+                turnId={turn.response.turn_id}
+                rows={toolRows}
+                sources={turnSourceList.length}
+                approvals={turn.response?.approval ? 1 : 0}
+              />
+            </div>
           {/if}
 
           {#if turn.response?.status === "needs_approval" && turn.response.approval}
@@ -3461,6 +3468,28 @@
     align-self: flex-start;
     align-items: flex-start;
   }
+  /* The receipt and the evidence share one quiet line. Earlier answers keep it
+     out of the reading order until pointed at or focused; an opened disclosure
+     stays open. Space is kept, so nothing below shifts when it appears. */
+  .turn-meta {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: var(--space-1) var(--space-3);
+    margin-top: var(--space-1);
+    transition: opacity var(--motion-fast, 120ms) var(--ease, ease);
+  }
+  .turn-meta > :global(*) { margin-top: 0 !important; }
+  .turn-meta:not(.turn-meta-latest):not(:has(details[open])):not(:focus-within) {
+    opacity: 0;
+  }
+  .message-group-raiker:hover .turn-meta,
+  .message-group-raiker:focus-within .turn-meta {
+    opacity: 1;
+  }
+  @media (hover: none) {
+    .turn-meta { opacity: 1 !important; }
+  }
   .message-bubble {
     position: relative;
     /* QUI-F12 — conversation text follows its own size (Settings ›
@@ -3475,11 +3504,82 @@
     color: var(--text-inverse);
     border-bottom-right-radius: 0.35rem;
   }
+  /* Raiker's answer is the page, not a bubble beside it — the convention of
+     ChatGPT, Claude and Cursor. A grey bubble shrink-wrapped a one-word answer
+     into a chip and boxed a long one into a card, so answers of different
+     lengths never looked like the same thing. The owner's own message keeps
+     its bubble, which is what tells the two voices apart. */
   .message-bubble-raiker {
-    background: var(--sunken);
+    background: transparent;
     color: var(--text-1);
-    border: 1px solid var(--border);
-    border-bottom-left-radius: 0.35rem;
+    border: 0;
+    box-shadow: none;
+    padding: 0.15rem 0 0;
+    border-radius: 0;
+    line-height: 1.65;
+    animation: answer-in 260ms var(--ease) both;
+  }
+  .message-group-raiker { max-width: min(100%, 48rem); }
+  @keyframes answer-in {
+    from { opacity: 0; transform: translateY(4px); }
+    to { opacity: 1; transform: none; }
+  }
+  /* While text streams, the newest block fades in and a soft caret marks where
+     the next words will land. */
+  .is-streaming :global(.markdown > *:last-child) {
+    animation: block-in 220ms var(--ease) both;
+  }
+  .is-streaming :global(.markdown > *:last-child)::after {
+    content: "";
+    display: inline-block;
+    width: 0.5em;
+    height: 1em;
+    margin-left: 0.15em;
+    vertical-align: -0.12em;
+    border-radius: 2px;
+    background: var(--accent);
+    opacity: 0.55;
+    animation: caret-blink 1s steps(2, start) infinite;
+  }
+  @keyframes block-in {
+    from { opacity: 0.25; }
+    to { opacity: 1; }
+  }
+  @keyframes caret-blink {
+    to { visibility: hidden; }
+  }
+  .thinking-dots { display: inline-flex; gap: 3px; align-items: center; }
+  .thinking-dots i {
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    background: var(--accent);
+    animation: dot-bounce 1.1s var(--ease) infinite;
+  }
+  .thinking-dots i:nth-child(2) { animation-delay: 0.15s; }
+  .thinking-dots i:nth-child(3) { animation-delay: 0.3s; }
+  @keyframes dot-bounce {
+    0%, 70%, 100% { transform: translateY(0); opacity: 0.35; }
+    35% { transform: translateY(-3px); opacity: 1; }
+  }
+  .shimmer-text {
+    background: linear-gradient(90deg, var(--text-3) 0%, var(--text-1) 50%, var(--text-3) 100%);
+    background-size: 200% 100%;
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    animation: shimmer 1.8s linear infinite;
+  }
+  @keyframes shimmer {
+    from { background-position: 100% 0; }
+    to { background-position: -100% 0; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .message-bubble-raiker,
+    .is-streaming :global(.markdown > *:last-child),
+    .thinking-dots i,
+    .shimmer-text { animation: none; }
+    .shimmer-text { color: var(--text-3); background: none; }
   }
   /* Quiet UI 04 — a chart is drawn to a 640-unit box and scaled to fit. In a
      bubble that shrinks to its content it was scaled down until its labels

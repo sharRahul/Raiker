@@ -44,6 +44,22 @@ class UsageTotals:
     def total_tokens(self) -> int:
         return self.input_tokens + self.output_tokens
 
+    @property
+    def context_tokens(self) -> int:
+        """What one request occupied in the model's window.
+
+        Uncached input, cached reads and cache writes are all prompt the model
+        read; the answer it wrote is carried into the next request. Counting
+        only ``input_tokens`` made a cached Anthropic conversation look nearly
+        empty, since most of its prompt is a cache read.
+        """
+        return (
+            self.input_tokens
+            + self.cache_read_tokens
+            + self.cache_write_tokens
+            + self.output_tokens
+        )
+
     def cost(self, facts: ModelFacts | None) -> Decimal | None:
         """Cost for these counts, or None when no price is resolvable."""
         if facts is None or facts.price is None:
@@ -178,6 +194,44 @@ class ModelUsageLedger:
         GROUP BY profile_id, provider, model
         ORDER BY provider, model, profile_id
     """
+
+    def latest_request(self, owner_principal_id: str, session_id: str) -> ModelUsageRow | None:
+        """The conversation's most recent model request, on its own.
+
+        The context window holds what the *last* request carried, not the sum
+        of every request the conversation made. Reading the aggregate's last
+        row (``session_usage(...)[-1]``) reported the summed input of whichever
+        model sorted last alphabetically, so a long chat read as many times
+        larger than its window and cached prompts read as almost empty.
+        """
+        with self.store.connect() as connection:
+            row = connection.execute(
+                """
+                SELECT profile_id, provider, model, input_tokens, output_tokens,
+                       cache_read_tokens, cache_write_tokens, estimated
+                FROM model_usage_ledger
+                WHERE owner_principal_id = ? AND session_id = ? AND request_kind = 'turn'
+                ORDER BY recorded_at DESC, rowid DESC
+                LIMIT 1
+                """,
+                (owner_principal_id, session_id),
+            ).fetchone()
+        if row is None:
+            return None
+        return ModelUsageRow(
+            profile_id=str(row[0]) if row[0] is not None else None,
+            provider=str(row[1]),
+            model=str(row[2]),
+            totals=UsageTotals(
+                input_tokens=int(row[3] or 0),
+                output_tokens=int(row[4] or 0),
+                cache_read_tokens=int(row[5] or 0),
+                cache_write_tokens=int(row[6] or 0),
+                requests=1,
+                turns=1,
+                estimated_requests=int(row[7] or 0),
+            ),
+        )
 
     def session_usage(self, owner_principal_id: str, session_id: str) -> list[ModelUsageRow]:
         """Totals for one conversation, split by the models it actually used."""

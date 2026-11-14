@@ -61,6 +61,8 @@ function policy(partial: Partial<NotificationDelivery> = {}): NotificationDelive
 }
 
 beforeEach(() => {
+  // Folded notices persist for the browser session; each test starts clean.
+  sessionStorage.clear();
   setToken("test-token");
   window.location.hash = "#/home";
 });

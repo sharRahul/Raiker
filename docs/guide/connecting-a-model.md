@@ -253,7 +253,10 @@ The **profile card** at the top of **Models** is the first thing the page says:
 the model in use, its provider, whether it is ready, and whether what you send
 stays on this computer or goes to the provider — with what that costs so far.
 **Change** picks another model from everything you have set up. When nothing is
-chosen it says so and offers **Add model**.
+chosen it says so and offers **Add model**. The first model you choose
+anywhere — in Chat's, Build's or Design's model menu — also becomes this default
+when none is set, so every surface can answer; a later choice in one surface is
+that surface's own override and leaves the default where it is.
 
 The default you choose is what Chat, Build and Design start on. If it cannot
 serve, the one that will answer instead is named in **Settings → Advanced →

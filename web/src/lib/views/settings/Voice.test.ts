@@ -26,7 +26,7 @@ function status(profile = "balanced", overrides: Record<string, unknown> = {}) {
         memory_bytes: 1, listening_available: false, speaking_available: true, recommended: true },
     ],
     listening: {
-      state: "unavailable", device: null,
+      state: "unavailable", device: null, engine: "server",
       components: [component("whisper_model", "whisper-small-q5_1", "Whisper small (q5_1)",
         { installable: false, refusal: "voice_item_pending" })],
     },
@@ -35,6 +35,7 @@ function status(profile = "balanced", overrides: Record<string, unknown> = {}) {
       components: [component("kokoro_model", "kokoro-82m-int8", "Kokoro-82M (int8)")],
     },
     plan: { fits: true, sentence: "Speech recognition runs on the processor with 4 threads.", smaller_profile: null, placements: [] },
+    runtime: { speaking: true, listening: true, installable: false },
     disk_bytes: 0,
     hardware: { os: "windows", arch: "x64", total_memory_bytes: 1, gpu: null },
     ...overrides,
@@ -42,6 +43,34 @@ function status(profile = "balanced", overrides: Record<string, unknown> = {}) {
 }
 
 describe("Settings › Voice", () => {
+  it("offers Install when the files are on disk but the runtime they run on is missing", async () => {
+    stubFetch({
+      "GET /api/voice/status": status("balanced", {
+        speaking: {
+          state: "installed", engine: "kokoro", voices: ["af_heart"],
+          components: [component("kokoro_model", "kokoro-82m-int8", "Kokoro-82M (int8)", { installed: true })],
+        },
+        runtime: { speaking: false, listening: false, installable: true },
+        disk_bytes: 120_000_000,
+      }),
+    });
+    render(Voice);
+    expect(await screen.findByRole("button", { name: "Install" })).toBeInTheDocument();
+  });
+
+  it("names the built-in listener where no whisper-server build exists", async () => {
+    stubFetch({
+      "GET /api/voice/status": status("balanced", {
+        listening: {
+          state: "not_installed", device: null, engine: "builtin",
+          components: [component("whisper_model", "whisper-small-q5_1", "Whisper small (q5_1)")],
+        },
+      }),
+    });
+    render(Voice);
+    expect(await screen.findByText("whisper.cpp, built into Raiker")).toBeInTheDocument();
+  });
+
   it("names the recommended profile and says why a component is not offered yet", async () => {
     stubFetch({ "GET /api/voice/status": status() });
     render(Voice);

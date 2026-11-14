@@ -130,10 +130,26 @@ def test_a_profile_resolves_to_this_machines_builds() -> None:
     assert lite.part("whisper_model").item_id == "whisper-base.en-q5_1"  # type: ignore[union-attr]
     assert lite.speaking == "kokoro" and lite.speaking_installable
     assert lite.part("kokoro_model").item_id == "kokoro-82m-int8"  # type: ignore[union-attr]
-    # Windows has a pinned engine and models. Linux still waits on its engine.
+    # Windows has a pinned engine and models.
     assert balanced.speaking_installable and balanced.listening_installable
+    assert balanced.listening_engine == "server"
+
+
+def test_linux_listens_with_the_built_in_worker_when_it_can(monkeypatch: pytest.MonkeyPatch) -> None:
+    """No verified whisper-server for Linux: the built-in listener, or nothing."""
+    from raiker.voice import profiles as profiles_module
+
+    catalogue = load()
+    monkeypatch.setattr(profiles_module, "builtin_listener_available", lambda: True)
     linux = resolve(catalogue, "balanced", _hardware(os_name="linux"))
-    assert not linux.listening_installable
+    assert linux.listening_engine == "builtin"
+    assert linux.listening_installable
+    assert linux.part("whisper_engine") is None
+    assert linux.part("whisper_model") is not None
+    monkeypatch.setattr(profiles_module, "builtin_listener_available", lambda: False)
+    waiting = resolve(catalogue, "balanced", _hardware(os_name="linux"))
+    assert waiting.listening_engine == "server"
+    assert not waiting.listening_installable
 
 
 def test_whisper_goes_on_the_gpu_only_with_headroom_next_to_the_model() -> None:
@@ -452,12 +468,73 @@ def test_the_install_worker_installs_every_installable_component(tmp_path: Path,
         return workspace
 
     monkeypatch.setattr(installer, "install_item", fake_install)
+    # The runtime packages are installed first when a side lacks them; here
+    # every side is reported missing and the install itself is recorded.
+    runtime_installs: list[bool] = []
+    monkeypatch.setattr(routes_voice.voice_runtime, "missing_sides", lambda sides: list(sides))
+    monkeypatch.setattr(routes_voice.voice_runtime, "install", lambda: runtime_installs.append(True))
     operation = routes_voice.start_voice_install(ws, owner, "balanced")
     routes_voice.run_voice_install(ws, owner, operation["operation_id"], "balanced")
     row = ModelOperationService(SQLiteStore(ws)).require(owner, operation["operation_id"])
     assert row.state == "complete", (row.error_code, row.error_detail)
     assert installed == ["whisper-server-windows-x64-cpu", "whisper-small-q5_1",
                          "kokoro-82m-int8", "kokoro-voices-v1"]
+    assert runtime_installs == [True]
+
+
+def test_a_failed_runtime_install_fails_the_operation_with_its_reason(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from raiker.api import routes_voice
+    from raiker.models.local_operations import ModelOperationService
+    from raiker.storage.sqlite import SQLiteStore
+    from raiker.voice import service as service_module
+
+    ws, owner = _owner_ws(tmp_path)
+    monkeypatch.setattr(service_module, "detect", lambda: _hardware(memory_gib=16))
+    VoiceService(ws, owner).save({"profile": "balanced"})
+    monkeypatch.setattr(routes_voice.voice_runtime, "missing_sides", lambda sides: list(sides))
+
+    def refuse() -> None:
+        raise routes_voice.voice_runtime.VoiceRuntimeError("voice_runtime_install_failed")
+
+    monkeypatch.setattr(routes_voice.voice_runtime, "install", refuse)
+    operation = routes_voice.start_voice_install(ws, owner, "balanced")
+    routes_voice.run_voice_install(ws, owner, operation["operation_id"], "balanced")
+    row = ModelOperationService(SQLiteStore(ws)).require(owner, operation["operation_id"])
+    assert row.state == "failed"
+    assert row.error_detail == "voice_runtime_install_failed"
+
+
+def test_the_built_in_listener_transcribes_a_wav_clip() -> None:
+    """The worker answers whisper-server's /inference route with {"text": ...}."""
+    pytest.importorskip("numpy")  # part of the voice runtime, not the base install
+
+    from raiker.voice import stt_worker
+
+    heard: list[tuple[int, str | None]] = []
+
+    class Fake:
+        def transcribe(self, samples: Any, language: str | None) -> str:
+            heard.append((len(samples), language))
+            return "hello raiker"
+
+    server = ThreadingHTTPServer(("127.0.0.1", 0), stt_worker.make_handler(Fake(), "test"))
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    try:
+        base = f"http://127.0.0.1:{server.server_address[1]}"
+        assert httpx.get(f"{base}/", timeout=5).json()["ok"] is True
+        clip = pcm16_wav(b"\x00\x00" * 24000, 24000)  # one second at 24 kHz
+        answer = httpx.post(f"{base}/inference", files={"file": ("a.wav", clip, "audio/wav")},
+                            data={"language": "en"}, timeout=5)
+        assert answer.status_code == 200 and answer.json() == {"text": "hello raiker"}
+        # Resampled to Whisper's 16 kHz, with the language passed through.
+        assert heard == [(16000, "en")]
+        assert httpx.post(f"{base}/v1/audio/transcriptions", content=b"x", timeout=5).status_code == 404
+        bad = httpx.post(f"{base}/inference", files={"file": ("a.wav", b"not a wav", "audio/wav")}, timeout=5)
+        assert bad.status_code == 400
+    finally:
+        server.shutdown()
 
 
 def test_word_error_rate() -> None:

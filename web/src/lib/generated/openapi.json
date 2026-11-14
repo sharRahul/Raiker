@@ -8536,6 +8536,11 @@
             ],
             "title": "Provider Total Cost"
           },
+          "session_cache_read_tokens": {
+            "default": 0,
+            "title": "Session Cache Read Tokens",
+            "type": "integer"
+          },
           "session_cost": {
             "anyOf": [
               {
@@ -37434,6 +37439,10 @@
             ],
             "title": "Device"
           },
+          "engine": {
+            "title": "Engine",
+            "type": "string"
+          },
           "state": {
             "title": "State",
             "type": "string"
@@ -37442,7 +37451,8 @@
         "required": [
           "state",
           "components",
-          "device"
+          "device",
+          "engine"
         ],
         "title": "VoiceListeningView",
         "type": "object"
@@ -37599,6 +37609,30 @@
           "freed_bytes"
         ],
         "title": "VoiceRemoved",
+        "type": "object"
+      },
+      "VoiceRuntimeView": {
+        "description": "Whether the Python packages each side runs on are importable here.",
+        "properties": {
+          "installable": {
+            "title": "Installable",
+            "type": "boolean"
+          },
+          "listening": {
+            "title": "Listening",
+            "type": "boolean"
+          },
+          "speaking": {
+            "title": "Speaking",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "speaking",
+          "listening",
+          "installable"
+        ],
+        "title": "VoiceRuntimeView",
         "type": "object"
       },
       "VoiceSettingsRequest": {
@@ -37853,6 +37887,9 @@
             "title": "Recommended Profile",
             "type": "string"
           },
+          "runtime": {
+            "$ref": "#/components/schemas/VoiceRuntimeView"
+          },
           "settings": {
             "$ref": "#/components/schemas/VoiceSettingsView"
           },
@@ -37868,6 +37905,7 @@
           "listening",
           "speaking",
           "plan",
+          "runtime",
           "disk_bytes",
           "hardware"
         ],

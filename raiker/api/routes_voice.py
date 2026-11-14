@@ -42,6 +42,7 @@ from raiker.models.local_operations import (
 from raiker.models.wire import ModelOperationView
 from raiker.storage.sqlite import SQLiteStore
 from raiker.voice import installer
+from raiker.voice import runtime as voice_runtime
 from raiker.voice.catalogue import load as load_catalogue
 from raiker.voice.engines import VoiceEngineError
 from raiker.voice.service import VoiceService
@@ -97,6 +98,23 @@ def run_voice_install(workspace: Path, owner: str, operation_id: str, profile: s
             raise VoiceEngineError("voice_profile_nothing_installable")
         total = sum(item.size_bytes or 0 for item in items)
         done = 0
+        # The packages the chosen engines run on, before their files: a source
+        # run lacked them, so Test and Preview failed after a "successful"
+        # install (voice_kokoro_runtime_missing).
+        resolved = service.resolved(profile_id=profile)
+        sides = []
+        if any(item.component.startswith("kokoro") for item in items):
+            sides.append("speaking")
+        if resolved is not None and resolved.listening_engine == "builtin" and any(
+            item.component == "whisper_model" for item in items
+        ):
+            sides.append("listening")
+        if voice_runtime.missing_sides(sides):
+            op.progress(completed_bytes=0, total_bytes=total, phase="installing_voice_runtime")
+            try:
+                voice_runtime.install()
+            except voice_runtime.VoiceRuntimeError as exc:
+                raise VoiceEngineError(str(exc)) from exc
 
         def advanced(amount: int) -> None:
             nonlocal done

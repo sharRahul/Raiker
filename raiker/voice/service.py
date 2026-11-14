@@ -18,6 +18,7 @@ from typing import Any
 from raiker.contracts.ids import utc_now
 from raiker.models.llama_cpp.hardware import HardwareProfile, detect
 from raiker.voice import installer
+from raiker.voice import runtime as voice_runtime
 from raiker.voice.catalogue import Catalogue, CatalogueItem, load
 from raiker.voice.engines import VoiceEngineError, VoiceEngines, engines_for
 from raiker.voice.planner import VoicePlan, plan
@@ -235,7 +236,8 @@ class VoiceService:
             "recommendation": why,
             "profiles": profiles,
             "listening": {"state": state(listening, "whisper"), "components": listening,
-                          "device": engines["whisper"]["device"]},
+                          "device": engines["whisper"]["device"],
+                          "engine": chosen.listening_engine if chosen else "server"},
             "speaking": {"state": state(speaking, "speaker"), "engine": chosen.speaking if chosen else "system",
                          "components": speaking, "voices": voices},
             "plan": {
@@ -243,6 +245,11 @@ class VoiceService:
                 "sentence": voice_plan.sentence if voice_plan else "Voice is off.",
                 "smaller_profile": voice_plan.smaller_profile if voice_plan else None,
                 "placements": [asdict(p) for p in voice_plan.placements] if voice_plan else [],
+            },
+            "runtime": {
+                "speaking": voice_runtime.available("speaking"),
+                "listening": voice_runtime.available("listening"),
+                "installable": voice_runtime.can_install(),
             },
             "disk_bytes": installer.installed_bytes(self.workspace_root),
             "hardware": {
@@ -294,10 +301,18 @@ class VoiceService:
             raise VoiceEngineError("voice_off")
         executable = self._path(resolved.part("whisper_engine"))
         model = self._path(resolved.part("whisper_model"))
-        if executable is None or model is None:
-            raise VoiceEngineError("voice_listening_not_installed")
         placement = self._placement(settings, "whisper")
         self.engines.idle_seconds = settings.idle_unload_minutes * 60.0
+        if resolved.listening_engine == "builtin":
+            if model is None:
+                raise VoiceEngineError("voice_listening_not_installed")
+            builtin = self.engines.ensure_builtin_whisper(
+                model, threads=placement.threads if placement else 4,
+                ram=placement.ram_bytes if placement else 0,
+            )
+            return builtin.endpoint
+        if executable is None or model is None:
+            raise VoiceEngineError("voice_listening_not_installed")
         engine = self.engines.ensure_whisper(
             executable, model, threads=placement.threads if placement else 4,
             device=placement.device if placement else "cpu",

@@ -108,7 +108,7 @@
 >
   <div class="context-heading"><strong>Context window</strong>{#if percentLabel}<span>{percentLabel}</span>{/if}</div>
   {#if display}
-    <div class="usage-figure"><strong>{number.format(effectiveUsed ?? 0)} tokens used</strong><span>of {number.format(effectiveWindow ?? 0)} available</span></div>
+    <div class="usage-figure"><strong>{number.format(effectiveUsed ?? 0)} tokens in context</strong><span>of {number.format(effectiveWindow ?? 0)} available</span></div>
     <!-- BUG-37 — the shared meter primitive rather than this component's own
          bar. It is a proportion of a fixed capacity, which is exactly what a
          meter means, and its tones now come from the same tokens the badge
@@ -124,7 +124,7 @@
     >
       <span class="meter-fill" data-value={Math.round(exactPercent ?? 0)}></span>
     </div>
-    <div class="remaining"><span>{number.format(remaining ?? 0)} tokens remaining</span><span>{number.format(usage?.session_input_tokens ?? 0)} input · {number.format(usage?.session_output_tokens ?? 0)} output</span></div>
+    <div class="remaining"><span>{number.format(remaining ?? 0)} tokens remaining</span><span>This chat: {number.format(usage?.session_input_tokens ?? 0)} input{#if (usage?.session_cache_read_tokens ?? 0) > 0} · {number.format(usage?.session_cache_read_tokens ?? 0)} cached{/if} · {number.format(usage?.session_output_tokens ?? 0)} output</span></div>
     <p class="reported">
       {#if isEstimate}
         Estimated from this chat
@@ -160,7 +160,7 @@
       {#if usage.latest_compaction.status === "completed"}
         <strong>Earlier context compacted</strong>
         <span>
-          {number.format(usage.latest_compaction.estimated_input_tokens_before)} â†’
+          {number.format(usage.latest_compaction.estimated_input_tokens_before)} →
           {number.format(usage.latest_compaction.estimated_summary_tokens)} tokens
         </span>
         <p>Chat transcript is unchanged; only the context sent to the model was summarised.</p>

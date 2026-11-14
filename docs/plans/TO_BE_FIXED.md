@@ -1682,24 +1682,62 @@ and the surface sweep fixes
 to [FIXED-1413](FIXED_ITEMS.md#fixed-1413--on-a-phone-builds-mode-menu-ran-off-screen-and-settings-opened-on-its-navigation))
 closed the irregularities found by `web/e2e/surface-sweep-live.spec.ts`
 (95 pop-ups and 56 pages, light and dark at 1440 px, light at 390 px).
+Closed by the second 2026-11-14 round: the Models default contradiction, the
+notice dock, Goals' title, the Approvals toolbar, the Build Terminal panel and
+the Threads row actions
+([FIXED-1414](FIXED_ITEMS.md#fixed-1414--models-said-no-default-model-is-chosen-beside-chat-default)
+to [FIXED-1420](FIXED_ITEMS.md#fixed-1420--threads-rows-showed-task-detail-and-evidence-as-captions)).
 Still open:
 
-* **Models contradicts itself about the default.** The page header says *No
-  default model is chosen* while the same page marks Haiku 4.5 as *Chat
-  default*. The header reads the global default; the card reads the per-surface
-  default. Decide which one the header names, then word both from one source.
-* **Goals is the only Work tab with its own title and description**, and it
-  offers **New goal** twice when empty.
-* **Approvals keeps its toolbar above its Pending/History filters.** Those are
-  queue filters, not hub tabs, so they were left; revisit with QUI-L11.
-* **Build › Terminal side panel** sets its environment facts in two narrow
-  columns at 1440 px; the panel needs a single-column fact list.
-* **Threads rows** show *Task detail* and *Evidence* as unstyled text well below
-  the title; they should read as the row's actions.
 * **Eight Settings sections still carry private copies of `.settings-card`.**
   A shared rule now exists in `app.css` (FIXED-1406); the copies can be deleted
   one section at a time once each is checked against it.
-* **The docked notification toast covers the top-right of every page** while
-  it is unread (page actions, the Goals **New goal**, the Models default card),
-  and on a phone it covers the page heading. It needs either a lower dock or
-  an automatic collapse to the bell after a few seconds.
+* **The notice dock on a phone now sits at the bottom edge**, which can cover a
+  composer for its five seconds. It folds into the bell and stays folded for
+  the session; a dock that waits for the composer to be idle is not built.
+* **Build and Design answers keep their own footers.** Chat's answer is page
+  text with one quiet meta line ([FIXED-1423](FIXED_ITEMS.md#fixed-1423--answers-carried-three-lines-of-metadata-and-rendered-as-grey-chips));
+  Build keeps its turn inspector open while a turn runs, and Design's image
+  results were not reviewed in this round.
+
+## Voice — listening on Linux and macOS not yet qualified
+
+[FIXED-1424](FIXED_ITEMS.md#fixed-1424--voice-install-test-and-preview-did-not-work)
+added Raiker's built-in listener (`raiker/voice/stt_worker.py`, whisper.cpp
+through `pywhispercpp`) for machines with no verified `whisper-server`, and
+made Install add the hash-locked voice runtime to a source run. This
+sandbox refuses `huggingface.co`, so the Whisper model could not be
+downloaded and no spoken round trip was heard back on Linux; the worker's
+route, resampling and failure codes are covered by tests with a stand-in
+recogniser only.
+
+**Required evidence.** On a Linux or macOS machine with network access:
+Settings › Voice › Balanced › Install (runtime, Whisper small, Kokoro), then
+**Test** reports *Spoke and heard it back* with a word-match figure, and a
+push-to-talk turn in Chat transcribes and answers aloud. Also open: the
+packaged desktop build has not been rebuilt with `pywhispercpp` collected
+(`--bundle-voice`), and `requirements/voice.txt` was extended with hashes read
+from PyPI in this round, so the Windows voice workflow should be re-run.
+
+## Built-in embedding model — what the first slice did not do
+
+[FIXED-1425](FIXED_ITEMS.md#fixed-1425--raiker-had-no-embedding-model-of-its-own-so-semantic-recall-waited-on-a-button)
+makes `nomic-embed-text` (through the owner's local Ollama) Raiker's default
+embedding space and keeps it current in the background. Still open:
+
+* **"Always installed" without Ollama.** Raiker's managed llama.cpp can serve
+  the same model (`llama-server --embedding` on `nomic-embed-text-v1.5`
+  GGUF, Q8_0 ~146 MB). It needs a catalogue entry with a SHA-256 and size read
+  from the publisher, which this sandbox could not reach; until then a
+  machine without Ollama keeps the lexical fallback. Bundling the file in
+  the installer is not recommended (it adds ~146 MB per platform); a
+  first-run background download is.
+* **Not qualified live.** No Ollama host was reachable here; the worker's
+  pass is covered by tests with stand-ins.
+* **No status on screen.** The last outcome is written to
+  `logs/background-index.json`; Memory and Diagnostics do not show it yet.
+* **What else it can do in the background** (not built): rank deferred tool
+  schemas by similarity to the turn, which would cut Raiker's ~9,500-token
+  prompt; related-file suggestions in Build; near-duplicate memory
+  detection before approval; thread and Library search by meaning;
+  routing a task to a project by similarity. Each is a separate change.

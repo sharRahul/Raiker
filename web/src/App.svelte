@@ -601,9 +601,12 @@
   :global(:root[data-desktop-shell]) .setup-focus {
     padding-top: calc(var(--topbar-h) - var(--space-3));
   }
+  /* The content landmark is a focus target after navigation, not a control.
+     This scoped ring outranked the global FIXED-1396 rule and kept drawing a
+     blue frame round every page reached by link or reload. */
+  .content:focus,
   .content:focus-visible {
-    outline: 2px solid var(--focus-ring);
-    outline-offset: -2px;
+    outline: none;
   }
   @media (max-width: 639px) {
     .content {

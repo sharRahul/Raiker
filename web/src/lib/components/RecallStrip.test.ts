@@ -42,7 +42,7 @@ describe("RecallStrip", () => {
     ).toBeInTheDocument();
   });
 
-  it("says memory was off, or that Incognito held it back, when nothing was recalled", () => {
+  it("says memory was off, or that Incognito held it back, and stays quiet when a search found nothing", () => {
     const { rerender } = render(RecallStrip, {
       props: {
         memories: [],
@@ -58,9 +58,8 @@ describe("RecallStrip", () => {
       onforget: vi.fn(),
       oncorrect: vi.fn(),
     });
-    expect(
-      screen.getByText("Memory: Brief + search · nothing recalled · searched sqlite-fts5 + raiker-local-hash-v1"),
-    ).toBeInTheDocument();
+    // A turn that searched and found nothing says nothing under the answer.
+    expect(screen.queryByText(/nothing recalled/)).toBeNull();
   });
 
   it("renders nothing when the turn recalled nothing", () => {

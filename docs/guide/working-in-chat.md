@@ -251,7 +251,15 @@ would create before you decide. See
 ## Reading a reply
 
 Raiker's replies are rendered as Markdown: headings, lists, tables, links, and
-fenced code. **Your own messages are shown exactly as you typed them, and this
+fenced code, as page text rather than in a bubble — your own messages keep
+theirs. While Raiker works you see *Thinking…*, then the answer as it streams,
+each new block fading in behind a soft caret. Under an answer is one quiet
+line: the model and, for a billed model, the approximate cost (open it for what
+was read, changed, sent and what left this computer), beside **Evidence**. It
+shows on the newest answer and on hover or focus for earlier ones. A memory line
+appears only when memories were used, or when memory was off or Incognito held
+it back. The composer's context figure is the whole prompt of the latest
+request — cached tokens included — against the model's window. **Your own messages are shown exactly as you typed them, and this
 is deliberate** — a prompt is an instruction whose exact characters matter, so
 Chat never re-formats one. If you write `**bold**` in a prompt, the model
 receives those asterisks and you see those asterisks.

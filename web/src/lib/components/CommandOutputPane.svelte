@@ -270,8 +270,12 @@
   .receipt-rail b { height: 1px; background: var(--border); }
   .command-row { display: flex; align-items: center; gap: .45rem; padding: .42rem .5rem; border: 1px solid var(--border); border-radius: var(--r-md); background: var(--sunken); }
   .command-notice { color: var(--text-2); font-size: var(--text-xs); }
-  .posture { display: flex; justify-content: space-between; gap: .8rem; padding: .48rem .1rem; color: var(--text-3); font-size: var(--text-2xs); }
-  .posture span { display: inline-flex; align-items: center; gap: .28rem; }
+  /* One fact per line. Side by side, the boundary and its posture were two
+     narrow columns that wrapped every three words in Build's side panel. */
+  .posture { display: grid; gap: .2rem; padding: .55rem .1rem; color: var(--text-3); font-size: var(--text-2xs); line-height: 1.45; }
+  .posture span { display: flex; align-items: flex-start; gap: .35rem; }
+  .posture span:last-child { padding-left: calc(14px + .35rem); }
+  .posture :global(svg), .command-row :global(svg) { flex: none; }
   .output-shell { min-height: 112px; overflow: hidden; border: 1px solid var(--term-border); border-radius: var(--r-md); background: var(--term-bg); color: var(--term-fg); color-scheme: dark; }
   .output-head { display: flex; justify-content: space-between; gap: .8rem; padding: .42rem .58rem; border-bottom: 1px solid var(--term-rule); color: var(--term-dim); font: var(--text-2xs) var(--font-mono); }
   .run-backend { color: var(--term-bright); font-weight: 600; }
@@ -279,13 +283,13 @@
   .receipt-card { margin-top: .55rem; padding: .42rem .55rem; border: 1px solid var(--border); border-radius: var(--r-md); color: var(--text-2); font-size: var(--text-2xs); }
   .receipt-card summary { cursor: pointer; }
   .receipt-card code { color: var(--text-3); }
-  dl { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: .45rem; margin: .55rem 0 0; }
+  dl { display: grid; grid-template-columns: repeat(auto-fit, minmax(7.5rem, 1fr)); gap: .45rem; margin: .55rem 0 0; }
   dl div { min-width: 0; } dt { color: var(--text-3); font-size: var(--text-2xs); } dd { margin: .12rem 0 0; overflow: hidden; text-overflow: ellipsis; }
   .pane-error { margin: .55rem 0 0; color: var(--danger); font-size: var(--text-2xs); }
   .run-picker { display: flex; align-items: center; gap: .5rem; margin: .5rem 0 .35rem; color: var(--text-3); font-size: var(--text-2xs); }
   .run-picker select { flex: 1; min-width: 0; font-family: var(--font-mono); font-size: var(--text-2xs); }
   .failure-nav { display: flex; align-items: center; gap: .45rem; flex-wrap: wrap; margin: .55rem 0 0; padding: .42rem .5rem; border: 1px solid color-mix(in srgb, var(--danger) 35%, var(--border)); border-radius: var(--r-md); background: color-mix(in srgb, var(--danger) 6%, transparent); color: var(--text-2); font-size: var(--text-2xs); }
   .failure-nav a { margin-left: auto; color: var(--accent); }
-  @media (max-width: 720px) { .command-pane { margin-inline: .75rem; } .receipt-rail { grid-template-columns: repeat(4, 1fr); } .receipt-rail b { display: none; } .receipt-rail span { justify-content: center; } .posture { display: grid; } dl { grid-template-columns: repeat(2, 1fr); } }
+  @media (max-width: 720px) { .command-pane { margin-inline: .75rem; } .receipt-rail { grid-template-columns: repeat(4, 1fr); } .receipt-rail b { display: none; } .receipt-rail span { justify-content: center; } }
   @media (prefers-reduced-motion: reduce) { .live-dot { box-shadow: none; } }
 </style>

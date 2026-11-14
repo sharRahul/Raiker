@@ -22,6 +22,7 @@ function usage(overrides: Partial<ContextUsage> = {}): ContextUsage {
     session_turns: 1,
     session_input_tokens: 2900,
     session_output_tokens: 12,
+    session_cache_read_tokens: 0,
     price_input_per_mtok: null,
     price_output_per_mtok: null,
     price_cache_write_per_mtok: null,
@@ -38,7 +39,7 @@ function usage(overrides: Partial<ContextUsage> = {}): ContextUsage {
 describe("ContextMeterPopover", () => {
   it("prefers provider-reported usage over the browser's estimate", () => {
     render(ContextMeterPopover, { usedTokens: 99, contextWindowTokens: 1000, estimated: true, usage: usage() });
-    expect(screen.getByText("2,900 tokens used")).toBeInTheDocument();
+    expect(screen.getByText("2,900 tokens in context")).toBeInTheDocument();
     expect(screen.getByText("1.45%")).toBeInTheDocument();
     expect(screen.getByText(/Reported by anthropic/)).toBeInTheDocument();
     expect(screen.getByText(/Capacity reported by runtime/)).toBeInTheDocument();
@@ -59,7 +60,7 @@ describe("ContextMeterPopover", () => {
       estimated: true,
       usage: usage({ usage_source: "unavailable", used_tokens: null, session_turns: 0, session_cost: null, provider_total_cost: null }),
     });
-    expect(screen.getByText("400 tokens used")).toBeInTheDocument();
+    expect(screen.getByText("400 tokens in context")).toBeInTheDocument();
     expect(screen.getByText("0.20%")).toBeInTheDocument();
     expect(screen.getByText(/Estimated from this chat/)).toBeInTheDocument();
   });

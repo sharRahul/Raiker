@@ -31,8 +31,8 @@ describe("QUI-F16 task receipt", () => {
     });
   });
 
-  it("says model, cost, reads and that nothing else left", () => {
-    expect(receiptLine(base)).toBe("Haiku 4.5 · ≈ $0.0143 · 2 files read · nothing else left this computer");
+  it("says model, cost and reads, and leaves the normal case to the rows", () => {
+    expect(receiptLine(base)).toBe("Haiku 4.5 · ≈ $0.0143 · 2 files read");
   });
 
   it("names a change with its approval time and the services reached", () => {
@@ -45,11 +45,17 @@ describe("QUI-F16 task receipt", () => {
     expect(line).toMatch(/^Haiku 4\.5 · ≈ \$0\.0143 · Send email \(approved \d{1,2}:\d{2}( [AP]M)?\) · also reached Gmail$/i);
   });
 
-  it("never calls an unpriced billable model free, and a local one leaves nothing", () => {
-    expect(receiptLine({ ...base, cost_usd: null, cost_basis: "unknown" })).toContain("cost not known");
-    const local = receiptLine({ ...base, model: "llama3", provider: "ollama", local: true, cost_usd: null, cost_basis: "free" });
-    expect(local).toContain("no charge");
-    expect(local).toContain("nothing left this computer");
+  it("never calls an unpriced billable model free, and says so in the rows", () => {
+    const unknown = { ...base, cost_usd: null, cost_basis: "unknown" as const };
+    expect(receiptLine(unknown)).not.toContain("$");
+    expect(receiptRows(unknown).find((row) => row.label === "Cost")?.value).toBe(
+      "Not known: Raiker has no price for this model",
+    );
+    const local = { ...base, model: "llama3", provider: "ollama", local: true, cost_usd: null, cost_basis: "free" as const };
+    expect(receiptLine(local)).toBe("Llama 3 · 2 files read");
+    expect(receiptRows(local).find((row) => row.label === "Cost")?.value).toBe(
+      "No charge: this model is not billed per token",
+    );
   });
 
   it("says in the expanded rows that the conversation went to the provider", () => {

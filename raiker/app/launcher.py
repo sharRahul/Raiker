@@ -480,6 +480,11 @@ def main(argv: list[str] | None = None) -> int:
         from raiker.voice.tts_worker import main as tts_worker_main
 
         return tts_worker_main(raw_args[1:])
+    if raw_args[:1] == ["--voice-stt-worker"]:
+        # The built-in listening worker, the same way (raiker/voice/stt_worker.py).
+        from raiker.voice.stt_worker import main as stt_worker_main
+
+        return stt_worker_main(raw_args[1:])
     if raw_args[:1] == ["--update-handoff"]:
         # A frozen host has no `python -m`; the signed-update helper is reached
         # through the launcher instead (raiker/app/update_handoff.py).

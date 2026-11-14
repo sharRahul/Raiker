@@ -58,6 +58,13 @@ def free_port() -> int:
         return int(probe.getsockname()[1])
 
 
+def listener_argv() -> list[str]:
+    """How to start Raiker's own listening worker from this process."""
+    if getattr(sys, "frozen", False):
+        return [sys.executable, "--voice-stt-worker"]
+    return [sys.executable, str(Path(__file__).with_name("stt_worker.py"))]
+
+
 def worker_argv() -> list[str]:
     """How to start Raiker's own speaking worker from this process."""
     if getattr(sys, "frozen", False):
@@ -131,6 +138,8 @@ class VoiceEngines:
                 tail = read_log_tail(log_path)
                 if "voice_kokoro_runtime_missing" in tail:
                     raise VoiceEngineError("voice_kokoro_runtime_missing")
+                if "voice_whisper_runtime_missing" in tail:
+                    raise VoiceEngineError("voice_whisper_runtime_missing")
                 raise VoiceEngineError(f"voice_{name}_exited")
             if health(engine):
                 break
@@ -213,6 +222,7 @@ class VoiceEngines:
             command = _process_command(pid)
             if command and argv and argv[0] in command and (
                 "whisper-server" in command or "tts_worker" in command or "--voice-tts-worker" in command
+                or "stt_worker" in command or "--voice-stt-worker" in command
             ):
                 with contextlib.suppress(OSError):
                     os.kill(pid, signal.SIGTERM)
@@ -244,6 +254,26 @@ class VoiceEngines:
                     return False
 
             return self._start("whisper", argv, port, device=device, ram=ram, vram=vram, gpu=gpu, health=healthy)
+
+    def ensure_builtin_whisper(self, model: Path, *, threads: int, ram: int) -> RunningEngine:
+        """Start (or reuse) Raiker's own listening worker on ``model``."""
+        with self._lock:
+            current = self.running("whisper")
+            if current is not None:
+                current.last_used = self._clock()
+                return current
+            port = free_port()
+            argv = [*listener_argv(), "--model", str(model), "--port", str(port), "--threads", str(max(1, threads))]
+
+            def healthy(engine: RunningEngine) -> bool:
+                try:
+                    return httpx.get(f"{engine.endpoint}/", timeout=1.0).status_code == 200
+                except httpx.HTTPError:
+                    return False
+
+            started = self._start("whisper", argv, port, device="cpu", ram=ram, vram=0, gpu=None, health=healthy)
+            started.detail = "builtin"
+            return started
 
     # ── speaking ───────────────────────────────────────────────────────
 

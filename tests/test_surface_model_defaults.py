@@ -257,3 +257,38 @@ def test_a_surface_default_never_grants_readiness(
 
     assert refused.status_code == 409
     assert refused.json()["detail"]["reason_code"] == "model_not_ready"
+
+
+def test_the_first_surface_choice_becomes_the_global_default(
+    client: TestClient, owner_token: str, workspace: Path
+) -> None:
+    """Choosing a model in one surface must not leave the others with none.
+
+    Models read "No default model is chosen" while marking the same model
+    "Chat default", and Build and Tasks said "No model is chosen".
+    """
+    from raiker.api.routes_models import _has_global_model
+
+    store = SQLiteStore(workspace)
+    assert not _has_global_model(store, "principal_owner")
+    first = client.put(
+        "/api/surface-models",
+        headers=_auth(owner_token),
+        json={"surface": "chat", "profile_id": "ollama-local-openai-compatible", "model": "gemma4:31b-cloud"},
+    )
+    assert first.status_code == 200
+    assert _has_global_model(store, "principal_owner")
+    build = client.get("/api/model-decision?surface=build", headers=_auth(owner_token)).json()
+    assert build["selected"]["source"] == "global_default"
+    assert build["selected"]["model"] == "gemma4:31b-cloud"
+
+    # A later surface choice is an override: the global default stays put.
+    second = client.put(
+        "/api/surface-models",
+        headers=_auth(owner_token),
+        json={"surface": "build", "profile_id": "ollama-local-openai-compatible", "model": "qwen3:8b"},
+    )
+    assert second.status_code == 200
+    design = client.get("/api/model-decision?surface=design", headers=_auth(owner_token)).json()
+    assert design["selected"]["source"] == "global_default"
+    assert design["selected"]["model"] == "gemma4:31b-cloud"

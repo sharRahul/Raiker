@@ -56,6 +56,9 @@ class VoiceListeningView(TypedDict):
     state: str
     components: list[VoiceComponentView]
     device: str | None
+    #: ``server`` (the catalogue's whisper-server) or ``builtin`` (Raiker's own
+    #: listening worker, where no verified build exists for this machine).
+    engine: str
 
 
 class VoiceSpeakingView(TypedDict):
@@ -89,6 +92,15 @@ class VoiceHardwareView(TypedDict):
     gpu: str | None
 
 
+class VoiceRuntimeView(TypedDict):
+    """Whether the Python packages each side runs on are importable here."""
+
+    speaking: bool
+    listening: bool
+    #: A source run that Install may add the hash-locked packages to.
+    installable: bool
+
+
 class VoiceStatus(TypedDict):
     settings: VoiceSettingsView
     recommended_profile: str
@@ -97,6 +109,7 @@ class VoiceStatus(TypedDict):
     listening: VoiceListeningView
     speaking: VoiceSpeakingView
     plan: VoicePlanView
+    runtime: VoiceRuntimeView
     disk_bytes: int
     hardware: VoiceHardwareView
 

@@ -104,8 +104,31 @@
    * counting it; pointing at it or focusing it holds it open. Elsewhere it
    * stays until read, as before.
    */
-  const FOLD_AFTER_MS = 6000;
-  let folded = $state<string[]>([]);
+  const FOLD_AFTER_MS = 5000;
+  /**
+   * Folded notices are remembered for the browser session. Kept only in
+   * component state, every reload or deep link re-docked the same unread
+   * notice over the page's top-right actions, so on a phone the "Background
+   * task finished" card covered the heading of every page the owner opened.
+   */
+  const FOLDED_KEY = "raiker.notices.folded";
+  function readFolded(): string[] {
+    try {
+      const raw = sessionStorage.getItem(FOLDED_KEY);
+      const parsed: unknown = raw ? JSON.parse(raw) : [];
+      return Array.isArray(parsed) ? parsed.filter((id): id is string => typeof id === "string").slice(-200) : [];
+    } catch {
+      return [];
+    }
+  }
+  let folded = $state<string[]>(readFolded());
+  $effect(() => {
+    try {
+      sessionStorage.setItem(FOLDED_KEY, JSON.stringify(folded.slice(-200)));
+    } catch {
+      // Private windows may refuse storage; folding still works for this page.
+    }
+  });
   let holding = $state(false);
   // Every page, not only the work surfaces: a docked notice left open covered
   // controls on the right of any page (a project's Save under its limits). Like
@@ -388,6 +411,27 @@
     background: var(--surface);
     box-shadow: var(--shadow-2);
     overflow: hidden;
+  }
+  .notifications {
+    animation: notice-in 220ms var(--ease);
+  }
+  @keyframes notice-in {
+    from { opacity: 0; transform: translateY(-6px); }
+    to { opacity: 1; transform: none; }
+  }
+  /* On a phone the top of the page is its heading; a notice docks at the
+     bottom edge instead, above the safe area, and still folds into the bell. */
+  @media (max-width: 700px) {
+    .notifications {
+      top: auto;
+      bottom: calc(env(safe-area-inset-bottom, 0px) + 12px);
+      right: 12px;
+      width: calc(100vw - 24px);
+      transform: none !important;
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .notifications { animation: none; }
   }
   .notifications:hover { border-color: var(--accent-border, var(--neutral-border)); }
   .notice {

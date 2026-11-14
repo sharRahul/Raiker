@@ -61,13 +61,34 @@ def summarize_model_usage(usage: Mapping[str, Any] | None) -> dict[str, int]:
         if isinstance(value, int) and value >= 0:
             out[key] = value
 
-    _put("input_tokens", usage.get("input_tokens", usage.get("prompt_tokens")))
+    raw_input = usage.get("input_tokens", usage.get("prompt_tokens"))
     _put("output_tokens", usage.get("output_tokens", usage.get("completion_tokens")))
     cached = usage.get("cache_read_input_tokens")
+    # Anthropic reports cache reads *beside* ``input_tokens``; OpenAI's Chat
+    # Completions (``prompt_tokens_details``) and Responses
+    # (``input_tokens_details``) report them as a *subset* of it. Raiker's
+    # canonical ``input_tokens`` is the uncached part, as Anthropic counts it,
+    # so a subset is taken out once here. Left in, every cached OpenAI token
+    # was billed twice (at the input rate and again at the cache rate) and the
+    # two providers' context sizes could not be compared.
+    cached_is_subset = False
     if cached is None:
-        details = usage.get("prompt_tokens_details")
-        if isinstance(details, Mapping):
-            cached = details.get("cached_tokens")
+        for details_key in ("prompt_tokens_details", "input_tokens_details"):
+            details = usage.get(details_key)
+            if isinstance(details, Mapping) and details.get("cached_tokens") is not None:
+                cached = details.get("cached_tokens")
+                cached_is_subset = True
+                break
+    if (
+        cached_is_subset
+        and isinstance(raw_input, int)
+        and not isinstance(raw_input, bool)
+        and isinstance(cached, int)
+        and not isinstance(cached, bool)
+        and cached >= 0
+    ):
+        raw_input = max(0, raw_input - cached)
+    _put("input_tokens", raw_input)
     _put("cache_read_tokens", cached)
     _put("cache_write_tokens", usage.get("cache_creation_input_tokens"))
     if "cache_read_tokens" in out:

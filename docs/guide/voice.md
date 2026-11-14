@@ -30,12 +30,18 @@ yet says why instead of being hidden. In this build:
 - **Speaking with Kokoro** uses Kokoro-82M in every profile: int8 for Lite
   and Balanced, full precision for High quality. Model and voice files are
   pinned and verified before installation. Piper is no longer offered.
-- **Speech recognition** has pinned Whisper models. Windows has a verified
-  upstream engine; Linux and macOS engine packaging remains pending.
-- **Kokoro's runtime** is `kokoro-onnx` (tested here with version `0.6.1`). On
-  a source install, `pip install kokoro-onnx==0.6.1` enables it. The personal
-  `--bundle-voice` build includes its pinned runtime and has passed frozen-worker
-  synthesis. A build without it uses the local system-voice fallback. A
+- **Speech recognition** has pinned Whisper models. Windows uses the verified
+  upstream `whisper-server`. Linux and macOS, which have no verified build, use
+  Raiker's built-in listener: the same whisper.cpp in Raiker's own process
+  (through `pywhispercpp`), on the same verified model. Settings › Voice says
+  *whisper.cpp, built into Raiker* when that is the engine.
+- **The voice runtime** (`kokoro-onnx`, `onnxruntime` and `pywhispercpp`, at
+  the exact versions and hashes in `requirements/voice.txt`) is installed by
+  **Install** when Raiker runs from source and a package is missing; Settings ›
+  Voice says *Installing the voice runtime…* while it does. If the files are
+  already on disk but the runtime is not, **Install** is offered again for
+  exactly that. The personal `--bundle-voice` build includes the pinned runtime
+  and never installs packages itself. A build without it uses the local system-voice fallback. A
   personal Windows build is unsigned, so Windows SmartScreen may ask you to
   confirm before it installs; its licence notices and the pinned sources for
   the speech components travel with it.
@@ -67,6 +73,7 @@ for each start, so other programs on the computer cannot use it.
 - **Read aloud.** The installed speaking engine reads answers sentence by
   sentence. Without one, read-aloud uses an on-device system voice, never a
   browser or cloud voice.
+- **▶ Preview.** Plays the chosen voice once.
 - **Test.** Speaks a phrase, transcribes it back when listening is installed,
   and shows how many words matched.
 ## Talking to Raiker (Preview)

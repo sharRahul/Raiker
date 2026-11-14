@@ -16,6 +16,45 @@ PR #106: the **user-owned fallback sequence** and **prompt caching + normalised
 cache-hit metrics**.
 
 
+## Result — 2026-11-14 (Second round: models, context, answers, Tasks, voice, embeddings)
+
+A Linux workspace served by `raiker-web --port 8765` at 1440×1000, built from
+this round's SPA. Anthropic was connected through **Add model** with an
+identity-linked key and its workspace ID typed into the UI from the round's
+environment (`RAIKER_LIVE_ANTHROPIC_KEY`, `RAIKER_LIVE_ANTHROPIC_WORKSPACE`;
+RT-1114-01); neither appears in the spec, logs or captures. The Balanced voice
+profile was installed through Settings › Voice. Spec:
+`web/e2e/fixed-1414-1425-round-live.spec.ts`. Result: **7 of 7 passed**.
+
+| # | Scenario | Verification | Result |
+|---|---|---|---|
+| RT-1114B-01 | Haiku chosen in Build's composer on a workspace with no global default becomes the default: Models names Haiku 4.5 in its header and Tasks has no "No model is chosen" | FIXED-1414 | Passed |
+| RT-1114B-02 | Tasks: the summary and board come first, the composer is docked below them, the templates sit directly above the composer | FIXED-1421 | Passed |
+| RT-1114B-03 | Goals has the shared toolbar and no `Goals` heading, one New goal while empty; Approvals' filters and Refresh share a centre line | FIXED-1417, FIXED-1418 | Passed |
+| RT-1114B-04 | Threads: Evidence is a padded action in the row's right half | FIXED-1420 | Passed |
+| RT-1114B-05 | A real Haiku answer: transparent background, one meta line naming the model, no "nothing recalled" or "nothing else left this computer", context figure above 0% | FIXED-1422, FIXED-1423 | Passed |
+| RT-1114B-06 | After a reload `main#main` has no outline; Build's Terminal facts are one column | FIXED-1416, FIXED-1419 | Passed |
+| RT-1114B-07 | Settings › Voice: **▶ Preview** returns `audio/wav` from Kokoro; **Test** reports it spoke | FIXED-1424 | Passed |
+
+**Found and fixed during the run.** Before the fix, the same Haiku
+conversation read **0% context** with about 10,000 prompt tokens in play (all
+but a few hundred were cache reads), and Models read *No default model is
+chosen* beside *Chat default*. Install reported success while Test and Preview
+failed with `voice_kokoro_runtime_missing`; the second Install added the
+runtime. Three first-draft assertions matched the wrong element (two `.summary`
+and two `.posture` classes on the page) and were narrowed before the passing
+run.
+
+**Not qualified here.** This sandbox refuses `huggingface.co` and
+`ollama.com`: the Whisper model and `nomic-embed-text` could not be fetched, so
+a spoken round trip and a background indexing pass on a real model remain open
+in [TO_BE_FIXED.md](../plans/TO_BE_FIXED.md#voice--listening-on-linux-and-macos-not-yet-qualified).
+
+**Captures.** `output/playwright/2026-11-14b-round/` — `01-models-header`,
+`02-tasks-docked-composer`, `03-goals`, `03-approvals`, `04-threads`,
+`05-chat-answer`, `06-build-terminal`, `07-voice`. Inspected at original
+resolution; no key, token or workspace ID is visible.
+
 ## Result — 2026-11-14 (Surface sweep: every page, sub-page and pop-up)
 
 The owner pointed out that the first 2026-11-14 review had missed many pages

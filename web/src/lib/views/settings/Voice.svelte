@@ -44,7 +44,19 @@
     voice_speaking_not_installed: "Install the speaking engine first.",
     voice_listening_not_installed: "Speech recognition is not installed, so the round trip could not be checked.",
     voice_kokoro_runtime_missing:
-      "Kokoro's runtime (the kokoro-onnx package) is not part of this Raiker build yet. Choose Lite or the system voice.",
+      "The speaking engine's runtime is not installed. Choose Install to add it.",
+    voice_whisper_runtime_missing:
+      "The listening engine's runtime is not installed. Choose Install to add it.",
+    voice_runtime_install_failed:
+      "Raiker could not install the voice runtime. Check this computer's internet connection and try Install again.",
+    voice_runtime_installer_missing:
+      "Raiker could not find pip or uv to install the voice runtime with.",
+    voice_runtime_not_in_build: "This Raiker build does not include the voice runtime.",
+    voice_install_failed: "the download did not finish",
+    voice_download_failed: "a file could not be downloaded. Check this computer's internet connection and try again",
+    voice_digest_mismatch: "a downloaded file did not match its verified digest, so it was discarded",
+    voice_listening_exited: "the listening engine stopped as it started",
+    voice_speaker_exited: "the speaking engine stopped as it started",
     voice_profile_does_not_fit: "This profile does not fit next to what is already running.",
     voice_profile_nothing_installable: "Nothing in this profile can be installed on this computer yet.",
     voice_off: "Choose a profile first.",
@@ -87,7 +99,8 @@
         operation = found;
         if (!found || ["complete", "failed", "cancelled"].includes(found.state)) {
           stopWatching();
-          if (found?.state === "failed") notice = { kind: "error", text: `Install failed: ${reason(found.error_code)}` };
+          if (found?.state === "failed")
+            notice = { kind: "error", text: `Install failed: ${reason(found.error_detail ?? found.error_code)}` };
           if (found?.state === "complete") notice = { kind: "ok", text: "Installed and verified." };
           await load();
         }
@@ -135,7 +148,12 @@
   const canInstall = $derived(
     !!status &&
       settings?.profile !== "off" &&
-      [...status.listening.components, ...status.speaking.components].some((c) => c.installable && !c.installed),
+      ([...status.listening.components, ...status.speaking.components].some((c) => c.installable && !c.installed) ||
+        // Files on disk but the packages they run on missing (a source run):
+        // Install adds the hash-locked runtime, so offer it.
+        (status.runtime.installable &&
+          ((!status.runtime.speaking && status.speaking.components.length > 0) ||
+            (status.listening.engine === "builtin" && !status.runtime.listening)))),
   );
   const whisperTiers = $derived(
     (status?.listening.components ?? []).filter((c) => c.role === "whisper_model"),
@@ -210,6 +228,11 @@
               <li><span>{component.name}</span><span class="meta">{componentLine(component)}</span></li>
             {/each}
           </ul>
+          {#if status.listening.engine === "builtin"}
+            <!-- No verified whisper-server build exists for this computer, so
+                 Raiker listens with the same whisper.cpp in its own process. -->
+            <p class="meta">whisper.cpp, built into Raiker</p>
+          {/if}
           {#if status.listening.device}<p class="meta">Runs on {status.listening.device === "cpu" ? "the processor" : status.listening.device.toUpperCase()}</p>{/if}
         </article>
         <article class="engine" aria-label="Speaking">
@@ -223,7 +246,9 @@
       </div>
       {#if operation && !["complete", "failed", "cancelled"].includes(operation.state)}
         <p class="notice" role="status">
-          Downloading and verifying{operation.progress_percent !== null ? ` — ${operation.progress_percent}%` : "…"}
+          {operation.phase === "installing_voice_runtime"
+            ? "Installing the voice runtime…"
+            : `Downloading and verifying${operation.progress_percent !== null ? ` — ${operation.progress_percent}%` : "…"}`}
         </p>
       {/if}
       <div class="actions">

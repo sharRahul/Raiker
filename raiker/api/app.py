@@ -535,9 +535,20 @@ def create_app(
 
             for runtime in runtimes:
                 refresh_in_background(runtime.workspace_root)
+        # The built-in embedding model keeps semantic recall current; it runs
+        # only where the owner already lets model work proceed without asking.
+        index_stops: list[Any] = []
+        with suppress(Exception):
+            from raiker.memory import background_index
+
+            for runtime in runtimes:
+                index_stops.append(background_index.start(runtime.workspace_root))
         try:
             yield
         finally:
+            for stop_event in index_stops:
+                if stop_event is not None:
+                    stop_event.set()
             app.state.runtime_started = False
             # Newest first, so an instance mounted during the run is stopped
             # before the workspace that holds it.

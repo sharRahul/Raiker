@@ -52,6 +52,7 @@ NON_SECRET_TOKEN_COUNT_KEYS = frozenset(
         # view survives redaction, so the next count added cannot repeat it.
         "session_input_tokens",
         "session_output_tokens",
+        "session_cache_read_tokens",
         "total_tokens",
         "used_tokens",
     }

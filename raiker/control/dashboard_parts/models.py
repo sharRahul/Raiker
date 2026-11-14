@@ -1004,18 +1004,38 @@ class ModelService:
         principal = acting_principal_id or ""
         session_rows = ledger.session_usage(principal, session_id) if principal else []
         session_totals = sum_totals(session_rows)
+        latest = ledger.latest_request(principal, session_id) if principal else None
+
+        def _profile_for(profile_id: str | None, provider: str, row_model: str) -> Any:
+            """The profile that served a ledger row, not today's selection.
+
+            A conversation answered by a surface default (Chat on Haiku while
+            nothing is chosen globally) was priced and sized against the
+            *global* profile — or none — so it showed no window and no cost.
+            """
+            if profile_id:
+                try:
+                    return registry.resolve_profile_id(profile_id)
+                except Exception:  # noqa: BLE001 — fall through to provider+model
+                    pass
+            try:
+                return registry.resolve(provider, row_model)
+            except Exception:  # noqa: BLE001 — an unknown row is simply unpriced
+                return None
 
         # The model that actually served this conversation beats the currently
         # selected one: re-pricing history at a newly picked model's rate would
         # misreport what the user already spent.
-        model = (
-            session_rows[-1].model
-            if session_rows
-            else (
-                (state.model if state is not None and state.model else None)
-                or (profile.model if profile is not None else None)
+        model: str | None
+        if latest is not None:
+            model = latest.model
+            served = _profile_for(latest.profile_id, latest.provider, latest.model)
+            if served is not None:
+                profile = served
+        else:
+            model = (state.model if state is not None and state.model else None) or (
+                profile.model if profile is not None else None
             )
-        )
         if model in (None, "", "<model>"):
             model = None
 
@@ -1027,17 +1047,21 @@ class ModelService:
         )
 
         def _priced_total(rows: list[Any]) -> Decimal | None:
-            """Sum cost by pricing each model at its own rate.
+            """Sum cost by pricing each model at its own rate and profile.
 
             Summing tokens first and applying one model's rate would charge a
             cheap model's tokens at an expensive model's price — one provider's models
             differ by roughly 15x, so a mixed history would be badly wrong.
+            A row served by a local runtime costs nothing and is skipped.
             Returns None when no row could be priced at all.
             """
             total = Decimal(0)
             priced_any = False
             for row in rows:
-                row_facts = self._resolve_facts(profile, row.model, acting_principal_id)
+                row_profile = _profile_for(row.profile_id, row.provider, row.model) or profile
+                if row_profile is None or not self._profile_is_billable(row_profile):
+                    continue
+                row_facts = self._resolve_facts(row_profile, row.model, acting_principal_id)
                 row_cost = row.totals.cost(row_facts)
                 if row_cost is None:
                     continue
@@ -1083,10 +1107,10 @@ class ModelService:
             profile_id=profile.profile_id if profile is not None else None,
             provider=profile.provider if profile is not None else None,
             model=model,
-            used_tokens=session_rows[-1].totals.input_tokens if session_rows else None,
+            used_tokens=latest.totals.context_tokens if latest is not None else None,
             context_window_tokens=facts.context_window_tokens if facts is not None else None,
             context_window_source=facts.context_window_source if facts is not None else None,
-            usage_source="provider" if session_rows else "unavailable",
+            usage_source="provider" if latest is not None else "unavailable",
             billable=billable,
             session_cost=str(session_cost) if session_cost is not None else None,
             provider_total_cost=str(provider_total) if provider_total is not None else None,
@@ -1096,6 +1120,7 @@ class ModelService:
             session_turns=session_totals.turns,
             session_input_tokens=session_totals.input_tokens,
             session_output_tokens=session_totals.output_tokens,
+            session_cache_read_tokens=session_totals.cache_read_tokens,
             price_input_per_mtok=str(price.input_per_mtok) if price is not None else None,
             price_output_per_mtok=str(price.output_per_mtok) if price is not None else None,
             price_cache_write_per_mtok=(

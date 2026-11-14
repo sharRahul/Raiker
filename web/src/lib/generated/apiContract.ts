@@ -1711,6 +1711,7 @@ export type ContextUsageView = {
   session_turns: number;
   session_input_tokens: number;
   session_output_tokens: number;
+  session_cache_read_tokens: number;
   price_input_per_mtok: string | null;
   price_output_per_mtok: string | null;
   price_cache_write_per_mtok: string | null;
@@ -7188,6 +7189,7 @@ export type VoiceListeningView = {
   state: string;
   components: VoiceComponentView[];
   device: string | null;
+  engine: string;
 };
 
 export type VoicePlacementView = {
@@ -7221,6 +7223,13 @@ export type VoiceProfileView = {
 
 export type VoiceRemoved = {
   freed_bytes: number;
+};
+
+/** Whether the Python packages each side runs on are importable here. */
+export type VoiceRuntimeView = {
+  speaking: boolean;
+  listening: boolean;
+  installable: boolean;
 };
 
 /** Voice spec §6.2 — every field optional; what is sent is changed. */
@@ -7265,6 +7274,7 @@ export type VoiceStatus = {
   listening: VoiceListeningView;
   speaking: VoiceSpeakingView;
   plan: VoicePlanView;
+  runtime: VoiceRuntimeView;
   disk_bytes: number;
   hardware: VoiceHardwareView;
 };

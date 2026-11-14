@@ -798,6 +798,242 @@
     />
   {/if}
 
+  {#if notice}<p class="notice" role="status">
+      {notice}
+      {#if noticeHref}<a href={noticeHref}>Open its history</a>{/if}
+    </p>{/if}
+  {#if loadError}<PageState state="error" title="Couldn't load tasks" detail={loadError} />
+  {:else if tasks === null}<PageState state="loading" title="Loading tasks…" lines={3} />
+  {:else}
+    <div class="summary"><span><strong>{active.length}</strong> open</span><span><strong>{scheduled.length}</strong> scheduled</span><span><strong>{history.length}</strong> finished</span></div>
+    {#if rows.length === 0}<div class="card">
+        <EmptyState
+          icon="tasks"
+          title="No work queued"
+          body="Give Raiker work that can continue after you leave."
+        >
+          {#snippet action()}
+            <!-- The plan form is docked at the bottom of this page. Naming
+                 where it is would be worse than putting the cursor in it. -->
+            <button type="button" class="btn btn-primary" onclick={() => instructionEl?.focus()}>
+              Plan your first task
+            </button>
+          {/snippet}
+        </EmptyState>
+      </div>
+    {:else}
+      <section class="work-list" aria-labelledby="open-work">
+        <h3 id="open-work">Open work</h3>
+        {#each page(rows, shownRows) as row (row.task.task_id)}
+          {@const task = row.task}
+          {@const pending = blockedBy(task)}
+          {@const children = delegated(task)}
+          <article class="card task" style={`--depth:${row.depth}`}>
+            <div class="task-main">
+              <div class="task-title">
+                <span class="branch" aria-hidden="true">{row.depth > 0 ? "↳" : ""}</span>
+                <div><h4>{task.title}</h4><p>{task.objective || "No additional instructions."}</p></div>
+              </div>
+              <Badge variant={taskBadge(task.status)} label={stateLabel(task)} />
+            </div>
+            {#if children.total > 0}
+              <!-- UX-TASK-06 — a parent settles only when its own run and every
+                   task it delegated have: completed if all of them did, failed
+                   if any did not. The bar is that rule, counted. -->
+              <div class="delegated">
+                <div
+                  class="progress"
+                  role="progressbar"
+                  aria-label="Delegated work settled"
+                  aria-valuenow={children.settled}
+                  aria-valuemin="0"
+                  aria-valuemax={children.total}
+                >
+                  <div style={`width:${Math.round((children.settled / children.total) * 100)}%`}></div>
+                </div>
+                <button
+                  type="button"
+                  class="btn btn-ghost btn-sm"
+                  aria-expanded={expanded.includes(task.task_id)}
+                  onclick={() => toggleDelegated(task.task_id)}
+                >
+                  {children.settled} of {children.total} delegated {children.total === 1 ? "task" : "tasks"} settled ·
+                  {expanded.includes(task.task_id) ? "Hide" : "Show"}
+                </button>
+              </div>
+            {/if}
+            {#if (task.attachments ?? []).length > 0}
+              <div class="task-attachments" aria-label="Files attached to this task">
+                {#each task.attachments ?? [] as attachment}
+                  <span><Icon name="file" size="sm" /> {attachmentLabel(attachment)}</span>
+                {/each}
+              </div>
+            {/if}
+
+            <!-- BUG-25 — the whole life of an approval, on the card that owns
+                 it. Waiting names the decision and links to it; continuing says
+                 the granted decision is being replayed right now; a parked run
+                 whose automatic continuation could not proceed states why and
+                 offers the retry, so a granted approval is never a dead end. -->
+            {#if task.status === "continuing"}
+              <p class="continuing" role="status">
+                <Icon name="refresh" size="sm" /> Approved — continuing this run now.
+              </p>
+            {:else if pending.length > 0}
+              <p class="blocked" role="status">
+                <Icon name="approvals" size="sm" />
+                Waiting on {pending.length === 1 ? "a decision" : `${pending.length} decisions`} before this can continue.
+                <a href={`#/approvals?session=${encodeURIComponent(task.session_id)}`}>Review {pending.length === 1 ? "it" : "them"}</a>
+              </p>
+            {:else if task.status === "waiting_for_children"}
+              <!-- BUG-220 — the row this replaces said "completed" while a
+                   child was still parked. The count is the point: it is what
+                   the owner would otherwise have to work out by reading the
+                   tree themselves. -->
+              <p class="blocked" role="status">
+                <Icon name="tasks" size="sm" />
+                Its own run finished. Waiting on {childCount(task)} delegated {childCount(task) === 1 ? "task" : "tasks"}.
+                It completes when every one of them completes, and fails if any fails or is stopped.
+              </p>
+            {:else if task.status === "waiting_for_approval"}
+              <!-- BUG-39 — granting the decision starts the continuation on its
+                   own, so this button is the recovery path, not the fast one.
+                   It is styled and labelled as one: quiet, and stated as what
+                   to press when a granted run has not moved. -->
+              <p class="blocked" role="status">
+                <Icon name="approvals" size="sm" />
+                {outcome(task) ?? "This run is waiting for your approval to continue."}
+                <span class="recovery">
+                  <span class="recovery-note">Approving continues this run automatically.</span>
+                  <button type="button" class="btn btn-ghost btn-sm" onclick={() => resumeTask(task)} disabled={busyTask === task.task_id}>
+                    {busyTask === task.task_id ? "Continuing…" : "Continue now"}
+                  </button>
+                </span>
+              </p>
+            {:else if task.status === "paused" && task.summary?.trim()}
+              <!-- DEC-12 step 6 — why it stopped, beside the Continue that
+                   starts it again; "paused" alone sent the owner to History. -->
+              <p class="blocked" role="status">
+                <Icon name="warning" size="sm" /> {task.summary.trim()}
+              </p>
+            {:else if outcome(task)}
+              <p class="outcome" role="status">{outcome(task)}</p>
+            {/if}
+            {#if task.delivery_state === "failed"}
+              <!-- DEC-12 step 5 — whether the owner was told is a separate fact
+                   from whether the work worked. A completed run whose notice did
+                   not arrive is still completed, and says so here. -->
+              <p class="blocked delivery-failed" role="status" data-testid="task-delivery-failed">
+                <Icon name="warning" size="sm" />
+                <span><strong>Delivery failed.</strong> {task.delivery_detail ?? "The notice that this ended did not arrive."}</span>
+              </p>
+            {/if}
+
+            <!-- "Now:" is only true while the work is moving. A settled task's
+                 last step is history, and its outcome line already says how it
+                 ended. -->
+            {#if task.current_step && ["running", "waiting"].includes(taskPhase(task))}<p class="step">Now: {task.current_step}</p>{/if}
+            {#if task.progress_percent !== null}
+              <div class="progress" role="progressbar" aria-valuenow={task.progress_percent} aria-valuemin="0" aria-valuemax="100"><div style={`width:${task.progress_percent}%`}></div></div>
+            {/if}
+            <footer>
+              <!-- The same order a thread and a project use: where the
+                   work lives, what it is doing, when it last moved. The state
+                   badge is above, on the title row, because a task's status is
+                   the first thing this card is read for.
+
+                   Backlog #23 — the working method is said only when it is not
+                   the default, so the common case stays quiet and a Build child
+                   stands out on the board. -->
+              <WorkMeta
+                project={task.surface === "build" ? "Build" : null}
+                detail={scheduleLabel(task)}
+                activityAt={task.updated_at}
+              />
+              <span class="task-actions">
+                <!-- C11 — each task runs its cycles in a conversation of its
+                     own, so "what did the overnight run find?" is a thread the
+                     owner opens and replies in, and the reply is context the
+                     next cycle reads.
+
+                     Only offered once there is something to read: a link to an
+                     empty transcript is a dead end, and a routine that has not
+                     run yet has one. -->
+                {#if task.thread_session_id && (task.thread_turns ?? 0) > 0}
+                  <a class="btn btn-ghost btn-sm thread-link" href={`#/new-chat?session=${task.thread_session_id}`}>
+                    <Icon name="chat" size="sm" />
+                    Thread · {task.thread_turns}
+                  </a>
+                {/if}
+                {#if deliveries.has(task.task_id)}
+                  {@const delivery = deliveries.get(task.task_id)}
+                  <!-- QUI-F06 — where else its results go, and whether the last one got there. -->
+                  <span class="delivery-line" title={delivery?.last_reason ?? ""}>
+                    Also to {delivery?.channel_name}{delivery?.last_status === "not_delivered" ? " · last one not sent" : ""}
+                    <button type="button" class="btn btn-ghost btn-sm" onclick={() => void stopDelivery(task.task_id)}>Stop sending</button>
+                  </span>
+                {/if}
+                <!-- BUG-299 — every run's attempts, the decision each waited on
+                     and the continuation that followed, at one address. -->
+                <a class="btn btn-ghost btn-sm thread-link" href={taskDetailHref(task.task_id)}>
+                  <Icon name="activity" size="sm" />
+                  History
+                </a>
+                <!-- DEC-12 steps 6 and 8 — will a routine run, and how long
+                     one run may take. Only work with a schedule has a next run
+                     to ask about. -->
+                {#if task.recurrence || task.scheduled_at}
+                  <RoutineCheck {task} onChanged={(updated) => replaceTask(updated)} />
+                {/if}
+                <!-- UX-TASK-05 — the controls this task's phase offers, from the
+                     one module every surface asks. Continue for a parked
+                     approval is already on the line above, beside its reason. -->
+                {#each taskActions(task).filter((action) => !(action === "continue" && task.status === "waiting_for_approval")) as action (action)}
+                  <button
+                    type="button"
+                    class={action === "run_now" || action === "continue"
+                      ? "btn btn-primary btn-sm"
+                      : action === "run_again"
+                        ? "btn btn-ghost btn-sm"
+                        : "btn btn-danger btn-sm"}
+                    onclick={() => act(task, action)}
+                    disabled={busyTask === task.task_id}
+                    >{busyTask === task.task_id ? busyLabel(action) : taskActionLabel(action)}</button
+                  >
+                {/each}
+              </span>
+            </footer>
+            {#if (task.thread_turns ?? 0) > 0}
+              <!-- QUI-F16 — what this task's own conversation used, read, changed and sent. -->
+              <TaskReceipt taskId={task.task_id} />
+            {/if}
+          </article>
+        {/each}
+        <ShowMore total={rows.length} shown={Math.min(shownRows, rows.length)} noun="tasks" onmore={() => (shownRows += PAGE_SIZE)} />
+      </section>
+    {/if}
+    {#if history.length > 0}<section class="history"><h3>Finished work</h3>{#each history as task (task.task_id)}<div class="history-row"><div class="history-main"><a class="history-title" href={taskDetailHref(task.task_id)}>{task.title}</a><p class="outcome">{outcome(task)}</p>{#if task.delivery_state === "failed"}<!-- DEC-12 step 5 — the work's outcome, and separately whether the owner was told. --><p class="delivery-failed" role="status" data-testid="task-delivery-failed"><Icon name="warning" size="sm" /> <strong>Delivery failed.</strong> {task.delivery_detail ?? "The notice that this ended did not arrive."}</p>{/if}{#if deliveries.has(task.task_id)}<!-- QUI-F06 --><p class="delivery-line">Also sent to {deliveries.get(task.task_id)?.channel_name}{deliveries.get(task.task_id)?.last_status === "not_delivered" ? " · the last one was not sent" : ""}</p>{/if}{#if (task.thread_turns ?? 0) > 0}<!-- QUI-F16 --><TaskReceipt taskId={task.task_id} />{/if}</div><Badge variant={taskBadge(task.status)} label={stateLabel(task)} /><span class="when">{relativeTime(task.updated_at)}</span>{#if taskActions(task).includes("run_again")}<button type="button" class="btn btn-ghost btn-sm" onclick={() => again(task)} disabled={busyTask === task.task_id}>{busyTask === task.task_id ? "Filing…" : "Run again"}</button>{/if}</div>{/each}</section>{/if}
+  {/if}
+
+  <!-- The composer docks at the bottom of the page, under the work it files,
+       the way Chat, Build and Design keep theirs: the list reads top-down and
+       the place to add to it stays in reach however long the list grows.
+       Templates sit directly above it, as Chat's starters do. -->
+  <div class="task-dock">
+  <!-- QUI-F06 — start from a template: it fills the form, the owner reads it
+       and presses Create. Suggestions under the composer, the way Chat offers
+       its starters, rather than a row of pills inside the input card. -->
+  {#if objective.trim() === ""}
+    <div class="templates" role="group" aria-label="Start from a template">
+      {#each SCHEDULE_TEMPLATES as template (template.id)}
+        <button type="button" class="template" title={template.detail} onclick={() => applyDraft(template)}>
+          <Icon name="clock" size="sm" />
+          <span>{template.label}</span>
+        </button>
+      {/each}
+    </div>
+  {/if}
+
   <!-- COMPOSER-10 — the same shell Chat, Build and Design use. What differs is
        the primary action and the one control specific to planning work: when
        it should run. Title, parent, priority, repeat, start time and model are
@@ -1098,237 +1334,7 @@
     {/snippet}
   </Composer>
 
-  <!-- QUI-F06 — start from a template: it fills the form, the owner reads it
-       and presses Create. Suggestions under the composer, the way Chat offers
-       its starters, rather than a row of pills inside the input card. -->
-  {#if objective.trim() === ""}
-    <div class="templates" role="group" aria-label="Start from a template">
-      {#each SCHEDULE_TEMPLATES as template (template.id)}
-        <button type="button" class="template" title={template.detail} onclick={() => applyDraft(template)}>
-          <Icon name="clock" size="sm" />
-          <span>{template.label}</span>
-        </button>
-      {/each}
-    </div>
-  {/if}
-
-  {#if notice}<p class="notice" role="status">
-      {notice}
-      {#if noticeHref}<a href={noticeHref}>Open its history</a>{/if}
-    </p>{/if}
-  {#if loadError}<PageState state="error" title="Couldn't load tasks" detail={loadError} />
-  {:else if tasks === null}<PageState state="loading" title="Loading tasks…" lines={3} />
-  {:else}
-    <div class="summary"><span><strong>{active.length}</strong> open</span><span><strong>{scheduled.length}</strong> scheduled</span><span><strong>{history.length}</strong> finished</span></div>
-    {#if rows.length === 0}<div class="card">
-        <EmptyState
-          icon="tasks"
-          title="No work queued"
-          body="Give Raiker work that can continue after you leave."
-        >
-          {#snippet action()}
-            <!-- The plan form is already on this page, above the empty
-                 state. Naming where it is would be worse than putting the
-                 cursor in it. -->
-            <button type="button" class="btn btn-primary" onclick={() => instructionEl?.focus()}>
-              Plan your first task
-            </button>
-          {/snippet}
-        </EmptyState>
-      </div>
-    {:else}
-      <section class="work-list" aria-labelledby="open-work">
-        <h3 id="open-work">Open work</h3>
-        {#each page(rows, shownRows) as row (row.task.task_id)}
-          {@const task = row.task}
-          {@const pending = blockedBy(task)}
-          {@const children = delegated(task)}
-          <article class="card task" style={`--depth:${row.depth}`}>
-            <div class="task-main">
-              <div class="task-title">
-                <span class="branch" aria-hidden="true">{row.depth > 0 ? "↳" : ""}</span>
-                <div><h4>{task.title}</h4><p>{task.objective || "No additional instructions."}</p></div>
-              </div>
-              <Badge variant={taskBadge(task.status)} label={stateLabel(task)} />
-            </div>
-            {#if children.total > 0}
-              <!-- UX-TASK-06 — a parent settles only when its own run and every
-                   task it delegated have: completed if all of them did, failed
-                   if any did not. The bar is that rule, counted. -->
-              <div class="delegated">
-                <div
-                  class="progress"
-                  role="progressbar"
-                  aria-label="Delegated work settled"
-                  aria-valuenow={children.settled}
-                  aria-valuemin="0"
-                  aria-valuemax={children.total}
-                >
-                  <div style={`width:${Math.round((children.settled / children.total) * 100)}%`}></div>
-                </div>
-                <button
-                  type="button"
-                  class="btn btn-ghost btn-sm"
-                  aria-expanded={expanded.includes(task.task_id)}
-                  onclick={() => toggleDelegated(task.task_id)}
-                >
-                  {children.settled} of {children.total} delegated {children.total === 1 ? "task" : "tasks"} settled ·
-                  {expanded.includes(task.task_id) ? "Hide" : "Show"}
-                </button>
-              </div>
-            {/if}
-            {#if (task.attachments ?? []).length > 0}
-              <div class="task-attachments" aria-label="Files attached to this task">
-                {#each task.attachments ?? [] as attachment}
-                  <span><Icon name="file" size="sm" /> {attachmentLabel(attachment)}</span>
-                {/each}
-              </div>
-            {/if}
-
-            <!-- BUG-25 — the whole life of an approval, on the card that owns
-                 it. Waiting names the decision and links to it; continuing says
-                 the granted decision is being replayed right now; a parked run
-                 whose automatic continuation could not proceed states why and
-                 offers the retry, so a granted approval is never a dead end. -->
-            {#if task.status === "continuing"}
-              <p class="continuing" role="status">
-                <Icon name="refresh" size="sm" /> Approved — continuing this run now.
-              </p>
-            {:else if pending.length > 0}
-              <p class="blocked" role="status">
-                <Icon name="approvals" size="sm" />
-                Waiting on {pending.length === 1 ? "a decision" : `${pending.length} decisions`} before this can continue.
-                <a href={`#/approvals?session=${encodeURIComponent(task.session_id)}`}>Review {pending.length === 1 ? "it" : "them"}</a>
-              </p>
-            {:else if task.status === "waiting_for_children"}
-              <!-- BUG-220 — the row this replaces said "completed" while a
-                   child was still parked. The count is the point: it is what
-                   the owner would otherwise have to work out by reading the
-                   tree themselves. -->
-              <p class="blocked" role="status">
-                <Icon name="tasks" size="sm" />
-                Its own run finished. Waiting on {childCount(task)} delegated {childCount(task) === 1 ? "task" : "tasks"}.
-                It completes when every one of them completes, and fails if any fails or is stopped.
-              </p>
-            {:else if task.status === "waiting_for_approval"}
-              <!-- BUG-39 — granting the decision starts the continuation on its
-                   own, so this button is the recovery path, not the fast one.
-                   It is styled and labelled as one: quiet, and stated as what
-                   to press when a granted run has not moved. -->
-              <p class="blocked" role="status">
-                <Icon name="approvals" size="sm" />
-                {outcome(task) ?? "This run is waiting for your approval to continue."}
-                <span class="recovery">
-                  <span class="recovery-note">Approving continues this run automatically.</span>
-                  <button type="button" class="btn btn-ghost btn-sm" onclick={() => resumeTask(task)} disabled={busyTask === task.task_id}>
-                    {busyTask === task.task_id ? "Continuing…" : "Continue now"}
-                  </button>
-                </span>
-              </p>
-            {:else if task.status === "paused" && task.summary?.trim()}
-              <!-- DEC-12 step 6 — why it stopped, beside the Continue that
-                   starts it again; "paused" alone sent the owner to History. -->
-              <p class="blocked" role="status">
-                <Icon name="warning" size="sm" /> {task.summary.trim()}
-              </p>
-            {:else if outcome(task)}
-              <p class="outcome" role="status">{outcome(task)}</p>
-            {/if}
-            {#if task.delivery_state === "failed"}
-              <!-- DEC-12 step 5 — whether the owner was told is a separate fact
-                   from whether the work worked. A completed run whose notice did
-                   not arrive is still completed, and says so here. -->
-              <p class="blocked delivery-failed" role="status" data-testid="task-delivery-failed">
-                <Icon name="warning" size="sm" />
-                <span><strong>Delivery failed.</strong> {task.delivery_detail ?? "The notice that this ended did not arrive."}</span>
-              </p>
-            {/if}
-
-            <!-- "Now:" is only true while the work is moving. A settled task's
-                 last step is history, and its outcome line already says how it
-                 ended. -->
-            {#if task.current_step && ["running", "waiting"].includes(taskPhase(task))}<p class="step">Now: {task.current_step}</p>{/if}
-            {#if task.progress_percent !== null}
-              <div class="progress" role="progressbar" aria-valuenow={task.progress_percent} aria-valuemin="0" aria-valuemax="100"><div style={`width:${task.progress_percent}%`}></div></div>
-            {/if}
-            <footer>
-              <!-- The same order a thread and a project use: where the
-                   work lives, what it is doing, when it last moved. The state
-                   badge is above, on the title row, because a task's status is
-                   the first thing this card is read for.
-
-                   Backlog #23 — the working method is said only when it is not
-                   the default, so the common case stays quiet and a Build child
-                   stands out on the board. -->
-              <WorkMeta
-                project={task.surface === "build" ? "Build" : null}
-                detail={scheduleLabel(task)}
-                activityAt={task.updated_at}
-              />
-              <span class="task-actions">
-                <!-- C11 — each task runs its cycles in a conversation of its
-                     own, so "what did the overnight run find?" is a thread the
-                     owner opens and replies in, and the reply is context the
-                     next cycle reads.
-
-                     Only offered once there is something to read: a link to an
-                     empty transcript is a dead end, and a routine that has not
-                     run yet has one. -->
-                {#if task.thread_session_id && (task.thread_turns ?? 0) > 0}
-                  <a class="btn btn-ghost btn-sm thread-link" href={`#/new-chat?session=${task.thread_session_id}`}>
-                    <Icon name="chat" size="sm" />
-                    Thread · {task.thread_turns}
-                  </a>
-                {/if}
-                {#if deliveries.has(task.task_id)}
-                  {@const delivery = deliveries.get(task.task_id)}
-                  <!-- QUI-F06 — where else its results go, and whether the last one got there. -->
-                  <span class="delivery-line" title={delivery?.last_reason ?? ""}>
-                    Also to {delivery?.channel_name}{delivery?.last_status === "not_delivered" ? " · last one not sent" : ""}
-                    <button type="button" class="btn btn-ghost btn-sm" onclick={() => void stopDelivery(task.task_id)}>Stop sending</button>
-                  </span>
-                {/if}
-                <!-- BUG-299 — every run's attempts, the decision each waited on
-                     and the continuation that followed, at one address. -->
-                <a class="btn btn-ghost btn-sm thread-link" href={taskDetailHref(task.task_id)}>
-                  <Icon name="activity" size="sm" />
-                  History
-                </a>
-                <!-- DEC-12 steps 6 and 8 — will a routine run, and how long
-                     one run may take. Only work with a schedule has a next run
-                     to ask about. -->
-                {#if task.recurrence || task.scheduled_at}
-                  <RoutineCheck {task} onChanged={(updated) => replaceTask(updated)} />
-                {/if}
-                <!-- UX-TASK-05 — the controls this task's phase offers, from the
-                     one module every surface asks. Continue for a parked
-                     approval is already on the line above, beside its reason. -->
-                {#each taskActions(task).filter((action) => !(action === "continue" && task.status === "waiting_for_approval")) as action (action)}
-                  <button
-                    type="button"
-                    class={action === "run_now" || action === "continue"
-                      ? "btn btn-primary btn-sm"
-                      : action === "run_again"
-                        ? "btn btn-ghost btn-sm"
-                        : "btn btn-danger btn-sm"}
-                    onclick={() => act(task, action)}
-                    disabled={busyTask === task.task_id}
-                    >{busyTask === task.task_id ? busyLabel(action) : taskActionLabel(action)}</button
-                  >
-                {/each}
-              </span>
-            </footer>
-            {#if (task.thread_turns ?? 0) > 0}
-              <!-- QUI-F16 — what this task's own conversation used, read, changed and sent. -->
-              <TaskReceipt taskId={task.task_id} />
-            {/if}
-          </article>
-        {/each}
-        <ShowMore total={rows.length} shown={Math.min(shownRows, rows.length)} noun="tasks" onmore={() => (shownRows += PAGE_SIZE)} />
-      </section>
-    {/if}
-    {#if history.length > 0}<section class="history"><h3>Finished work</h3>{#each history as task (task.task_id)}<div class="history-row"><div class="history-main"><a class="history-title" href={taskDetailHref(task.task_id)}>{task.title}</a><p class="outcome">{outcome(task)}</p>{#if task.delivery_state === "failed"}<!-- DEC-12 step 5 — the work's outcome, and separately whether the owner was told. --><p class="delivery-failed" role="status" data-testid="task-delivery-failed"><Icon name="warning" size="sm" /> <strong>Delivery failed.</strong> {task.delivery_detail ?? "The notice that this ended did not arrive."}</p>{/if}{#if deliveries.has(task.task_id)}<!-- QUI-F06 --><p class="delivery-line">Also sent to {deliveries.get(task.task_id)?.channel_name}{deliveries.get(task.task_id)?.last_status === "not_delivered" ? " · the last one was not sent" : ""}</p>{/if}{#if (task.thread_turns ?? 0) > 0}<!-- QUI-F16 --><TaskReceipt taskId={task.task_id} />{/if}</div><Badge variant={taskBadge(task.status)} label={stateLabel(task)} /><span class="when">{relativeTime(task.updated_at)}</span>{#if taskActions(task).includes("run_again")}<button type="button" class="btn btn-ghost btn-sm" onclick={() => again(task)} disabled={busyTask === task.task_id}>{busyTask === task.task_id ? "Filing…" : "Run again"}</button>{/if}</div>{/each}</section>{/if}
-  {/if}
+  </div>
 </section>
 
 <style>
@@ -1354,6 +1360,10 @@
      reads as a composer control rather than as a form field, because that is
      what it is. */
   .tasks header.page-toolbar{align-items:center;margin-bottom:var(--space-2)}
+  .tasks{display:flex;flex-direction:column;min-height:var(--content-h,calc(100dvh - 8rem))}
+  .task-dock{position:sticky;bottom:0;z-index:2;margin-top:auto;padding-top:var(--space-5);background:linear-gradient(to bottom,transparent,var(--bg) var(--space-5))}
+  .task-dock .templates{margin:0 auto var(--space-3)}
+  @media (max-width:700px){.task-dock .templates{flex-wrap:nowrap;justify-content:flex-start;overflow-x:auto;width:100%;scrollbar-width:none;padding-bottom:2px}.task-dock .template{flex:none}}
   /* FIXED-1389 — the starters sit under the card, centred on its width, in the
      same quiet bordered shape as Chat's. */
   .templates{display:flex;flex-wrap:wrap;justify-content:center;gap:var(--space-2);width:min(calc(100% - 2 * var(--space-4)),47.5rem);margin:0 auto var(--space-5)}

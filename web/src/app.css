@@ -1393,10 +1393,23 @@ time {
   margin-left: auto;
   align-self: center;
 }
+/* A page toolbar is one row of short controls; centring keeps the guide icon
+   on Refresh's line rather than at the row's top edge (Goals, 2026-11-14). */
+.head-row.page-toolbar {
+  align-items: center;
+}
 /* 720px, which is the width all eight private copies already used. */
 @media (max-width: 720px) {
   .head-row {
     flex-direction: column;
+  }
+  /* A page toolbar (Refresh, a primary action, the guide) is one short row and
+     stays one: stacked, a phone showed Refresh centred on its own line and the
+     guide icon alone on the next. */
+  .head-row.page-toolbar {
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
   }
 }
 

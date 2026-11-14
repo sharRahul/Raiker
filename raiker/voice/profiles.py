@@ -35,6 +35,10 @@ class ResolvedProfile:
     audience: str
     speaking: str
     components: tuple[Component, ...]
+    #: ``server`` — the catalogue's ``whisper-server`` build; ``builtin`` —
+    #: Raiker's own listening worker (:mod:`raiker.voice.stt_worker`), used
+    #: where no verified build exists for this machine.
+    listening_engine: str = "server"
 
     @property
     def download_bytes(self) -> int:
@@ -66,6 +70,13 @@ class ResolvedProfile:
         return bool(parts) and all(c.refusal is None for c in parts)
 
 
+def builtin_listener_available() -> bool:
+    """Whether Raiker's own listening worker can run here, or Install can make it run."""
+    from raiker.voice import runtime
+
+    return runtime.available("listening") or runtime.can_install()
+
+
 def _whisper_backends(hardware: HardwareProfile) -> tuple[str, ...]:
     return tuple(backend for backend in hardware.backends if backend in {"cuda", "metal", "vulkan"}) + ("cpu",)
 
@@ -89,6 +100,13 @@ def resolve(
     profile = catalogue.profiles[profile_id]
     components: list[Component] = []
     engine = catalogue.engine_for("whisper_engine", hardware.os, hardware.arch, _whisper_backends(hardware))
+    listening_engine = "server"
+    if (engine is None or engine.refusal() is not None) and builtin_listener_available():
+        # No verified whisper-server for this machine (Linux and macOS today),
+        # but the same whisper.cpp is importable here: listen with Raiker's own
+        # worker on the same verified model rather than not at all.
+        engine = None
+        listening_engine = "builtin"
     if engine is not None:
         components.append(Component("whisper_engine", engine))
     choices = [catalogue.get(item_id) for item_id in profile.listening]
@@ -119,6 +137,7 @@ def resolve(
         audience=profile.audience,
         speaking=profile.speaking,
         components=tuple(components),
+        listening_engine=listening_engine,
     )
 
 

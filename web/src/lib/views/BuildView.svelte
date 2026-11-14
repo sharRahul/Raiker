@@ -1013,7 +1013,7 @@
       ? [
           {
             label: "Conversation",
-            value: `${usedTokens.toLocaleString()} tokens so far`,
+            value: `${usedTokens.toLocaleString()} tokens in context`,
             short: contextPercent === null ? `${compactTokens(usedTokens)} tokens` : undefined,
           },
         ]

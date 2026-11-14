@@ -229,6 +229,16 @@ keeps the one thing you need while reading your memories — whether recall is
 matching meaning or only words — and a link to that page when it is not what you
 wanted.
 
+**Raiker's built-in embedding model.** `nomic-embed-text` (Apache-2.0, 768
+dimensions) is the default semantic space, served by your local Ollama, which
+fetches and verifies the model. Nothing leaves this computer. When Ollama is
+running and `model_provider_runtime` is set to **Always allow** or **Auto**,
+Raiker indexes new approved memories and managed-file chunks in the background
+every ten minutes through the same governed action as **Index**; under **Ask**
+it waits rather than asking you. `RAIKER_BACKGROUND_INDEX=off` turns it off,
+and the last pass is recorded in `logs/background-index.json`. Raiker adds the
+`search_document:` and `search_query:` prefixes the model expects.
+
 The default lexical fallback, `raiker-local-hash-v1`, works offline and matches shared
 words. It is lexical rather than meaning-based, so paraphrases may not match.
 

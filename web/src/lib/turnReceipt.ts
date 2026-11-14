@@ -44,12 +44,12 @@ export function receiptParts(receipt: TurnReceipt): string[] {
     const why = fallbackReason(receipt);
     parts.push(why ? `${modelName(receipt.model)} (fallback: ${why})` : modelName(receipt.model));
   }
+  // The summary line carries what an owner glances for: the model, and the
+  // cost when there is one. "No charge", "cost not known" and "nothing else
+  // left this computer" are the normal case and stay in the expanded rows;
+  // anything unusual (a fallback, a change, another destination) stays here.
   if (receipt.cost_basis === "priced" && receipt.cost_usd !== null) {
     parts.push(`≈ ${formatCost(String(receipt.cost_usd), "USD") ?? `$${receipt.cost_usd}`}`);
-  } else if (receipt.cost_basis === "free") {
-    parts.push("no charge");
-  } else {
-    parts.push("cost not known");
   }
   const reads = Object.entries(receipt.reads).map(([noun, count]) => `${plural(count, noun)} read`);
   parts.push(...reads);
@@ -61,9 +61,8 @@ export function receiptParts(receipt: TurnReceipt): string[] {
   }
   if (receipt.left_computer.length > 0) {
     parts.push(`also reached ${receipt.left_computer.join(", ")}`);
-  } else {
-    parts.push(receipt.local ? "nothing left this computer" : "nothing else left this computer");
   }
+  if (parts.length === 0) parts.push("Details");
   return parts;
 }
 

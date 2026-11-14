@@ -22,6 +22,9 @@ ENTRY_PATHS_DOC = Path("raiker/runtime/authority/entry_paths.py")
 ROUTE_ACTION_CALLERS = {
     "raiker/approvals/execution.py",
     "raiker/control/service.py",
+    # The built-in embedding model's background pass: the same governed
+    # `index_memories` action the Memory page's Index button routes.
+    "raiker/memory/background_index.py",
     "raiker/memory/query_embedding.py",
     "raiker/runtime/authority/router.py",
     "raiker/runtime/executors/tier1_approval.py",
@@ -72,6 +75,9 @@ LOCAL_GATE_CHECK_MODULES = {
     # MEM-10 reads admission first so Ask can degrade a passive read without
     # parking it, then routes allowed/auto execution through chokepoint B.
     "raiker/memory/query_embedding.py",
+    # Reads admission for the same reason, so the background index never parks
+    # an approval nobody asked for; execution still goes through chokepoint B.
+    "raiker/memory/background_index.py",
     # The readiness rows a composer renders. A third describing module,
     # here for the same reason as `context/gatherer.py` and `control/service.py`:
     # `web_search · Ready` has to be the enforcing path's own answer, or the

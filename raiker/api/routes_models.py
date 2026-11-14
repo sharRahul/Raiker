@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import contextlib
 import json
 import re
 import shutil
@@ -172,7 +173,7 @@ def get_surface_models(
 
 
 @router.put("/api/surface-models")
-def set_surface_model(
+async def set_surface_model(
     body: SurfaceModelDefaultRequest,
     request: Request,
     auth_data: tuple[ApiSession, Principal] = Depends(_auth),
@@ -209,8 +210,34 @@ def set_surface_model(
             status_code=422, detail={"reason_code": f"model_required_for_profile:{profile_id}"}
         )
     store.save_surface_model_default(session.principal_id, surface, profile.profile_id, model)
+    # The first model an owner chooses anywhere is also the default everywhere
+    # else. Choosing Haiku in Chat used to leave Build, Design and Tasks with
+    # "No model is chosen" and Models headed "No default model is chosen" while
+    # the same page marked Haiku "Chat default". A later per-surface choice is
+    # an override and never moves an existing global default.
+    if not _has_global_model(store, session.principal_id):
+        from raiker.control.dashboard import DashboardService
+
+        # The surface preference is already saved; a refused global choice
+        # (a gate closed since) leaves the owner where they were.
+        with contextlib.suppress(Exception):
+            await DashboardService(request.app.state.workspace_root).set_model_selection(  # type: ignore[attr-defined]
+                profile.profile_id, model, session.principal_id
+            )
     answer = {"ok": True, "surface": surface, "profile_id": profile.profile_id, "model": model}
     return serialize_dto(answer)
+
+
+def _has_global_model(store: SQLiteStore, principal_id: str) -> bool:
+    """Whether the owner has chosen a global default model."""
+    from raiker.models.session_state import TERMINAL_MODEL_SESSION_ID
+
+    try:
+        if store.get_account(principal_id) is not None:
+            return store.load_principal_model_state(principal_id) is not None
+        return store.load_model_session_state(TERMINAL_MODEL_SESSION_ID) is not None
+    except Exception:  # noqa: BLE001 — unreadable state: do not overwrite anything
+        return True
 
 
 @router.get("/api/model-decision")

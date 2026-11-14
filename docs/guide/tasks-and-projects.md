@@ -7,7 +7,10 @@ identity. A parked task keeps its proposal attribution; continuing after an
 approval rotates the token before work resumes. Activity therefore shows which
 machine turn acted while account resources remain scoped to the human owner.
 
-**Tasks → Plan work.** The composer asks two questions, in this order: **when
+**Tasks → Plan work.** The page reads top-down — the counts, the board, then
+finished work — and the composer is docked at the bottom, where Chat, Build and
+Design keep theirs, so it stays in reach however long the board grows. The
+templates sit just above it. The composer asks two questions, in this order: **when
 to run**, and — only where there is a choice — **how it runs**.
 
 | When to run | How it runs | Extra fields | Button | Behaviour |

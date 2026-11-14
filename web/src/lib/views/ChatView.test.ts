@@ -1089,7 +1089,7 @@ describe("ChatView streaming transcript", () => {
     });
     render(ChatView);
     await fireEvent.click(await screen.findByRole("button", { name: /^Context for this turn/ }));
-    expect(screen.getByText("0 tokens used")).toBeInTheDocument();
+    expect(screen.getByText("0 tokens in context")).toBeInTheDocument();
     expect(screen.getByText(/of [\d,]+ available/)).toBeInTheDocument();
     expect(screen.getByText(/[\d,]+ tokens remaining/)).toBeInTheDocument();
     expect(screen.queryByText(/context compacted/i)).not.toBeInTheDocument();
@@ -1124,7 +1124,7 @@ describe("ChatView streaming transcript", () => {
     await fireEvent.input(box, { target: { value: "help me plan this" } });
     await fireEvent.keyDown(box, { key: "Enter" });
 
-    expect(await screen.findByText("Working…")).toBeInTheDocument();
+    expect(await screen.findByText("Thinking…")).toBeInTheDocument();
     expect(screen.queryByText("internal intent payload")).not.toBeInTheDocument();
     expect(screen.queryByLabelText("Raiker's thinking")).not.toBeInTheDocument();
     expect(screen.queryByText("See what Raiker is thinking")).not.toBeInTheDocument();
@@ -1166,7 +1166,7 @@ describe("ChatView streaming transcript", () => {
     // Streaming text is its own progress: the indicator ends at the first token
     // rather than narrating that words visibly appearing are being written.
     expect(await screen.findByText(/You're welcome/)).toBeInTheDocument();
-    expect(screen.queryByText("Working…")).not.toBeInTheDocument();
+    expect(screen.queryByText("Thinking…")).not.toBeInTheDocument();
     finishStream?.();
 
     // BUG-208 slice F — the emoji this asserted was appended to the *owner's*
@@ -1635,7 +1635,7 @@ describe("ChatView long transcripts (QUI-G04)", () => {
 describe("ChatView voice conversation (voice spec V2)", () => {
   const voiceStatus = (listening: string, speaking: string) => ({
     settings: { profile: "balanced", conversation: { labs_hands_free: false, barge_in: true, end_silence_ms: 500 } },
-    listening: { state: listening, components: [{ role: "whisper_model", name: "Whisper small (q5_1)" }] },
+    listening: { state: listening, engine: "server", components: [{ role: "whisper_model", name: "Whisper small (q5_1)" }] },
     speaking: { state: speaking, components: [{ role: "kokoro_model", name: "Kokoro-82M (int8)" }] },
   });
 

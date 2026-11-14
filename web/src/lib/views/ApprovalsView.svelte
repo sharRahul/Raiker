@@ -682,14 +682,52 @@
   onMount(load);
 </script>
 
-<div class="head-row">
-  <GuideLink route="approvals" />
-  <button type="button" class="btn btn-ghost btn-sm" onclick={load} aria-label="Refresh approvals">
-    <Icon name="refresh" size="sm" />
-    Refresh
-  </button>
-</div>
 
+<div class="queue-controls">
+  <div class="filters" role="tablist" aria-label="Approvals">
+    {#each VIEWS as v (v.id)}
+      <button
+        type="button"
+        class="filter-btn"
+        class:active={view === v.id}
+        role="tab"
+        aria-selected={view === v.id}
+        onclick={() => setView(v.id)}
+      >
+        {v.label}{#if v.id === "pending" && pendingCount > 0}<span class="tab-count">{pendingCount}</span>{/if}
+      </button>
+    {/each}
+  </div>
+  {#if view === "history"}
+    <label class="sort-control">
+      <span class="sr-only">Show</span>
+      <select class="select" aria-label="Show decisions" bind:value={historyStatus}>
+        {#each HISTORY_FILTERS as h (h.id)}
+          <option value={h.id}>{h.label}</option>
+        {/each}
+      </select>
+    </label>
+  {:else if (approvals ?? []).length > 0}
+    <!-- An empty queue hides its sort, as an empty list hides its search. -->
+    <label class="sort-control">
+      <span class="sr-only">Sort approvals</span>
+      <select class="select" aria-label="Sort approvals" bind:value={sort}>
+        <option value="risk">Highest risk first</option>
+        <option value="newest">Newest first</option>
+      </select>
+    </label>
+  {/if}
+  <!-- One toolbar: the queue filters lead, the page's Refresh and guide end
+       the same row. A separate toolbar above the filters made Approvals the
+       only page with two control rows before its content. -->
+  <span class="queue-page-actions">
+    <button type="button" class="btn btn-ghost btn-sm" onclick={load} aria-label="Refresh approvals">
+      <Icon name="refresh" size="sm" />
+      Refresh
+    </button>
+    <GuideLink route="approvals" />
+  </span>
+</div>
 {#if notice}
   <p class="notice {notice.kind === 'ok' ? 'notice-ok' : 'notice-danger'}" role="status">
     {notice.text}
@@ -729,41 +767,6 @@
   </div>
 {/if}
 
-<div class="queue-controls">
-  <div class="filters" role="tablist" aria-label="Approvals">
-    {#each VIEWS as v (v.id)}
-      <button
-        type="button"
-        class="filter-btn"
-        class:active={view === v.id}
-        role="tab"
-        aria-selected={view === v.id}
-        onclick={() => setView(v.id)}
-      >
-        {v.label}{#if v.id === "pending" && pendingCount > 0}<span class="tab-count">{pendingCount}</span>{/if}
-      </button>
-    {/each}
-  </div>
-  {#if view === "history"}
-    <label class="sort-control">
-      <span class="sr-only">Show</span>
-      <select class="select" aria-label="Show decisions" bind:value={historyStatus}>
-        {#each HISTORY_FILTERS as h (h.id)}
-          <option value={h.id}>{h.label}</option>
-        {/each}
-      </select>
-    </label>
-  {:else if (approvals ?? []).length > 0}
-    <!-- An empty queue hides its sort, as an empty list hides its search. -->
-    <label class="sort-control">
-      <span class="sr-only">Sort approvals</span>
-      <select class="select" aria-label="Sort approvals" bind:value={sort}>
-        <option value="risk">Highest risk first</option>
-        <option value="newest">Newest first</option>
-      </select>
-    </label>
-  {/if}
-</div>
 
 {#if loadError}
   <div class="read-recovery">
@@ -1274,13 +1277,19 @@
     border: 1px solid var(--border);
     border-radius: var(--r-pill);
     padding: 3px;
-    margin-bottom: var(--space-4);
   }
   .queue-controls {
+    margin-bottom: var(--space-4);
     display: flex;
-    align-items: flex-start;
-    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
     gap: var(--space-3);
+  }
+  .queue-page-actions {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-2);
+    margin-left: auto;
   }
   .sort-control .select {
     min-width: 10.5rem;

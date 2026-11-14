@@ -714,23 +714,55 @@
   /* REM-THREAD-03 — the secondary destinations sit under the row rather than
      inside its link, at one quiet weight: resuming the work is the row, and
      verifying how it ran is a link beside it. */
+  /* The row's secondary actions sit at its right edge, centred on the row,
+     drawn as quiet buttons so they read as actions rather than as captions
+     under the title. On a phone they drop under the title. */
+  li:has(> .row-links) {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    column-gap: var(--space-2);
+  }
+  li:has(> .row-links) > :global(*) { grid-column: 1; }
   .row-links {
+    grid-column: 2 !important;
+    grid-row: 1;
     display: flex;
-    flex-wrap: wrap;
-    gap: var(--space-3);
-    /* Tucked under the row's title rather than given a line of its own: the
-       row is the work, and a secondary destination that doubles every row's
-       height turns a board into a list of pairs. */
-    margin-top: -0.55rem;
-    padding: 0 var(--space-2) var(--space-2);
+    flex-wrap: nowrap;
+    align-items: center;
+    gap: var(--space-1);
+    padding-right: var(--space-2);
   }
   .row-link {
-    color: var(--text-3);
-    font-size: var(--text-xs);
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    min-height: 28px;
+    padding: 0.2rem 0.55rem;
+    border: 1px solid transparent;
+    border-radius: var(--r-sm);
+    background: transparent;
+    color: var(--text-2);
+    font: inherit;
+    font-size: var(--text-sm);
+    font-weight: 550;
+    text-decoration: none;
+    white-space: nowrap;
+    cursor: pointer;
   }
   .row-link:hover,
   .row-link:focus-visible {
-    color: var(--accent);
+    background: var(--sunken);
+    border-color: var(--border);
+    color: var(--text-1);
+    text-decoration: none;
+  }
+  @media (max-width: 700px) {
+    .row-links {
+      grid-column: 1 !important;
+      grid-row: auto;
+      padding: 0 var(--space-2) var(--space-2);
+    }
   }
   .matched {
     grid-column: 1/-1;
@@ -745,19 +777,7 @@
     font-size: var(--text-sm);
     margin: 0 0 var(--space-3);
   }
-  .organise {
-    background: none;
-    border: 0;
-    padding: 0;
-    cursor: pointer;
-    font: inherit;
-    font-size: var(--text-xs);
-    color: var(--text-3);
-  }
-  .organise:hover,
-  .organise:focus-visible {
-    color: var(--accent);
-  }
+  /* Organise is one of the row's actions and is drawn by `.row-link`. */
   .tags,
   .library,
   .rename {

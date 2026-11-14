@@ -296,6 +296,18 @@
     flex-wrap: wrap;
     min-width: 0;
   }
+  /* 2026-11-15 — a bar that carries the context line keeps everything on one
+     row: the left group shrinks and the context line (the only flexible item,
+     ComposerContext) ends in an ellipsis, rather than the model picker or the
+     send action wrapping to a second row under a long project name. */
+  .bar-left:has(> :global(.context-line)) {
+    flex: 1 1 0;
+    flex-wrap: nowrap;
+  }
+  .bar-left:has(> :global(.context-line)) > :global(:not(.context-line)) {
+    flex-shrink: 0;
+    white-space: nowrap;
+  }
   /* Per-turn settings sit on the right of the bar, ending in the send action. */
   .bar-right {
     margin-left: auto;

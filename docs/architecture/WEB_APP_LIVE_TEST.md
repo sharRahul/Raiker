@@ -27,7 +27,8 @@ OpenRouter keys were typed into **Add model** too; this session's network
 refuses both providers' hosts, so they could not be checked (RT-1115-08,
 blocked by the environment). No key, token or workspace ID appears in a spec,
 log or capture. Spec: `web/e2e/fixed-1446-1468-round-live.spec.ts`. Result:
-**7 of 7 passed**, RT-1115-08 blocked.
+**8 of 8 passed**, RT-1115-08 blocked. The host was restarted on the same
+workspace after RT-1115-02 and opened on the rotated key.
 
 | # | Scenario | Verification | Result |
 |---|---|---|---|
@@ -39,6 +40,7 @@ log or capture. Spec: `web/e2e/fixed-1446-1468-round-live.spec.ts`. Result:
 | RT-1115-06 | Diagnostics lists *Recall is matching words only* with **Open Permissions** | FIXED-1463 | Passed |
 | RT-1115-07 | Tasks' counts share the toolbar; Settings › Notifications at 1280×800 is ≤ 1,200 px with the categories in columns | FIXED-1458, FIXED-1460 | Passed |
 | RT-1115-08 | OpenAI and OpenRouter connect and pass **Test** | — | Blocked (sandbox network refuses both hosts) |
+| RT-1115-09 | After a real Haiku 4.5 Build turn in a project with a long name, every left-hand composer control and **Send** share one row (owner-reported) | FIXED-1469 | Passed |
 
 **Also run live.** `all-pages-live` *size budgets (QUI-G01)*, now a failing
 check: 0 of 78 measurements over budget (the first run this round found Tasks
@@ -55,7 +57,7 @@ turn's header reads as a failure, and a project overview briefly showed
 `02-key-rotated`, `02b-backup-retired-key`, `03-profile-refused`,
 `03b-cloud-first-answers`, `04-build-goal-action`, `04b-goal-form`,
 `05-attach-dialog`, `06-diagnostics-indexing`, `07-tasks-toolbar`,
-`07b-notifications`. Inspected at original resolution; no key, token or
+`07b-notifications`, `09-build-composer-one-row`. Inspected at original resolution; no key, token or
 workspace ID is visible.
 
 ## Result — 2026-11-14 (Third round: permissions harness, web reads and work lists)

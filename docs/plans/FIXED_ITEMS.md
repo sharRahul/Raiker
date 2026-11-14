@@ -1,5 +1,15 @@
 # Fixed items
 
+## FIXED-1469 — Build's composer put the model, and then Send, on a second row
+
+**Severity: Low. Area: Quiet UI / composer. Status: Fixed 2026-11-15.**
+
+**Observed.** Reported by the owner with a screenshot: after a Build turn, the context line under the prompt read *Round 1115 1794686608840 · raiker-live · Local sandbox · 5% context*, as wide as its text, so the model picker wrapped to a second row; with the picker moved up, the microphone and **Send** wrapped instead, and when squeezed, *Run within limits* broke over three lines.
+
+**Fixed.** The context line (`ComposerContext`) is the one flexible item on the bar: it shrinks first, is capped at 16rem and ends in an ellipsis, with the whole summary in its tooltip and its inspector. A bar that carries it keeps its left group on one row (`Composer.svelte`: the group shrinks, every other control keeps its width and does not wrap its label). Chat, Design, Tasks and the phone bar were checked unchanged.
+
+**Evidence.** RT-1115-09 (live: after a real Haiku 4.5 Build turn in a project with a long name, every left-hand control and **Send** share one row); component suite 616 passed.
+
 ## FIXED-1468 — The app still asked for text in the browser's own prompt box
 
 **Severity: Low. Area: Quiet UI / dialogs. Status: Fixed 2026-11-15.**
@@ -2859,6 +2869,7 @@ file you can open. The two capture sets that remain — `screenshots/pages/` and
 | [FIXED-1382](#fixed-1382--linux-filesystem-flags-broke-windows-type-checking) | Low | Platform portability | Fixed 2026-11-09 |
 | [FIXED-1383](#fixed-1383--keyboard-start-evidence-depended-on-retired-receipt-wording) | Low | Beta live tests | Fixed 2026-11-09 |
 | [FIXED-1384](#fixed-1384--model-downloads-checked-redirect-hosts-after-contacting-them) | High | Model and speech downloads | Fixed 2026-11-09 |
+| [FIXED-1469](#fixed-1469--builds-composer-put-the-model-and-then-send-on-a-second-row) | Low | Quiet UI / composer | Fixed 2026-11-15 |
 | [FIXED-1468](#fixed-1468--the-app-still-asked-for-text-in-the-browsers-own-prompt-box) | Low | Quiet UI / dialogs | Fixed 2026-11-15 |
 | [FIXED-1467](#fixed-1467--three-live-specs-still-drove-the-permissions-page-qui-l06-replaced) | Low | Live test harness | Fixed 2026-11-15 |
 | [FIXED-1466](#fixed-1466--a-proposed-memory-that-repeated-an-approved-one-in-other-words-looked-new) | Low | Memory / review | Fixed 2026-11-15 |

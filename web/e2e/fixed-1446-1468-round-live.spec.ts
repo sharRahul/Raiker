@@ -201,3 +201,39 @@ test("RT-1115-08 OpenAI and OpenRouter connect through Add model and are ready",
     await capture(page, `${OUT}/08-${options.provider.toLowerCase()}-ready.png`, card);
   }
 });
+
+test("RT-1115-09 Build's composer keeps the model on the bar's one row with a long project name", async ({ page }) => {
+  test.setTimeout(300_000);
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await signInAsOwner(page, BASE);
+  await page.goto(`${BASE}/#/work?tab=projects`);
+  const list = page.locator(".project-list");
+  if ((await list.locator("article.project").count()) === 0) {
+    const name = page.getByPlaceholder(/project name/i).first();
+    await name.fill(`Round 1115 ${Date.now()}`);
+    await name.press("Enter");
+  }
+  await list.locator("article.project").first().getByRole("button", { name: "Start in Build" }).click();
+  // The long summary (project · workspace · sandbox · context) appears once a
+  // turn has run, which is the state the owner's screenshot showed.
+  await chooseModelForTurn(page, /Haiku/, "Build composer");
+  await page.getByLabel("Describe the change").fill("Answer in one short sentence and use no tools: what is a README?");
+  const run = page.getByRole("button", { name: /^(Run|Plan|Propose)$/ }).first();
+  await expect(run).toBeEnabled({ timeout: 60_000 });
+  await run.click();
+  await expect(page.getByRole("button", { name: "Make this a goal" }).last()).toBeVisible({ timeout: 180_000 });
+  await expect(page.locator(".bar-left").last().locator(".context-summary")).toContainText("·", { timeout: 30_000 });
+  const bar = page.locator(".bar-left").last();
+  await expect(bar.locator(".context-summary")).toBeVisible({ timeout: 30_000 });
+  const tops = await bar.evaluate((node) =>
+    Array.from(node.children)
+      .filter((child) => (child as HTMLElement).offsetParent !== null)
+      .map((child) => Math.round(child.getBoundingClientRect().top + child.getBoundingClientRect().height / 2)),
+  );
+  // Every control on the left of the bar shares one row, and so does Send.
+  expect(Math.max(...tops) - Math.min(...tops)).toBeLessThanOrEqual(4);
+  const send = await page.locator(".bar-right").last().boundingBox();
+  const left = await bar.boundingBox();
+  expect(send && left && Math.abs(send.y + send.height / 2 - (left.y + left.height / 2))).toBeLessThanOrEqual(6);
+  await capture(page, `${OUT}/09-build-composer-one-row.png`, page.locator(".composer").last());
+});

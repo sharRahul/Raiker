@@ -106,7 +106,7 @@
       aria-haspopup="dialog"
       aria-expanded={open}
       aria-label={`Context for this turn: ${summary}`}
-      title="What this turn will see"
+      title={`What this turn will see: ${summary}`}
       {disabled}
       bind:this={trigger}
       onclick={() => {
@@ -155,10 +155,16 @@
 {/if}
 
 <style>
+  /* 2026-11-15 — a long project name made this line as wide as its text, and
+     on Build it pushed the model picker onto a second row. The line now
+     shrinks first and ends in an ellipsis; the whole of it is in the tooltip
+     and the inspector. */
   .context-line {
     position: relative;
     display: inline-flex;
+    flex: 0 1 auto;
     min-width: 0;
+    max-width: 16rem;
   }
   /* This is information, not attention. It stays the quietest thing
      on the bar until it is opened. */

@@ -57,8 +57,8 @@ describe("ModelReadinessStrip", () => {
       draftPreserved: true,
     });
 
-    expect(screen.getByText(/checking this model/i)).toBeInTheDocument();
-    expect(screen.getByText(/you can still send/i)).toBeInTheDocument();
+    expect(screen.getByText(/not checked recently/i)).toBeInTheDocument();
+    expect(screen.getByText(/checked when you send/i)).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Set up model" })).not.toBeInTheDocument();
   });
 

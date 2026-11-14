@@ -1,9 +1,9 @@
 <script lang="ts">
   import { mcpProvenance } from "../mcpProvenance";
+  import EmptyState from "../components/EmptyState.svelte";
   import { askConfirm } from "../confirm.svelte";
   import { formatTimestamp } from "../format";
   import { onMount } from "svelte";
-  import GuideLink from "../components/GuideLink.svelte";
   import Icon from "../components/Icon.svelte";
   import { api, ApiError } from "../api";
   import { connectionFailure } from "../connectionRecovery";
@@ -475,9 +475,11 @@
      it, so a heading here said the page's own name a second time and a
      paragraph explained it a third. What an MCP server is belongs in the guide;
      this page opens with its own state. -->
+<!-- FIXED-1399 — the sub-tab row above carries this hub's one guide link; a
+     second icon here, on its own line, made two "ⓘ" for one page. Refresh is a
+     labelled button, as on every other page toolbar. -->
 <div class="header">
-  <GuideLink section="extensions-and-mcp" label="How MCP servers work" />
-  <button class="icon" aria-label="Refresh servers" title="Refresh servers" onclick={refresh}><Icon name="refresh" size="md" /></button>
+  <button type="button" class="btn btn-ghost btn-sm" aria-label="Refresh servers" onclick={refresh}><Icon name="refresh" size="sm" /> Refresh</button>
 </div>
 
 {#each blocks as block (block.reason)}
@@ -578,10 +580,19 @@
 {:else if servers.length === 0}
   <!-- An empty state that ignores an offer sitting directly above it reads as a
        contradiction. When a plugin has offered one, that is the shortest route. -->
-  <div class="empty">
-    {offers.length > 0
-      ? "No MCP servers yet. Add one your plugins offer above, or generate the developer example below."
-      : "No MCP servers yet. Install a plugin that offers one, or generate the developer example below."}
+  <!-- FIXED-1410 — the shared carded empty state, not a dashed text box. -->
+  <div class="card">
+    <EmptyState
+      icon="tool"
+      title="No MCP servers yet"
+      body={offers.length > 0
+        ? "Add one your plugins offer above, or generate the developer example below."
+        : "Install a plugin that offers one, or generate the developer example below."}
+    >
+      {#snippet action()}
+        <a class="btn btn-primary" href="#/connections?tab=advanced&kind=plugins">Browse plugins</a>
+      {/snippet}
+    </EmptyState>
   </div>
 {:else}
   <ul class="list">

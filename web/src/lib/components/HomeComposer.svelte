@@ -148,7 +148,9 @@
     width: 100%;
     min-height: 3.5rem;
     max-height: 11rem;
-    resize: vertical;
+    /* FIXED-1401 — no resize grip: Chat's composer grows with its text and
+       draws none; this one showed a corner handle the others do not have. */
+    resize: none;
     border: 0;
     background: transparent;
     color: var(--text-1);
@@ -161,7 +163,9 @@
   .home-composer-tools { display: flex; align-items: center; gap: var(--space-2); }
   .hint { font-size: var(--text-xs); color: var(--text-3); }
   .data-label { display: inline-flex; align-items: center; gap: var(--space-1); }
-  .send { width: 2.5rem; height: 2.5rem; padding: 0; display: inline-grid; place-items: center; border-radius: var(--r-md); }
+  /* FIXED-1401 — the round send Chat and Build draw; the global `.send`
+     min-width stretched this one into a wide bar. */
+  .send { min-width: 0; width: 2.25rem; height: 2.25rem; padding: 0; display: inline-grid; place-items: center; border-radius: 50%; }
   .starters {
     list-style: none;
     margin: 0;

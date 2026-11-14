@@ -536,11 +536,23 @@
     .settings-layout {
       grid-template-columns: 1fr;
     }
+    /* FIXED-1413 — on a phone the rail stacked all fifteen sections above the
+       content, so every section opened on a screen of navigation. It is one
+       horizontally scrolling strip of the sections instead. */
     .section-rail {
       flex-direction: row;
-      flex-wrap: wrap;
+      flex-wrap: nowrap;
       position: static;
+      overflow-x: auto;
+      gap: var(--space-1);
+      margin-inline: calc(-1 * var(--space-2));
+      padding: 0 var(--space-2) var(--space-2);
+      scrollbar-width: none;
     }
-    .rail-section { width: 100%; }
+    .section-rail::-webkit-scrollbar { display: none; }
+    .rail-section { display: flex; flex: none; gap: var(--space-1); }
+    .rail-section + .rail-section { margin-top: 0; }
+    .rail-group { display: none; }
+    .rail-item { flex: none; white-space: nowrap; }
   }
 </style>

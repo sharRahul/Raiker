@@ -754,14 +754,17 @@
     text-align: left;
     cursor: pointer;
   }
+  /* FIXED-1397 — the same size and weight as the menu's other rows; it drew a
+     taller, bolder row at the body size, so "Effort" read as a heading. */
   .effort-row {
     display: grid;
     grid-template-columns: minmax(0, 1fr) auto auto;
     align-items: center;
     gap: 0.5rem;
-    min-height: 3.25rem;
-    padding: 0.55rem 0.6rem;
-    font-weight: 650;
+    min-height: 2.25rem;
+    padding: 0.4rem 0.48rem;
+    font-size: var(--text-sm);
+    font-weight: 500;
   }
   .effort-row:hover,
   .effort-choice:hover:not(:disabled),

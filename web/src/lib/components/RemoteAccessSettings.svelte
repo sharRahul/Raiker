@@ -457,6 +457,9 @@
 {/if}
 
 <style>
+  /* FIXED-1404 — card titles at the size every other Settings card uses; they
+     were the browser's h2, larger than the section's own heading above them. */
+  .card > h2 { margin: 0 0 var(--space-2); font-size: var(--text-md); font-weight: 650; }
   .setting-row {
     display: grid;
     /* FIXED-1391 — a fixed action column, so values line up down the page
@@ -488,8 +491,13 @@
     font-size: var(--text-sm);
   }
   .choices { display: grid; gap: var(--space-2); margin-top: var(--space-2); }
+  /* FIXED-1407 — the generic `label` rule below made each option a column, so
+     its radio sat on a line of its own above the title. */
   .choice {
     display: flex;
+    flex-direction: row;
+    max-width: none;
+    margin-top: 0;
     gap: var(--space-2);
     align-items: flex-start;
     padding: var(--space-3);

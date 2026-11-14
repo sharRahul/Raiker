@@ -9,6 +9,7 @@
    * this is the page saying so first, not the page deciding it.
    */
   import { onMount } from "svelte";
+  import Icon from "./Icon.svelte";
   import { api, ApiError } from "../api";
   import type { ProjectView } from "../apiTypes";
   import { explainReasonCode } from "../reasonCodes";
@@ -73,7 +74,7 @@
   <header>
     <h2 id="move-title">Move “{project.name}”</h2>
     <button type="button" class="icon-btn" aria-label="Close" onclick={onclose} disabled={busy}
-      >×</button
+      ><Icon name="x" size="sm" /></button
     >
   </header>
   <p class="muted">

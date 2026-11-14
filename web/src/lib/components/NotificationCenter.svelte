@@ -22,6 +22,7 @@
    * failed read changes nothing on screen and the next tick tries again.
    */
   import type { Notification as RaikerNotification } from "../apiTypes";
+  import Icon from "./Icon.svelte";
   import { api, hasToken } from "../api";
   import { canRaiseDesktopNotice, raikerIsHidden, raiseDesktopNotice } from "../desktopNotice";
   import { delivery, interrupts, localClock, refreshDelivery, watchDelivery } from "../deliveryPolicy.svelte";
@@ -349,7 +350,7 @@
         class="dismiss"
         aria-label={`Dismiss: ${newest.title}`}
         title="Mark read"
-        onclick={() => void dismiss(newest)}>×</button
+        onclick={() => void dismiss(newest)}><Icon name="x" size="sm" /></button
       >
     </div>
     {#if visible.length > 1}

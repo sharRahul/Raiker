@@ -17,6 +17,7 @@
    * ever proposes; nothing it says is applied until the owner accepts it.
    */
   import { onMount, tick } from "svelte";
+  import EmptyState from "./EmptyState.svelte";
   import { routeStateFromHash } from "../routeState";
   import Icon from "./Icon.svelte";
   import TabStrip from "./TabStrip.svelte";
@@ -125,6 +126,7 @@
 
   /* ── New document ── */
   let newTitle = $state("");
+  let newTitleEl = $state<HTMLInputElement>();
   let newPreset = $state("social_square");
 
   async function loadList() {
@@ -1106,7 +1108,7 @@
       >
         <label>
           <span>New design</span>
-          <input type="text" bind:value={newTitle} placeholder="Name it — Launch post, Pricing page…" maxlength="120" />
+          <input type="text" bind:this={newTitleEl} bind:value={newTitle} placeholder="Name it — Launch post, Pricing page…" maxlength="120" />
         </label>
         <label>
           <span>Starts as</span>
@@ -1123,11 +1125,18 @@
       {:else if list === null}
         <p class="muted">Loading designs…</p>
       {:else if list.documents.length === 0}
-        <p class="muted empty">
-          No designs yet. A design is a document of frames and layers you can keep editing, ask
-          the agent to change, check, export and hand to Build. Pictures you generate live under
-          <strong>Images</strong> and can be placed into one.
-        </p>
+        <!-- FIXED-1410 — the shared carded empty state; the form above is its action. -->
+        <div class="card">
+          <EmptyState
+            icon="design"
+            title="No designs yet"
+            body="A design is a document of frames and layers you can keep editing, ask the agent to change, check, export and hand to Build. Pictures you generate live under Images and can be placed into one."
+          >
+            {#snippet action()}
+              <button type="button" class="btn btn-primary" onclick={() => newTitleEl?.focus()}>Name your first design</button>
+            {/snippet}
+          </EmptyState>
+        </div>
       {:else}
         <ul class="doc-list">
           {#each list.documents as item (item.document_id)}

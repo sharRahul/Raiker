@@ -72,7 +72,9 @@
   const summary = $derived(
     [
       ...facts.filter((fact) => fact.short).map((fact) => fact.short as string),
-      ...(usedPercent === null ? [] : [`${Math.round(usedPercent)}%`]),
+      // FIXED-1397 — labelled: a bare "0%" on the bar said nothing about what
+      // it measured.
+      ...(usedPercent === null ? [] : [`${Math.round(usedPercent)}% context`]),
     ].join(" · "),
   );
 

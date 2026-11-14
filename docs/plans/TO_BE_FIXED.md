@@ -1674,18 +1674,32 @@ launcher path and the npm-prefix search on macOS and Windows.
 code), choose a model, send one Chat turn and one tool-using Build turn, read
 the limit windows on the card, Switch account, Sign out.
 
-## Quiet UI consistency — what the 2026-11-14 sweep did not change
+## Quiet UI consistency — what the 2026-11-14 sweeps did not change
 
 [FIXED-1391](FIXED_ITEMS.md#fixed-1391--navigable-pages-disagreed-in-shape-order-and-detail)
-fixed eleven page irregularities. Still open from the same sweep:
+and the surface sweep fixes
+([FIXED-1396](FIXED_ITEMS.md#fixed-1396--the-content-area-drew-a-focus-frame-after-navigation)
+to [FIXED-1413](FIXED_ITEMS.md#fixed-1413--on-a-phone-builds-mode-menu-ran-off-screen-and-settings-opened-on-its-navigation))
+closed the irregularities found by `web/e2e/surface-sweep-live.spec.ts`
+(95 pop-ups and 56 pages, light and dark at 1440 px, light at 390 px).
+Still open:
 
+* **Models contradicts itself about the default.** The page header says *No
+  default model is chosen* while the same page marks Haiku 4.5 as *Chat
+  default*. The header reads the global default; the card reads the per-surface
+  default. Decide which one the header names, then word both from one source.
 * **Goals is the only Work tab with its own title and description**, and it
-  offers **New goal** twice when empty. Decide whether Work tabs carry titles.
+  offers **New goal** twice when empty.
 * **Approvals keeps its toolbar above its Pending/History filters.** Those are
   queue filters, not hub tabs, so they were left; revisit with QUI-L11.
-* **Each Settings section still carries a private copy of `.settings-card`**
-  (eight copies with three paddings). One shared rule in `app.css` would stop
-  the drift FIXED-1391 had to correct by hand.
-* **Memory › Overview is a single sentence when nothing is remembered**; it
-  should carry the same carded empty state as the other tabs.
-
+* **Build › Terminal side panel** sets its environment facts in two narrow
+  columns at 1440 px; the panel needs a single-column fact list.
+* **Threads rows** show *Task detail* and *Evidence* as unstyled text well below
+  the title; they should read as the row's actions.
+* **Eight Settings sections still carry private copies of `.settings-card`.**
+  A shared rule now exists in `app.css` (FIXED-1406); the copies can be deleted
+  one section at a time once each is checked against it.
+* **The docked notification toast covers the top-right of every page** while
+  it is unread (page actions, the Goals **New goal**, the Models default card),
+  and on a phone it covers the page heading. It needs either a lower dock or
+  an automatic collapse to the bell after a few seconds.

@@ -13,6 +13,7 @@
    * credential and the capability gates in Permissions still decide.
    */
   import ConnectionPresets from "../components/ConnectionPresets.svelte";
+  import EmptyState from "../components/EmptyState.svelte";
   import { onMount } from "svelte";
   import Icon from "../components/Icon.svelte";
   import PageState from "../components/PageState.svelte";
@@ -353,11 +354,19 @@
       </span>
     {/snippet}
     {#snippet empty()}
-      <div class="empty-services">
-        <p>Nothing is connected yet. Connect a service so Raiker can read or act on it, always under your permissions.</p>
-        <button type="button" class="btn btn-primary" onclick={() => (adding = true)}>
-          <Icon name="plus" size="sm" /> Add connection
-        </button>
+      <!-- FIXED-1410 — the shared carded empty state. -->
+      <div class="card">
+        <EmptyState
+          icon="connections"
+          title="Nothing connected yet"
+          body="Nothing is connected yet. Connect a service so Raiker can read or act on it, always under your permissions."
+        >
+          {#snippet action()}
+            <button type="button" class="btn btn-primary" onclick={() => (adding = true)}>
+              <Icon name="plus" size="sm" /> Add connection
+            </button>
+          {/snippet}
+        </EmptyState>
       </div>
     {/snippet}
     {#snippet detail(service)}
@@ -652,17 +661,6 @@
   .row-status {
     color: var(--text-3);
     font-size: var(--text-sm);
-  }
-  .empty-services {
-    display: grid;
-    justify-items: start;
-    gap: var(--space-3);
-    padding: var(--space-4) 0;
-    color: var(--text-2);
-  }
-  .empty-services p {
-    margin: 0;
-    max-width: 34rem;
   }
   .detail {
     display: grid;

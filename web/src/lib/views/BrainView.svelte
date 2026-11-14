@@ -847,7 +847,7 @@
             </tbody>
           </table>
         {/if}
-        {#if actionError}<p class="action-error" role="alert">{actionError}<button onclick={() => (actionError = null)} aria-label="Dismiss">×</button></p>{/if}
+        {#if actionError}<p class="action-error" role="alert">{actionError}<button onclick={() => (actionError = null)} aria-label="Dismiss"><Icon name="x" size="sm" /></button></p>{/if}
       </div>
     {/if}
 
@@ -920,7 +920,7 @@
       <div class="viewport-controls"><button aria-label="Fit graph" onclick={fitGraph}>Fit</button><button aria-label="Zoom out" onclick={() => transform = { ...transform, k: Math.max(.35, transform.k - .15) }}>−</button><span>{Math.round(transform.k * 100)}%</span><button aria-label="Zoom in" onclick={() => transform = { ...transform, k: Math.min(3, transform.k + .15) }}>+</button></div>
       <!-- NEW-MAP-01 — the dot and the word say what is true of the graph on
            screen now, not whether an update once happened. -->
-      {#if actionError}<p class="action-error" role="alert">{actionError}<button onclick={() => (actionError = null)} aria-label="Dismiss">×</button></p>{/if}
+      {#if actionError}<p class="action-error" role="alert">{actionError}<button onclick={() => (actionError = null)} aria-label="Dismiss"><Icon name="x" size="sm" /></button></p>{/if}
       <div class="graph-meta"><span class="live-dot" class:stale={!graphIsLive}></span>{graphFreshness}<button onclick={(event) => { event.stopPropagation(); void load(); }} disabled={refreshing}>{refreshing ? "Updating…" : "Refresh"}</button></div>
 
       {#if settingsOpen}
@@ -928,7 +928,7 @@
           <!-- REM-MAP-01 — the panel opens on Filters, the section about which
                records are on screen; the simulation constants are drawing
                tuning and stay closed. Every control keeps its value. -->
-          <div class="panel-title"><div><span>Graph settings</span><small>Personal workspace view</small></div><button aria-label="Close graph settings" onclick={() => settingsOpen = false}>×</button></div>
+          <div class="panel-title"><div><span>Graph settings</span><small>Personal workspace view</small></div><button aria-label="Close graph settings" onclick={() => settingsOpen = false}><Icon name="x" size="sm" /></button></div>
           <details open><summary>Filters</summary>{#each FILTER_TYPES as type}<label class="check-row"><input type="checkbox" checked={enabledTypes[type]} onchange={(event) => enabledTypes = { ...enabledTypes, [type]: event.currentTarget.checked }} /><span>{FILTER_LABELS[type] ?? type.charAt(0).toUpperCase() + type.slice(1) + "s"}</span></label>{/each}<label class="check-row"><input type="checkbox" bind:checked={showOrphans} /><span>Orphan records</span></label></details>
           <details><summary>Groups</summary>{#each groups as group}<div class="group-row"><i style={`background:${group.color}`}></i><span><b>{group.name}</b><small>{group.query}</small></span></div>{/each}<button class="text-action" onclick={() => newGroupOpen = !newGroupOpen}>+ New group</button>{#if newGroupOpen}<div class="group-form"><input bind:value={groupName} placeholder="Group name" /><input bind:value={groupQuery} placeholder='type:memory status:approved' /><label>Colour <input type="color" bind:value={groupColor} /></label><button onclick={addGroup}>Add group</button></div>{/if}</details>
           <p class="panel-divider">Advanced display</p>
@@ -941,7 +941,7 @@
 
       {#if inspectorOpen}
         <aside class="inspector" aria-label="Record inspector">
-          <button class="close" aria-label="Close inspector" onclick={() => inspectorOpen = false}>×</button>
+          <button class="close" aria-label="Close inspector" onclick={() => inspectorOpen = false}><Icon name="x" size="sm" /></button>
           {#if selected}<span class="record-kicker"><i style={`background:${selected.color}`}></i>{selected.node_type} record</span><h3>{selected.label}</h3><div class="status-line"><span>{statusLabel(selected.status)}</span><span>{selected.degree} connection{selected.degree === 1 ? "" : "s"}</span></div><p>{selected.detail ?? "No additional stored metadata is available."}</p><h4>Relationships</h4>{#if selectedConnections.length}{#each selectedConnections as edge}<div class="relationship-row"><button class="relationship" onclick={() => { const other = nodeId(edge.source) === selected.node_id ? nodeId(edge.target) : nodeId(edge.source); selectedIds = [other]; }}><span>{edge.relationship.replaceAll("_", " ")}</span><b>{renderedNodes.find((node) => node.node_id === (nodeId(edge.source) === selected.node_id ? nodeId(edge.target) : nodeId(edge.source)))?.label}</b></button>{#if edge.evidence_memory_id}<small>Evidence: {edge.evidence_memory_id}</small>{/if}{#if edge.owner_can_reject}<button class="reject-link" onclick={() => void rejectRelationship(edge)}>Reject link</button>{/if}</div>{/each}{:else}<p class="muted">No stored relationships yet.</p>{/if}<div class="inspector-actions"><button onclick={() => centreNode(selected)}>View neighbours</button>{#if selected.pinned}<button onclick={() => unpin(selected)}>Unpin position</button>{/if}</div>{:else}<p>Select a node to inspect it.</p>{/if}
         </aside>
       {/if}
@@ -957,7 +957,7 @@
        the places Raiker holds an owner's work plus the folders they granted —
        it never lists the workspace root, which is what made it offer Raiker's
        whole installation as something to index. -->
-  {#if sourceOpen}<dialog use:modal class="source-modal" aria-labelledby="source-title" oncancel={closeSourceDialog} onclick={(event) => { if (event.target === event.currentTarget) closeSourceDialog(); }}><button class="close" aria-label="Close add source" onclick={() => closeSourceDialog()}>×</button><span class="eyebrow">Knowledge boundary</span><h2 id="source-title">Add a source</h2><p>Nothing else on this computer is visible here. Review what would be indexed, then confirm — sources never become approved memory automatically.</p>
+  {#if sourceOpen}<dialog use:modal class="source-modal" aria-labelledby="source-title" oncancel={closeSourceDialog} onclick={(event) => { if (event.target === event.currentTarget) closeSourceDialog(); }}><button class="close" aria-label="Close add source" onclick={() => closeSourceDialog()}><Icon name="x" size="sm" /></button><span class="eyebrow">Knowledge boundary</span><h2 id="source-title">Add a source</h2><p>Nothing else on this computer is visible here. Review what would be indexed, then confirm — sources never become approved memory automatically.</p>
     {#if sourceBrowse}
       <nav class="source-browser" aria-label="Knowledge source browser">
         {#if sourceBrowse.parent !== null || sourceBrowse.path}<button onclick={() => void browseSource(sourceBrowse!.parent ?? "")}>← {sourceBrowse.parent ? "Up one folder" : "All places"}</button>{/if}

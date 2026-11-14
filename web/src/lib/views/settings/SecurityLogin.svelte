@@ -855,6 +855,9 @@
 {/if}
 
 <style>
+  /* FIXED-1404 — card titles at the size every other Settings card uses; they
+     were the browser's h2, larger than the section's own heading above them. */
+  .card > h2 { margin: 0 0 var(--space-2); font-size: var(--text-md); font-weight: 650; }
   .page-heading { margin-bottom: var(--space-3); }
   .page-heading h2 { margin: 0; }
   /* QUI-L03 — a setting is a row: label, current value, one action. */

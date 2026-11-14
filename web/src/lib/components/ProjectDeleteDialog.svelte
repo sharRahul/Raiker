@@ -16,6 +16,7 @@
    * this collects the password rather than deciding anything.
    */
   import { onMount } from "svelte";
+  import Icon from "./Icon.svelte";
   import { api, auth, ApiError, getToken, setToken } from "../api";
   import type { ProjectDeletionPreview, ProjectView } from "../apiTypes";
   import { explainReasonCode } from "../reasonCodes";
@@ -152,7 +153,7 @@
   <header>
     <h2 id="delete-title">Delete “{project.name}”</h2>
     <button type="button" class="icon-btn" aria-label="Close" onclick={onclose} disabled={busy}
-      >×</button
+      ><Icon name="x" size="sm" /></button
     >
   </header>
 

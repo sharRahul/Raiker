@@ -353,8 +353,12 @@
     font-size: var(--text-sm);
     margin: 0;
   }
-  @media (max-width: 720px) {
-  }
+  /* FIXED-1412 — short values on one line: the type ("Principal resolved") and
+     the time ("just now") wrapped into two lines while the empty identity
+     column took the width. The summary column is the one that takes the slack. */
+  .table td:first-child,
+  .table td:last-child { white-space: nowrap; }
+  .table .summary-cell { width: 40%; }
   .filters {
     display: flex;
     align-items: flex-end;

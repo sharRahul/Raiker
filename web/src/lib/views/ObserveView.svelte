@@ -543,7 +543,9 @@
 {/if}
 
 <style>
-  .overview { display: grid; gap: var(--space-3); max-width: 52rem; }
+  /* FIXED-1411 — the full width its five sibling tabs use; capped at 52rem it
+     left half the page empty beside them. Reading width stays on the prose. */
+  .overview { display: grid; gap: var(--space-3); }
   .section-h {
     font-size: var(--text-md);
     margin: 0 0 var(--space-3);

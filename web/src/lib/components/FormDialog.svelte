@@ -96,4 +96,8 @@
     overscroll-behavior: contain;
   }
   .form-body > :global(*) { min-width: 0; }
+  /* FIXED-1408 — a button is as wide as its words; as a grid child it
+     stretched across the dialog (Enroll in MFA, Check breach corpus) while
+     every other dialog's actions are compact. */
+  .form-body > :global(button) { justify-self: start; }
 </style>

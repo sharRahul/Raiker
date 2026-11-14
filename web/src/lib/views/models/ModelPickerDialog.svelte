@@ -8,6 +8,7 @@
    * missing in the provider's own terms.
    */
   import ProviderLogo from "../../components/ProviderLogo.svelte";
+  import Icon from "../../components/Icon.svelte";
   import type { ModelProfile, ProviderModelList } from "../../apiTypes";
   import { profileLabel } from "../../format";
   import { providerErrorGuidance } from "../../providerErrors";
@@ -80,7 +81,7 @@
     aria-labelledby="picker-title"
     tabindex="-1"
   >
-    <button class="close" aria-label="Close model picker" onclick={onclose}>×</button>
+    <button class="close" aria-label="Close model picker" onclick={onclose}><Icon name="x" size="sm" /></button>
     <div class="signin-logo">
       <ProviderLogo provider={profile.provider} size={40} />
     </div>

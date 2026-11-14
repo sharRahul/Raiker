@@ -252,13 +252,15 @@
         disabled={busy}
       />
     </label>
-    <div class="actions">
+    <!-- FIXED-1405 — the order and alignment every other confirmation uses:
+         Cancel, then the act, at the right. -->
+    <div class="actions confirm-actions">
+      {#if !busy}
+        <button type="button" class="btn btn-ghost" onclick={() => (confirmingDelete = false)}>Cancel</button>
+      {/if}
       <button type="button" class="btn btn-danger" disabled={busy || !deletePassword || !typedMatches} onclick={deleteAccount}>
         {busy ? "Deleting account…" : "Permanently delete"}
       </button>
-      {#if !busy}
-        <button type="button" class="btn btn-soft" onclick={() => (confirmingDelete = false)}>Cancel</button>
-      {/if}
     </div>
     {#if busy}
       <p class="sub deleting" role="status">
@@ -289,6 +291,7 @@
     gap: var(--space-2);
     margin-top: var(--space-2);
   }
+  .confirm-actions { justify-content: flex-end; }
   .delete-row {
     display: flex;
     align-items: center;

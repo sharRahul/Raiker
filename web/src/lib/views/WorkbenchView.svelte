@@ -868,5 +868,6 @@
     font-size: var(--text-sm); color: var(--text-2);
   }
   .week-line { margin: 0; font-size: var(--text-sm); color: var(--text-2); line-height: 1.6; }
-  .week-line .sep { color: var(--text-3); }
+  /* FIXED-1401 — explicit room either side; the titles ran into the dot. */
+  .week-line .sep { color: var(--text-3); margin: 0 0.35em; white-space: pre; }
 </style>

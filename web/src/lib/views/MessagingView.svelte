@@ -947,7 +947,9 @@
   .hook-list, .event-list { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-3); }
    .event-list > li { display: grid; gap: 0.3rem; padding: var(--space-3); border: 1px solid var(--border); border-radius: var(--r-md); }
   .event-dead { opacity: 0.62; }
-  .hook-tag { display: inline-flex; align-items: center; font-size: var(--text-2xs); font-weight: 650; padding: 0.05rem 0.5rem; border: 1px solid var(--accent-border); border-radius: var(--r-pill); background: var(--accent-soft); color: var(--accent); }
+  /* FIXED-1397 — a tag is as wide as its words; as a grid row it stretched
+     into a full-width bar. */
+  .hook-tag { justify-self: start; display: inline-flex; align-items: center; font-size: var(--text-2xs); font-weight: 650; padding: 0.05rem 0.5rem; border: 1px solid var(--accent-border); border-radius: var(--r-pill); background: var(--accent-soft); color: var(--accent); }
   .hook-tag-dead { border-color: var(--border); background: var(--sunken); color: var(--text-3); }
   .note { color: var(--text-3); font-size: var(--text-sm); }
   .channel-head { display: flex; flex-wrap: wrap; align-items: center; gap: 0.45rem; }

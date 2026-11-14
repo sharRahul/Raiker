@@ -2034,7 +2034,7 @@
       tabindex="-1"
       style={`--brand:${b.tint}`}
     >
-      <button class="close" aria-label="Close" onclick={closeSignIn}>×</button>
+      <button class="close" aria-label="Close" onclick={closeSignIn}><Icon name="x" size="sm" /></button>
       <div class="signin-logo">
         <ProviderLogo provider={signInProfile.provider} size={44} />
       </div>
@@ -2310,12 +2310,19 @@
     font-size: var(--text-sm);
     max-width: 44rem;
   }
+  /* FIXED-1402 — the model select and its Cancel pushed past the card's right
+     edge ("Cance"): the copy beside them would not shrink. The copy now gives
+     way and the actions wrap within the card. */
   .profile-actions {
     display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
     align-items: center;
     gap: var(--space-2);
-    flex-shrink: 0;
+    flex: 0 1 auto;
+    min-width: 0;
   }
+  .profile-card > :first-child { min-width: 0; flex: 1 1 18rem; }
   .my-models h2 {
     margin: 0;
     font-size: var(--text-md);
@@ -2390,7 +2397,7 @@
   .global-model-field {
     display: grid;
     gap: 0.3rem;
-    min-width: min(100%, 22rem);
+    min-width: min(100%, 16rem);
     font-weight: 650;
   }
 

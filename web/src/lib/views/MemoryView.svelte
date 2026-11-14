@@ -1,5 +1,6 @@
 <script lang="ts">
   import MemoryControls from "../components/MemoryControls.svelte";
+  import EmptyState from "../components/EmptyState.svelte";
   import { askConfirm } from "../confirm.svelte";
   import Icon from "../components/Icon.svelte";
   import PageState from "../components/PageState.svelte";
@@ -511,7 +512,15 @@
 {:else if memories === null}<PageState state="loading" title="Loading memories…" />
 {:else if tab === "overview"}
   <div id="panel-overview" role="tabpanel" aria-labelledby="tab-overview">
-    <p class="page-lead">{memorySentence(counts)}</p>
+    {#if counts.approved === 0}
+      <!-- FIXED-1410 — the empty overview was one grey sentence on a bare page;
+           it is the shared carded empty state, as on every other tab. -->
+      <div class="card">
+        <EmptyState icon="memory" title="Nothing remembered yet" body={memorySentence(counts)} />
+      </div>
+    {:else}
+      <p class="page-lead">{memorySentence(counts)}</p>
+    {/if}
 
   <!-- UX-MEM-06 — where every record is in the one pipeline it passes
        through, so "why is Raiker using this?" has an answer on the page that
@@ -610,7 +619,7 @@
          none. Repeating its sentence here put the same line on screen twice;
          the empty state keeps the action, which is the half that is not
          already said. -->
-    {#if records.length === 0}<div class="empty"><Icon name="spark" size="xl" /><h4>No approved memories yet</h4><a href={posture.action ? "#/capabilities" : "#/approvals"}>{posture.action ?? "Learn how governed review works"}</a></div>
+    {#if records.length === 0}<div class="card"><EmptyState icon="memory" title="No approved memories yet" body="Approved memories are the only thing Raiker can recall.">{#snippet action()}<a class="btn btn-primary" href={posture.action ? "#/capabilities" : "#/approvals"}>{posture.action ?? "Learn how governed review works"}</a>{/snippet}</EmptyState></div>
     {:else if filtered.length === 0}<div class="empty"><h4>No memories match these filters</h4><p>Clear or change the filters to see approved memories.</p></div>
     {:else}<div class="memory-grid">{#each filtered as m (m.memory_id)}<article class="memory-card" id={`memory-${m.memory_id}`} class:pinned={m.pinned}>
       <div class="memory-title">{#if editingId === m.memory_id}<textarea rows="3" bind:value={editDraft} aria-label="Memory text"></textarea>{:else}<h4>{m.text}</h4>{/if}{#if m.pinned}<span class="pin-label"><Icon name="check" size="sm" /> Pinned</span>{/if}</div>
@@ -712,7 +721,7 @@
         </div>
       {/if}
       {#if observations.observations.length === 0}
-        <div class="empty"><Icon name="spark" size="xl" /><h4>No observations yet</h4><p>Raiker records one observation each time a governed tool returns material. Run a turn that reads a file or searches the workspace and it will appear here.</p></div>
+        <div class="card"><EmptyState icon="memory" title="No observations yet" body="Raiker records one observation each time a governed tool returns material. Run a turn that reads a file or searches the workspace and it will appear here." /></div>
       {:else if observationRows.length === 0}
         <div class="empty"><h4>No observations match this filter</h4><p>Choose a different kind to see what was captured.</p></div>
       {:else}

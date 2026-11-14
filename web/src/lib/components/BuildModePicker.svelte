@@ -202,4 +202,19 @@
     font-size: var(--text-2xs);
     line-height: 1.35;
   }
+  /* FIXED-1413 — anchored at the trigger's left, the menu ran past a phone's
+     right edge; below the split it is the bottom sheet the + and Tools menus
+     already use. */
+  @media (max-width: 47.9rem) {
+    .mode-menu {
+      position: fixed;
+      inset: auto 0 0 0;
+      z-index: var(--z-modal);
+      width: auto;
+      max-width: none;
+      border-radius: var(--r-lg) var(--r-lg) 0 0;
+      padding: var(--space-3) var(--space-3) var(--space-5);
+      box-shadow: var(--shadow-3);
+    }
+  }
 </style>

@@ -16,6 +16,38 @@ PR #106: the **user-owned fallback sequence** and **prompt caching + normalised
 cache-hit metrics**.
 
 
+## Result — 2026-11-14 (Surface sweep: every page, sub-page and pop-up)
+
+The owner pointed out that the first 2026-11-14 review had missed many pages
+and every pop-up: it read 39 top-level captures of an empty workspace and
+opened nothing. `web/e2e/surface-sweep-live.spec.ts` now opens **96 pop-up
+surfaces** through the real UI (dialogs, menus, popovers, drawers, sheets and
+disclosures across the shell, Chat, Build, Design, Work, Models, Memory,
+Connections, Permissions, Approvals, Diagnostics and Settings) and captures
+**56 pages and sub-pages** full-length, in light and dark at 1440 px and light
+at 390 px, on the populated workspace of the earlier live round. Each surface
+starts from a fresh document, and anything it could not open is listed in
+`opened.json` with the reason.
+
+**Coverage.** 90 of 96 pop-ups opened in each configuration. The six not
+opened are not offered in this workspace's state: Build's file browser (no
+repository), task history (no open task), Create project (disabled until
+named), Choose a model (a default exists), the Knowledge Map's add-source
+control (Memory store off) and the vault setup (already set).
+
+**Found and fixed.** Eighteen irregularities,
+[FIXED-1396](../plans/FIXED_ITEMS.md#fixed-1396--the-content-area-drew-a-focus-frame-after-navigation)
+to [FIXED-1413](../plans/FIXED_ITEMS.md#fixed-1413--on-a-phone-builds-mode-menu-ran-off-screen-and-settings-opened-on-its-navigation):
+the focus frame round the content area, stretched badges and buttons, menu
+entries drawn as boxes, three close glyphs, five empty-state shapes, Design's
+detached composer controls, the clipped Models **Cancel**, mis-sized card
+titles, the false *Checking this model* note, and two phone layouts. Each was
+re-captured after its fix. Items found but not changed are listed in
+[TO_BE_FIXED.md](../plans/TO_BE_FIXED.md#quiet-ui-consistency--what-the-2026-11-14-sweeps-did-not-change).
+
+**Captures.** `output/playwright/surfaces/{light-1440,dark-1440,light-390}/`
+(pop-ups at the top level, pages under `pages/`), not committed.
+
 ## Result — 2026-11-14 (Tasks composer, ChatGPT sign-in and page consistency)
 
 A fresh Linux workspace served by `raiker-web --port 8765` at 1440×1000, built

@@ -756,6 +756,16 @@ code,
   }
 }
 
+/* FIXED-1396 — a route change moves focus to the main landmark so keyboard and
+   screen-reader users start on the new page (App.svelte). The landmark is a
+   focus *target*, not a control: it drew the global ring around the whole
+   content area, a blue frame that appeared on some pages and not others. */
+main[tabindex="-1"]:focus,
+main[tabindex="-1"]:focus-visible {
+  outline: none;
+  box-shadow: none;
+}
+
 /* Naming both halves: a background-only rule inherits whatever colour the text
    already had, which on an accent bubble left the selection unreadable. */
 ::selection {
@@ -899,9 +909,28 @@ time {
   background: var(--surface);
   box-shadow: var(--shadow-2);
 }
+/* FIXED-1403 — a menu entry is a row, not a button. `.menu-item` never reset
+   the global button chrome, so overflow menus and the composer's + and Tools
+   menus drew every entry as its own bordered, centred box. */
 .menu-item {
   min-height: var(--control-min-h);
   font-size: var(--text-sm);
+}
+:where(button, a).menu-item {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  border: 0;
+  border-radius: var(--r-sm);
+  background: transparent;
+  color: var(--text-1);
+  font-weight: 500;
+  text-align: left;
+  text-decoration: none;
+}
+:where(button).menu-item:disabled {
+  color: var(--text-3);
+  cursor: not-allowed;
 }
 .menu-item:hover:not(:disabled) {
   background: var(--accent-soft);
@@ -1370,6 +1399,20 @@ time {
     flex-direction: column;
   }
 }
+
+/* FIXED-1406 — one Settings card, defined once. Each section kept a private
+   copy of this rule, and the two that lacked one (Voice, Command downloads)
+   rendered as loose text on the page while their neighbours were cards. A
+   section's own copy still wins where it tunes the padding. */
+.settings-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  padding: var(--card-pad-y, var(--space-4)) var(--card-pad-x, var(--space-4));
+  margin-bottom: var(--space-3);
+}
+.settings-card .card-heading h3 { margin: 0; }
+.settings-card .card-heading { margin-bottom: var(--space-2); }
 
 .page-lead {
   color: var(--text-2);

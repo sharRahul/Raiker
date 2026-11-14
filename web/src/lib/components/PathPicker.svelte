@@ -140,7 +140,7 @@
 >
   <header>
     <h2 id="path-picker-title">{title}</h2>
-    <button type="button" class="icon-btn" aria-label="Close" onclick={onclose}>×</button>
+    <button type="button" class="icon-btn" aria-label="Close" onclick={onclose}><Icon name="x" size="sm" /></button>
   </header>
 
   <div class="crumb">

@@ -519,6 +519,9 @@
   .model-row { display: flex; flex-wrap: wrap; gap: 0.6rem; align-items: center; }
   .goal-form label.inline, .chips label { display: inline-flex; gap: 0.3rem; align-items: center; }
   fieldset { border: 1px solid var(--border); border-radius: var(--r-md); padding: 0.75rem; display: grid; gap: 0.5rem; min-width: 0; }
+  /* FIXED-1408 — Add criterion and Add step at their own width, like every
+     other add action, not stretched across the fieldset. */
+  fieldset > button { justify-self: start; }
   .row { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; }
   .row input { flex: 1 1 12rem; min-width: 0; }
   .step-draft { display: grid; gap: 0.4rem; padding-bottom: 0.5rem; border-bottom: 1px dashed var(--border); }

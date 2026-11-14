@@ -108,8 +108,8 @@ test("Design's Research reaches the turn and answers", async ({ page }) => {
   const composer = page.getByRole("group", { name: "Image composer" });
   await expect(composer).toBeVisible({ timeout: 60_000 });
   await composer.getByRole("textbox").first().fill("a timber footbridge over a narrow river");
-  await page.getByText("Workspace options", { exact: true }).click();
-  await page.getByRole("button", { name: "Tools" }).first().click();
+  // FIXED-1400 — Tools is in the composer bar now, not behind a disclosure.
+  await composer.getByRole("button", { name: "Tools" }).first().click();
   await page.getByRole("menu", { name: "Tools" }).getByRole("menuitem", { name: "Search the web" }).click();
 
   const research = page.getByTestId("design-research");

@@ -1028,7 +1028,7 @@
     <header>
       <ProviderLogo provider={picked.provider} size={26} />
       <h2 id="matrix-picker-title">{picked.label} models</h2>
-      <button type="button" class="close" aria-label="Close model picker" onclick={() => (pickerFor = null)}>×</button>
+      <button type="button" class="close" aria-label="Close model picker" onclick={() => (pickerFor = null)}><Icon name="x" size="sm" /></button>
     </header>
     <AvailableModels
       profileId={picked.profileId}

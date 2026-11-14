@@ -116,7 +116,7 @@
   <div class="backups-head">
     <div class="card-heading">
       <h3 id="backups-heading">This workspace</h3>
-      <p>A checked copy of this workspace; one is also taken before each update, and the last three are kept.{#if !loadError && view && view.backups.length === 0} <span>No backups yet.</span>{/if}</p>
+      <p>A checked copy of this workspace; one is also taken before each update, and the last three are kept.{#if !loadError && view && view.backups.length === 0}<span class="none-yet">No backups yet.</span>{/if}</p>
     </div>
     <button type="button" class="btn btn-primary btn-sm" disabled={busy !== null} onclick={backUp}>
       {busy === "create" ? "Backing up…" : "Back up now"}
@@ -171,6 +171,9 @@
 </section>
 
 <style>
+  /* FIXED-1410 — "kept.No backups yet.": the space before the span was
+     dropped, so the two sentences ran together. */
+  .none-yet { margin-left: 0.3em; }
   /* The Account page's card, which its scoped styles do not reach in here. */
   .backups-head > .btn { flex: none; white-space: nowrap; }
   .backups-head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-4); }

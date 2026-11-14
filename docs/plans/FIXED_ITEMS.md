@@ -1,5 +1,185 @@
 # Fixed items
 
+## FIXED-1413 — On a phone, Build's Mode menu ran off-screen and Settings opened on its navigation
+
+**Severity: Medium. Area: Quiet UI / phone layout. Status: Fixed 2026-11-14.**
+
+**Observed (390 px sweep).** Build's Mode menu was anchored to its trigger's left edge and ran past the screen, cut to “Plan” and “Suggest c”. Every Settings section stacked all fifteen section links above its content, so each one opened on a screen of navigation.
+
+**Fixed.** Below the split, Mode is the bottom sheet the `+` and Tools menus already use; the Settings sections are one horizontally scrolling strip above the content.
+
+**Evidence.** `web/e2e/surface-sweep-live.spec.ts` at 390 px, before and after.
+
+## FIXED-1412 — Short table and list values wrapped while wide columns stayed empty
+
+**Severity: Low. Area: Quiet UI tables. Status: Fixed 2026-11-14.**
+
+**Observed.** The audit log wrapped *Principal resolved* and *just now* onto two lines while the empty identity column took the width. Tasks' finished-work rows set the time at body size and spread status, time and **Run again** across the row.
+
+**Fixed.** Type and time stay on one line and the summary column takes the slack; finished-work rows group status, time and action at the right at the list's small size.
+
+**Evidence.** Found by `web/e2e/surface-sweep-live.spec.ts` (see [Live Test](../architecture/WEB_APP_LIVE_TEST.md#result--2026-11-14-surface-sweep-every-page-sub-page-and-pop-up)); re-captured after the fix in light and dark at 1440 px and light at 390 px. Affected component suites pass.
+
+## FIXED-1411 — Diagnostics › Overview was capped at half the page
+
+**Severity: Low. Area: Quiet UI / Diagnostics. Status: Fixed 2026-11-14.**
+
+**Observed.** Overview's cards stopped at 52rem while its five sibling tabs used the full width, leaving the right half empty on a 1440px window.
+
+**Fixed.** Overview uses the full width; reading width stays on its prose.
+
+**Evidence.** Found by `web/e2e/surface-sweep-live.spec.ts` (see [Live Test](../architecture/WEB_APP_LIVE_TEST.md#result--2026-11-14-surface-sweep-every-page-sub-page-and-pop-up)); re-captured after the fix in light and dark at 1440 px and light at 390 px. Affected component suites pass.
+
+## FIXED-1410 — Empty states used five different shapes
+
+**Severity: Medium. Area: Quiet UI empty states. Status: Fixed 2026-11-14.**
+
+**Observed.** Connections › Services and Design › Documents showed a bare sentence; MCP servers a dashed text box; Memory's approved memories and observations dashed boxes with small titles; Memory › Overview one grey sentence; Settings › Backups read “kept.No backups yet.”.
+
+**Fixed.** Each uses the shared carded empty state (icon, title, primary action where one exists), matching Work and Diagnostics; the Backups sentences are spaced.
+
+**Evidence.** Found by `web/e2e/surface-sweep-live.spec.ts` (see [Live Test](../architecture/WEB_APP_LIVE_TEST.md#result--2026-11-14-surface-sweep-every-page-sub-page-and-pop-up)); re-captured after the fix in light and dark at 1440 px and light at 390 px. Affected component suites pass.
+
+## FIXED-1409 — Dialogs closed with three different glyphs
+
+**Severity: Low. Area: Quiet UI dialogs. Status: Fixed 2026-11-14.**
+
+**Observed.** The All-pages panel closed with a text **Close** link; thirteen dialogs and panels (model details, model picker, export, path picker, project move and delete, the notification toast, Knowledge Map panels) used a text “×”, one of them heavy; the rest used the thin ✕ icon.
+
+**Fixed.** All use the shared ✕ icon with an accessible **Close** name.
+
+**Evidence.** Found by `web/e2e/surface-sweep-live.spec.ts` (see [Live Test](../architecture/WEB_APP_LIVE_TEST.md#result--2026-11-14-surface-sweep-every-page-sub-page-and-pop-up)); re-captured after the fix in light and dark at 1440 px and light at 390 px. Affected component suites pass.
+
+## FIXED-1408 — Some dialog and form buttons stretched to full width
+
+**Severity: Low. Area: Quiet UI dialogs. Status: Fixed 2026-11-14.**
+
+**Observed.** **Enroll in MFA**, **Check breach corpus**, and Goals' **Add criterion** and **Add step** spanned their whole container as grid children, while every other dialog and form action is compact.
+
+**Fixed.** Buttons directly inside a form dialog body or a goal fieldset are as wide as their words.
+
+**Evidence.** Found by `web/e2e/surface-sweep-live.spec.ts` (see [Live Test](../architecture/WEB_APP_LIVE_TEST.md#result--2026-11-14-surface-sweep-every-page-sub-page-and-pop-up)); re-captured after the fix in light and dark at 1440 px and light at 390 px. Affected component suites pass.
+
+## FIXED-1407 — Remote access put each radio on its own line above its option
+
+**Severity: Low. Area: Quiet UI / Settings. Status: Fixed 2026-11-14.**
+
+**Observed.** In **Set up** remote access, the generic `label` column rule overrode the option card's layout, so each radio sat alone above its title.
+
+**Fixed.** The option is a row: radio, then title and description.
+
+**Evidence.** Found by `web/e2e/surface-sweep-live.spec.ts` (see [Live Test](../architecture/WEB_APP_LIVE_TEST.md#result--2026-11-14-surface-sweep-every-page-sub-page-and-pop-up)); re-captured after the fix in light and dark at 1440 px and light at 390 px. Affected component suites pass.
+
+## FIXED-1406 — Voice and Command downloads rendered without the Settings card
+
+**Severity: Medium. Area: Quiet UI / Settings. Status: Fixed 2026-11-14.**
+
+**Observed.** Every Settings section carried a private copy of `.settings-card`; Voice and Command downloads used the class with no copy, so they rendered as loose text while their neighbours were cards. Usage and spending titled *Pricing* larger than *Rolling seven-day usage* above it.
+
+**Fixed.** One shared `.settings-card` rule in `app.css` (section copies still win where they tune padding); Pricing's title matches the usage title.
+
+**Evidence.** Found by `web/e2e/surface-sweep-live.spec.ts` (see [Live Test](../architecture/WEB_APP_LIVE_TEST.md#result--2026-11-14-surface-sweep-every-page-sub-page-and-pop-up)); re-captured after the fix in light and dark at 1440 px and light at 390 px. Affected component suites pass.
+
+## FIXED-1405 — Delete account laid out its confirmation differently from every other
+
+**Severity: Low. Area: Quiet UI / Settings. Status: Fixed 2026-11-14.**
+
+**Observed.** Delete account put **Permanently delete** first and **Cancel** (styled as a selected soft button) after it, left-aligned; Disable agent runtime and every other confirmation put Cancel first and the act last, right-aligned.
+
+**Fixed.** Cancel, then the act, at the right; Cancel is a quiet ghost button. The busy state still removes Cancel while the deletion runs.
+
+**Evidence.** Found by `web/e2e/surface-sweep-live.spec.ts` (see [Live Test](../architecture/WEB_APP_LIVE_TEST.md#result--2026-11-14-surface-sweep-every-page-sub-page-and-pop-up)); re-captured after the fix in light and dark at 1440 px and light at 390 px. Affected component suites pass.
+
+## FIXED-1404 — Security's card titles were larger than the section heading
+
+**Severity: Low. Area: Quiet UI / Settings. Status: Fixed 2026-11-14.**
+
+**Observed.** *Signing in and devices*, *Remote access*, *Encryption and the vault* and the rest drew at the browser's `h2` size, larger than the section's own **Security** heading above them.
+
+**Fixed.** They use the card title size every other Settings card uses.
+
+**Evidence.** Found by `web/e2e/surface-sweep-live.spec.ts` (see [Live Test](../architecture/WEB_APP_LIVE_TEST.md#result--2026-11-14-surface-sweep-every-page-sub-page-and-pop-up)); re-captured after the fix in light and dark at 1440 px and light at 390 px. Affected component suites pass.
+
+## FIXED-1403 — Menu entries drew as separate bordered buttons
+
+**Severity: Medium. Area: Quiet UI menus. Status: Fixed 2026-11-14.**
+
+**Observed.** The provider-card overflow menu and the composer's `+` and Tools menus drew every entry as its own bordered, centred box: `.menu-item` never reset the global `button` chrome.
+
+**Fixed.** `button.menu-item` and `a.menu-item` are left-aligned rows with no border or fill, hovering to the accent wash, in every menu that uses the class.
+
+**Evidence.** Found by `web/e2e/surface-sweep-live.spec.ts` (see [Live Test](../architecture/WEB_APP_LIVE_TEST.md#result--2026-11-14-surface-sweep-every-page-sub-page-and-pop-up)); re-captured after the fix in light and dark at 1440 px and light at 390 px. Affected component suites pass.
+
+## FIXED-1402 — Models pushed the default-model Cancel off its card
+
+**Severity: Medium. Area: Quiet UI / Models. Status: Fixed 2026-11-14.**
+
+**Observed.** Pressing **Change** on *No default model is chosen* drew the model select and its **Cancel** past the card's right edge, clipped to “Cance”, because the copy beside them would not shrink.
+
+**Fixed.** The copy yields and the actions wrap inside the card.
+
+**Evidence.** Found by `web/e2e/surface-sweep-live.spec.ts` (see [Live Test](../architecture/WEB_APP_LIVE_TEST.md#result--2026-11-14-surface-sweep-every-page-sub-page-and-pop-up)); re-captured after the fix in light and dark at 1440 px and light at 390 px. Affected component suites pass.
+
+## FIXED-1401 — Home's composer had a resize grip and a stretched send button, and This week ran titles together
+
+**Severity: Low. Area: Quiet UI / Home. Status: Fixed 2026-11-14.**
+
+**Observed.** Home's composer showed a textarea resize handle Chat's does not, and its send button inherited the global `.send` minimum width, drawing a wide rectangle instead of Chat's round button. *This week* rendered two titles as `READY·Reply` with no room around the separator.
+
+**Fixed.** No grip; a round 36px send; explicit spacing around the separator.
+
+**Evidence.** Found by `web/e2e/surface-sweep-live.spec.ts` (see [Live Test](../architecture/WEB_APP_LIVE_TEST.md#result--2026-11-14-surface-sweep-every-page-sub-page-and-pop-up)); re-captured after the fix in light and dark at 1440 px and light at 390 px. Affected component suites pass.
+
+## FIXED-1400 — Design's composer controls sat outside the composer
+
+**Severity: Medium. Area: Quiet UI / Design. Status: Fixed 2026-11-14.**
+
+**Observed.** Design hid `+`, Tools, size, count and the context line under a *Workspace options* disclosure above the composer, where they drew as a loose row of pills detached from the card — the composer itself held only import and model.
+
+**Fixed.** They are the composer's own controls, in its bar, in the order Chat and Build use. Image import keeps its own image glyph so it is not confused with the `+` menu. The always-true dictation sentence went with the disclosure.
+
+**Evidence.** Found by `web/e2e/surface-sweep-live.spec.ts` (see [Live Test](../architecture/WEB_APP_LIVE_TEST.md#result--2026-11-14-surface-sweep-every-page-sub-page-and-pop-up)); re-captured after the fix in light and dark at 1440 px and light at 390 px. Affected component suites pass.
+
+## FIXED-1399 — Connections › Advanced carried two guide icons per tab and mixed card title sizes
+
+**Severity: Low. Area: Quiet UI consistency. Status: Fixed 2026-11-14.**
+
+**Observed.** MCP servers and Skills each showed a second "ⓘ" on a line of its own under the sub-tabs' "ⓘ"; Hooks showed two more inside its cards. MCP's refresh was an unlabelled icon. Hooks and Plugins titled three cards at the page-heading size and three at the card size, side by side.
+
+**Fixed.** One guide link for the hub (on the sub-tab row); MCP's refresh is a labelled **Refresh**; every card on these tabs titles at the card size.
+
+**Evidence.** Found by `web/e2e/surface-sweep-live.spec.ts` (see [Live Test](../architecture/WEB_APP_LIVE_TEST.md#result--2026-11-14-surface-sweep-every-page-sub-page-and-pop-up)); re-captured after the fix in light and dark at 1440 px and light at 390 px. Affected component suites pass.
+
+## FIXED-1398 — Composers said “Checking this model” when nothing was checking
+
+**Severity: Medium. Area: Model readiness copy. Status: Fixed 2026-11-14.**
+
+**Observed.** Chat, Tasks and Build showed *Checking this model — you can still send.* for as long as the page stayed open whenever the last readiness observation had expired. No check was running; the server checks when a turn is sent. The README forbids a label that names an act that did not happen.
+
+**Fixed.** The note now reads *Not checked recently — it is checked when you send.* Behaviour is unchanged: sending still runs the check first.
+
+**Evidence.** Found by `web/e2e/surface-sweep-live.spec.ts` (see [Live Test](../architecture/WEB_APP_LIVE_TEST.md#result--2026-11-14-surface-sweep-every-page-sub-page-and-pop-up)); re-captured after the fix in light and dark at 1440 px and light at 390 px. Affected component suites pass.
+
+## FIXED-1397 — Badges stretched, the Effort row shouted and the context meter read a bare 0%
+
+**Severity: Low. Area: Quiet UI details. Status: Fixed 2026-11-14.**
+
+**Observed.** Connections › Channels › Delivery environment drew each status tag (*Capability off*, *Unsigned*, *Accepted*) as a full-width bar. The model picker's **Effort** row was taller and bolder than the rows above it. Chat's composer showed a lone **0%** with nothing saying what it measured.
+
+**Fixed.** Tags size to their words; the Effort row uses the menu's row size and weight; the context line reads **0% context**.
+
+**Evidence.** Found by `web/e2e/surface-sweep-live.spec.ts` (see [Live Test](../architecture/WEB_APP_LIVE_TEST.md#result--2026-11-14-surface-sweep-every-page-sub-page-and-pop-up)); re-captured after the fix in light and dark at 1440 px and light at 390 px. Affected component suites pass.
+
+## FIXED-1396 — The content area drew a focus frame after navigation
+
+**Severity: Low. Area: Quiet UI focus. Status: Fixed 2026-11-14.**
+
+**Observed (surface sweep).** After many navigations a 2px blue frame outlined the whole content area: the route change moves focus to the `main` landmark (`tabindex="-1"`) for keyboard and screen-reader users, and the global `:focus-visible` ring drew around it. It appeared on Connections › Advanced, Settings sections and Work › Threads, and not on others.
+
+**Fixed.** The landmark keeps receiving focus; as a focus target rather than a control it draws no ring (`app.css`). Every control keeps its ring.
+
+**Evidence.** Found by `web/e2e/surface-sweep-live.spec.ts` (see [Live Test](../architecture/WEB_APP_LIVE_TEST.md#result--2026-11-14-surface-sweep-every-page-sub-page-and-pop-up)); re-captured after the fix in light and dark at 1440 px and light at 390 px. Affected component suites pass.
+
 ## FIXED-1395 — A custom endpoint saved off the machine showed no route on its card (BUG-352)
 
 **Severity: Low. Area: Models / UI. Status: Fixed 2026-11-14.**
@@ -2133,6 +2313,24 @@ file you can open. The two capture sets that remain — `screenshots/pages/` and
 | [FIXED-1382](#fixed-1382--linux-filesystem-flags-broke-windows-type-checking) | Low | Platform portability | Fixed 2026-11-09 |
 | [FIXED-1383](#fixed-1383--keyboard-start-evidence-depended-on-retired-receipt-wording) | Low | Beta live tests | Fixed 2026-11-09 |
 | [FIXED-1384](#fixed-1384--model-downloads-checked-redirect-hosts-after-contacting-them) | High | Model and speech downloads | Fixed 2026-11-09 |
+| [FIXED-1413](#fixed-1413--on-a-phone-builds-mode-menu-ran-off-screen-and-settings-opened-on-its-navigation) | Medium | Quiet UI / phone layout | Fixed 2026-11-14 |
+| [FIXED-1412](#fixed-1412--short-table-and-list-values-wrapped-while-wide-columns-stayed-empty) | Low | Quiet UI tables | Fixed 2026-11-14 |
+| [FIXED-1411](#fixed-1411--diagnostics--overview-was-capped-at-half-the-page) | Low | Quiet UI / Diagnostics | Fixed 2026-11-14 |
+| [FIXED-1410](#fixed-1410--empty-states-used-five-different-shapes) | Medium | Quiet UI empty states | Fixed 2026-11-14 |
+| [FIXED-1409](#fixed-1409--dialogs-closed-with-three-different-glyphs) | Low | Quiet UI dialogs | Fixed 2026-11-14 |
+| [FIXED-1408](#fixed-1408--some-dialog-and-form-buttons-stretched-to-full-width) | Low | Quiet UI dialogs | Fixed 2026-11-14 |
+| [FIXED-1407](#fixed-1407--remote-access-put-each-radio-on-its-own-line-above-its-option) | Low | Quiet UI / Settings | Fixed 2026-11-14 |
+| [FIXED-1406](#fixed-1406--voice-and-command-downloads-rendered-without-the-settings-card) | Medium | Quiet UI / Settings | Fixed 2026-11-14 |
+| [FIXED-1405](#fixed-1405--delete-account-laid-out-its-confirmation-differently-from-every-other) | Low | Quiet UI / Settings | Fixed 2026-11-14 |
+| [FIXED-1404](#fixed-1404--securitys-card-titles-were-larger-than-the-section-heading) | Low | Quiet UI / Settings | Fixed 2026-11-14 |
+| [FIXED-1403](#fixed-1403--menu-entries-drew-as-separate-bordered-buttons) | Medium | Quiet UI menus | Fixed 2026-11-14 |
+| [FIXED-1402](#fixed-1402--models-pushed-the-default-model-cancel-off-its-card) | Medium | Quiet UI / Models | Fixed 2026-11-14 |
+| [FIXED-1401](#fixed-1401--homes-composer-had-a-resize-grip-and-a-stretched-send-button-and-this-week-ran-titles-together) | Low | Quiet UI / Home | Fixed 2026-11-14 |
+| [FIXED-1400](#fixed-1400--designs-composer-controls-sat-outside-the-composer) | Medium | Quiet UI / Design | Fixed 2026-11-14 |
+| [FIXED-1399](#fixed-1399--connections--advanced-carried-two-guide-icons-per-tab-and-mixed-card-title-sizes) | Low | Quiet UI consistency | Fixed 2026-11-14 |
+| [FIXED-1398](#fixed-1398--composers-said-checking-this-model-when-nothing-was-checking) | Medium | Model readiness copy | Fixed 2026-11-14 |
+| [FIXED-1397](#fixed-1397--badges-stretched-the-effort-row-shouted-and-the-context-meter-read-a-bare-0) | Low | Quiet UI details | Fixed 2026-11-14 |
+| [FIXED-1396](#fixed-1396--the-content-area-drew-a-focus-frame-after-navigation) | Low | Quiet UI focus | Fixed 2026-11-14 |
 | [FIXED-1395](#fixed-1395--a-custom-endpoint-saved-off-the-machine-showed-no-route-on-its-card-bug-352) | Low | Models / UI | Fixed 2026-11-14 |
 | [FIXED-1394](#fixed-1394--terminal-model-commands-could-not-reach-a-connected-hosted-provider-bug-351) | Low | CLI / models | Fixed 2026-11-14 |
 | [FIXED-1393](#fixed-1393--chatgpt-turns-timed-out-leaked-codex-processes-and-lost-the-limit-windows) | High | Models / ChatGPT subscription | Fixed 2026-11-14 |

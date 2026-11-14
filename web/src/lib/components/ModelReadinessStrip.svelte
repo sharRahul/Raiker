@@ -21,7 +21,10 @@
 
 {#if readiness && !readiness.ready}
   {#if confirming}
-    <p class="rechecking" role="status">Checking this model — you can still send.</p>
+    <!-- FIXED-1398 — nothing was checking: an aged-out observation sat here as
+         "Checking this model" for as long as the page stayed open. The check
+         happens when a turn is sent, so the note says that. -->
+    <p class="rechecking" role="status">Not checked recently — it is checked when you send.</p>
   {:else}
     <!-- Quiet UI — the summary and the one button that fixes it; how to fix
          it is the tooltip here and the whole of the dialog the button opens. -->

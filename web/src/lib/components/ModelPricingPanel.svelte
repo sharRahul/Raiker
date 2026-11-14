@@ -373,7 +373,8 @@
 
   .pricing { display: grid; gap: var(--space-3); }
   .pricing-head { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--space-3); flex-wrap: wrap; }
-  .pricing-head h2 { margin: 0 0 .25rem; }
+  /* FIXED-1406 — the same title size as the usage section above it. */
+  .pricing-head h2 { margin: 0 0 .25rem; font-size: var(--text-base); }
   .sub { color: var(--text-2); font-size: var(--text-sm); margin: 0; max-width: 68ch; line-height: 1.5; }
   .ok-note { color: var(--ok); font-size: var(--text-sm); margin: 0; font-weight: 600; }
   .error { color: var(--danger); font-size: var(--text-sm); margin: 0; }

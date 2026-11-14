@@ -16,7 +16,6 @@
    * refusal here is a refusal there.
    */
   import { onMount } from "svelte";
-  import GuideLink from "../components/GuideLink.svelte";
   import Icon from "../components/Icon.svelte";
   import Badge from "../components/Badge.svelte";
   import PageState from "../components/PageState.svelte";
@@ -334,7 +333,6 @@
            this tab for a permission surface has to be corrected on the page
            rather than in a document they may never open. -->
       <h2 id="skills-h" class="sr-only">Skills</h2>
-      <GuideLink section="extensions-and-mcp" label="How skills work" />
     </div>
     <button type="button" class="btn btn-ghost btn-sm" onclick={load}>
       <Icon name="refresh" size="sm" /> Refresh

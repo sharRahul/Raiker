@@ -126,7 +126,7 @@
 >
     <header>
       <h2 id="export-title">Export conversation</h2>
-      <button type="button" class="icon-btn" aria-label="Close" onclick={onclose}>×</button>
+      <button type="button" class="icon-btn" aria-label="Close" onclick={onclose}><Icon name="x" size="sm" /></button>
     </header>
 
     {#if loading}

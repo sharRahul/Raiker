@@ -213,7 +213,6 @@
       <p class="note">
         A hook can only make an action <strong>stricter</strong> — never allow one Raiker
         refused, skip an approval, or reach past the tool broker.
-        <GuideLink section="extensions-and-mcp" label="How hooks work" />
       </p>
       {#if hooks === null}
         <p class="note">{hooksError ?? "Reading hook configuration…"}</p>
@@ -423,9 +422,6 @@
         <li><code>.raiker/hooks.json</code> <span class="note">local — this machine only</span></li>
         <li><code>.raiker/plugins/</code> <span class="note">plugin — lowest, so it can only make an action stricter</span></li>
       </ul>
-      <p class="note">
-        <GuideLink section="extensions-and-mcp" label="How hooks are configured" />
-      </p>
     </section>
   </div>
     {:else if kind === "plugins"}
@@ -670,6 +666,9 @@
   .matcher,
   .events summary { cursor: pointer; display: flex; align-items: baseline; gap: 0.5rem; flex-wrap: wrap; }
   .events-h { font-size: var(--text-md); font-weight: 600; margin: 0; display: inline; }
+  /* FIXED-1399 — every card on these tabs titles at one size; three used the
+     page-heading size and three the card size, side by side. */
+  .card > h2:not(.sr-only) { font-size: var(--text-md); font-weight: 600; margin: 0 0 var(--space-2); }
   .handler-type {
     font-family: var(--font-mono);
     font-size: var(--text-xs);

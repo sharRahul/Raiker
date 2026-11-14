@@ -1,5 +1,6 @@
 <script lang="ts">
   import { failure } from "../../errorCopy";
+  import Icon from "../../components/Icon.svelte";
   /**
    * UX-MODEL-01 — Model details, out of the Models page.
    *
@@ -127,7 +128,7 @@
     <button
       class="close"
       aria-label="Close model details"
-      onclick={() => onclose()}>×</button
+      onclick={() => onclose()}><Icon name="x" size="sm" /></button
     >
     <div class="details-heading">
       <ProviderLogo provider={profile.provider} size={28} />

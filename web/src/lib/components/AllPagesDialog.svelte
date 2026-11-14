@@ -148,7 +148,8 @@
         <h2 id="all-pages-h">More</h2>
         <p class="where">You are on <strong>{here.label}</strong></p>
       </div>
-      <button type="button" class="btn btn-ghost btn-sm close" onclick={close}>Close</button>
+      <!-- FIXED-1409 — the ✕ every other panel and dialog closes with. -->
+      <button type="button" class="btn btn-ghost btn-sm close" aria-label="Close" onclick={close}><Icon name="x" size="sm" /></button>
     </header>
     <button type="button" class="find" onclick={search}>
       <Icon name="search" size="sm" />

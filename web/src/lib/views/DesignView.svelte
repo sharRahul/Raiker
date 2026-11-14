@@ -983,8 +983,59 @@
     </ul>
   {/if}
 
-  <details class="design-options"><summary>Workspace options</summary>
-    <p>Dictation requires a local speech engine. Raiker does not retain the audio.</p>
+  <Composer
+    cardClass="design-composer"
+    ariaLabel="Image composer"
+    inputId="design-prompt"
+    bind:inputEl={promptEl}
+    inputLabel="Describe the image"
+    bind:value={draft.text}
+    inputProps={{
+      placeholder: "Describe what you want to create or edit...",
+      title: sendHint(uiPrefs.sendKey).replace("to send", "to generate"),
+      disabled: busy,
+      onkeydown: onKeydown,
+      onselect: trackPromptSelection,
+      onkeyup: trackPromptSelection,
+      onclick: trackPromptSelection,
+    }}
+    onsubmit={() => { if (!voiceActive) void generate(); }}
+  >
+    {#snippet left()}
+      <label class="upload-image" title="Import an image to edit">
+        <Icon name="design" size="sm" /><span class="sr-only">Import image</span>
+        <input class="sr-only" type="file" accept="image/png,image/jpeg,image/webp,image/gif" disabled={busy || importing} onchange={(event) => void importImage(event)} />
+      </label>
+      <label class="composer-scope model-scope">
+        <span class="sr-only">Image model</span>
+        <Icon name="models" size="sm" />
+        {#if imageChoices.length > 0}
+          <select
+            class="bar-select"
+            bind:value={choiceKey}
+            aria-label="Image model"
+            disabled={busy}
+            onchange={(event) => remember((event.currentTarget as HTMLSelectElement).value)}
+          >
+            {#each imageChoices as item (item.key)}
+              <option value={item.key}>
+                {providerName(item.provider)} · {modelName(item.model)}
+              </option>
+            {/each}
+          </select>
+          <Icon name="chevron-down" size="sm" />
+        {:else}
+          <a
+            class="bar-select bar-empty"
+            href="#/models"
+            title="No image model is connected. Connect one on the Models page."
+            >No image model — connect one</a
+          >
+        {/if}
+      </label>
+      <!-- FIXED-1400 — these sat outside the composer, under a "Workspace
+           options" disclosure, as a loose row of pills; they are the composer's
+           own controls, in the bar, in the order Chat and Build use. -->
       <!-- COMPOSER-09 — the same two entry points Chat and Build carry, so a
            person moving between the three Work modes finds the composer in the
            same shape each time. -->
@@ -1050,57 +1101,6 @@
         </select>
       </label>
       <ComposerContext facts={contextFacts} disabled={busy} />
-  </details>
-  <Composer
-    cardClass="design-composer"
-    ariaLabel="Image composer"
-    inputId="design-prompt"
-    bind:inputEl={promptEl}
-    inputLabel="Describe the image"
-    bind:value={draft.text}
-    inputProps={{
-      placeholder: "Describe what you want to create or edit...",
-      title: sendHint(uiPrefs.sendKey).replace("to send", "to generate"),
-      disabled: busy,
-      onkeydown: onKeydown,
-      onselect: trackPromptSelection,
-      onkeyup: trackPromptSelection,
-      onclick: trackPromptSelection,
-    }}
-    onsubmit={() => { if (!voiceActive) void generate(); }}
-  >
-    {#snippet left()}
-      <label class="upload-image" title="Import an image to edit">
-        <Icon name="plus" size="sm" /><span class="sr-only">Import image</span>
-        <input class="sr-only" type="file" accept="image/png,image/jpeg,image/webp,image/gif" disabled={busy || importing} onchange={(event) => void importImage(event)} />
-      </label>
-      <label class="composer-scope model-scope">
-        <span class="sr-only">Image model</span>
-        <Icon name="models" size="sm" />
-        {#if imageChoices.length > 0}
-          <select
-            class="bar-select"
-            bind:value={choiceKey}
-            aria-label="Image model"
-            disabled={busy}
-            onchange={(event) => remember((event.currentTarget as HTMLSelectElement).value)}
-          >
-            {#each imageChoices as item (item.key)}
-              <option value={item.key}>
-                {providerName(item.provider)} · {modelName(item.model)}
-              </option>
-            {/each}
-          </select>
-          <Icon name="chevron-down" size="sm" />
-        {:else}
-          <a
-            class="bar-select bar-empty"
-            href="#/models"
-            title="No image model is connected. Connect one on the Models page."
-            >No image model — connect one</a
-          >
-        {/if}
-      </label>
     {/snippet}
 
     {#snippet above()}

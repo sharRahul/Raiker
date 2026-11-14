@@ -6,6 +6,7 @@
   import Icon from "../components/Icon.svelte";
   import PageState from "../components/PageState.svelte";
   import ProviderLogo from "../components/ProviderLogo.svelte";
+  import ChatgptSignIn from "../components/ChatgptSignIn.svelte";
   import RowOverflow from "../components/RowOverflow.svelte";
   import AddDialog from "../components/AddDialog.svelte";
   import GuideLink from "../components/GuideLink.svelte";
@@ -288,22 +289,14 @@
     }
   }
 
-  async function startCodexSubscriptionLogin() {
-    if (codexSubscriptionBusy) return;
-    codexSubscriptionBusy = true;
+  let codexSwitching = $state(false);
+  /** The owner's sign-in finished and the account is adopted; reload the card. */
+  async function codexConnected(plan: string | null) {
+    codexSwitching = false;
+    codexSubscriptionStatus = "connected";
+    codexSubscriptionPlan = plan;
     codexSubscriptionNotice = null;
-    try {
-      const status = await api.startCodexSubscriptionLogin();
-      codexSubscriptionStatus = status.connection_status;
-      codexSubscriptionNotice = "Finish sign-in in the browser, then refresh this page to list your available models.";
-    } catch (error) {
-      codexSubscriptionNotice =
-        error instanceof ApiError && error.reasonCode
-          ? `ChatGPT sign-in could not start (${error.reasonCode}).`
-          : "ChatGPT sign-in could not start. Check that Codex is installed on this device.";
-    } finally {
-      codexSubscriptionBusy = false;
-    }
+    await load();
   }
 
   /** Sign the ChatGPT subscription out of Raiker; Codex keeps its own session. */
@@ -1791,9 +1784,10 @@
                           <button
                             type="button"
                             class="btn btn-ghost btn-sm"
-                            onclick={() => void startCodexSubscriptionLogin()}
+                            aria-expanded={codexSwitching}
+                            onclick={() => (codexSwitching = !codexSwitching)}
                             disabled={codexSubscriptionBusy}
-                            >{codexSubscriptionBusy ? "Opening sign-in…" : "Switch account"}</button
+                            >Switch account</button
                           >
                           <button
                             type="button"
@@ -1802,17 +1796,16 @@
                             disabled={codexSubscriptionBusy}
                             >Sign out</button
                           >
+                          {#if codexSwitching}
+                            <ChatgptSignIn
+                              label="Sign in to another account"
+                              onconnected={(plan) => void codexConnected(plan)}
+                            />
+                          {/if}
                         {:else if isCodexSubscription(p)}
-                          <button
-                            type="button"
-                            class="btn btn-primary btn-sm pc-connect"
-                            onclick={() => void startCodexSubscriptionLogin()}
-                            disabled={codexSubscriptionBusy}
-                            style={`--brand:${b.tint}`}
-                            >{codexSubscriptionBusy
-                              ? "Opening sign-in…"
-                              : "Sign in with ChatGPT"}</button
-                          >
+                          <!-- FIXED-1390 — the same sign-in control Add model
+                               uses: install, browser, device code, adoption. -->
+                          <ChatgptSignIn onconnected={(plan) => void codexConnected(plan)} />
                         {:else if !p.connection_configured}
                           <button
                             type="button"
@@ -2262,6 +2255,13 @@
     grid-column: 2; grid-row: 1 / span 3; align-self: center;
     justify-content: flex-end; margin: 0;
   }
+  /* FIXED-1390 — an open ChatGPT sign-in (code, waiting, error) takes the
+     card's full width under its header instead of squeezing into the action
+     column beside it. */
+  .compact-providers .provider-card .pc-actions:has(:global([data-expanded="true"])) {
+    grid-column: 1 / -1; grid-row: auto; justify-content: flex-start; align-self: stretch;
+  }
+  .pc-actions :global([data-expanded="true"]) { flex: 1 1 100%; }
   .compact-providers .pc-status { margin-block: var(--space-1); }
   .compact-providers .pc-actions { margin-top: var(--space-2); }
   .compact-providers .chips { margin-block: var(--space-1); }

@@ -226,6 +226,10 @@
   .settings-section { display: grid; gap: var(--space-3); }
   .profiles, .templates, .bindings { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-3); }
   .templates { grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr)); }
+  /* FIXED-1391 — each template card's action sits on the same baseline, at the
+     card's foot, however long its summary runs. */
+  .templates > li { display: flex; flex-direction: column; align-items: flex-start; gap: var(--space-2); }
+  .templates > li > p { flex: 1 1 auto; margin: 0; }
   .head { display: flex; gap: 0.5rem; align-items: baseline; flex-wrap: wrap; }
   .pill { border: 1px solid var(--accent-border); background: var(--accent-soft); border-radius: var(--r-pill); padding: 0 0.5rem; font-size: var(--text-xs); }
   .edit { display: grid; gap: 0.5rem; }

@@ -485,7 +485,11 @@ export const api = {
   refreshProviderCatalogues: (profile_ids?: string[]) =>
     contract.refreshConnectedProviderCatalogues(profile_ids ? { profile_ids } : {}),
   codexSubscriptionStatus: () => contract.getChatgptCodexStatus(),
-  startCodexSubscriptionLogin: () => contract.startChatgptCodexLogin(),
+  // FIXED-1390 — the answer carries the sign-in page (and a device code) for
+  // the owner's own browser; the server no longer opens one nobody can see.
+  startCodexSubscriptionLogin: (method?: "browser" | "device_code") =>
+    contract.startChatgptCodexLogin(method ? { method } : null),
+  cancelCodexSubscriptionLogin: () => contract.cancelChatgptCodexLogin(),
   // BUG-259 — adopting the subscription is its own act. Reading the status no
   // longer connects anything, so this is the only way a ChatGPT account becomes
   // one of this owner's providers.

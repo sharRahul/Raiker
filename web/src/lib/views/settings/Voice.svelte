@@ -180,8 +180,10 @@
             checked={settings.profile === profile.profile_id} disabled={busy !== null}
             onchange={() => save({ profile: profile.profile_id as "lite" | "balanced" | "high" })} />
           <span>
-            <strong>{profile.name}</strong>
-            {#if profile.recommended}<span class="tag">Recommended for this computer</span>{/if}
+            <!-- FIXED-1391 — the name and its tag share a line; as a row of the
+                 grid the tag stretched into a full-width bar. -->
+            <span class="title"><strong>{profile.name}</strong>
+              {#if profile.recommended}<span class="tag">Recommended for this computer</span>{/if}</span>
             <span class="meta">
               {formatBytes(profile.download_bytes)} · {profile.audience}
               {#if !profile.listening_available || !profile.speaking_available}
@@ -360,7 +362,8 @@
   .profile { display: flex; gap: var(--space-3); align-items: flex-start; padding: var(--space-2) var(--space-3); border: 1px solid var(--border); border-radius: var(--r-md); cursor: pointer; }
   .profile > span { display: grid; gap: .15rem; }
   .meta { color: var(--text-3); font-size: var(--text-sm); }
-  .tag { display: inline-block; margin-left: var(--space-2); font-size: var(--text-2xs); font-weight: 600; padding: .05rem .45rem; border-radius: var(--r-pill); border: 1px solid var(--border); color: var(--text-2); }
+  .title { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); }
+  .tag { display: inline-block; justify-self: start; font-size: var(--text-2xs); font-weight: 600; padding: .05rem .45rem; border-radius: var(--r-pill); border: 1px solid var(--border); color: var(--text-2); }
   .engines { display: grid; gap: var(--space-3); grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr)); }
   .engine { border: 1px solid var(--border); border-radius: var(--r-md); padding: var(--space-3); }
   .engine h4 { margin: 0 0 var(--space-2); display: flex; justify-content: space-between; gap: var(--space-2); font-size: var(--text-base); }

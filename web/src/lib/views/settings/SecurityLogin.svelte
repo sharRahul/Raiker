@@ -457,6 +457,8 @@
   REM-SET-SECURITY — four groups, because these are four lifecycles. QUI-L09 —
   each setting is one row; its form opens in a dialog.
 -->
+<!-- FIXED-1391 — the section's own name, as every other Settings section has. -->
+<header class="page-heading"><h2>Security</h2></header>
 {#if notice && panel === null}
   <p class="notice {notice.kind === 'ok' ? 'notice-ok' : 'notice-danger'}" role="status">{notice.text}</p>
 {/if}
@@ -853,10 +855,14 @@
 {/if}
 
 <style>
+  .page-heading { margin-bottom: var(--space-3); }
+  .page-heading h2 { margin: 0; }
   /* QUI-L03 — a setting is a row: label, current value, one action. */
   .setting-row {
     display: grid;
-    grid-template-columns: minmax(10rem, 1fr) minmax(0, 1.4fr) auto;
+    /* FIXED-1391 — a fixed action column, so values line up down the page
+       whether a row has one button, two, or none. */
+    grid-template-columns: minmax(10rem, 1fr) minmax(0, 1.4fr) minmax(7.5rem, max-content);
     align-items: center;
     gap: var(--space-3);
     min-height: 52px;
@@ -865,6 +871,7 @@
   .setting-row:first-of-type {
     border-top: none;
   }
+  .setting-row > :last-child { justify-self: end; }
   .setting-row h3 {
     margin: 0;
     font-size: var(--text-sm);

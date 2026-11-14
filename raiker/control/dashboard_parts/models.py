@@ -286,21 +286,19 @@ class ModelService:
                 if acting_principal_id and effective_model and "<" not in effective_model
                 else None
             )
+            endpoint_kind = _effective_endpoint_kind(profile, saved_connection)
             return ModelProfileView(
                 profile_id=profile.profile_id,
                 provider=profile.provider,
                 model=effective_model,
                 default_state=profile.default_state,
-                local_only=profile.local_only,
-                requires_network=profile.requires_network,
-                endpoint_kind=str(profile.raw.get("endpoint_kind", "unknown")),
+                local_only=profile.local_only and endpoint_kind not in _OFF_MACHINE,
+                requires_network=profile.requires_network or endpoint_kind in _OFF_MACHINE,
+                endpoint_kind=endpoint_kind,
                 requires_egress_policy=bool(profile.raw.get("requires_egress_policy", False)),
                 requires_budget_policy=bool(profile.raw.get("requires_budget_policy", False)),
-                runtime_gate=self._runtime_gate_for_profile(
-                    str(profile.raw.get("endpoint_kind", "unknown"))
-                ),
-                off_machine=str(profile.raw.get("endpoint_kind", "unknown"))
-                in {"remote_hosted", "private_network"},
+                runtime_gate=self._runtime_gate_for_profile(endpoint_kind),
+                off_machine=endpoint_kind in _OFF_MACHINE,
                 selected=selected,
                 connection_configured=bool(saved_connection),
                 environment_credential_env=_environment_credential_env(profile.raw)
@@ -2163,3 +2161,25 @@ def _rate_limited_until(readiness: Any) -> str | None:
     if until is None or until <= datetime.now(UTC):
         return None
     return until.isoformat()
+
+
+_OFF_MACHINE = frozenset({"remote_hosted", "private_network"})
+
+
+def _effective_endpoint_kind(profile: Any, saved_connection: dict[str, str] | None) -> str:
+    """Where this profile's requests actually go, for this owner (BUG-352).
+
+    A custom OpenAI-compatible card is shipped pointing at ``127.0.0.1``; once
+    the owner saves an endpoint on their network or the internet, the card's
+    posture, route line and off-machine counts must follow that endpoint, not
+    the shipped default. Profiles without a saved endpoint keep their shipped
+    classification.
+    """
+    shipped = str(profile.raw.get("endpoint_kind", "unknown"))
+    endpoint = str((saved_connection or {}).get("endpoint", "")).strip()
+    if not endpoint:
+        return shipped
+    from raiker.models.endpoint_policy import classify_endpoint
+
+    kind = classify_endpoint(endpoint)
+    return kind if kind in {"local_machine", "private_network", "remote_hosted"} else shipped

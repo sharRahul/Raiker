@@ -402,14 +402,18 @@
       {/if}
     </div>
   {:else if total === 0 && !query.trim() && projectFilter === "" && scope === "all"}
-    <EmptyState
-      title="Nothing going yet"
-      body="Every chat and routine you have running shows up here."
-    >
-      {#snippet action()}
-        <a class="btn btn-primary" href="#/new-chat">Start a chat</a>
-      {/snippet}
-    </EmptyState>
+    <!-- FIXED-1391 — carded like every other Work tab's empty state. -->
+    <div class="card">
+      <EmptyState
+        icon="sessions"
+        title="Nothing going yet"
+        body="Every chat and routine you have running shows up here."
+      >
+        {#snippet action()}
+          <a class="btn btn-primary" href="#/new-chat">Start a chat</a>
+        {/snippet}
+      </EmptyState>
+    </div>
   {:else if total === 0}
     <EmptyState title="Nothing in this view" body="Widen the filters to see your other threads." />
   {:else}

@@ -201,10 +201,12 @@ class _FakeCodex:
     async def passive_status(self, _principal_id: str) -> None:
         return None
 
-    async def start_login(self, _principal_id: str) -> Any:
+    async def start_login(self, _principal_id: str, method: str = "browser") -> Any:
         from raiker.models.codex_app_server import CodexLogin
 
-        return CodexLogin(login_id="login_contract")
+        return CodexLogin(login_id="login_contract", url="https://auth.example.test/authorize")
+
+    async def cancel_login(self, _principal_id: str) -> None: ...
 
     async def disconnect(self, _principal_id: str) -> None: ...
 
@@ -403,6 +405,7 @@ CASES: Cases = {
         plain("/api/models/chatgpt-codex/connection"), _fake_codex
     ),
     ("POST", "/api/models/chatgpt-codex/login"): patched(plain("/api/models/chatgpt-codex/login"), _fake_codex),
+    ("DELETE", "/api/models/chatgpt-codex/login"): patched(plain("/api/models/chatgpt-codex/login"), _fake_codex),
     ("DELETE", "/api/models/chatgpt-codex/connection"): patched(
         plain("/api/models/chatgpt-codex/connection"), _fake_codex
     ),

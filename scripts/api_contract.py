@@ -181,6 +181,7 @@ VERIFIED: frozenset[tuple[str, str]] = frozenset(
         ("DELETE", "/api/model-library/roots"),
         ("DELETE", "/api/model-operations/{operation_id}"),
         ("DELETE", "/api/models/chatgpt-codex/connection"),
+        ("DELETE", "/api/models/chatgpt-codex/login"),
         ("DELETE", "/api/projects/{project_id}"),
         ("DELETE", "/api/projects/{project_id}/root"),
         ("DELETE", "/api/sessions/bulk"),

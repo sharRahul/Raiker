@@ -459,13 +459,16 @@
 <style>
   .setting-row {
     display: grid;
-    grid-template-columns: minmax(10rem, 1fr) minmax(0, 1.4fr) auto;
+    /* FIXED-1391 — a fixed action column, so values line up down the page
+       whether a row has one button, two, or none. */
+    grid-template-columns: minmax(10rem, 1fr) minmax(0, 1.4fr) minmax(7.5rem, max-content);
     align-items: center;
     gap: var(--space-3);
     min-height: 52px;
     border-top: 1px solid var(--border);
   }
   .setting-row:first-of-type { border-top: none; }
+  .setting-row > :last-child { justify-self: end; }
   .setting-row h3 { margin: 0; font-size: var(--text-sm); }
   .setting-value { color: var(--text-2); font-size: var(--text-sm); }
   .row-actions { display: flex; gap: var(--space-2); }

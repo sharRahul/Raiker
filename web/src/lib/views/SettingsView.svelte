@@ -440,7 +440,10 @@
     {:else if active === "updates"}
       <Updates />
     {:else if active === "advanced"}
-      <!-- QUI-L09 — the developer and runtime settings, one segment at a time. -->
+      <!-- QUI-L09 — the developer and runtime settings, one segment at a time.
+           FIXED-1391 — every other section opens with its own name; this one
+           opened on its segment control and a sub-heading. -->
+      <header class="page-heading"><h2>Advanced</h2></header>
       <div class="segmented advanced-segments" role="group" aria-label="Advanced settings">
         {#each ADVANCED_SETTINGS as item (item.id)}
           <button
@@ -520,6 +523,8 @@
   .advanced-segments {
     margin-bottom: var(--space-4);
   }
+  .page-heading { margin-bottom: var(--space-3); }
+  .page-heading h2 { margin: 0; }
   /* A navigation group label, which the finding names as a place
      for sentence case. Caps at 2xs with .09em tracking was four typographic
      devices doing the job of one. */

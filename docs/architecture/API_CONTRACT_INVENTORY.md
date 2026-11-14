@@ -12,7 +12,7 @@ operation answers with, and whether OpenAPI describes it (OPT-01/OPT-02 —
 * **deferred** — the body has no declared type; a test fails while any is.
 * **special** — a stream, a file or another non-JSON transport; hand-written.
 
-**530 operations: 514 verified, 0 eligible, 0 deferred, 16 special.**
+**531 operations: 515 verified, 0 eligible, 0 deferred, 16 special.**
 
 | Method | Path | Request | Response | Status | Why |
 |---|---|---|---|---|---|
@@ -385,6 +385,7 @@ operation answers with, and whether OpenAPI describes it (OPT-01/OPT-02 —
 | POST | `/api/models/catalogues/refresh` | ModelCatalogueRefreshRequest | CatalogueRefreshed | verified | declared CatalogueRefreshed |
 | DELETE | `/api/models/chatgpt-codex/connection` |  | ConnectionSet | verified | declared ConnectionSet |
 | POST | `/api/models/chatgpt-codex/connection` |  | CodexConnected | verified | declared CodexConnected |
+| DELETE | `/api/models/chatgpt-codex/login` |  | Ok | verified | built as Ok |
 | POST | `/api/models/chatgpt-codex/login` |  | CodexLoginStarted | verified | declared CodexLoginStarted |
 | GET | `/api/models/chatgpt-codex/status` |  | CodexStatus | verified | declared CodexStatus |
 | GET | `/api/models/pricing` |  | ModelPricingView | verified | DashboardService.list_model_pricing |

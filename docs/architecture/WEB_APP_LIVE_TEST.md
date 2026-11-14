@@ -16,6 +16,55 @@ PR #106: the **user-owned fallback sequence** and **prompt caching + normalised
 cache-hit metrics**.
 
 
+## Result — 2026-11-14 (Tasks composer, ChatGPT sign-in and page consistency)
+
+A fresh Linux workspace served by `raiker-web --port 8765` at 1440×1000, built
+from this round's SPA, with `RAIKER_CODEX_PATH` pointing at a real codex-cli
+0.169 that is not on `PATH`. Anthropic was connected through **Add model** with
+an identity-linked key and its workspace ID, both typed into the UI from the
+round's environment (`RAIKER_LIVE_ANTHROPIC_KEY`,
+`RAIKER_LIVE_ANTHROPIC_WORKSPACE`); neither appears in the spec, logs or
+captures. Spec: `web/e2e/fixed-1389-1393-tasks-chatgpt-live.spec.ts`.
+Result: **4 of 4 specs, 7 of 7 scenarios passed**.
+
+| # | Scenario | Verification | Result |
+|---|---|---|---|
+| RT-1114-01 | Anthropic connects with key + workspace ID; Haiku 4.5 is Ready; Chat returns `RAIKER_ROUND_OK` in Raiker's own message | Real provider round trip | Passed |
+| RT-1114-02 | Tasks composer: no timing or template groups inside the card, one schedule control on the same row as **Create task**, templates under the card | FIXED-1389 | Passed |
+| RT-1114-03 | The schedule popover offers *When* and *How it runs*; **At a time** opens the start-time details | FIXED-1389 | Passed |
+| RT-1114-04 | A one-pass task created from the new composer is filed on the board and finishes with `READY` | FIXED-1389, real model | Passed |
+| RT-1114-05 | **Sign in with a code** reaches the real Codex App Server; on this host it names the unreachable sign-in service | FIXED-1390, FIXED-1392 | Passed (see note) |
+| RT-1114-06 | **Sign in with ChatGPT** hands the owner a real `auth.openai.com/oauth/authorize` page, **Open sign-in again** and **Cancel** | FIXED-1390 | Passed |
+| RT-1114-07 | Settings › Updates, Security and Advanced open with their own `h2`; Work › Library's empty state is carded | FIXED-1391 | Passed |
+
+**Note on RT-1114-05.** This sandbox's network proxy refuses `auth.openai.com`
+(`CONNECT 403`), so Codex could not fetch a device code. That exposed a
+diagnostic gap fixed in this round: the card showed
+`codex_app_server_request_failed:account/login/start` and now says Codex could
+not reach ChatGPT's sign-in service. Directly against the same Codex binary,
+`account/login/start {type: chatgpt}` returned a PKCE authorize URL locally,
+and `{type: chatgptDeviceCode}` failed only at the network. Completing a
+sign-in needs the owner's subscription and is open in
+[TO_BE_FIXED.md](../plans/TO_BE_FIXED.md#chatgpt-subscription--owner-signed-in-turn-not-yet-qualified).
+
+**Found and fixed during the run.** The sign-in panel first rendered inside
+the provider card's narrow action column, squeezing the card's name and status
+into one-word lines; an open sign-in now takes the card's full width. Two
+assertions in the first draft of the spec matched the owner's own prompt and
+the composer's draft text rather than Raiker's answer and the board row; they
+were narrowed before the passing run.
+
+**All-pages sweep.** `all-pages-live.spec.ts` captured the 39 destinations
+before the changes (`output/playwright/pages/`); the eleven irregularities in
+[FIXED-1391](../plans/FIXED_ITEMS.md#fixed-1391--navigable-pages-disagreed-in-shape-order-and-detail)
+came from that review and were re-captured after.
+
+**Captures.** `output/playwright/2026-11-14-round/` — `01-anthropic-connected`,
+`01-chat-answer`, `02-tasks-composer`, `03-schedule-menu`, `04-task-filed`,
+`05-chatgpt-row`, `05-chatgpt-device-code-unreachable`, `06-chatgpt-browser`,
+`07-settings-{updates,security,advanced}`, `07-library`. Inspected at original
+resolution; no key, token or workspace ID is visible.
+
 ## Result — 2026-11-09 (Windows beta recovery, twenty-case round)
 
 Built the SPA and served a new disposable workspace on this Windows PC at
@@ -629,7 +678,7 @@ in a spec, command, document, screenshot or the server log.
 | MT-05 | A cloud metadata address is never a destination | ✅ saving `http://169.254.169.254/v1`, even ticked, is refused in the Connect dialog with `model_dial_refused:metadata_address` |
 | MT-06 | The opt-in in the dialog, dark theme at 390 px | ✅ prefilled from the saved connection, no horizontal overflow; the endpoint was disconnected afterwards |
 | Suites | `model-transport-guard-live` 6/6 on a fresh workspace (7.8 min); `tests/test_model_transport_guard.py` 34/34 (NET-01 … NET-12) | ✅ |
-| Visual review | Inspected at original resolution | ✅ — found [BUG-352](../plans/TO_BE_FIXED.md#bug-352--a-custom-endpoint-saved-off-the-machine-shows-no-route-on-its-card): the custom endpoint saved off the machine shows no route line |
+| Visual review | Inspected at original resolution | ✅ — found BUG-352, fixed in [FIXED-1395](../plans/FIXED_ITEMS.md#fixed-1395--a-custom-endpoint-saved-off-the-machine-showed-no-route-on-its-card-bug-352): the custom endpoint saved off the machine shows no route line |
 
 ## Result — 2026-10-20 (model connection authorization, hosted Anthropic Haiku 4.5)
 

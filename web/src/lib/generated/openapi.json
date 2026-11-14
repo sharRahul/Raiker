@@ -6425,21 +6425,72 @@
         "title": "CodexConnected",
         "type": "object"
       },
+      "CodexLoginRequest": {
+        "additionalProperties": false,
+        "description": "How the owner wants to sign in to ChatGPT: a browser callback or a device code.",
+        "properties": {
+          "method": {
+            "default": "browser",
+            "enum": [
+              "browser",
+              "device_code"
+            ],
+            "title": "Method",
+            "type": "string"
+          }
+        },
+        "title": "CodexLoginRequest",
+        "type": "object"
+      },
       "CodexLoginStarted": {
+        "description": "A sign-in the owner finishes in their own browser.\n\n``url`` is the ChatGPT page to open; a device-code sign-in also carries the\none-time ``user_code`` to type there. Tokens and the PKCE verifier stay in\nthe Codex process.",
         "properties": {
           "connection_status": {
             "const": "login_pending",
             "title": "Connection Status",
             "type": "string"
           },
+          "method": {
+            "enum": [
+              "browser",
+              "device_code"
+            ],
+            "title": "Method",
+            "type": "string"
+          },
           "ok": {
             "title": "Ok",
             "type": "boolean"
+          },
+          "url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Url"
+          },
+          "user_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "User Code"
           }
         },
         "required": [
           "ok",
-          "connection_status"
+          "connection_status",
+          "method",
+          "url",
+          "user_code"
         ],
         "title": "CodexLoginStarted",
         "type": "object"
@@ -6456,6 +6507,10 @@
               "not_connected"
             ],
             "title": "Connection Status",
+            "type": "string"
+          },
+          "login_error": {
+            "title": "Login Error",
             "type": "string"
           },
           "plan_type": {
@@ -52603,8 +52658,43 @@
       }
     },
     "/api/models/chatgpt-codex/login": {
+      "delete": {
+        "description": "Stop an owner-started sign-in; an adopted connection is left alone.",
+        "operationId": "cancel_chatgpt_codex_login_api_models_chatgpt_codex_login_delete",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Ok"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Cancel Chatgpt Codex Login"
+      },
       "post": {
+        "description": "Start a ChatGPT sign-in and hand the owner what finishes it.\n\nFIXED-1390 — the sign-in page used to be opened by the *server*, which on a\ndesktop shell, a headless host or a remote browser opened nothing the\nowner could see; the route answered \"pending\" for a sign-in that could\nnever complete. The owner's own browser now opens the address.",
         "operationId": "start_chatgpt_codex_login_api_models_chatgpt_codex_login_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/CodexLoginRequest"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Body"
+              }
+            }
+          }
+        },
         "responses": {
           "200": {
             "content": {
@@ -52615,6 +52705,16 @@
               }
             },
             "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
           }
         },
         "summary": "Start Chatgpt Codex Login"

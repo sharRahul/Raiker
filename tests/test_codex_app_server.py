@@ -4,8 +4,10 @@
 from __future__ import annotations
 
 import asyncio
+import os
 import sys
 from pathlib import Path
+from typing import Any
 
 from raiker.models.codex_app_server import CodexAppServerClient
 from raiker.models.contracts import ModelCapabilities, ModelMessage, ModelRequest
@@ -16,15 +18,25 @@ def _server_script(tmp_path: Path) -> Path:
     script = tmp_path / "fake_codex_server.py"
     script.write_text(
         """import json, sys
+initialized = False
 for raw in sys.stdin:
     request = json.loads(raw)
     method = request[\"method\"]
+    if \"id\" not in request:
+        if method == \"initialized\":
+            initialized = True
+        continue
+    if method != \"initialize\" and not initialized:
+        print(json.dumps({\"id\": request[\"id\"], \"error\": {\"code\": -32600, \"message\": \"Not initialized\"}}), flush=True)
+        continue
     if method == \"initialize\":
         result = {\"userAgent\": \"fake\"}
     elif method == \"account/read\":
         result = {\"requiresOpenaiAuth\": True, \"account\": {\"type\": \"chatgpt\", \"email\": \"owner@example.test\", \"planType\": \"plus\"}}
     elif method == \"model/list\":
         result = {\"data\": [{\"id\": \"gpt-5.6\", \"model\": \"gpt-5.6\", \"displayName\": \"GPT 5.6\", \"description\": \"Subscription model\", \"hidden\": False, \"isDefault\": True, \"defaultReasoningEffort\": \"medium\", \"supportedReasoningEfforts\": []}], \"nextCursor\": None}
+    elif method == \"account/login/start\" and request[\"params\"][\"type\"] == \"chatgptDeviceCode\":
+        result = {\"type\": \"chatgptDeviceCode\", \"loginId\": \"login_2\", \"userCode\": \"ABCD-1234\", \"verificationUrl\": \"https://auth.example.test/device\"}
     elif method == \"account/login/start\":
         result = {\"type\": \"chatgpt\", \"loginId\": \"login_1\", \"authUrl\": \"https://auth.example.test/login?state=secret\"}
     elif method == \"thread/start\":
@@ -32,6 +44,7 @@ for raw in sys.stdin:
     elif method == \"turn/start\":
         result = {\"turn\": {\"id\": \"turn_1\"}}
         print(json.dumps({\"id\": request[\"id\"], \"result\": result}), flush=True)
+        print(json.dumps({\"method\": \"account/rateLimits/updated\", \"params\": {\"rateLimits\": {\"primary\": {\"usedPercent\": 42, \"windowDurationMins\": 300, \"resetsAt\": None}, \"secondary\": {\"usedPercent\": 7, \"windowDurationMins\": 10080}}}}), flush=True)
         print(json.dumps({\"method\": \"item/agentMessage/delta\", \"params\": {\"threadId\": \"thread_1\", \"turnId\": \"turn_1\", \"itemId\": \"item_1\", \"delta\": \"Hello\"}}), flush=True)
         print(json.dumps({\"method\": \"turn/completed\", \"params\": {\"threadId\": \"thread_1\", \"turn\": {\"id\": \"turn_1\"}}}), flush=True)
         continue
@@ -59,23 +72,91 @@ def test_account_and_model_reads_expose_no_identity_or_token(tmp_path: Path) -> 
     asyncio.run(run())
 
 
-def test_login_opens_the_codex_owned_url_without_returning_it(tmp_path: Path) -> None:
-    opened: list[str] = []
+def test_login_returns_the_sign_in_page_for_the_owners_browser(tmp_path: Path) -> None:
+    """FIXED-1390 — the server no longer opens a browser the owner cannot see."""
 
     async def run() -> None:
-        client = CodexAppServerClient(
-            command=(sys.executable, str(_server_script(tmp_path))),
-            open_browser=opened.append,
-        )
+        client = CodexAppServerClient(command=(sys.executable, str(_server_script(tmp_path))))
         try:
             login = await client.start_chatgpt_login()
             assert login.login_id == "login_1"
-            assert not hasattr(login, "auth_url")
+            assert login.method == "browser"
+            assert login.url == "https://auth.example.test/login?state=secret"
+            assert login.user_code is None
+            assert client.pending_login_id == "login_1"
         finally:
             await client.aclose()
 
     asyncio.run(run())
-    assert opened == ["https://auth.example.test/login?state=secret"]
+
+
+def test_device_code_login_returns_the_code_and_verification_page(tmp_path: Path) -> None:
+    async def run() -> None:
+        client = CodexAppServerClient(command=(sys.executable, str(_server_script(tmp_path))))
+        try:
+            login = await client.start_chatgpt_login("device_code")
+            assert (login.method, login.url, login.user_code) == (
+                "device_code",
+                "https://auth.example.test/device",
+                "ABCD-1234",
+            )
+        finally:
+            await client.aclose()
+
+    asyncio.run(run())
+
+
+def test_a_refused_browser_login_falls_back_to_a_device_code(tmp_path: Path) -> None:
+    """The callback port is taken (another Codex is signing in): use the code."""
+    script = _server_script(tmp_path)
+    source = script.read_text(encoding="utf-8").replace(
+        'elif method == \"account/login/start\":\n        result = {\"type\": \"chatgpt\"',
+        'elif method == \"account/login/start\":\n        print(json.dumps({\"id\": request[\"id\"], \"error\": {\"code\": -32000, \"message\": \"port 1455 in use\"}}), flush=True)\n        continue\n        result = {\"type\": \"chatgpt\"',
+    )
+    script.write_text(source, encoding="utf-8")
+
+    async def run() -> None:
+        client = CodexAppServerClient(command=(sys.executable, str(script)))
+        try:
+            login = await client.start_chatgpt_login("browser")
+            assert login.method == "device_code"
+            assert login.user_code == "ABCD-1234"
+        finally:
+            await client.aclose()
+
+    asyncio.run(run())
+
+
+def test_a_failed_sign_in_is_reported_on_the_next_status_read() -> None:
+    client = CodexAppServerClient(command=("codex",))
+    client.pending_login_id = "login_1"
+    client._note({"method": "account/login/completed", "params": {"loginId": "login_1", "success": False, "error": "access_denied"}})
+    assert client.login_error == "access_denied"
+    assert client.pending_login_id is None
+    # Another sign-in's completion is not this one's.
+    client.pending_login_id = "login_3"
+    client._note({"method": "account/login/completed", "params": {"loginId": "login_9", "success": True}})
+    assert client.pending_login_id == "login_3"
+    assert client.login_error == "access_denied"
+
+
+def test_the_launcher_is_found_outside_the_gui_path(tmp_path: Path, monkeypatch: Any) -> None:
+    """FIXED-1392 — a desktop app's PATH lacks the npm global bin."""
+    from raiker.models import codex_app_server
+
+    bin_dir = tmp_path / "npm-global" / "bin"
+    bin_dir.mkdir(parents=True)
+    launcher = bin_dir / ("codex.cmd" if os.name == "nt" else "codex")
+    launcher.write_text("#!/bin/sh\n", encoding="utf-8")
+    launcher.chmod(0o755)
+    monkeypatch.setenv("PATH", str(tmp_path / "empty"))
+    monkeypatch.delenv(codex_app_server.CODEX_PATH_ENV, raising=False)
+    monkeypatch.setattr(codex_app_server, "_launcher_directories", lambda: [bin_dir])
+    command = codex_app_server.resolve_codex_command()
+    assert Path(command[0]).resolve() == launcher.resolve()
+    assert command[1:] == ("app-server", "--stdio")
+    monkeypatch.setenv(codex_app_server.CODEX_PATH_ENV, "/opt/tools/codex")
+    assert codex_app_server.resolve_codex_command()[0] == "/opt/tools/codex"
 
 
 def test_chat_collects_only_agent_text_from_the_app_server(tmp_path: Path) -> None:
@@ -83,6 +164,9 @@ def test_chat_collects_only_agent_text_from_the_app_server(tmp_path: Path) -> No
         client = CodexAppServerClient(command=(sys.executable, str(_server_script(tmp_path))))
         try:
             assert await client.complete_chat(model="gpt-5.6", prompt="hello", effort="high") == "Hello"
+            # FIXED-1393 — the windows arrive in their own notification now.
+            assert [window.used_percent for window in client.last_limit_windows] == [42.0, 7.0]
+            assert [window.label for window in client.last_limit_windows] == ["5-hour", "Weekly"]
         finally:
             await client.aclose()
 
@@ -100,7 +184,11 @@ def test_provider_adapts_codex_models_and_text_only_chat(tmp_path: Path) -> None
             ),
         )
         try:
-            assert [model.id for model in await provider.list_models()] == ["gpt-5.6"]
+            models = await provider.list_models()
+            assert [model.id for model in models] == ["gpt-5.6"]
+            assert models[0].metadata == {"display_name": "GPT 5.6"}
+            # FIXED-1393 — a read closes the Codex process it started.
+            assert provider._clients == []
             response = await provider.chat(
                 ModelRequest(
                     "chatgpt-codex-subscription",
@@ -135,3 +223,31 @@ def test_passive_status_never_constructs_or_starts_an_unrequested_client() -> No
 
     asyncio.run(scenario())
     assert calls == []
+
+
+def test_an_unreachable_sign_in_service_is_named_as_such(tmp_path: Path) -> None:
+    """Codex could not reach auth.openai.com: say so, not a raw request failure."""
+    from raiker.models.exceptions import ProviderConnectionError
+
+    script = _server_script(tmp_path)
+    source = script.read_text(encoding="utf-8").replace(
+        'elif method == \"account/login/start\" and request[\"params\"][\"type\"] == \"chatgptDeviceCode\":\n',
+        'elif method == \"account/login/start\" and request[\"params\"][\"type\"] == \"chatgptDeviceCode\":\n'
+        '        print(json.dumps({\"id\": request[\"id\"], \"error\": {\"code\": -32603, \"message\": \"failed to request device code: error sending request for url (https://auth.openai.com/api/accounts/deviceauth/usercode)\"}}), flush=True)\n'
+        '        continue\n',
+    )
+    script.write_text(source, encoding="utf-8")
+
+    async def run() -> None:
+        client = CodexAppServerClient(command=(sys.executable, str(script)))
+        try:
+            try:
+                await client.start_chatgpt_login("device_code")
+            except ProviderConnectionError as exc:
+                assert str(exc) == "codex_login_service_unreachable"
+            else:
+                raise AssertionError("an unreachable sign-in service must not look like success")
+        finally:
+            await client.aclose()
+
+    asyncio.run(run())

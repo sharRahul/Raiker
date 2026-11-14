@@ -206,13 +206,17 @@
   {:else if items.length === 0 && compact}
     <p class="none">Nothing made here yet. Documents Raiker writes and blocks you pin in this project's chats appear here.</p>
   {:else if items.length === 0}
-    <EmptyState
-      icon="library"
-      title="Nothing made yet"
-      body="Documents Raiker writes, images and designs, and answer blocks you pin appear here."
-    >
-      {#snippet action()}<a class="btn btn-soft" href="#/new-chat">Start a chat</a>{/snippet}
-    </EmptyState>
+    <!-- FIXED-1391 — the same carded empty state, with the same primary
+         action weight, as the Work tabs beside it. -->
+    <div class="card">
+      <EmptyState
+        icon="library"
+        title="Nothing made yet"
+        body="Documents Raiker writes, images and designs, and answer blocks you pin appear here."
+      >
+        {#snippet action()}<a class="btn btn-primary" href="#/new-chat">Start a chat</a>{/snippet}
+      </EmptyState>
+    </div>
   {:else}
     <div class="filters">
       <div class="chip-row" role="group" aria-label="Show">

@@ -476,7 +476,6 @@
   $effect(() => { void load(); });
 </script>
 
-{#if tab !== "map"}<header class="page-intro"><GuideLink route="memory" /><button class="btn btn-ghost btn-sm" type="button" onclick={load}><Icon name="refresh" size="sm" /> Refresh</button></header>{/if}
 
 <!-- Memory carried approved records, proposals, observations, a document
      library, two recall controls and an import/export drawer at one visual
@@ -494,6 +493,9 @@
   </div>
 {:else}
 <TabStrip {tabs} selected={tab} onselect={selectTab} label="Memory sections" />
+<!-- FIXED-1391 — section tabs first, then the page's own actions, the order
+     Work, Connections and Diagnostics already use. -->
+<header class="page-intro"><GuideLink route="memory" /><button class="btn btn-ghost btn-sm" type="button" onclick={load}><Icon name="refresh" size="sm" /> Refresh</button></header>
 
 <section class="posture-card posture-{posture.kind}" role="note" aria-label="Memory permission posture">
   <Icon name={posture.kind === "proposes" ? "check" : "info"} size="md" />

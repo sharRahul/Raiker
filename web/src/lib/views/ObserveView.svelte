@@ -507,11 +507,13 @@
            bare grey line. Its five siblings, and every other list surface in the
            product, use the shared empty state; this read as an unfinished page
            rather than as a quiet one. Same component, same icon vocabulary. -->
-      <EmptyState
-        icon="bell"
-        title="Nothing has been raised"
-        body="Approvals, background work and containment write here when they need you."
-      />
+      <div class="card">
+        <EmptyState
+          icon="bell"
+          title="Nothing has been raised"
+          body="Approvals, background work and containment write here when they need you."
+        />
+      </div>
     {:else}
       <ul class="notifications">
         {#each notifications as notification (notification.notification_id)}

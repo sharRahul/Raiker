@@ -26,6 +26,7 @@ from raiker.api.schemas import (
     BrainSourceUploadRequest,
     BreachCheckRequest,
     BulkDeleteSessionsRequest,
+    CodexLoginRequest,
     ConnectCodeRepoRequest,
     ContainMcpServerRequest,
     ConversationBranchRequest,
@@ -2788,8 +2789,10 @@ def _record_codex_connection(request: Request, principal_id: str, *, signed_in: 
     disconnect.
 
     The marker is the fact of the connection and nothing else. Access tokens,
-    refresh tokens, verifiers, device codes and authorization URLs stay inside
-    the Codex process, which is the only thing that ever holds them.
+    refresh tokens and PKCE verifiers stay inside the Codex process, which is
+    the only thing that ever holds them. The sign-in page address and a device
+    code go to the owner who started the sign-in, and are never stored or
+    audited (FIXED-1390).
     """
     store = SQLiteStore(request.app.state.workspace_root)
     already = get_model_connection(store, principal_id, CODEX_SUBSCRIPTION_PROFILE_ID) is not None
@@ -2861,6 +2864,8 @@ async def get_chatgpt_codex_status(
         ),
         "plan_type": account.plan_type,
     }
+    if account.login_error and not account.signed_in:
+        answer["login_error"] = account.login_error
     return serialize_dto(answer)
 
 
@@ -2899,18 +2904,54 @@ async def connect_chatgpt_codex(
 @router.post("/api/models/chatgpt-codex/login")
 async def start_chatgpt_codex_login(
     request: Request,
+    body: CodexLoginRequest | None = None,
     auth_data: tuple[ApiSession, Principal] = Depends(_auth),
 ) -> dict[str, Any]:
+    """Start a ChatGPT sign-in and hand the owner what finishes it.
+
+    FIXED-1390 — the sign-in page used to be opened by the *server*, which on a
+    desktop shell, a headless host or a remote browser opened nothing the
+    owner could see; the route answered "pending" for a sign-in that could
+    never complete. The owner's own browser now opens the address.
+    """
     session, _principal = auth_data
+    method = body.method if body is not None else "browser"
     try:
-        await _codex_sessions(request).start_login(session.principal_id)
+        login = await _codex_sessions(request).start_login(session.principal_id, method)
+    except ProviderConfigurationError as exc:
+        reason = safe_error(str(exc))
+        raise HTTPException(
+            status_code=(
+                status.HTTP_409_CONFLICT
+                if reason == "codex_app_server_not_installed"
+                else status.HTTP_503_SERVICE_UNAVAILABLE
+            ),
+            detail={"reason_code": reason},
+        ) from exc
     except ModelProviderError as exc:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail={"reason_code": safe_error(str(exc))},
         ) from exc
-    answer: CodexLoginStarted = {"ok": True, "connection_status": "login_pending"}
+    answer: CodexLoginStarted = {
+        "ok": True,
+        "connection_status": "login_pending",
+        "method": login.method,
+        "url": login.url,
+        "user_code": login.user_code,
+    }
     return serialize_dto(answer)
+
+
+@router.delete("/api/models/chatgpt-codex/login")
+async def cancel_chatgpt_codex_login(
+    request: Request,
+    auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+) -> dict[str, Any]:
+    """Stop an owner-started sign-in; an adopted connection is left alone."""
+    session, _principal = auth_data
+    await _codex_sessions(request).cancel_login(session.principal_id)
+    return serialize_dto(Ok())
 
 
 @router.delete("/api/models/chatgpt-codex/connection")

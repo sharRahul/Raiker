@@ -1280,15 +1280,25 @@ export type CodexConnected = {
   connection_configured: boolean;
 };
 
+/** How the owner wants to sign in to ChatGPT: a browser callback or a device code. */
+export type CodexLoginRequest = {
+  method?: "browser" | "device_code";
+};
+
+/** A sign-in the owner finishes in their own browser. */
 export type CodexLoginStarted = {
   ok: boolean;
   connection_status: "login_pending";
+  method: "browser" | "device_code";
+  url: string | null;
+  user_code: string | null;
 };
 
 /** Whether the ChatGPT subscription is connected, offered, signed out or not installed. */
 export type CodexStatus = {
   connection_status: "connected" | "available" | "signed_out" | "codex_missing" | "not_connected";
   plan_type: string | null;
+  login_error?: string;
 };
 
 export type CommandChunkView = {
@@ -8080,8 +8090,10 @@ export const contract = {
     call<ConnectionSet>("DELETE", "/api/models/chatgpt-codex/connection"),
   connectChatgptCodex: () =>
     call<CodexConnected>("POST", "/api/models/chatgpt-codex/connection"),
-  startChatgptCodexLogin: () =>
-    call<CodexLoginStarted>("POST", "/api/models/chatgpt-codex/login"),
+  cancelChatgptCodexLogin: () =>
+    call<Ok>("DELETE", "/api/models/chatgpt-codex/login"),
+  startChatgptCodexLogin: (body?: CodexLoginRequest | null) =>
+    call<CodexLoginStarted>("POST", "/api/models/chatgpt-codex/login", { body }),
   getChatgptCodexStatus: () =>
     request<CodexStatus>("/api/models/chatgpt-codex/status"),
   getModelPricing: () =>

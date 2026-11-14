@@ -42,6 +42,7 @@
   } from "../providerConnections";
   import Icon from "./Icon.svelte";
   import ProviderLogo from "./ProviderLogo.svelte";
+  import ChatgptSignIn from "./ChatgptSignIn.svelte";
   import AvailableModels from "../views/models/AvailableModels.svelte";
 
   let {
@@ -508,26 +509,16 @@
     }
   }
 
-  async function startSubscriptionLogin(row: Row) {
-    busy = set(busy, row.profileId, "saving");
+  /** The owner's own sign-in finished and the account is adopted. */
+  let switchingAccount = $state(false);
+  async function subscriptionConnected(row: Row, plan: string | null) {
+    switchingAccount = false;
+    stored = set(stored, row.profileId, true);
+    subscriptionAvailable = false;
+    subscriptionPlan = plan;
     failure = drop(failure, row.profileId);
-    note = drop(note, row.profileId);
-    try {
-      await api.startCodexSubscriptionLogin();
-      note = set(note, row.profileId, "Finish sign-in in the browser. Raiker will check again shortly.");
-      if (loginPolling !== null) clearTimeout(loginPolling);
-      loginPolling = setTimeout(() => void readSubscriptionStatus(row, true), 2000);
-    } catch (error) {
-      failure = set(
-        failure,
-        row.profileId,
-        error instanceof ApiError && error.reasonCode
-          ? `ChatGPT sign-in could not start (${error.reasonCode}).`
-          : "ChatGPT sign-in could not start. Check that Codex is installed on this device.",
-      );
-    } finally {
-      busy = drop(busy, row.profileId);
-    }
+    note = set(note, row.profileId, "Reading available models…");
+    await detect(row);
   }
 
   /** Point the OpenAI-compatible profile at the owner's own server, then ask it. */
@@ -879,16 +870,24 @@
           {/if}
           <!-- Reachable while connected: an owner holding more than one ChatGPT
                plan has no other way to move Raiker between them. -->
-          <button class="btn btn-ghost btn-sm" type="button" disabled={busy[row.profileId] !== undefined} onclick={() => void startSubscriptionLogin(row)}>Switch account</button>
+          <button class="btn btn-ghost btn-sm" type="button" aria-expanded={switchingAccount} disabled={busy[row.profileId] !== undefined} onclick={() => (switchingAccount = !switchingAccount)}>Switch account</button>
           <button class="btn btn-ghost btn-sm" type="button" disabled={busy[row.profileId] !== undefined} onclick={() => void disconnectSubscription(row)}>Sign out</button>
+          {#if switchingAccount}
+            <ChatgptSignIn label="Sign in to another account" onconnected={(plan) => void subscriptionConnected(row, plan)} />
+          {/if}
         {:else if subscriptionAvailable}
           <!-- BUG-259 — Codex is signed in to somebody's ChatGPT account. That
                is an offer, not a connection: a fresh Raiker on a shared machine
                must not adopt an account nobody here chose. -->
           <button class="btn btn-sm btn-primary" type="button" disabled={busy[row.profileId] !== undefined} onclick={() => void connectSubscription(row)}>{busy[row.profileId] === "saving" ? "Connecting…" : "Use this subscription"}</button>
-          <button class="btn btn-ghost btn-sm" type="button" disabled={busy[row.profileId] !== undefined} onclick={() => void startSubscriptionLogin(row)}>Use a different account</button>
+          <button class="btn btn-ghost btn-sm" type="button" aria-expanded={switchingAccount} disabled={busy[row.profileId] !== undefined} onclick={() => (switchingAccount = !switchingAccount)}>Use a different account</button>
+          {#if switchingAccount}
+            <ChatgptSignIn label="Sign in to another account" onconnected={(plan) => void subscriptionConnected(row, plan)} />
+          {/if}
         {:else}
-          <button class="btn btn-sm btn-primary" type="button" disabled={busy[row.profileId] !== undefined} onclick={() => void startSubscriptionLogin(row)}>{busy[row.profileId] === "saving" ? "Opening sign-in…" : "Sign in with ChatGPT"}</button>
+          <!-- FIXED-1390 — install, browser sign-in, device code and adoption
+               in one control shared with the Models page. -->
+          <ChatgptSignIn onconnected={(plan) => void subscriptionConnected(row, plan)} />
           <button class="btn btn-ghost btn-sm" type="button" disabled={busy[row.profileId] !== undefined} onclick={() => void connectSubscription(row)}>Use existing sign-in</button>
         {/if}
       </div>
@@ -1131,6 +1130,8 @@
     justify-content: flex-end;
     min-width: 0;
   }
+  /* FIXED-1390 — an open ChatGPT sign-in gets the row's full line. */
+  .controls :global([data-expanded="true"]) { flex: 1 1 100%; }
   .field {
     display: block;
     min-width: 0;

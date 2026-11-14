@@ -234,6 +234,22 @@
 </section>
 
 <style>
+  /* FIXED-1391 — this section rendered with no card and its terms stacked over
+     their values, the one Settings page that did. The same card and the same
+     label · value rows as Security and Privacy. */
+  .section-heading { margin-bottom: var(--space-3); }
+  .section-heading h2, .card-heading h3 { margin: 0; }
+  .card-heading { margin-bottom: var(--space-2); }
+  .card-heading :global(p) { color: var(--text-2); margin: 0.3rem 0 0; }
+  .settings-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-lg); padding: var(--card-pad-y, var(--space-4)) var(--card-pad-x); margin-bottom: var(--space-3); }
+  .settings-card :global(dl) { display: grid; margin: var(--space-2) 0; }
+  .settings-card :global(dl > div) { display: grid; grid-template-columns: minmax(9rem, 14rem) minmax(0, 1fr); gap: var(--space-3); align-items: baseline; padding: 0.55rem 0; border-top: 1px solid var(--border); }
+  .settings-card :global(dl > div:first-child) { border-top: 0; }
+  .settings-card :global(dt) { color: var(--text-2); font-size: var(--text-sm); }
+  .settings-card :global(dd) { margin: 0; color: var(--text-1); font-size: var(--text-sm); overflow-wrap: anywhere; }
+  @media (max-width: 40rem) {
+    .settings-card :global(dl > div) { grid-template-columns: minmax(0, 1fr); gap: 0.15rem; }
+  }
   .points { margin: 0; padding: 0; list-style: none; display: grid; gap: 0.2rem; }
   .notes-heading { margin: 0.5rem 0 0.2rem; font-size: var(--text-sm); }
   .release-notes { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; max-height: 12rem; overflow-y: auto; }

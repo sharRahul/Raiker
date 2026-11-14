@@ -1,5 +1,174 @@
 # Fixed items
 
+## FIXED-1395 — A custom endpoint saved off the machine showed no route on its card (BUG-352)
+
+**Severity: Low. Area: Models / UI. Status: Fixed 2026-11-14.**
+
+**Observed.** The OpenAI-compatible card connected to an internet or LAN
+endpoint showed no off-machine posture or route, because `off_machine`,
+`endpoint_kind`, `requires_network` and the runtime gate were read from the
+shipped `127.0.0.1` endpoint rather than the one the owner saved.
+
+**Fixed.** `_effective_endpoint_kind` classifies the owner's saved endpoint
+with the same `classify_endpoint` the egress policy uses, and the profile view
+derives its posture, gate and off-machine count from it. A profile with no saved
+endpoint, or an unreadable one, keeps its shipped classification. This changes
+what the card reports, not what the policy permits.
+
+**Evidence.** `tests/test_model_view_saved_endpoint.py` (hosted, LAN, none,
+unreadable) and the existing `tests/test_api_dashboard.py` suite pass.
+
+## FIXED-1394 — Terminal `/model` commands could not reach a connected hosted provider (BUG-351)
+
+**Severity: Low. Area: CLI / models. Status: Fixed 2026-11-14.**
+
+**Observed.** `/model`, `/launch` and the model listing built a router with no
+owner, so after ADR-0004 every hosted provider refused them with
+`model_connection_required` even when connected in Models.
+
+**Fixed.** `_owner_router` resolves the bootstrapped local owner and builds the
+router through `owner_model_runtime`, the path Chat turns already use; with no
+owner it keeps the ownerless router. A missing connection now ends with
+*next: connect it in Models* instead of naming a retired environment variable.
+
+**Evidence.** `tests/test_cli_owner_model_router.py` (owner-bound router,
+ownerless fallback, connect hint) plus the 33 existing model-selection and
+async-runtime CLI tests pass.
+
+## FIXED-1393 — ChatGPT turns timed out, leaked Codex processes and lost the limit windows
+
+**Severity: High. Area: Models / ChatGPT subscription. Status: Fixed 2026-11-14.**
+
+**Observed.** Checked against `codex app-server generate-json-schema`
+(codex-cli 0.169): the client never sent the `initialized` notification that
+ends the handshake; a running turn used the 15-second control timeout, so a
+reasoning model that thought longer before its first delta failed with
+`codex_app_server_timeout`; each health or catalogue read started a Codex
+process that stayed alive until the provider closed; turns ran with the host's
+working directory; and the five-hour and weekly windows now arrive in
+`account/rateLimits/updated`, not in `turn/completed`, so nothing was recorded.
+
+**Fixed.** The handshake sends `initialized`; turns use a separate 300-second
+idle timeout; one-shot reads close their process; turns run in an empty private
+directory; `account/rateLimits/updated` is parsed (the older turn-attached shape
+is still read); a failed turn status raises instead of returning partial text;
+model display names are kept as catalogue metadata.
+
+**Evidence.** `tests/test_codex_app_server.py` drives a fake App Server that
+refuses requests before `initialized`, emits the rate-limit notification and
+checks process cleanup; nine cases pass. The real codex-cli 0.169 App Server
+answered `initialize`, `account/read`, both login types and `model/list` in this
+round ([Live Test](../architecture/WEB_APP_LIVE_TEST.md#result--2026-11-14-tasks-composer-chatgpt-sign-in-and-page-consistency)).
+
+**Limit.** A full signed-in ChatGPT turn needs the owner's own subscription and
+is recorded as open in [TO_BE_FIXED.md](TO_BE_FIXED.md#chatgpt-subscription--owner-signed-in-turn-not-yet-qualified).
+
+## FIXED-1392 — Codex was reported missing when the desktop app's PATH did not reach it
+
+**Severity: High. Area: Models / ChatGPT subscription. Status: Fixed 2026-11-14.**
+
+**Observed.** A Codex installed with `npm install -g @openai/codex` was found
+in a terminal but not by Raiker started from the dock or Start menu, whose
+`PATH` lacks the npm, Homebrew, Volta and nvm directories. The card said
+*Codex is not installed on this device* and stopped there.
+
+**Fixed.** `resolve_codex_command` checks `RAIKER_CODEX_PATH`, then `PATH`,
+then the npm global prefix, `%APPDATA%\npm`, `~/.npm-global/bin`,
+`~/.local/bin`, Volta, Bun, Cargo, Homebrew and nvm. A missing Codex now answers
+the sign-in route with `409 codex_app_server_not_installed`, and the card shows
+the install command with **Copy** and **Check again**.
+
+**Evidence.** `test_the_launcher_is_found_outside_the_gui_path` and
+`test_a_missing_codex_is_a_conflict_with_its_reason`; the component test
+`tells the owner how to install Codex when it is missing`. The live host found
+Codex only through `RAIKER_CODEX_PATH`.
+
+## FIXED-1391 — Navigable pages disagreed in shape, order and detail
+
+**Severity: Medium. Area: Quiet UI consistency. Status: Fixed 2026-11-14.**
+
+**Observed (all-pages sweep, 40 captures).** Settings › About & updates had no
+card and stacked each term over its value; Security and Advanced opened without
+their section name; execution-profile template buttons sat at three heights;
+Voice's *Recommended* tag stretched into a full-width bar; Security rows put
+values in different columns depending on the action beside them; Memory put its
+toolbar above its tabs while Work, Connections and Diagnostics put tabs first;
+Tasks put the guide icon on the left and Refresh on the right, the reverse of
+every other page; Work › Library and Threads and Diagnostics › Notifications
+left their empty states uncarded, and Library used a secondary button where
+its siblings used a primary one; Connections said *Refresh connections* where
+every other toolbar said *Refresh*.
+
+**Fixed.** Updates uses the Settings card with label · value rows; Security and
+Advanced open with an `h2` of their name; template cards pin their action to
+the foot; the Voice tag shares a line with its name; Security and Remote access
+rows use a fixed action column; Memory's toolbar follows its tabs; Tasks uses
+the shared `head-row`; Library, Threads and Notifications empty states are
+carded with a primary action; Connections says *Refresh* and keeps
+*Refresh connections* as its accessible name.
+
+**Evidence.** Before and after captures under
+`output/playwright/pages/` and `output/playwright/2026-11-14-round/`;
+RT-1114-07 in the [Live Test results](../architecture/WEB_APP_LIVE_TEST.md#result--2026-11-14-tasks-composer-chatgpt-sign-in-and-page-consistency).
+Settings, Memory, Connections, Library and Observe component suites pass.
+
+## FIXED-1390 — ChatGPT sign-in opened a browser on the server and could not complete
+
+**Severity: Critical. Area: Models / ChatGPT subscription. Status: Fixed 2026-11-14.**
+
+**Observed.** The sign-in route asked the *server* to open the OAuth page and
+answered only `login_pending`. In the desktop shell, from a remote browser or on
+a headless host, no page appeared that the owner could see; the row then said
+*Finish sign-in in the browser* indefinitely. When the local callback port
+(`127.0.0.1:1455`) was taken, the start failed outright. A failed sign-in was
+never reported, and there was no way to cancel one.
+
+**Decision.** Follow the Codex CLI and Hermes Agent: the owner's own browser
+opens the page, and a **device code** is offered for another device or a busy
+callback port. The authorization address and one-time code go only to the
+authenticated owner who started the sign-in and are never stored or audited;
+tokens and the PKCE verifier still never leave Codex. Adoption still happens
+only after the owner's own sign-in (BUG-259).
+
+**Fixed.** `POST /api/models/chatgpt-codex/login` takes `{method: browser |
+device_code}` and returns `url` and `user_code`; a browser start Codex refuses
+falls back to a device code; `account/login/completed` failures surface as
+`login_error` on the status read; `DELETE /api/models/chatgpt-codex/login`
+cancels. A shared `ChatgptSignIn` control serves Add model, first-run setup and
+the Models card: install help, browser page with **Open sign-in again**, device
+code with **Copy code**, two-second polling for up to ten minutes, and
+**Cancel**.
+
+**Evidence.** `tests/test_api_codex_subscription.py` (6),
+`tests/test_codex_app_server.py` (9), `ChatgptSignIn.test.ts` (4), and the
+Models, setup and provider-matrix suites. RT-1114-05/06 obtained a real device
+code and a real `auth.openai.com` authorize page from codex-cli 0.169.
+
+## FIXED-1389 — The Tasks composer stacked three rows of option pills over its input
+
+**Severity: Medium. Area: Quiet UI / Tasks. Status: Fixed 2026-11-14.**
+
+**Observed.** The owner reported the Tasks composer and the option shapes over
+it. The card carried template pills, timing pills and run-mode pills — three
+rows in shapes used nowhere else in the composer — above the input; the model
+notice sat between the input and the bar; the context line (*Chat · Local
+sandbox — setup required · Capacity unknown*) pushed the model picker and
+**Create task** onto a second row; and the hint repeated the timing.
+
+**Fixed.** One bar, like Chat and Build: `+`, Tools, a single schedule control
+that names the timing (*Runs now*, *Once — pick a time*, *Daily…*), the model
+and **Create task**. The schedule control opens a popover with *When* and *How
+it runs* as segmented controls, opens the details itself when a start time is
+needed, and links to title and priority. Readiness sits above the input as in
+Chat. Templates moved below the card as quiet starters. The ordinary context
+(Chat, no project) no longer occupies the bar.
+
+**Evidence.** `TasksView.test.ts` (41) passes with the schedule moved behind
+the control; RT-1114-02/03/04 verify one bar, the popover, the start-time
+details and a task filed from the new composer. Captures:
+`output/playwright/2026-11-14-round/02-tasks-composer.png` and
+`03-schedule-menu.png`.
+
 ## FIXED-1388 — Empty list/detail states stayed inside the old list column
 
 **Severity: Low. Area: Quiet UI alignment. Status: Fixed 2026-11-10.**
@@ -1964,6 +2133,13 @@ file you can open. The two capture sets that remain — `screenshots/pages/` and
 | [FIXED-1382](#fixed-1382--linux-filesystem-flags-broke-windows-type-checking) | Low | Platform portability | Fixed 2026-11-09 |
 | [FIXED-1383](#fixed-1383--keyboard-start-evidence-depended-on-retired-receipt-wording) | Low | Beta live tests | Fixed 2026-11-09 |
 | [FIXED-1384](#fixed-1384--model-downloads-checked-redirect-hosts-after-contacting-them) | High | Model and speech downloads | Fixed 2026-11-09 |
+| [FIXED-1395](#fixed-1395--a-custom-endpoint-saved-off-the-machine-showed-no-route-on-its-card-bug-352) | Low | Models / UI | Fixed 2026-11-14 |
+| [FIXED-1394](#fixed-1394--terminal-model-commands-could-not-reach-a-connected-hosted-provider-bug-351) | Low | CLI / models | Fixed 2026-11-14 |
+| [FIXED-1393](#fixed-1393--chatgpt-turns-timed-out-leaked-codex-processes-and-lost-the-limit-windows) | High | Models / ChatGPT subscription | Fixed 2026-11-14 |
+| [FIXED-1392](#fixed-1392--codex-was-reported-missing-when-the-desktop-apps-path-did-not-reach-it) | High | Models / ChatGPT subscription | Fixed 2026-11-14 |
+| [FIXED-1391](#fixed-1391--navigable-pages-disagreed-in-shape-order-and-detail) | Medium | Quiet UI consistency | Fixed 2026-11-14 |
+| [FIXED-1390](#fixed-1390--chatgpt-sign-in-opened-a-browser-on-the-server-and-could-not-complete) | Critical | Models / ChatGPT subscription | Fixed 2026-11-14 |
+| [FIXED-1389](#fixed-1389--the-tasks-composer-stacked-three-rows-of-option-pills-over-its-input) | Medium | Quiet UI / Tasks | Fixed 2026-11-14 |
 | [FIXED-1388](#fixed-1388--empty-listdetail-states-stayed-inside-the-old-list-column) | Low | Quiet UI alignment | Fixed 2026-11-10 |
 | [FIXED-1387](#fixed-1387--forgotten-memory-returned-through-ambient-conversation-recall) | High | Memory privacy and correction | Fixed 2026-11-10 |
 | [FIXED-1386](#fixed-1386--escape-from-a-nested-overflow-closed-its-enclosing-dialog) | Medium | Quiet UI keyboard recovery | Fixed 2026-11-10 |

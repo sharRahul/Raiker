@@ -303,8 +303,10 @@
 <div class="services-head">
   <GuideLink route="connections" />
   <div class="head-actions">
-    <button type="button" class="btn btn-ghost btn-sm" onclick={load} disabled={busy}>
-      <Icon name="refresh" size="sm" /> Refresh connections
+    <!-- FIXED-1391 — "Refresh", like every other page toolbar; the
+         accessible name still says what it refreshes. -->
+    <button type="button" class="btn btn-ghost btn-sm" onclick={load} disabled={busy} aria-label="Refresh connections">
+      <Icon name="refresh" size="sm" /> Refresh
     </button>
     {#if services.length > 0}
       <button type="button" class="btn btn-ghost btn-sm" onclick={() => (showManifest = true)}>

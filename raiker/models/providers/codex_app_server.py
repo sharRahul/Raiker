@@ -49,11 +49,28 @@ class AsyncCodexAppServerProvider:
         self._clients.append(client)
         return client
 
+    async def _one_shot(self) -> CodexAppServerClient:
+        """A client for a single read, closed by the caller's ``finally``.
+
+        Health and catalogue reads used to leave their Codex process running
+        until the provider itself was closed, one per read (FIXED-1393).
+        """
+        return self._client()
+
+    async def _release(self, client: CodexAppServerClient) -> None:
+        with suppress(ValueError):
+            self._clients.remove(client)
+        with suppress(Exception):
+            await client.aclose()
+
     async def health(self, *, timeout: float = 1.0) -> ProviderHealth:
+        client = await self._one_shot()
         try:
-            account = await self._client().account_status()
+            account = await client.account_status()
         except Exception:
             return ProviderHealth(self.provider, False, False, "codex_app_server_unavailable")
+        finally:
+            await self._release(client)
         return ProviderHealth(
             self.provider,
             account.signed_in,
@@ -62,7 +79,19 @@ class AsyncCodexAppServerProvider:
         )
 
     async def list_models(self) -> list[ProviderModelInfo]:
-        return [ProviderModelInfo(id=model, owned_by="chatgpt-codex") for model in await self._client().list_models()]
+        client = await self._one_shot()
+        try:
+            entries = await client.list_model_entries()
+        finally:
+            await self._release(client)
+        return [
+            ProviderModelInfo(
+                id=entry.model,
+                owned_by="chatgpt-codex",
+                metadata={"display_name": entry.display_name} if entry.display_name else {},
+            )
+            for entry in entries
+        ]
 
     @staticmethod
     def _prompt(request: ModelRequest) -> str:
@@ -73,12 +102,16 @@ class AsyncCodexAppServerProvider:
         return "\n\n".join(f"{message.role}: {message.content}" for message in request.messages)
 
     async def chat(self, request: ModelRequest) -> ModelResponse:
-        client = self._client()
-        text = await client.complete_chat(
-            model=request.model,
-            prompt=self._prompt(request),
-            effort=(request.reasoning.effort if request.reasoning and request.reasoning.enabled else None),
-        )
+        prompt = self._prompt(request)
+        client = await self._one_shot()
+        try:
+            text = await client.complete_chat(
+                model=request.model,
+                prompt=prompt,
+                effort=(request.reasoning.effort if request.reasoning and request.reasoning.enabled else None),
+            )
+        finally:
+            await self._release(client)
         # Reporting what the subscription said must never be able to fail the
         # turn it rode in on: the answer is already in hand.
         if self._on_limit_windows is not None and client.last_limit_windows:

@@ -16,6 +16,7 @@
   import Composer from "../components/Composer.svelte";
   import ComposerActionMenu from "../components/ComposerActionMenu.svelte";
   import ComposerContext from "../components/ComposerContext.svelte";
+  import TaskScheduleMenu from "../components/TaskScheduleMenu.svelte";
   import { composerMenu } from "../composerCapabilities";
   import { readReadiness, refreshReadCapabilities } from "../readCapabilities.svelte";
   import { setWorkProject, workProject } from "../workProject.svelte";
@@ -546,7 +547,9 @@
     {
       label: "Method",
       value: workMethod === "build" ? "Build — reads the project's repository" : "Chat",
-      short: workMethod === "build" ? "Build" : "Chat",
+      // FIXED-1389 — the ordinary case is not repeated on the bar; it stayed
+      // there on every task and pushed Create onto a second row.
+      ...(workMethod === "build" ? { short: "Build" } : {}),
     },
     // These two were permanent chips beside the model picker, and
     // they are facts rather than actions: where a run executes, and how much
@@ -556,14 +559,12 @@
     {
       label: "Runs in",
       value: environmentLabel,
-      short: environmentLabel,
       href: "#/settings?tab=advanced&kind=runtime",
       action: "Runtime",
     },
     {
       label: "Context",
       value: capacityLabel,
-      short: capacityLabel,
       href: "#/models",
       action: "Models",
     },
@@ -773,8 +774,12 @@
 </script>
 
 <section class="tasks">
-  <header>  <GuideLink route="tasks" />
-<button type="button" class="btn btn-ghost btn-sm" onclick={load}><Icon name="refresh" size="sm" /> Refresh</button></header>
+  <!-- FIXED-1391 — actions on the left and the guide on the right, the way
+       every other page's toolbar reads. -->
+  <header class="head-row page-toolbar">
+    <button type="button" class="btn btn-ghost btn-sm" onclick={load}><Icon name="refresh" size="sm" /> Refresh</button>
+    <GuideLink route="tasks" />
+  </header>
 
   <!-- BUG-299 — the address Home's rows, Build's panel and the Stop control's
        "refresh to see the run's current state" all needed. It opens above the
@@ -823,42 +828,13 @@
     onsubmit={() => void createTask()}
   >
     {#snippet above()}
-      <!-- QUI-F06 — start from a template: it fills the form, the owner reads
-           it and presses Create. Shown while the instruction is empty. -->
-      {#if objective.trim() === ""}
-        <div class="cadence chip-row templates" role="group" aria-label="Start from a template">
-          {#each SCHEDULE_TEMPLATES as template (template.id)}
-            <button type="button" class="chip" title={template.detail} onclick={() => applyDraft(template)}
-              >{template.label}</button
-            >
-          {/each}
-        </div>
-      {/if}
-      <!-- REM-TASK-01 — when it runs, then how it runs. The second question is
-           only asked where the runtime has an answer for it: a background agent
-           starts now, so it is not offered beside a start time. -->
-      <div class="cadence chip-row" role="group" aria-label="When to run">
-        {#each TASK_TIMINGS as entry (entry.id)}
-          <button
-            type="button"
-            class="chip"
-            aria-pressed={timing === entry.id}
-            onclick={() => (timing = entry.id)}>{entry.label}</button
-          >
-        {/each}
-      </div>
-      {#if timing === "now"}
-        <div class="cadence chip-row" role="group" aria-label="How it runs">
-          {#each TASK_RUN_MODES as entry (entry.id)}
-            <button
-              type="button"
-              class="chip"
-              aria-pressed={runMode === entry.id}
-              onclick={() => (runMode = entry.id)}>{entry.label}</button
-            >
-          {/each}
-        </div>
-      {/if}
+      <!-- FIXED-1389 — readiness first, where Chat and Build put it, and
+           nothing else above the input: the timing moved into the bar and the
+           templates moved below the card. -->
+      <ModelReadinessStrip
+        readiness={modelsKnown() ? modelReadiness : null}
+        draftPreserved={Boolean(objective.trim())}
+      />
       <ComposerChips store={attachStore} disabled={creating} />
       {#if attachOpen}
         <ComposerAttachPanel store={attachStore} disabled={creating} idPrefix="task" />
@@ -1056,10 +1032,6 @@
           </fieldset>
         </div>
       {/if}
-      <ModelReadinessStrip
-        readiness={modelsKnown() ? modelReadiness : null}
-        draftPreserved={Boolean(objective.trim())}
-      />
     {/snippet}
 
     {#snippet left()}
@@ -1076,18 +1048,17 @@
         onchoose={runComposerAction}
       />
       <!-- The one control planning work needs that asking a question does not.
-           Collapsed it still says what was chosen, so the details being hidden
+           Collapsed it still says what was chosen, so the menu being closed
            never means the timing is invisible. -->
-      <button
-        type="button"
-        class="composer-control schedule-toggle"
-        aria-expanded={detailsOpen}
-        aria-controls="task-details"
-        onclick={() => (detailsOpen = !detailsOpen)}
-      >
-        <Icon name="clock" size="sm" />
-        <span>{schedule}</span>
-      </button>
+      <TaskScheduleMenu
+        bind:timing
+        bind:runMode
+        bind:detailsOpen
+        timings={TASK_TIMINGS}
+        runModes={TASK_RUN_MODES}
+        summary={schedule}
+        disabled={creating}
+      />
       <ComposerContext facts={contextFacts} disabled={creating} />
     {/snippet}
 
@@ -1123,9 +1094,23 @@
     {/snippet}
 
     {#snippet hint()}
-      {schedule} · {title ? `Filed as “${title}”` : "Write an instruction to begin"}
+      {title ? `Filed as “${title}”` : "Describe the work to begin"}
     {/snippet}
   </Composer>
+
+  <!-- QUI-F06 — start from a template: it fills the form, the owner reads it
+       and presses Create. Suggestions under the composer, the way Chat offers
+       its starters, rather than a row of pills inside the input card. -->
+  {#if objective.trim() === ""}
+    <div class="templates" role="group" aria-label="Start from a template">
+      {#each SCHEDULE_TEMPLATES as template (template.id)}
+        <button type="button" class="template" title={template.detail} onclick={() => applyDraft(template)}>
+          <Icon name="clock" size="sm" />
+          <span>{template.label}</span>
+        </button>
+      {/each}
+    </div>
+  {/if}
 
   {#if notice}<p class="notice" role="status">
       {notice}
@@ -1368,7 +1353,14 @@
   /* The one control planning work needs that asking a question does not. It
      reads as a composer control rather than as a form field, because that is
      what it is. */
-  .schedule-toggle{display:inline-flex;align-items:center;gap:.35rem;white-space:nowrap;max-width:16rem;overflow:hidden;text-overflow:ellipsis}
+  .tasks header.page-toolbar{align-items:center;margin-bottom:var(--space-2)}
+  /* FIXED-1389 — the starters sit under the card, centred on its width, in the
+     same quiet bordered shape as Chat's. */
+  .templates{display:flex;flex-wrap:wrap;justify-content:center;gap:var(--space-2);width:min(calc(100% - 2 * var(--space-4)),47.5rem);margin:0 auto var(--space-5)}
+  .template{display:inline-flex;align-items:center;gap:.4rem;min-height:2.25rem;padding:0 .85rem;border:1px solid var(--border);border-radius:var(--r-md);background:var(--surface);color:var(--text-2);font-size:var(--text-sm);font-weight:400;cursor:pointer}
+  .template:hover{color:var(--text-1)}
+  .template:hover{border-color:var(--accent-border);background:var(--accent-soft)}
+  .template:focus-visible{outline:2px solid var(--focus-ring);outline-offset:1px}
   .project-choice{display:flex;align-items:center;gap:var(--space-2);flex-wrap:wrap;margin:0 0 var(--space-2)}
   .project-choice label{color:var(--text-2);font-size:var(--text-sm)}
   .delegated{display:flex;align-items:center;gap:var(--space-2);margin-top:.6rem}

@@ -189,6 +189,39 @@ async def _resolve_use_model(
     )
 
 
+
+def _owner_router(workspace_root: str | Path, writer: EventLogWriter | None = None) -> ModelRouter:
+    """A router that reads this terminal's owner's saved connections (BUG-351).
+
+    The terminal's ``/model`` commands built a router with no owner, so after
+    ADR-0004 every hosted provider refused them with
+    ``model_connection_required`` even when the owner had connected it in
+    Models. They now resolve the bootstrapped local owner, exactly as Chat
+    turns do, and fall back to the ownerless router only when there is none.
+    """
+    from raiker.cli.principal_resolver import resolve_local_principal
+    from raiker.models.owner_runtime import owner_model_runtime
+
+    store = SQLiteStore(workspace_root)
+    try:
+        principal, _reason = resolve_local_principal(workspace_root)
+    except Exception:  # noqa: BLE001 - an unreadable owner is the ownerless case
+        principal = None
+    if principal is None:
+        return ModelRouter(
+            ModelProfileRegistry.load(),
+            writer,
+            runtime_policy=provider_runtime_policy_from_gates(store),
+        )
+    router, _selected = owner_model_runtime(store, principal.principal_id, writer or EventLogWriter(store))
+    return router
+
+
+#: What a terminal says when a hosted provider has no saved connection: where
+#: to fix it, rather than an environment variable that no longer applies.
+CONNECT_IN_MODELS = "next: connect it in Models (web app › Models › Add model)"
+
+
 async def render_models_async(
     path: str | Path = "config/model-profiles.json",
     *,
@@ -204,14 +237,17 @@ async def render_models_async(
             f"- {profile.profile_id}{marker} [{profile.default_state}] provider={profile.provider} model={profile.model} phase={profile.build_phase}"
         )
     lines.extend(["Live models for selected provider:"])
-    live_router = router or ModelRouter(registry)
+    live_router = router or _owner_router(workspace_root)
     try:
         # Listing what a provider serves needs no model chosen — it is how one
         # gets chosen. Asking through the profile keeps an Ollama with nothing
         # selected yet listable instead of reporting it unreachable.
         models = await live_router.alist_models_for_profile(selected)
     except ProviderPolicyError as exc:
-        lines.extend(["status: policy_denied", f"reason: {safe_error(str(exc))}"])
+        reason = safe_error(str(exc))
+        lines.extend(["status: policy_denied", f"reason: {reason}"])
+        if reason == "model_connection_required":
+            lines.append(CONNECT_IN_MODELS)
     except ModelProviderError as exc:
         reason = (
             "model_listing_unsupported" if "unsupported" in str(exc) else "provider_unreachable"
@@ -264,7 +300,7 @@ def handle_launch(command: str, *, workspace_root: str | Path = ".") -> str:
     args = parser.parse_args(shlex.split(command)[1:])
     store = SQLiteStore(workspace_root)
     writer = EventLogWriter(store)
-    router = ModelRouter(ModelProfileRegistry.load(), writer)
+    router = _owner_router(workspace_root, writer)
     client = terminal_client()
     result = router.launch(
         args.provider,
@@ -273,6 +309,8 @@ def handle_launch(command: str, *, workspace_root: str | Path = ".") -> str:
         turn_id=None,
         client=client,
     )
+    if "model_connection_required" in result.message:
+        return f"{result.message}\n{CONNECT_IN_MODELS}"
     return result.message
 
 
@@ -1972,7 +2010,7 @@ async def handle_model_command_async(command: str, *, workspace_root: str | Path
     parts = shlex.split(command)
     registry = ModelProfileRegistry.load()
     store = SQLiteStore(workspace_root)
-    router = ModelRouter(registry, runtime_policy=provider_runtime_policy_from_gates(store))
+    router = _owner_router(workspace_root)
     selected = _selected_profile(registry, workspace_root)
     if len(parts) == 1 or parts[1] == "current":
         return _render_profile_current(selected)
@@ -2067,7 +2105,10 @@ async def handle_model_command_async(command: str, *, workspace_root: str | Path
             if len(parts) >= 3:
                 payload["profile_id"] = parts[2]
             _append_model_event(store, "model_provider_rejected_by_policy", payload)
-            return f"Model selection failed: {type(exc).__name__}:{safe_error(str(exc))}"
+            failure = f"Model selection failed: {type(exc).__name__}:{safe_error(str(exc))}"
+            if safe_error(str(exc)) == "model_connection_required":
+                failure = f"{failure}\n{CONNECT_IN_MODELS}"
+            return failure
     return "Usage: /model [current|use <profile_id>|use --provider <provider> --model <model>|health|capabilities]"
 
 

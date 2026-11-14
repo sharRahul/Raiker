@@ -488,6 +488,7 @@ describe("ModelsView state grammar", () => {
   });
 
   it("offers ChatGPT subscription sign-in in Models without an API-key dialog", async () => {
+    vi.stubGlobal("open", vi.fn());
     const mock = stubFetch({
       "GET /api/models": models({
         profiles: [
@@ -503,7 +504,7 @@ describe("ModelsView state grammar", () => {
         ],
       }),
       "GET /api/models/chatgpt-codex/status": { connection_status: "signed_out", plan_type: null },
-      "POST /api/models/chatgpt-codex/login": { connection_status: "login_pending", plan_type: null },
+      "POST /api/models/chatgpt-codex/login": { ok: true, connection_status: "login_pending", method: "browser", url: "https://auth.openai.com/oauth/authorize", user_code: null },
     });
     render(ModelsView, { tab: "add", source: "account" });
 
@@ -514,7 +515,7 @@ describe("ModelsView state grammar", () => {
         expect.objectContaining({ method: "POST" }),
       ),
     );
-    expect(await screen.findByText(/Finish sign-in in the browser/)).toBeInTheDocument();
+    expect(await screen.findByText(/Finish signing in to ChatGPT/)).toBeInTheDocument();
     expect(screen.queryByLabelText(/API key/i)).not.toBeInTheDocument();
   });
 

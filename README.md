@@ -264,7 +264,7 @@ FTS5), and both packages provide the same module. More: [Managing the host](docs
 |---|---|
 | On this computer | Ollama, LM Studio, llama.cpp (managed GGUF), MLX on Apple silicon |
 | Your own network | vLLM and any OpenAI-compatible endpoint on your LAN or home lab |
-| Hosted | Anthropic, OpenAI, Google Gemini, OpenRouter, ChatGPT subscription through the local subscription client, and other OpenAI-compatible providers |
+| Hosted | Anthropic, OpenAI, Google Gemini, OpenRouter, ChatGPT subscription through OpenAI's Codex client (browser or device-code sign-in), and other OpenAI-compatible providers |
 
 Raiker detects a local runtime that is already installed. If you want local
 models and have none, Models links to the runtime's official download; Raiker

@@ -456,6 +456,7 @@ describe("first-run setup", () => {
   });
 
   it("signs in to the ChatGPT subscription without asking for an API key", async () => {
+    vi.stubGlobal("open", vi.fn());
     const fetchMock = stubFetch({
       "GET /api/setup": required,
       "GET /api/models": { profiles: REGISTRY, chat_profiles: [] },
@@ -467,7 +468,7 @@ describe("first-run setup", () => {
         profile_id: "lm-studio-local", provider: "lm-studio", status: "unavailable", reason_code: "x", models: [],
       },
       "GET /api/models/chatgpt-codex/status": { connection_status: "signed_out", plan_type: null },
-      "POST /api/models/chatgpt-codex/login": { ok: true, connection_status: "login_pending" },
+      "POST /api/models/chatgpt-codex/login": { ok: true, connection_status: "login_pending", method: "browser", url: "https://auth.openai.com/oauth/authorize", user_code: null },
     });
     render(ModelSetupView);
     await openProviders();
@@ -482,7 +483,7 @@ describe("first-run setup", () => {
         expect.objectContaining({ method: "POST" }),
       ),
     );
-    expect(await within(row).findByText(/Finish sign-in in the browser/)).toBeInTheDocument();
+    expect(await within(row).findByText(/Finish signing in to ChatGPT/)).toBeInTheDocument();
   });
 
   it("names the connected plan and still offers a way to change accounts", async () => {

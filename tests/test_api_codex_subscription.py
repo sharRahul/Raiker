@@ -28,10 +28,22 @@ class FakeCodexSessions:
     async def passive_status(self, principal_id: str) -> CodexAccountStatus | None:
         return await self.status(principal_id) if self.pending else None
 
-    async def start_login(self, principal_id: str) -> CodexLogin:
+    async def start_login(self, principal_id: str, method: str = "browser") -> CodexLogin:
         assert principal_id == "principal_owner"
         self.pending = True
-        return CodexLogin(login_id="login_1")
+        self.method = method
+        if method == "device_code":
+            return CodexLogin(
+                login_id="login_2",
+                method="device_code",
+                url="https://auth.example.test/device",
+                user_code="ABCD-1234",
+            )
+        return CodexLogin(login_id="login_1", url="https://auth.example.test/authorize")
+
+    async def cancel_login(self, principal_id: str) -> None:
+        assert principal_id == "principal_owner"
+        self.pending = False
 
     async def disconnect(self, principal_id: str) -> None:
         assert principal_id == "principal_owner"
@@ -67,7 +79,14 @@ def test_subscription_routes_expose_safe_status_and_start_local_login(
 
     login = client.post("/api/models/chatgpt-codex/login", headers=_headers(workspace))
     assert login.status_code == 200, login.text
-    assert login.json() == {"ok": True, "connection_status": "login_pending"}
+    # FIXED-1390 — the owner's browser opens the page, so the route hands it over.
+    assert login.json() == {
+        "ok": True,
+        "connection_status": "login_pending",
+        "method": "browser",
+        "url": "https://auth.example.test/authorize",
+        "user_code": None,
+    }
     polled = client.get("/api/models/chatgpt-codex/status", headers=_headers(workspace))
     assert polled.json()["connection_status"] == "available"
 
@@ -149,3 +168,51 @@ def test_subscription_routes_require_auth(tmp_path: Path) -> None:
     assert client.get("/api/models/chatgpt-codex/status").status_code == 401
     assert client.post("/api/models/chatgpt-codex/login").status_code == 401
     assert client.post("/api/models/chatgpt-codex/connection").status_code == 401
+
+
+def test_device_code_sign_in_and_cancel(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    workspace = tmp_path / "subscription"
+    workspace.mkdir()
+    bootstrap_owner("owner", "Owner", workspace_root=workspace)
+    client = TestClient(create_app(workspace))
+
+    import raiker.api.routes_dashboard as routes
+
+    sessions = FakeCodexSessions()
+    monkeypatch.setattr(routes, "_codex_sessions", lambda request: sessions)
+
+    login = client.post(
+        "/api/models/chatgpt-codex/login", headers=_headers(workspace), json={"method": "device_code"}
+    )
+    assert login.status_code == 200, login.text
+    assert login.json()["user_code"] == "ABCD-1234"
+    assert sessions.method == "device_code"
+    refused = client.post(
+        "/api/models/chatgpt-codex/login", headers=_headers(workspace), json={"method": "token"}
+    )
+    assert refused.status_code == 422
+    cancel = client.delete("/api/models/chatgpt-codex/login", headers=_headers(workspace))
+    assert cancel.status_code == 200, cancel.text
+    assert sessions.pending is False
+
+
+def test_a_missing_codex_is_a_conflict_with_its_reason(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from raiker.models.exceptions import ProviderConfigurationError
+
+    workspace = tmp_path / "subscription"
+    workspace.mkdir()
+    bootstrap_owner("owner", "Owner", workspace_root=workspace)
+    client = TestClient(create_app(workspace))
+
+    import raiker.api.routes_dashboard as routes
+
+    class Missing(FakeCodexSessions):
+        async def start_login(self, principal_id: str, method: str = "browser") -> CodexLogin:
+            raise ProviderConfigurationError("codex_app_server_not_installed")
+
+    monkeypatch.setattr(routes, "_codex_sessions", lambda request: Missing())
+    login = client.post("/api/models/chatgpt-codex/login", headers=_headers(workspace))
+    assert login.status_code == 409
+    assert "codex_app_server_not_installed" in login.text

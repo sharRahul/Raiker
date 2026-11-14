@@ -613,6 +613,12 @@ class ModelWeeklyBudgetRequest(StrictRequest):
     token_budget: int | None = None
 
 
+class CodexLoginRequest(StrictRequest):
+    """How the owner wants to sign in to ChatGPT: a browser callback or a device code."""
+
+    method: Literal["browser", "device_code"] = "browser"
+
+
 class ServerCheckRequest(StrictRequest):
     """The exact model to check on a local or custom server."""
 

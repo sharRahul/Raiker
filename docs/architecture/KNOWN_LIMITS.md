@@ -449,11 +449,6 @@ on the shipped build, not estimated.
   per-sender rate limits and signed delivery. What is still short there is above
   the transport — the spec's routing modes, and resolving an approval over a
   channel.
-- **Terminal `/model` commands reach local models only (2026-10-20).** The
-  terminal's `/model` list, launch and use build a router with no owner, so they
-  read no saved connection and refuse a hosted provider with
-  `model_connection_required`. A Chat turn from the terminal goes through the
-  owner's gateway and is unaffected (BUG-351).
 - **On a proxy-only host, the proxy resolves names, not Raiker (2026-10-26).**
   A name this machine cannot resolve goes to your `HTTPS_PROXY` only when it
   has the shape of a public name; `intranet`, `*.corp`, `*.internal`, `*.lan`

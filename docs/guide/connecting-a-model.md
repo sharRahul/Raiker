@@ -549,19 +549,32 @@ the workspace header only when you have named one.
 ### Using a ChatGPT subscription instead of a key
 
 The **ChatGPT subscription** card is a different path from the OpenAI card, and
-it is not an API key. It talks to a compatible **local subscription client** client installed on
-this machine, over that client's local process interface. local subscription client opens the
-browser sign-in, holds the tokens, and knows what your plan includes; Raiker
-receives the signed-in state, the plan name, and the model identifiers — nothing
-else. No token, refresh token, device code or sign-in URL is ever stored by
-Raiker.
+it is not an API key. It talks to OpenAI's **Codex** client installed on this
+machine, over Codex's local App Server. Codex runs the sign-in, holds the
+tokens, and knows what your plan includes; Raiker receives the signed-in state,
+the plan name and the model identifiers. Raiker never stores a token, refresh
+token or sign-in secret.
 
-* **Sign in with ChatGPT** starts the flow in local subscription client. If local subscription client is not installed,
-  the card says so; Raiker does not download or install it for you.
-* **If local subscription client is already signed in, Raiker does not use that account until you
+* **Install Codex once.** If Codex is missing, the card shows the one command
+  to run — `npm install -g @openai/codex` — with **Copy** and **Check again**.
+  Raiker also looks where npm, Homebrew, Volta and nvm put the launcher when the
+  desktop app's own `PATH` does not reach it. If Codex lives somewhere else, set
+  `RAIKER_CODEX_PATH` to the `codex` launcher and restart Raiker.
+* **Sign in with ChatGPT** opens the ChatGPT sign-in page in *your* browser.
+  If no page appears (a blocked pop-up, or Raiker open on another device), use
+  **Open sign-in again** or **Use a code instead**.
+* **Sign in with a code** shows a one-time code and the page to type it on.
+  This works from any device, and Raiker falls back to it by itself when the
+  local sign-in callback cannot start (for example, another Codex is already
+  signing in). It is the same device-code flow the Codex CLI and Hermes Agent
+  use. The code works once and expires after about fifteen minutes.
+* Raiker checks every two seconds while you sign in and connects the account
+  only once your sign-in finishes. **Cancel** stops the sign-in. If ChatGPT
+  refuses it, the card says why instead of waiting.
+* **If Codex is already signed in, Raiker does not use that account until you
   say so.** The card says an account is signed in on this device and offers
   **Use this subscription** beside **Use a different account**. Reading the
-  status never connects anything — on a shared machine the account local subscription client holds
+  status never connects anything — on a shared machine the account Codex holds
   may not be yours.
 * Once connected the card names the plan — "ChatGPT Plus connected" — and keeps
   **Switch account** and **Sign out** available, so an owner with more than one
@@ -571,7 +584,7 @@ Raiker.
   this provider's default. The current default is marked rather than offered
   again.
 * Raiker shows how much of your plan's window is left **when the provider says
-  so as part of a turn** — ChatGPT reports a five-hour and a weekly window. It
+  so while a turn runs** — ChatGPT reports a five-hour and a weekly window. It
   is never polled from a portal and never estimated, so a provider that reports
   nothing shows nothing. The figures appear on the provider card and in
   **Diagnostics → Activity**.

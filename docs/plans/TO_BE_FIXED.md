@@ -271,7 +271,7 @@ tiny model from ggerganov/whisper.cpp, and the upstream JFK WAV sample.
 ## Reading order
 
 1. **Open-defect index** — the table below is the current source of truth for status.
-2. **Open defect records** — BUG-194, BUG-248, BUG-287, BUG-339, BUG-348, BUG-351, BUG-352, BUG-354, BUG-355, BUG-356 and BUG-359, in numeric order.
+2. **Open defect records** — BUG-194, BUG-248, BUG-287, BUG-339, BUG-348, BUG-354, BUG-355, BUG-356 and BUG-359, in numeric order.
 3. **Verification follow-up** — newly observed failures that still need triage.
 4. **Reference baseline and decisions** — verified behavior and historical direction; these sections do not add open defects.
 
@@ -311,8 +311,6 @@ Evidence: `screenshots/not-working/` (defects),
 | [BUG-287](#bug-287--the-image-provider-round-trip-is-unverified-against-a-real-provider) | Medium | Design / image runtime / live evidence | Open remainder — reduced 2026-10-18: real OpenAI generation, edit, four-result variation, lineage, permission-off refusal and empty-allowlist refusal passed; a source-image provider refusal and a live research-reference **Sent with** check remain |
 | [BUG-339](#bug-339--the-issue-to-pull-request-routine-has-a-template-and-no-runner) | Low | Tasks / routines | Open remainder — reduced 2026-10-18 ([FIXED-950](FIXED_ITEMS.md#fixed-950--the-issue-to-pull-request-routine-can-now-be-scheduled-as-a-build-task-bug-339-reduced)): the template schedules a governed Build task from Settings → GitHub; RR-40 live evidence against a consented repository remains; 2026-10-19 the pull request receipt ([FIXED-974](FIXED_ITEMS.md#fixed-974--a-pull-request-raiker-opened-was-known-only-from-the-create-response-br-12)) and the task's repository binding ([FIXED-976](FIXED_ITEMS.md#fixed-976--a-scheduled-build-task-ran-in-whatever-repository-build-was-pointed-at-br-02)) the run will read back are in place |
 | [BUG-348](#bug-348--the-design-canvas-is-edited-by-keyboard-and-inspector-only-and-five-dw-requirements-are-still-partial) | Medium | Design / composition | Open remainder — reduced 2026-10-20 ([FIXED-998](FIXED_ITEMS.md#fixed-998--a-layer-could-only-be-moved-with-the-arrow-keys-dw-02-bug-348) to [FIXED-1010](FIXED_ITEMS.md#fixed-1010--after-a-restart-the-design-agent-said-no-chat-model-was-connected)): pointer editing, imports, components, notes, vector PDF and proposal receipts ship; selecting inside a group on the canvas, brand-guide import, system-level components and presentation export remain |
-| [BUG-351](#bug-351--cli-model-commands-cannot-reach-a-connected-hosted-provider) | Low | CLI / models | Open — compatibility consequence of ADR-0004, found 2026-10-20 |
-| [BUG-352](#bug-352--a-custom-endpoint-saved-off-the-machine-shows-no-route-on-its-card) | Low | Models / UI | Open — found 2026-10-20 in the BUG-349 live round (MT-03) |
 | [BUG-354](#bug-354--the-workspace-key-cannot-be-rotated-in-place) | Low | Storage / memory key | Open — found 2026-10-20 writing the MEM-KEY-05 runbook; the runbook gives the export/import route |
 | [BUG-355](#bug-355--goals-ship-without-intake-from-chat-validator-backed-criteria-or-a-restart-scenario) | Medium | Goals / personal agent | Open remainder of PA-D01 — the first slice shipped 2026-10-20 ([FIXED-1039](FIXED_ITEMS.md#fixed-1039--an-outcome-could-live-only-in-a-chat-transcript-there-was-no-durable-goal-goal-01-pa-d01) to [FIXED-1048](FIXED_ITEMS.md#fixed-1048--a-goal-had-no-budget-across-its-steps-goal-10-pa-d01)) |
 | [BUG-356](#bug-356--execution-profiles-govern-goal-steps-only-and-cover-one-data-class) | Medium | Execution profiles / models / data handling | Open remainder of PA-D02 — the first slice shipped 2026-10-20 ([FIXED-1049](FIXED_ITEMS.md#fixed-1049--there-was-nowhere-to-say-where-a-goals-work-may-run-prof-01-pa-d02) to [FIXED-1051](FIXED_ITEMS.md#fixed-1051--changing-the-boundary-would-have-applied-silently-to-work-in-flight-prof-03-pa-d02)) |
@@ -818,52 +816,6 @@ components, then a presentation export.
 
 **Required user-interface outcome.** The remaining rows are reachable from the
 Documents workspace and absent until they are.
-
-## BUG-351 — CLI model commands cannot reach a connected hosted provider
-
-**Severity: Low. Area: CLI / models. Status: Open — compatibility consequence of
-ADR-0004, found 2026-10-20.**
-
-**Observed.** The terminal `/model` list, launch and use commands build a
-`ModelRouter` with no owner, so they read no saved connections. Before ADR-0004
-an environment key plus `RAIKER_MODEL_EGRESS_ALLOWLIST` reached a hosted
-provider from those commands; now they refuse with `model_connection_required`
-and work only for local models. Chat turns from the CLI go through
-`AgentGateway` with the owner and are unaffected.
-
-**Root cause.** `raiker/cli/commands.py` predates per-owner connections and
-never resolves the terminal's owner.
-
-**Proposed fix.** Resolve the bootstrapped local owner with
-`resolve_local_principal` and pass `connection_resolver` and
-`runtime_policy_resolver` for that owner, as `owner_model_runtime` does.
-
-**Required user-interface outcome.** `/model` in the terminal lists and
-launches the owner's connected providers, and an unconnected one says
-*connect it in Models* rather than naming an environment variable.
-
-
-## BUG-352 — A custom endpoint saved off the machine shows no route on its card
-
-**Severity: Low. Area: Models / UI. Status: Open — found 2026-10-20 in the
-BUG-349 live round (MT-03).**
-
-**Observed.** The OpenAI-compatible card connected to
-`https://models.raiker-live.example/v1` showed no posture line — no *Needs
-network*, and no *Direct connection* / *Through your proxy* — while every
-shipped hosted card did.
-
-**Root cause.** `ModelProfileView.off_machine` and the posture flags are read
-from the profile's own shipped endpoint (`http://127.0.0.1:8000/v1`), not from
-the endpoint the owner saved. `proxy_route` already uses the saved endpoint;
-the line that would show it is gated on `off_machine`.
-
-**Proposed fix.** Classify the saved connection's endpoint when there is one
-for `off_machine` and the posture, and check every count that reads
-`off_machine` (posture totals, `remote_profile_count`) still means what it says.
-
-**Required user-interface outcome.** A custom endpoint pointed at the owner's
-network or the internet reads like any other off-machine card, with its route.
 
 ## BUG-354 — The workspace key cannot be rotated in place
 
@@ -1703,3 +1655,37 @@ The Windows browser round found and fixed a late model-library read erasing a
 newer scan error (FIXED-1380), and redirected CP1252 CLI help crashing
 (FIXED-1379). Existing broad recovery, provider and installer gates remain.
 Full Windows mypy now passes all 1,285 files after FIXED-1382. This is type-check portability evidence; Windows pinned-handle promotion and the existing sandbox security gates remain open.
+
+## ChatGPT subscription — owner-signed-in turn not yet qualified
+
+**Severity: Medium. Area: Models / ChatGPT subscription. Status: Open — found
+2026-11-14 while fixing [FIXED-1390](FIXED_ITEMS.md#fixed-1390--chatgpt-sign-in-opened-a-browser-on-the-server-and-could-not-complete)
+to [FIXED-1393](FIXED_ITEMS.md#fixed-1393--chatgpt-turns-timed-out-leaked-codex-processes-and-lost-the-limit-windows).**
+
+The real codex-cli 0.169 App Server issued a device code and a browser
+authorize page through Raiker, and the protocol fixes are covered against a
+schema-faithful fake. Completing a sign-in, adopting the plan, listing the
+signed-in catalogue, running a turn through Raiker's `text_json` tool mode and
+recording `account/rateLimits/updated` all need the owner's own ChatGPT
+subscription and were not run. Also unverified: the Windows `codex.ps1`
+launcher path and the npm-prefix search on macOS and Windows.
+
+**Required evidence.** On the owner's PC: Sign in with ChatGPT (browser and
+code), choose a model, send one Chat turn and one tool-using Build turn, read
+the limit windows on the card, Switch account, Sign out.
+
+## Quiet UI consistency — what the 2026-11-14 sweep did not change
+
+[FIXED-1391](FIXED_ITEMS.md#fixed-1391--navigable-pages-disagreed-in-shape-order-and-detail)
+fixed eleven page irregularities. Still open from the same sweep:
+
+* **Goals is the only Work tab with its own title and description**, and it
+  offers **New goal** twice when empty. Decide whether Work tabs carry titles.
+* **Approvals keeps its toolbar above its Pending/History filters.** Those are
+  queue filters, not hub tabs, so they were left; revisit with QUI-L11.
+* **Each Settings section still carries a private copy of `.settings-card`**
+  (eight copies with three paddings). One shared rule in `app.css` would stop
+  the drift FIXED-1391 had to correct by hand.
+* **Memory › Overview is a single sentence when nothing is remembered**; it
+  should carry the same carded empty state as the other tabs.
+

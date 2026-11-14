@@ -22,9 +22,23 @@ async function instruct(text: string): Promise<void> {
   });
 }
 
+/** FIXED-1389 — the timing questions live behind the composer's schedule control. */
+async function openSchedule(): Promise<void> {
+  if (screen.queryByRole("dialog", { name: "Schedule" })) return;
+  await fireEvent.click(
+    screen.getByRole("button", { expanded: false, name: /Runs|Once|Daily|Hourly|Weekly|Every|Keeps/ }),
+  );
+}
+
+async function choice(name: string): Promise<HTMLElement> {
+  await openSchedule();
+  return within(screen.getByRole("dialog", { name: "Schedule" })).getByRole("button", { name });
+}
+
 async function openDetails(): Promise<void> {
-  const toggle = screen.getByRole("button", { expanded: false, name: /Runs|Once|Daily|Hourly|Weekly|Every/ });
-  await fireEvent.click(toggle);
+  if (document.getElementById("task-details")) return;
+  await openSchedule();
+  await fireEvent.click(screen.getByRole("button", { name: /Title, priority and more/ }));
 }
 
 describe("TasksView", () => {
@@ -40,12 +54,10 @@ describe("TasksView", () => {
     // split the one chip row into the two questions it was answering, so the
     // control /schedule names is the timing one.
     await waitFor(() =>
-      expect(screen.getByRole("button", { name: "At a time" })).toHaveAttribute(
-        "aria-pressed",
-        "true",
-      ),
+      expect(screen.getByRole("button", { name: /Once/ })).toBeInTheDocument(),
     );
-    expect(screen.getByRole("button", { name: "Now" })).toHaveAttribute("aria-pressed", "false");
+    expect(await choice("At a time")).toHaveAttribute("aria-pressed", "true");
+    expect(await choice("Now")).toHaveAttribute("aria-pressed", "false");
     expect(
       fetchMock.mock.calls.filter(([url, init]) =>
         String(url).includes("/api/tasks") && (init as RequestInit | undefined)?.method === "POST",
@@ -61,12 +73,10 @@ describe("TasksView", () => {
     render(TasksView);
 
     await waitFor(() =>
-      expect(screen.getByRole("button", { name: "Now" })).toHaveAttribute("aria-pressed", "true"),
+      expect(screen.getByRole("button", { name: /Runs now/ })).toBeInTheDocument(),
     );
-    expect(screen.getByRole("button", { name: "One pass" })).toHaveAttribute(
-      "aria-pressed",
-      "true",
-    );
+    expect(await choice("Now")).toHaveAttribute("aria-pressed", "true");
+    expect(await choice("One pass")).toHaveAttribute("aria-pressed", "true");
   });
 
   it("offers Run now for an unscheduled queued task and invokes only the explicit run route", async () => {
@@ -246,13 +256,13 @@ describe("TasksView", () => {
     ] } });
     render(TasksView);
     await screen.findByText("No work queued");
-    await fireEvent.click(screen.getByRole("button", { name: "At a time" }));
+    await fireEvent.click(await choice("At a time"));
     // COMPOSER-10 — the model sits in the composer bar as it does on every
     // other Work surface, rather than under a label of its own. What a schedule
     // captures it *onto* is said by the primary action and the timing line.
     expect(screen.getByRole("button", { name: /model for this turn: haiku/i })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Schedule task/ })).toBeInTheDocument();
-    expect(screen.getByRole("button", { expanded: false, name: /Once — pick a time/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Once — pick a time/ })).toBeInTheDocument();
   });
 
   it("shows a route-level loading state while tasks are fetched", async () => {
@@ -311,7 +321,7 @@ describe("TasksView", () => {
     render(TasksView);
 
     await waitFor(() => expect(screen.getByText("No work queued")).toBeInTheDocument());
-    await fireEvent.click(screen.getByRole("button", { name: "Repeating" }));
+    await fireEvent.click(await choice("Repeating"));
     await instruct("Prepare the release notes.");
     await openDetails();
     await fireEvent.input(screen.getByLabelText("Task title"), { target: { value: "Plan release" } });
@@ -373,7 +383,7 @@ describe("TasksView", () => {
     render(TasksView);
 
     await waitFor(() => expect(screen.getByText("No work queued")).toBeInTheDocument());
-    await fireEvent.click(screen.getByRole("button", { name: "Repeating" }));
+    await fireEvent.click(await choice("Repeating"));
     await instruct("Report any failing job.");
     await openDetails();
     await fireEvent.input(screen.getByLabelText("Task title"), { target: { value: "Watch the build" } });
@@ -737,9 +747,9 @@ describe("TasksView blocked-on-approval pointer", () => {
     // everywhere else.
     expect(screen.getByRole("button", { name: "Add to this turn" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Tools" })).toBeInTheDocument();
-    // The one context line, rather than a separate environment badge and
-    // capacity chip of this surface's own.
-    expect(screen.getByRole("button", { name: /^Context for this turn:/ })).toBeInTheDocument();
+    // FIXED-1389 — the ordinary case (Chat, no project) says nothing on the
+    // bar; the context line appears when there is something to say.
+    expect(screen.queryByRole("button", { name: /^Context for this turn:/ })).not.toBeInTheDocument();
     // And the model control is the shared picker, not a select of its own.
     expect(screen.getByRole("button", { name: /^Model for this turn:/ })).toBeInTheDocument();
     // The one control planning needs that asking does not, collapsed until
@@ -778,7 +788,7 @@ describe("TasksView schedule terms and lifecycle", () => {
     });
     render(TasksView);
     await waitFor(() => expect(screen.getByText("No work queued")).toBeInTheDocument());
-    await fireEvent.click(screen.getByRole("button", { name: "Repeating" }));
+    await fireEvent.click(await choice("Repeating"));
     await instruct("Draft my stand-up notes.");
     await openDetails();
     expect(screen.getByRole("group", { name: "Schedule" })).toBeInTheDocument();
@@ -942,7 +952,7 @@ describe("QUI-F06 templates and QUI-F18 a handed-over routine", () => {
     const group = await screen.findByRole("group", { name: "Start from a template" });
     await fireEvent.click(within(group).getByRole("button", { name: "Morning brief" }));
     expect((screen.getByLabelText("What should Raiker do?") as HTMLTextAreaElement).value).toContain("brief for today");
-    expect(screen.getByRole("button", { name: "Repeating" })).toHaveAttribute("aria-pressed", "true");
+    expect(await choice("Repeating")).toHaveAttribute("aria-pressed", "true");
     expect((screen.getByLabelText("Repeat") as HTMLSelectElement).value).toBe("daily");
     expect(screen.getByText(/Results appear on Home and in this task's own conversation/)).toBeInTheDocument();
     expect(screen.queryByRole("group", { name: "Start from a template" })).not.toBeInTheDocument();

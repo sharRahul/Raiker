@@ -269,6 +269,8 @@ class CodexStatus(TypedDict):
 
     connection_status: Literal["connected", "available", "signed_out", "codex_missing", "not_connected"]
     plan_type: str | None
+    #: Why the owner's last sign-in failed, in Codex's words, when it did.
+    login_error: NotRequired[str]
 
 
 class CodexConnected(TypedDict):
@@ -279,8 +281,18 @@ class CodexConnected(TypedDict):
 
 
 class CodexLoginStarted(TypedDict):
+    """A sign-in the owner finishes in their own browser.
+
+    ``url`` is the ChatGPT page to open; a device-code sign-in also carries the
+    one-time ``user_code`` to type there. Tokens and the PKCE verifier stay in
+    the Codex process.
+    """
+
     ok: bool
     connection_status: Literal["login_pending"]
+    method: Literal["browser", "device_code"]
+    url: str | None
+    user_code: str | None
 
 
 class ConnectionSet(TypedDict):

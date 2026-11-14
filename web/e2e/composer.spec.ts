@@ -884,8 +884,9 @@ test("Design starters prepare an editable draft and keep composer controls at na
   await expect(prompt).toHaveValue(/professional poster/);
   await page.keyboard.press("Escape");
   const composer = page.getByRole("group", { name: "Image composer" });
-  await expect(composer.getByLabel("Size")).toHaveCount(0);
-  await expect(composer.getByLabel("How many")).toHaveCount(0);
+  // FIXED-1400 — size and count are the composer's own controls now.
+  await expect(composer.getByLabel("Size")).toBeVisible();
+  await expect(composer.getByLabel("How many")).toBeVisible();
   await expect(composer.getByLabel("Image model")).toBeVisible();
   await expect(composer.locator(".model-scope svg")).toHaveCount(2);
   await expect(composer.getByRole("button", { name: "Dictate" })).toBeVisible();
@@ -1167,8 +1168,9 @@ test("Build discards a sandbox copy without touching the project", async ({ page
 test("UX-2 — Chat, Build and Design share one composer grammar, in one order", async ({ page }) => {
   // The controls every composer shares appear in the same order on all three:
   // what you bring, tools, context, how much Raiker may do, the model, then
-  // dictation and the primary action. Design has no tools, autonomy or turn
-  // model (its image model is chosen in the panel), so it shares the ends.
+  // dictation and the primary action. Design has no autonomy or turn model
+  // (its image model is its own select), so it shares the rest in the same
+  // order — FIXED-1400 moved its +, Tools and context into the bar.
   const order = async (route: string, label: string): Promise<string[]> => {
     await page.goto(`http://127.0.0.1:8765/#/${route}`);
     const composer = page.getByRole("group", { name: label });
@@ -1191,5 +1193,5 @@ test("UX-2 — Chat, Build and Design share one composer grammar, in one order",
   expect(chat).toEqual(grammar);
   expect(build).toEqual(grammar);
   expect(design).toEqual(grammar.filter((item) => design.includes(item)));
-  expect(design).toEqual(["prompt", "Dictate", "primary"]);
+  expect(design).toEqual(["prompt", "Add to this turn", "Tools", "context", "Dictate", "primary"]);
 });

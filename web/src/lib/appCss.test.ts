@@ -335,3 +335,22 @@ describe("the composer's primary action keeps its name at phone width", () => {
     expect(composer).toContain("width: 2.5rem");
   });
 });
+
+describe("one Settings card rule", () => {
+  it("is defined only in app.css and follows the card edge token", async () => {
+    const { readdirSync } = await import("node:fs");
+    const roots = [resolve(process.cwd(), "src", "lib", "views", "settings"), resolve(process.cwd(), "src", "lib", "components")];
+    const copies: string[] = [];
+    for (const root of roots) {
+      for (const name of readdirSync(root)) {
+        if (!name.endsWith(".svelte")) continue;
+        const source = readFileSync(resolve(root, name), "utf8");
+        // A descendant rule (`.settings-card label`) tunes a section; a bare
+        // `.settings-card {` would redefine the card itself.
+        if (/(^|[\s,}])\.settings-card\s*[,{]/m.test(source)) copies.push(name);
+      }
+    }
+    expect(copies).toEqual([]);
+    expect(stylesheet).toMatch(/\.settings-card \{[^}]*border: 1px solid var\(--card-edge, var\(--border\)\)/);
+  });
+});

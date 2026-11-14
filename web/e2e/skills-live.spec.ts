@@ -9,6 +9,7 @@
 // Start the host first:
 //   python -m raiker.api.serve --workspace .tmp/live-skills --port 8799 --no-browser
 import { expect, test } from "@playwright/test";
+import { armConfirm } from "./live";
 import { capture } from "./capture";
 import type { Page } from "@playwright/test";
 import { signInAsOwner } from "./hosted-provider";
@@ -106,7 +107,7 @@ test("live Skills tab: shipped skills, upload, rename, deactivate, delete", asyn
   expect((await download).suggestedFilename()).toBe("live-check-renamed.skill");
 
   // Delete, and confirm it is gone from the list rather than merely greyed out.
-  page.once("dialog", (dialog) => void dialog.accept());
+  armConfirm(page);
   await renamed.getByRole("button", { name: "Delete" }).click();
   await expect(page.getByText(/Deleted “live-check-renamed”/)).toBeVisible({ timeout: 10_000 });
   await expect(page.getByText("live-check-renamed", { exact: true })).toHaveCount(0);
@@ -123,7 +124,7 @@ test("live Skills tab: Raiker builds a skill", async ({ page }) => {
   // build fail on a name clash rather than on anything under test.
   const existing = page.locator(".card", { hasText: "release-notes" }).first();
   if (await existing.count()) {
-    page.once("dialog", (dialog) => void dialog.accept());
+    armConfirm(page);
     await existing.getByRole("button", { name: "Delete" }).click();
     await expect(page.getByText(/Deleted “release-notes”/)).toBeVisible({ timeout: 10_000 });
   }
@@ -222,7 +223,7 @@ test(`live Chat: the model loads an installed skill through skill_load`, async (
   // this test assert the second half's behaviour. Start from nothing.
   const leftover = page.locator(".card", { hasText: "passphrase-check" }).first();
   if (await leftover.count()) {
-    page.once("dialog", (dialog) => void dialog.accept());
+    armConfirm(page);
     await leftover.getByRole("button", { name: "Delete" }).click();
     await expect(page.getByText(/Deleted “passphrase-check”/)).toBeVisible({ timeout: 10_000 });
   }

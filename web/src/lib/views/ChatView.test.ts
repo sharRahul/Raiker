@@ -1055,7 +1055,7 @@ describe("ChatView streaming transcript", () => {
     render(ChatView, { props: { sessionId: "sess_missing" } });
 
     await waitFor(() =>
-      expect(screen.getByText(/could not load history/i)).toBeInTheDocument(),
+      expect(screen.getByText(/this conversation did not load/i)).toBeInTheDocument(),
     );
   });
 

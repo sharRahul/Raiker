@@ -44,6 +44,15 @@ _BREAK_ELEMENTS = frozenset({
     "figure", "figcaption", "dt", "dd", "hr", "nav",
 })
 
+#: FIXED-1442 — elements with no end tag. A hidden one (`<input hidden>`,
+#: `<img height="0">`) opened a hidden region that nothing ever closed, so the
+#: rest of the page was dropped: PyPI's httpx page came back as "Skip to main
+#: content" with 430 hidden elements. They are counted, never nested.
+_VOID_ELEMENTS = frozenset({
+    "area", "base", "br", "col", "embed", "hr", "img", "input", "link", "meta",
+    "param", "source", "track", "wbr",
+})
+
 #: Inline styling that means "the reader never sees this".
 _HIDDEN_STYLE = re.compile(
     r"(display\s*:\s*none)"
@@ -75,6 +84,14 @@ _ROLE_IMPERSONATION = re.compile(
 )
 _FENCE = re.compile(r"^\s*(`{3,}|~{3,})", re.MULTILINE)
 
+#: FIXED-1441 — direction overrides reorder what a reader sees; one is enough
+#: to call a page suspicious. Zero-width joiners and soft hyphens are ordinary
+#: in real pages (emoji, hyphenation), so they count only in bulk.
+_BIDI_OVERRIDE = re.compile("[\u202a-\u202e\u2066-\u2069]")
+INVISIBLE_ALERT = 8
+#: How much hidden text is kept to be checked for instructions, at most.
+MAX_HIDDEN_CHARS = 20_000
+
 
 @dataclass
 class SanitizedPage:
@@ -86,15 +103,25 @@ class SanitizedPage:
     hidden_blocks_removed: int = 0
     invisible_characters_removed: int = 0
     role_markers_defanged: int = 0
+    #: FIXED-1441 — instruction-shaped signals found in the text that was hidden.
+    hidden_instruction_signals: int = 0
+    bidi_overrides_removed: int = 0
     notes: list[str] = field(default_factory=list)
 
     @property
     def suspicious(self) -> bool:
-        """True when the page carried something shaped like an injection attempt."""
+        """True when the page carried something shaped like an injection attempt.
+
+        FIXED-1441 — hidden elements alone are not evidence: almost every real
+        page hides menus, dialogs and screen-reader text (github.com/about
+        raised the alert on its navigation). Hidden text counts when it reads
+        like instructions to a model; it is removed and noted either way.
+        """
         return bool(
-            self.hidden_blocks_removed
-            or self.invisible_characters_removed
-            or self.role_markers_defanged
+            self.role_markers_defanged
+            or self.hidden_instruction_signals
+            or self.bidi_overrides_removed
+            or self.invisible_characters_removed >= INVISIBLE_ALERT
         )
 
 
@@ -107,6 +134,8 @@ class _Sanitizer(HTMLParser):
         self._in_title = False
         self.title = ""
         self.hidden_blocks = 0
+        self.hidden_parts: list[str] = []
+        self._hidden_chars = 0
 
     @staticmethod
     def _is_hidden(attrs: list[tuple[str, str | None]]) -> bool:
@@ -125,6 +154,12 @@ class _Sanitizer(HTMLParser):
 
     def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
         tag = tag.lower()
+        if tag in _VOID_ELEMENTS:
+            if self._is_hidden(attrs) and not (self._hidden_depth or self._suppress_depth):
+                self.hidden_blocks += 1
+            elif tag in _BREAK_ELEMENTS and not (self._suppress_depth or self._hidden_depth):
+                self._parts.append("\n")
+            return
         if tag in _DROP_ELEMENTS:
             self._suppress_depth += 1
             return
@@ -146,6 +181,9 @@ class _Sanitizer(HTMLParser):
 
     def handle_endtag(self, tag: str) -> None:
         tag = tag.lower()
+        if tag in _VOID_ELEMENTS:
+            # A stray </input> or </br> closes nothing that was opened.
+            return
         if tag in _DROP_ELEMENTS:
             self._suppress_depth = max(0, self._suppress_depth - 1)
             return
@@ -158,6 +196,10 @@ class _Sanitizer(HTMLParser):
             self._parts.append("\n")
 
     def handle_data(self, data: str) -> None:
+        if self._hidden_depth and not self._suppress_depth and self._hidden_chars < MAX_HIDDEN_CHARS:
+            self.hidden_parts.append(data)
+            self.hidden_parts.append("\n")
+            self._hidden_chars += len(data)
         if self._suppress_depth or self._hidden_depth:
             return
         if self._in_title:
@@ -186,6 +228,13 @@ def sanitize_html(body: str, *, max_chars: int = MAX_SUMMARY_CHARS) -> Sanitized
     page = sanitize_text(parser.text(), max_chars=max_chars)
     page.title = _collapse(unescape(parser.title))[:300]
     page.hidden_blocks_removed = parser.hidden_blocks
+    if parser.hidden_parts:
+        from raiker.security.injection_scan import scan_untrusted_text
+
+        hidden = unicodedata.normalize("NFKC", unescape("".join(parser.hidden_parts)))
+        page.hidden_instruction_signals = len(scan_untrusted_text(hidden)) + len(
+            _ROLE_IMPERSONATION.findall(hidden)
+        )
     if parser.hidden_blocks:
         page.notes.append(
             f"{parser.hidden_blocks} hidden element(s) were removed before this text was "
@@ -202,6 +251,7 @@ def sanitize_text(body: str, *, max_chars: int = MAX_SUMMARY_CHARS) -> Sanitized
     # of a role marker is defanged by the same rule as the plain one.
     text = unicodedata.normalize("NFKC", text)
 
+    bidi = len(_BIDI_OVERRIDE.findall(text))
     cleaned, invisible = _INVISIBLE.subn("", text)
     text = cleaned.replace("\r\n", "\n").replace("\r", "\n")
     text = "".join(
@@ -224,6 +274,7 @@ def sanitize_text(body: str, *, max_chars: int = MAX_SUMMARY_CHARS) -> Sanitized
         truncated=truncated,
         invisible_characters_removed=invisible,
         role_markers_defanged=role_markers,
+        bidi_overrides_removed=bidi,
     )
     if invisible:
         page.notes.append(

@@ -70,3 +70,18 @@ export async function sendTurn(
   await composer.getByRole("button", { name: /^Send/ }).click();
   return composer;
 }
+
+/**
+ * Answer the next confirmation, whichever kind it is (QUI-F10).
+ *
+ * Raiker asks with its own in-app dialog now; eight older specs waited for the
+ * browser's `dialog` event, which never came, and stalled before testing
+ * anything. Armed before the click that asks, like `page.once("dialog")` was:
+ * the in-app button is clicked when it appears, and a native confirm (still
+ * used by a few desktop paths) is answered the same way.
+ */
+export function armConfirm(page: Page, accept = true): void {
+  const buttons = page.locator("dialog.confirm-dialog .actions button");
+  void (accept ? buttons.last() : buttons.first()).click({ timeout: 60_000 }).catch(() => undefined);
+  page.once("dialog", (dialog) => void (accept ? dialog.accept() : dialog.dismiss()));
+}

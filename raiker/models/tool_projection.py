@@ -102,6 +102,38 @@ if _UNKNOWN:  # pragma: no cover - a definition error, not a runtime state
 
 
 #: Model-exposed tools whose schema is fetched rather than carried.
+#: FIXED-1436 — the core a small-context model carries. A local model with an
+#: 8K or 16K window spent most of it on ~5,500 tokens of schemas before the
+#: owner typed (measured 9,459 prompt tokens for one Chat question). Below
+#: :data:`SMALL_CONTEXT_TOKENS` a turn carries these and names the rest, without
+#: descriptions, on `tool_search`; every other tool is still one search away and
+#: passes the same gate, decision mode and approval when called.
+COMPACT_PROJECTED: frozenset[str] = frozenset({
+    "read_file",
+    "glob",
+    "grep",
+    "list_directory",
+    "edit_file",
+    "write_file",
+    "shell",
+    "update_plan",
+    "ask_owner_question",
+    "memory_search",
+    "web_search",
+    "web_fetch",
+})
+if COMPACT_PROJECTED - ALWAYS_PROJECTED:  # pragma: no cover - a definition error
+    raise ValueError("compact_projected_must_be_a_subset_of_the_core")
+
+#: A model whose advertised window is at or below this carries the compact core.
+SMALL_CONTEXT_TOKENS = 16_384
+
+
+def compact_for(context_window_tokens: int | None) -> bool:
+    """Whether a turn on a model with this window carries the compact core."""
+    return context_window_tokens is not None and 0 < context_window_tokens <= SMALL_CONTEXT_TOKENS
+
+
 DEFERRABLE_TOOL_NAMES: frozenset[str] = frozenset(
     MODEL_EXPOSED_TOOLS - ALWAYS_PROJECTED - {TOOL_SEARCH}
 )
@@ -172,7 +204,10 @@ def matching_tools(
     server declared rather than from `TOOL_DESCRIPTIONS`.
     """
     terms = [word for word in _WORD.findall(query.lower()) if word not in _STOPWORDS]
-    described_by = {name: TOOL_DESCRIPTIONS.get(name, "") for name in deferred_tool_names()}
+    # The compact core leaves part of the full core uncarried; those must be
+    # findable too, or a small model could not reach `git_status` at all.
+    searchable = (*deferred_tool_names(), *sorted(ALWAYS_PROJECTED - COMPACT_PROJECTED))
+    described_by = {name: TOOL_DESCRIPTIONS.get(name, "") for name in searchable}
     described_by.update(extra or {})
     scored: list[tuple[int, str]] = []
     for name in sorted(described_by):
@@ -182,8 +217,15 @@ def matching_tools(
         # Whole words, not substrings. "all" inside "Call the tool" matched
         # five unrelated tools and turned a query that means nothing into five
         # confident answers.
-        described = set(_WORD.findall(f"{name} {described_by[name]}".lower()))
         named = set(_WORD.findall(name.lower()))
+        # A core tool is matched by its name only: a full-window turn already
+        # carries it, so it must not crowd a search's results there, and a
+        # compact turn reaches it by the name its index lists.
+        described = (
+            named
+            if name in ALWAYS_PROJECTED
+            else set(_WORD.findall(f"{name} {described_by[name]}".lower()))
+        )
         # A term in the *name* is worth more than one buried in prose: "commit"
         # in `git_commit` is what the model meant; "commit" in another tool's
         # description is a coincidence.
@@ -201,6 +243,7 @@ def project_specs(
     revealed: frozenset[str] = frozenset(),
     defer: bool = True,
     mcp_specs: list[ToolSpec] | None = None,
+    compact: bool = False,
 ) -> list[ToolSpec]:
     """The specs this request carries: the core, plus whatever was revealed.
 
@@ -218,9 +261,10 @@ def project_specs(
     mcp = list(mcp_specs or [])
     if not defer:
         return [*all_specs, *mcp]
-    keep = ALWAYS_PROJECTED | {TOOL_SEARCH} | set(revealed)
+    core = COMPACT_PROJECTED if compact else ALWAYS_PROJECTED
+    keep = core | {TOOL_SEARCH} | set(revealed)
     kept = [spec for spec in all_specs if spec.name in keep]
-    mcp_carried = mcp_specs_fit_budget(mcp)
+    mcp_carried = mcp_specs_fit_budget(mcp) and not compact
     kept.extend(spec for spec in mcp if mcp_carried or spec.name in revealed)
     # The model has to know what it can ask for, or deferring becomes hiding.
     # The catalogue rides on `tool_search`'s own description — the one spec
@@ -228,6 +272,21 @@ def project_specs(
     # costs a few hundred tokens against the several thousand the full schemas
     # cost, and it is the whole difference between "not carried" and "not
     # available".
+    if compact:
+        # Names only: the one-line descriptions alone are ~1,500 tokens.
+        uncarried = (DEFERRABLE_TOOL_NAMES | (ALWAYS_PROJECTED - COMPACT_PROJECTED)) - set(revealed)
+        names = sorted(uncarried) + sorted(spec.name for spec in mcp if spec.name not in revealed)
+        index = ", ".join(names)
+        return [
+            spec
+            if spec.name != TOOL_SEARCH
+            else ToolSpec(
+                name=spec.name,
+                description=f"{spec.description} Available on request: {index}" if names else spec.description,
+                parameters=spec.parameters,
+            )
+            for spec in kept
+        ]
     entries = [(name, _one_line(name)) for name in sorted(DEFERRABLE_TOOL_NAMES - set(revealed))]
     if not mcp_carried:
         entries.extend(

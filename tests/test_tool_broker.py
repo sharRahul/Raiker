@@ -274,6 +274,32 @@ def test_write_file_proposal_states_that_approving_writes_the_file(tmp_path) -> 
     )
 
 
+def test_edit_proposals_say_how_many_places_and_which_cell(tmp_path) -> None:  # type: ignore[no-untyped-def]
+    """FIXED-1430 — RT-TOOL-04: a replace-all edit counts its matches and a
+    notebook edit names its cell, on the card itself."""
+    broker = _broker(tmp_path)
+    (tmp_path / "palette.py").write_text("RED = 1\nRED_2 = RED\nprint(RED)\n", encoding="utf-8")
+
+    def effect(arguments: dict) -> str:  # type: ignore[type-arg]
+        result, _decision = broker.execute(
+            ToolAction(new_id("act_"), "edit_file", arguments, "high", True),
+            session_id=new_id("sess_"),
+            turn_id=new_id("turn_"),
+        )
+        return str(result.output["expected_effect"])  # type: ignore[index]
+
+    assert effect({"path": "palette.py", "old_text": "RED", "new_text": "CRIMSON", "replace_all": True}) == (
+        "Approving replaces this text in 4 places in palette.py, once."
+    )
+    assert effect({"path": "palette.py", "old_text": "print(RED)", "new_text": "print(1)"}) == (
+        "Approving writes this exact change to palette.py, once."
+    )
+    notebook = ToolAction(new_id("act_"), "edit_file", {"path": "nb.ipynb", "old_text": "a", "new_text": "b", "cell": "3"}, "high", True)
+    assert broker._edit_consequence(notebook, "nb.ipynb") == (
+        "Approving writes this exact change to cell 3 of nb.ipynb, once."
+    )
+
+
 def test_shell_proposal_states_that_approving_executes_once(tmp_path) -> None:  # type: ignore[no-untyped-def]
     broker = _broker(tmp_path)
     result, _decision = broker.execute(

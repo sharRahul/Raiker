@@ -38,6 +38,7 @@
   import { HELD_SEND_SECONDS, holdsBeforeSending } from "../heldSend";
   import { shownInline } from "../inlineDecisions.svelte";
   import Icon from "./Icon.svelte";
+  import DiffView from "./DiffView.svelte";
   import LimitRuleForm from "./LimitRuleForm.svelte";
   import { limitRuleReason } from "../limitRules";
   import { announcePermissionsChanged } from "../permissionSync";
@@ -246,6 +247,15 @@
     {/each}
   </dl>
 
+  {#if detail?.diff && (detail.preview_kind === "file_diff" || detail.preview_kind === "patch") && !expired}
+    <!-- FIXED-1430 — RT-TOOL-04: the card said it writes "this exact change"
+         while the change itself was a page away. It is shown here, collapsed
+         and read-only; narrowing hunks still happens in Approvals. -->
+    <div class="inline-diff" data-testid="safety-diff">
+      <DiffView diff={detail.diff} path={detail.diff_path} open={detail.diff.split("\n").length <= 16} />
+    </div>
+  {/if}
+
   {#if expired}
     <p class="note">
       Nobody answered within {timeLimit === null ? "the time limit" : approvalTimeoutLabel(timeLimit)}, so
@@ -342,6 +352,7 @@
     font-size: var(--text-xs);
     font-weight: 650;
   }
+  .inline-diff { margin: 0 0 var(--space-3); min-width: 0; }
   .rows {
     display: grid;
     gap: 0.3rem;

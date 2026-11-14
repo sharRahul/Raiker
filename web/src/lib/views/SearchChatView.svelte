@@ -179,12 +179,24 @@
     sessionId: string,
     id: CommandId,
     run: () => Promise<unknown>,
+    paint?: (thread: WorkThread) => WorkThread | null,
   ): Promise<void> {
     // BUG-306 — the command says what it is, whether it is confirmed, and how
     // it reads when it fails. This page renders and calls; it no longer also
     // decides.
     actionError = null;
     busy = sessionId;
+    // FIXED-1432 — QUI-G04: rename, pin and archive paint before the request
+    // returns. `paint` gives the row as it will read (or `null` when it leaves
+    // this scope); a refusal puts the list back exactly as it was and says so.
+    const before = threads;
+    if (paint) {
+      threads = threads.flatMap((thread) => {
+        if (thread.session_id !== sessionId) return [thread];
+        const next = paint(thread);
+        return next === null ? [] : [next];
+      });
+    }
     try {
       await run();
       // The menu's job is done, and the list behind it is about to change:
@@ -193,7 +205,13 @@
       openMenu = null;
       await read(null);
     } catch (error) {
-      actionError = commandFailure(id, error instanceof ApiError ? error.status : undefined);
+      const message = commandFailure(id, error instanceof ApiError ? error.status : undefined);
+      if (paint) {
+        threads = before;
+        actionError = `${message} The list is back as it was.`;
+      } else {
+        actionError = message;
+      }
     } finally {
       busy = null;
     }
@@ -207,10 +225,12 @@
   async function archiveOrRestore(thread: WorkThread): Promise<void> {
     const id: CommandId = thread.archived ? "restore" : "archive";
     if (command(id).confirms && !(await askConfirm({ title: archiveConfirmation(thread.title), confirmLabel: "Archive" }))) return;
-    await organise(thread.session_id, id, () =>
-      thread.archived
-        ? api.unarchiveSession(thread.session_id)
-        : api.archiveSession(thread.session_id),
+    await organise(
+      thread.session_id,
+      id,
+      () => (thread.archived ? api.unarchiveSession(thread.session_id) : api.archiveSession(thread.session_id)),
+      // Archiving or restoring moves the thread to the other scope.
+      () => null,
     );
   }
 
@@ -224,8 +244,11 @@
     const next = titleDraft.trim();
     renaming = null;
     if (!next || next === thread.title) return;
-    await organise(thread.session_id, "rename", () =>
-      api.renameSession(thread.session_id, next),
+    await organise(
+      thread.session_id,
+      "rename",
+      () => api.renameSession(thread.session_id, next),
+      (row) => ({ ...row, title: next }),
     );
   }
 
@@ -504,8 +527,11 @@
                 class="chip"
                 disabled={busy === thread.session_id}
                 onclick={() =>
-                  void organise(thread.session_id, thread.pinned ? "unpin" : "pin", () =>
-                    api.setSessionPinned(thread.session_id, !thread.pinned),
+                  void organise(
+                    thread.session_id,
+                    thread.pinned ? "unpin" : "pin",
+                    () => api.setSessionPinned(thread.session_id, !thread.pinned),
+                    (row) => ({ ...row, pinned: !row.pinned }),
                   )}>{thread.pinned ? "Unpin" : "Pin"}</button
               >
               <button type="button" class="chip" onclick={() => startRename(thread)}>Rename</button>

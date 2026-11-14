@@ -259,6 +259,29 @@ describe("MemoryView", () => {
     ));
   });
 
+  it("names the approved memory a proposal repeats (FIXED-1439)", async () => {
+    stubFetch({
+      "GET /api/memory": [],
+      "GET /api/memory/settings": { incognito: false },
+      "GET /api/memory/proposals": [{
+        candidate_id: "memcand_2",
+        source_event_id: "evt_2",
+        memory_type: "preference",
+        scope: "global",
+        text: "User prefers short replies",
+        sensitivity: "normal",
+        confidence: 0.8,
+        decision: "deferred",
+        created_at: "2026-11-14T00:00:00Z",
+        similar_memory: { memory_id: "mem_9", text: "The owner prefers short replies.", similarity: 1 },
+      }],
+    });
+    render(MemoryView, { props: { tab: "suggestions" } });
+    const note = await screen.findByTestId("near-duplicate");
+    expect(note).toHaveTextContent("The owner prefers short replies.");
+    expect(note).toHaveTextContent("Approving keeps both");
+  });
+
   it("reviews extracted relationships with visible evidence", async () => {
     const fetchMock = stubFetch({
       "GET /api/memory": [],

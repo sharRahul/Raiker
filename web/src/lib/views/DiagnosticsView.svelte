@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { failure } from "../errorCopy";
   import { RUNTIME_HEALTH_CHANGED } from "../observeAttention";
   import { onMount } from "svelte";
   import Badge from "../components/Badge.svelte";
@@ -70,7 +71,7 @@
       integrityNotice = `Rebuilt — ${result.indexed_rows} rows indexed.`;
       await loadIntegrity();
     } catch (e) {
-      integrityNotice = e instanceof ApiError ? `Could not rebuild (${e.status}).` : "Could not rebuild.";
+      integrityNotice = failure("The index was not rebuilt", "The existing index is unchanged.", "Try again.", e);
     } finally {
       integrityBusy = false;
     }
@@ -99,7 +100,7 @@
       await loadIntegrity();
       announceRepaired();
     } catch (e) {
-      integrityNotice = e instanceof ApiError ? `Could not rebuild (${e.status}).` : "Could not rebuild.";
+      integrityNotice = failure("The index was not rebuilt", "The existing index is unchanged.", "Try again.", e);
     } finally {
       integrityBusy = false;
     }
@@ -127,7 +128,7 @@
       await loadIntegrity();
       announceRepaired();
     } catch (e) {
-      integrityNotice = e instanceof ApiError ? `Could not remove them (${e.status}).` : "Could not remove them.";
+      integrityNotice = failure("The damaged vectors were not removed", "Recall skips them until they are.", "Try again.", e);
     } finally {
       integrityBusy = false;
     }

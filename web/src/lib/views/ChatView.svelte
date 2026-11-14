@@ -6,7 +6,7 @@
   import { uiPrefs } from "../prefs.svelte";
   import { askConfirm } from "../confirm.svelte";
   import { LARGE_PASTE_CHARS } from "../composerAttachments.svelte";
-  import { NOT_ANSWERING } from "../errorCopy";
+  import { failure, NOT_ANSWERING } from "../errorCopy";
   import { pickableProjects } from "../projectLifecycle";
   import { workDraft } from "../workDraft.svelte";
   import { onMount, tick, untrack } from "svelte";
@@ -1090,6 +1090,10 @@
       earlierShown = 0;
       turns = detail.turns.map((t) => restoredTurn(t, id, parked.get(t.turn_id)));
       nextId = turns.length + 1;
+      // FIXED-1427 — the transcript is on screen now. The reads below fill in
+      // chips, sources and recall; holding the loading line through them left
+      // "Loading conversation…" above a conversation that had already drawn.
+      historyLoading = false;
       await restoreAttachmentChips(id);
       await inspector.refreshTurnSources(id);
       await recall.refresh(id);
@@ -1100,8 +1104,12 @@
       // not changed.
       if (anchoredTurnId === null || anchoredTurnId === "") void scrollToEnd(true);
     } catch (e) {
-      historyError =
-        e instanceof ApiError ? `Could not load history (${e.status}).` : "Could not load history.";
+      historyError = failure(
+        "This conversation did not load",
+        "Nothing in it was changed.",
+        "Reload the page, or open it again from Threads.",
+        e,
+      );
     } finally {
       historyLoading = false;
     }
@@ -1953,7 +1961,7 @@
           : `Filed under ${projects?.projects.find((project) => project.project_id === target)?.name ?? "the project"}. Recall still draws on all your memory.`;
       onProjectsChanged?.();
     } catch (error) {
-      projectNotice = error instanceof ApiError ? `Could not move this chat (${error.status}).` : "Could not move this chat.";
+      projectNotice = failure("This chat was not moved", "It stays where it was.", "Try again, or move it from Work › Threads.", error);
     }
   }
 

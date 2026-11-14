@@ -23,7 +23,7 @@ import {
   openProviderDetails,
   signInAsOwner,
 } from "./hosted-provider";
-import { LIVE_BASE as BASE, ANTHROPIC_KEY as KEY } from "./live";
+import { LIVE_BASE as BASE, ANTHROPIC_KEY as KEY, armConfirm } from "./live";
 
 const SHOTS = "../../output/playwright/2026-09-12-catalogue-lifecycle";
 
@@ -104,7 +104,7 @@ test("disconnecting a provider takes its models with it", async ({ page }) => {
   // default — so without this the click is a no-op and the assertion below
   // reads as the catalogue refusing to clear rather than as a disconnect that
   // never happened.
-  page.once("dialog", (dialog) => void dialog.accept());
+  armConfirm(page);
   await disconnect.click();
 
   await expect

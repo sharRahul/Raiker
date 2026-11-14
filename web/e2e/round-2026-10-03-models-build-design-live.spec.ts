@@ -16,8 +16,8 @@ import { join } from "node:path";
 import { expect, test, type Page } from "@playwright/test";
 import { capture, captureElement } from "./capture";
 import { horizontalBleed, settled } from "./destinations";
-import { chooseModelForTurn, dismissFirstRunModelSetup, signInAsOwner } from "./hosted-provider";
-import { LIVE_BASE, useAnthropic } from "./live";
+import { chooseModelForTurn, dismissFirstRunModelSetup, signInAsOwner, openPermission } from "./hosted-provider";
+import { LIVE_BASE, useAnthropic, armConfirm } from "./live";
 
 const BASE = LIVE_BASE;
 const SHOTS = join(import.meta.dirname, "..", "..", "output", "playwright", "2026-10-03-models-build-design-round");
@@ -157,12 +157,7 @@ const CODE_DIR_MISSING = () => !existsSync(join(WORKSPACE, CODE_DIR, "test_prici
 let projectId = "";
 
 async function setCapability(page: Page, label: string, reason: string) {
-  await page.goto(`${BASE}/#/capabilities`);
-  const search = page.getByLabel("Search capabilities", { exact: true });
-  await expect(search).toBeVisible({ timeout: 30_000 });
-  await search.fill(label);
-  const card = page.locator(".cap.card").filter({ hasText: label }).first();
-  await expect(card).toBeVisible();
+  const card = await openPermission(page, BASE, label);
   const toggle = card.getByRole("button", { name: label });
   if ((await toggle.getAttribute("aria-expanded")) !== "true") await toggle.click();
   const turnOn = card.getByRole("button", { name: "Turn on" });
@@ -411,7 +406,7 @@ test("Design: filed or Unfiled before Generate, then export, delete, restore and
   await expect(inspector).toContainText(/Filed in\s*Unfiled/);
   await inspector.getByRole("button", { name: "Delete" }).click();
   await page.getByTestId("design-recently-deleted").locator("summary").click();
-  page.once("dialog", (dialog) => void dialog.accept());
+  armConfirm(page);
   await page.getByRole("button", { name: "Remove for good" }).click();
   await expect(page.getByTestId("design-recently-deleted")).toHaveCount(0);
   const gallery = await api<{ generations: { generation_id: string }[]; deleted: unknown[] }>(page, "GET", "/api/images");

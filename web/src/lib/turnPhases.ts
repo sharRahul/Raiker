@@ -127,10 +127,13 @@ export function summarizeEvent(ev: StreamEvent): string {
       return `Risk: ${str(p.risk_level)}${p.requires_approval ? " — approval required" : ""}.`;
     case "context_gathered":
       return "Workspace context gathered (bounded local metadata only).";
+    // FIXED-1429 — these two are the governance pipeline's pre-flight review,
+    // not the plan an owner asks for in Build's Plan posture. "No plan required"
+    // sat under a Plan turn that was busy writing one (RT-TOOL-22).
     case "plan_created":
-      return "Plan created.";
+      return "Governance review: multi-step checks planned before acting.";
     case "plan_skipped":
-      return "No plan required for this turn.";
+      return "Governance review: a single safe step, so no pre-flight checks were needed.";
     case "agent_plan_updated":
       return `Plan updated: ${str(p.completed)} of ${str(p.total)} step(s) done${p.current_step ? ` — now ${str(p.current_step)}` : ""}.`;
     case "agent_plan_replayed":

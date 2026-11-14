@@ -17,7 +17,7 @@ import { expect, test, type Page } from "@playwright/test";
 import { capture } from "./capture";
 import { horizontalBleed, settled } from "./destinations";
 import { chooseModelForTurn, enableCapability, signInAsOwner } from "./hosted-provider";
-import { ANTHROPIC_MODEL, LIVE_BASE, sendTurn, useAnthropic } from "./live";
+import { ANTHROPIC_MODEL, LIVE_BASE, sendTurn, useAnthropic, armConfirm } from "./live";
 
 const BASE = LIVE_BASE;
 const SHOTS = join(import.meta.dirname, "..", "..", "output", "playwright", "2026-10-05-readiness-decisions-round");
@@ -146,7 +146,7 @@ test("the time zone says its UTC offset, and leaving Settings with an unsaved ed
   expect(prompts.length).toBe(1);
 
   // Leaving and agreeing goes.
-  page.once("dialog", (dialog) => dialog.accept());
+  armConfirm(page);
   await page.evaluate(() => {
     window.location.hash = "#/tasks";
   });

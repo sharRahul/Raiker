@@ -166,6 +166,33 @@ describe("the notice dock", () => {
   });
 });
 
+describe("the notice dock on a phone (FIXED-1437)", () => {
+  it("goes straight into the bell while the owner is typing", async () => {
+    const original = window.matchMedia;
+    window.matchMedia = ((query: string) => ({
+      matches: query.includes("max-width: 700px"),
+      media: query,
+      addEventListener: () => {},
+      removeEventListener: () => {},
+    })) as unknown as typeof window.matchMedia;
+    const field = document.createElement("textarea");
+    document.body.appendChild(field);
+    field.focus();
+    try {
+      stubFetch({
+        "GET /api/notifications": [notice({ title: "While typing" })],
+        "GET /api/notifications/delivery": policy(),
+      });
+      render(NotificationCenter);
+      await new Promise((resolve) => setTimeout(resolve, 50));
+      await waitFor(() => expect(screen.queryByRole("region", { name: "Notifications" })).toBeNull());
+    } finally {
+      field.remove();
+      window.matchMedia = original;
+    }
+  });
+});
+
 describe("the approval card", () => {
   const pending = {
     approval_id: "ap_1",

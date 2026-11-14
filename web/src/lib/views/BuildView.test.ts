@@ -1030,7 +1030,7 @@ describe("Build conversation restore", () => {
     stubFetch(baseRoutes({ "GET /api/sessions/sess_prior": { __status: 500 } }));
     render(BuildView, { props: { projects: BUILD_PROJECTS, sessionId: "sess_prior" } });
 
-    expect(await screen.findByRole("alert")).toHaveTextContent(/Could not load history/);
+    expect(await screen.findByRole("alert")).toHaveTextContent(/This conversation did not load/);
   });
 });
 

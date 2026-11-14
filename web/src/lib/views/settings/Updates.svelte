@@ -241,7 +241,6 @@
   .section-heading h2, .card-heading h3 { margin: 0; }
   .card-heading { margin-bottom: var(--space-2); }
   .card-heading :global(p) { color: var(--text-2); margin: 0.3rem 0 0; }
-  .settings-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-lg); padding: var(--card-pad-y, var(--space-4)) var(--card-pad-x); margin-bottom: var(--space-3); }
   .settings-card :global(dl) { display: grid; margin: var(--space-2) 0; }
   .settings-card :global(dl > div) { display: grid; grid-template-columns: minmax(9rem, 14rem) minmax(0, 1fr); gap: var(--space-3); align-items: baseline; padding: 0.55rem 0; border-top: 1px solid var(--border); }
   .settings-card :global(dl > div:first-child) { border-top: 0; }

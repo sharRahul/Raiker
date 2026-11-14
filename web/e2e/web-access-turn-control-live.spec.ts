@@ -28,7 +28,7 @@ import { expect, test, type Browser, type BrowserContext, type Page } from "@pla
 import { capture } from "./capture";
 import { join } from "node:path";
 
-import { refreshHostedReadiness, signInAsOwner } from "./hosted-provider";
+import { refreshHostedReadiness, setPermission, signInAsOwner, openPermission } from "./hosted-provider";
 import { LIVE_BASE as BASE, ANTHROPIC_KEY, useAnthropic } from "./live";
 
 const SHOTS = join(import.meta.dirname, "..", "..", "docs", "plans", "screenshots", "working");
@@ -59,16 +59,7 @@ async function signIn(target: Page) {
 
 /** Open one capability's card on the Permissions page. */
 async function openCapability(label: string) {
-  await page.goto(`${BASE}/#/capabilities`);
-  const search = page.getByLabel("Search capabilities", { exact: true });
-  await expect(search).toBeVisible({ timeout: 30_000 });
-  await search.fill(label);
-  const card = page.locator(".cap.card").filter({ hasText: label }).first();
-  await expect(card).toBeVisible({ timeout: 30_000 });
-  if ((await card.getByRole("button", { name: label }).getAttribute("aria-expanded")) !== "true") {
-    await card.getByRole("button", { name: label }).click();
-  }
-  await expect(card.locator(".cap-detail")).toBeVisible({ timeout: 10_000 });
+  const card = await openPermission(page, BASE, label);
   return card;
 }
 
@@ -134,6 +125,9 @@ test("the provider key is added through the UI and a real turn answers", async (
 
 test("B12/C7 — a web read is withheld with its reason before the owner enables it", async () => {
   test.setTimeout(300_000);
+  // A used workspace may already allow web reads (an earlier round turned it
+  // on); the case is about the withheld read, so it sets that state itself.
+  await setPermission(page, BASE, "Web fetch", "Turn off", "B12/C7 precondition: web reads start off");
   await refreshHostedReadiness(page, BASE, "Anthropic");
   await page.goto(`${BASE}/#/new-chat`);
   const prompt = page.getByPlaceholder("What would you like Raiker to do?");
@@ -248,14 +242,17 @@ test("B17/C13 — the owner stops a running turn, and it ends as stopped", async
   );
   await page.getByRole("button", { name: "Send", exact: true }).click();
 
-  const control = page.getByTestId("turn-control");
-  await expect(control).toBeVisible({ timeout: 60_000 });
-  await control.getByRole("button", { name: "Stop safely" }).click();
+  // FIXED-1306 — Send morphs into Stop safely while the turn runs; there is
+  // no separate turn-control Stop button any more.
+  const composer = page.getByRole("group", { name: "Message composer" });
+  const stop = composer.getByRole("button", { name: "Stop safely", exact: true });
+  await expect(stop).toBeVisible({ timeout: 60_000 });
+  await stop.click();
   await expect(page.getByText(/Stop requested/)).toBeVisible({ timeout: 30_000 });
   await capture(page, join(SHOTS, "b17-stop-requested.png"));
 
   // The turn really ends, and it ends as a decision rather than a failure.
-  await expect(control).toBeHidden({ timeout: 240_000 });
+  await expect(composer.getByRole("button", { name: "Send", exact: true })).toBeVisible({ timeout: 240_000 });
   await expect(page.getByText(/Stopped at your request/).last()).toBeVisible({ timeout: 30_000 });
   await capture(page, join(SHOTS, "b17-turn-stopped.png"));
 });

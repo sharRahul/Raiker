@@ -16,6 +16,54 @@ PR #106: the **user-owned fallback sequence** and **prompt caching + normalised
 cache-hit metrics**.
 
 
+## Result — 2026-11-14 (Third round: permissions harness, web reads and work lists)
+
+A Linux workspace served by `raiker-web --port 8765` at 1440×1000 (1440×900
+for the size report), built from this round's SPA. Anthropic was connected
+through **Add model** with an identity-linked key and its workspace ID typed
+into the UI from the round's environment (`RAIKER_LIVE_ANTHROPIC_KEY`,
+`RAIKER_LIVE_ANTHROPIC_WORKSPACE`; RT-1114-01 passed first). Neither appears
+in a spec, log or capture. Spec: `web/e2e/fixed-1426-1442-round-live.spec.ts`.
+Result: **8 of 8 passed**.
+
+| # | Scenario | Verification | Result |
+|---|---|---|---|
+| RT-1114C-01 | Settings › General's card has the shared 1 px edge and radius; no section redefines it | FIXED-1443 | Passed |
+| RT-1114C-02 | Settings › Advanced › Memory engine names the background indexer's last pass (*Waiting … Open Permissions*) | FIXED-1426 | Passed |
+| RT-1114C-03 | Work › Projects: one column of rows, each ≥ 64 px, actions in the right half | FIXED-1431 | Passed |
+| RT-1114C-04 | Memory › Controls at 1440×900: the two lists share a top edge | FIXED-1433 | Passed |
+| RT-1114C-05 | Work › Threads: a rename is on screen within 2 s and stays after the index re-read | FIXED-1432 | Passed |
+| RT-1114C-06 | A real Haiku 4.5 Build turn, started from a project row's **Start in Build**: page-text answer and one quiet line *Haiku 4.5 · ≈ $0.0130 · Evidence* | FIXED-1438 | Passed |
+| RT-1114C-07 | A reopened conversation, and the same after a reload, shows no *Loading conversation…* once its transcript is on screen | FIXED-1427 | Passed |
+| RT-1114C-08 | The Stop dialog names the tasks it would reach, or says nothing runs | FIXED-1428 | Passed |
+
+**Older specs re-run on the same workspace (Haiku already kept).**
+`web-access-turn-control-live`: the provider connects through the UI and a
+real turn answers; a web read is withheld with its reason once *Web fetch* is
+off; once on and allowed, the agent quotes PyPI's httpx summary; the owner
+steers a running turn; **Stop safely** ends a running tool turn as *Stopped at
+your request*. The allowlist case is refused here for a different reason: this
+sandbox's proxy refuses DNS-over-HTTPS, so `example.com` is refused as
+unverified (an environment limit recorded in TO_BE_FIXED).
+`model-connection-anthropic-live` LC-04 disconnected Anthropic through the
+in-app confirm; RT-1114-01 reconnected it.
+
+**Found and fixed during the run.** The first web-access run reproduced the
+2026-11-07 setup failure: the shared helper re-entered the identity-linked key
+without its workspace ID, so the model dialog listed nothing
+(FIXED-1444). The first successful read of PyPI returned only *Skip to main
+content* with 430 hidden elements: a hidden void element opened a hidden
+region nothing closed (FIXED-1442).
+
+**Size report.** `all-pages-live.spec.ts` *size budgets*: Memory › Controls
+and Tasks now fit; Observe › Activity and Settings › Notifications and
+Advanced (1280×800) remain over.
+
+**Captures.** `output/playwright/2026-11-14c-round/` — `01-settings-card`,
+`02-memory-engine-background`, `03-projects-rows`, `04-memory-controls`,
+`05-thread-renamed`, `06-build-meta-line`, `07-reopened`, `08-stop-dialog`.
+Inspected at original resolution; no key, token or workspace ID is visible.
+
 ## Result — 2026-11-14 (Second round: models, context, answers, Tasks, voice, embeddings)
 
 A Linux workspace served by `raiker-web --port 8765` at 1440×1000, built from
@@ -2181,9 +2229,9 @@ seconds) on the final build. Failures on the way are not passing evidence:
 * **Harness, not product.** The first RT-EXEC-05 run had no Build model chosen
   in this workspace. The case now chooses Haiku in Build's model menu first.
   `web-access-turn-control-live.spec.ts` was brought up to the new controls, but
-  its own setup helper fails on a workspace that already keeps Haiku. This is
-  recorded in
-  [TO_BE_FIXED](../plans/TO_BE_FIXED.md#the-web-access-live-specs-setup-cannot-run-on-a-workspace-that-already-keeps-haiku).
+  its own setup helper failed on a workspace that already keeps Haiku. Fixed
+  on 2026-11-14 in
+  [FIXED-1444](../plans/FIXED_ITEMS.md#fixed-1444--older-live-specs-could-not-reach-permissions-a-confirm-or-stop-safely).
 
 The 11 captures are under
 `output/playwright/2026-11-07-composer-execution-states/` (ignored by Git).

@@ -1565,11 +1565,39 @@ class ToolBroker:
                 # the same treatment every other argument gets on the way out.
                 raw_path = str(action.arguments.get("path", ""))
                 path = str(self._redact_value(raw_path)) or "the proposed path"
+                if action.tool_name == "edit_file":
+                    return self._edit_consequence(action, path)
                 return f"Approving writes this exact change to {path}, once."
         return (
             "Records an action-bound approval request only. Approval resolution is "
             "metadata-only and does not execute the action."
         )
+
+    def _edit_consequence(self, action: ToolAction, path: str) -> str:
+        """FIXED-1430 — an edit's sentence says how much it changes and where.
+
+        A ``replace_all`` edit changes every match, so the card says how many
+        there are; a notebook edit changes one cell, so the card names it.
+        RT-TOOL-04 found both left to the change view.
+        """
+        options = edit_options(action.arguments)
+        cell = options["cell"]
+        where = f"cell {self._redact_value(cell)} of {path}" if cell is not None else path
+        if options["replace_all"]:
+            old_text = str(action.arguments.get("old_text", ""))
+            count = 0
+            if cell is None and old_text:
+                snapshot = self._approval_preview(action) or {}
+                before = snapshot.get("before_snapshot")
+                if isinstance(before, str):
+                    count = before.count(old_text)
+            if count:
+                places = "place" if count == 1 else "places"
+                return f"Approving replaces this text in {count} {places} in {where}, once."
+            return f"Approving replaces every match of this text in {where}, once."
+        if options["insert_line"] is not None:
+            return f"Approving inserts this exact text in {where}, once."
+        return f"Approving writes this exact change to {where}, once."
 
     def _pre_tool_use(
         self,

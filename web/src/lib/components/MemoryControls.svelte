@@ -85,6 +85,10 @@
   }
 </script>
 
+<!-- FIXED-1433 — QUI-G01: the two lists sit side by side on a wide screen.
+     Each is usually one line ("Nothing yet", "None in force"), and stacked they
+     pushed Memory › Controls past its one-screen budget at 1440×900. -->
+<div class="controls-pair">
 <section class="controls-section" aria-labelledby="learned-h">
   <div class="section-head"><h3 id="learned-h">What Raiker has learned to do</h3></div>
   {#if skills === null}
@@ -124,11 +128,14 @@
   {/if}
 </section>
 
+</div>
+
 {#if notice}<p class="notice" role="status">{notice}</p>{/if}
 {#if problem}<p class="problem" role="alert">{problem}</p>{/if}
 
 <style>
-  .controls-section{margin:0 0 var(--space-5)}
+  .controls-pair{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,22rem),1fr));gap:0 var(--space-5);margin:0 0 var(--space-4)}
+  .controls-section{margin:0;min-width:0}
   .controls-section h3{margin:0 0 var(--space-2);font-size:var(--text-md)}
   .control-list{list-style:none;margin:0;padding:0;display:grid;gap:var(--space-2)}
   .control-list li{display:flex;align-items:center;justify-content:space-between;gap:var(--space-3);padding:var(--space-2) var(--space-3);border:1px solid var(--border);border-radius:var(--r-md);background:var(--surface)}

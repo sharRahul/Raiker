@@ -227,6 +227,18 @@ product.
 permission off. Re-run every spec against a fresh host. The
 specs updated in PR #245 are the model.
 
+**2026-11-14 — reduced** ([FIXED-1444](FIXED_ITEMS.md#fixed-1444--older-live-specs-could-not-reach-permissions-a-confirm-or-stop-safely)).
+`openPermission` and `setPermission` in `hosted-provider.ts` now walk the rail;
+seventeen specs call them, including `model-connection-anthropic-live`
+LC-03/LC-04 and `web-access-turn-control-live`. Ten still assert the old
+layout itself and need a case-by-case rewrite: `b9-repository-code-map`,
+`bug-239-unset-gate-honesty`, `bug-58-known-limits` (its list check),
+`gcr-provider-validation-and-workspace`, `memory-restart-provider-composer`,
+`release-readiness-2026-09-13`, `removal-review-permissions-2026-09-14`,
+`round-2026-09-04-priority`, `round-2026-09-15-typed-and-authority` and
+`round-2026-10-02-memory`. LC-03's first check expects *On by connection*,
+which holds only on a workspace where the gate was never turned on by hand.
+
 ## Windows high-DPI window restoration
 
 On a Windows display at 150% scaling, the Electron shell geometry test observed
@@ -962,15 +974,6 @@ The focused regression set, documentation contracts, Ruff, mypy, and web checks 
 
 These are not closed by this documentation/live-test pass. They need follow-up investigation to determine which are Windows-environment assumptions and which are regressions in command, Git proposal, or notification behavior.
 
-## 2026-10-21 verification follow-up — the top bar's STOP count after a finished turn
-
-In the Quiet UI live round, the RT-QUI-05 capture taken just after a 120-line
-answer finished shows the top bar's **STOP** control with a count of 1 while
-Chat showed no running turn. Home then listed *2 proposed memories to review*,
-so the running item was probably the memory-proposal pass after the turn, but
-this was not confirmed. Triage: read `GET /api/work-in-flight` at that moment and
-check that whatever the STOP count includes is named where the owner can see it.
-
 ## 2026-10-21 Quiet UI round 2 — what is still open
 
 Round 2 shipped [FIXED-1080](FIXED_ITEMS.md#fixed-1080--home-offered-five-threads-to-continue-instead-of-the-one-with-its-next-step-qui-h01)
@@ -979,26 +982,23 @@ the layout round shipped [FIXED-1101](FIXED_ITEMS.md#fixed-1101--the-shell-was-w
 to [FIXED-1123](FIXED_ITEMS.md#fixed-1123--chats-readiness-steps-disappeared-with-the-models-overview-qui-l08).
 These parts of the same items are not done:
 
-* **QUI-G01 — two pages are still a little over budget** after the
-  2026-10-25 round ([FIXED-1174](FIXED_ITEMS.md#fixed-1174--settings--privacy-general-and-advanced-were-over-their-size-budget-qui-l03-qui-g01)):
-  Memory › Controls (929 px at 1440×900 against 900) and Memory › Map (922 px,
-  a canvas). Diagnostics, Privacy, General and Advanced now fit. The report is
-  in `all-pages-live.spec.ts`; it becomes a failing check once these two fit.
-* **QUI-G06 — about 200 other error messages** still give a status code, or
-  *Could not X*, without what it affected and a next step. The pattern and the
+* **QUI-G01 — three measurements are still over budget** after the
+  2026-11-14 round ([FIXED-1433](FIXED_ITEMS.md#fixed-1433--memory--controls-ran-past-its-one-screen-budget-qui-g01)):
+  Observe › Activity (a log, long by design) at both sizes, and Settings ›
+  Notifications (1,273 px) and Advanced (1,246 px) at 1280×800 against 1,200.
+  The report is in `all-pages-live.spec.ts`; it becomes a failing check once
+  these fit or Activity is exempted.
+* **QUI-G06 — about 190 other error messages** still give a status code, or
+  *Could not X*, without what it affected and a next step (eleven more moved
+  2026-11-14, [FIXED-1445](FIXED_ITEMS.md#fixed-1445--ten-more-error-messages-gave-a-status-code-and-no-next-step-qui-g06)). The pattern and the
   helper are in `web/src/lib/errorCopy.ts`; the ones on Stop, steer, continuing,
   export, upload, file lookup and saving a task are done.
-* **QUI-G04 — actions that paint before their request returns.** Long
-  transcripts are windowed; optimistic rename, pin and archive with a visible
-  roll-back are not built.
 * **QUI-L11 — the moves out of Diagnostics.** Overview as issue cards and
   Recovery shipped 2026-10-25 ([FIXED-1170](FIXED_ITEMS.md#fixed-1170--diagnostics-opened-on-seven-tiles-reading-ready-and-0-qui-l11),
   [FIXED-1171](FIXED_ITEMS.md#fixed-1171--restoring-a-checkpoint-was-the-dominant-button-and-named-little-qui-l11)).
   Sessions as Work › Threads, activity inside each task and project, and
   Recovery reached from the affected task are not built; Diagnostics keeps its
   six tabs until they are.
-* **QUI-L12 — Projects as rows.** Work's lists page after 50 and threads and
-  goals are 64 px rows; Projects is still a card grid.
 * **Older live specs still drive the pages the layout round replaced.** About
   70 specs under `web/e2e/*-live.spec.ts` (written before 2026-10-21) open
   Models by its old tabs, Extensions tabs, Permissions rows that opened in
@@ -1162,12 +1162,6 @@ Raiker's side is ready to take them; something outside it is not.
 
 ### Found while working the inventory, not yet fixed
 
-* **The approval card does not show an edit's diff inline.** RT-TOOL-04: the
-  Safety card for an `edit_file` says *Approving writes this exact change to
-  src/palette.py* and offers **Change**, but the replacement itself is only in
-  the change view. For a `replace_all` edit, the number of places it changes
-  is worth saying on the card, and for a notebook edit (RT-TOOL-21) *Affects*
-  names the file but not the cell, which the row already shows. Not triaged.
 * **A live web search is unproven on the test host.** Its proxy refuses
   `duckduckgo.com` by its own network policy (403), so the proxy route for
   search is proven by the unit suite only; a read of `github.com` through the
@@ -1187,13 +1181,16 @@ Raiker's side is ready to take them; something outside it is not.
   load.** Twice in this round one of its tests failed in a three-shard parallel
   run and passed alone and in every rerun (the restore and same-origin cases).
   Not reproduced on CI; triage the timing it depends on.
-* **`github.com/about` raised the *suspicious text* alert** (RT-TOOL-20). The
-  sanitiser's instruction-shape check may be too eager on product pages that
-  talk about AI; triage against its rules before relaxing anything.
-* **A Build Plan turn's record says *No plan required for this turn*** under
-  *How this turn was governed* while the turn writes a plan (RT-TOOL-22): the
-  pipeline's planning stage and the Plan posture are two different things with
-  the same word.
+* **`tests/test_tool_broker.py::test_run_command_returns_feedback_only_for_exact_active_session_grant`
+  and `tests/test_api_approvals.py::TestApprovalsResolve::test_approved_shell_executes_once_with_bounded_evidence`
+  fail in a container that cannot enforce the native sandbox.** Triaged
+  2026-11-14: they are not load-sensitive. In this cloud container they fail
+  every time with `native_sandbox_not_enforced` (and `native_sandbox_artifact_missing`
+  before `scripts/build_native_runner.py` is run), alone and under six-way
+  parallel load; CI's runners enforce the sandbox and pass them. The lock-screen
+  and background-execution tests passed six times in parallel here. A skip
+  marker that names the unenforced sandbox would make a local run read
+  truthfully; it is not added, because a skipped security test is easy to miss.
 
 ## 2026-10-25 Quiet UI polish round — what is still open
 
@@ -1210,11 +1207,6 @@ Found or left open in it:
 * **QUI-V05 — the companion.** The open ring and palette are in; the companion
   waits for its art, and with it the pick in Hello (QUI-W02) and the picture on
   a first-day Home (QUI-H02).
-* ***Loading conversation…* stays after a reopened conversation has drawn.**
-  Seen in the RT-QUI-66 captures: after a reload the transcript, the tool row
-  and the Safety card are on screen while the line above still says it is
-  loading. Not triaged: which of the reads after the transcript (attachments,
-  sources, recall) holds the flag.
 * **Older live specs and this round's changes.** Live specs written before
   2026-10-25 that click **Re-measure boundary** or **Reset environment** in
   Settings › Advanced › Runtime now need to open that environment's *Details*;
@@ -1222,14 +1214,11 @@ Found or left open in it:
   still forwards); and specs that sort an empty Approvals queue find no sort.
   The mocked suite and `quiet-ui-polish-live` are updated (related to
   BUG-248).
-* **The Workstations view keeps its own colours.** Diagnostics › Work in
-  action's optional *Workstations* scene draws desks and characters in fixed
-  colours rather than tokens, so it does not follow the QUI-V01 palette. It is
-  opt-in and kept by an earlier decision; restyling it is open.
 * **A Python test is sensitive to a loaded machine.**
   `test_background_execution.py::test_a_foreground_run_holds_no_lease_and_is_never_swept`
   failed once in a four-worker local run and passes alone; CI runs each shard
-  serially. Watch it in the shards.
+  serially. 2026-11-14: it passed six times in parallel once the native runner
+  was built; its earlier local failures were `native_sandbox_artifact_missing`.
 
 ## Quiet UI features and improvements — open items (document closed 2026-10-26)
 
@@ -1250,13 +1239,19 @@ and [03, QUI-H04](quiet-ui/03_WELCOME_HOME_AND_CHAT.md#status).
   by default, small transparent window that reacts only to *needs your
   decision* and *done*. It waits for the companion's art
   ([08](quiet-ui/08_BRAND_AND_VISUAL_SYSTEM.md#status)).
-* **Goals are noticed by shared words, not by meaning.** Two requests about the
-  same aim in different words are not matched; two unrelated requests that
-  share three uncommon words can be. **Not now** keeps a wrong offer from
-  returning.
-* **Older live specs answer native confirms.** Eight earlier live specs wait
-  for the browser's `dialog` event; the in-app dialog (QUI-F10) needs them to
-  press its button instead. The mocked suite and both rounds' live specs do.
+* **Goals are noticed by shared word forms, not by meaning.** Inflections now
+  match ([FIXED-1440](FIXED_ITEMS.md#fixed-1440--goals-were-noticed-only-when-the-same-words-recurred));
+  synonyms ("trip" and "holiday") do not, and two unrelated requests that
+  share three uncommon words can still match. **Not now** keeps a wrong offer
+  from returning. Matching by meaning would use the built-in embedding model
+  where the owner has allowed it.
+* **Older live specs answer native prompts.** The confirms moved to
+  `armConfirm` ([FIXED-1444](FIXED_ITEMS.md#fixed-1444--older-live-specs-could-not-reach-permissions-a-confirm-or-stop-safely));
+  four specs still answer a native `prompt()` with text
+  (`project-error-recovery`, `round-2026-10-02-memory`,
+  `round-2026-10-05-readiness-decisions`) or dismiss every dialog
+  (`qui-a08-diagrams-and-fixes`, `bug-305-306-2026-09-20`). Check each page
+  still asks that way before converting it.
 * **One approvals test is load-sensitive.**
   `tests/test_api_approvals.py::TestApprovalsResolve::test_approved_shell_executes_once_with_bounded_evidence`
   failed once in a full local shard under load and passes alone and in its
@@ -1442,24 +1437,6 @@ is planned in the same section and not started. Its open design questions are
 what ghost text may suggest without a model call, and where a `{variable}` gets
 its value.
 
-## The web-access live spec's setup cannot run on a workspace that already keeps Haiku
-
-**Found 2026-11-07, not fixed.** `web-access-turn-control-live.spec.ts` connects
-Anthropic through `useAnthropic`, which waits for Haiku's checkbox in the Models
-dialog. On a workspace where Haiku was already kept, by
-`models-provider-validation-live.spec.ts`, that checkbox is not offered, so the
-spec's first test times out and its serial cases never run. This is a harness
-problem, not a product one, and the same family as
-[BUG-248](#bug-248--twenty-seven-live-specs-still-sign-in-inside-a-test-body).
-Its steer case was rewritten for the composer execution states. The same flow
-is covered live by `composer-execution-states-live.spec.ts` RT-EXEC-01.
-2026-11-08: `keepModelAvailable` now closes the dialog when the card already
-names the model
-([FIXED-1357](FIXED_ITEMS.md#fixed-1357--twelve-live-checks-never-waited-and-a-kept-model-could-stop-a-specs-setup-found-this-round)).
-Keeping an already-kept Haiku completed live, but its switch was offered, so
-the failing shape was not reproduced. Still to do: re-run the web-access spec
-on such a workspace (it needs a funded key).
-
 ## Windows builds are signed with a self-signed beta certificate (IN-3)
 
 Owner's decision, 2026-11-07: sign Windows with an OpenSSL self-signed
@@ -1481,23 +1458,28 @@ Measured 2026-11-07: one Chat question to a local model was 9,459 prompt
 tokens. FIXED-1319 sized auto contexts at up to 32,768 so a GPU-served model
 answers, and auto no longer plans a context below 12,288 tokens
 ([FIXED-1356](FIXED_ITEMS.md#fixed-1356--auto-could-plan-a-local-context-no-turn-fits-in)):
-a machine that cannot fit that is told the model does not fit. Still open:
-trim the system prompt and tool list for small contexts, so such a machine can
-use a local model at all.
+a machine that cannot fit that is told the model does not fit. 2026-11-14: a model whose window is 16,384 tokens or less carries a compact
+twelve-tool core, about 2,600 schema tokens instead of 5,500
+([FIXED-1436](FIXED_ITEMS.md#fixed-1436--small-local-models-spent-most-of-their-window-on-tool-schemas)).
+Still open: measure the whole prompt on a small local model, and trim the
+~1,000-token standing instructions and the Memory Brief for such a window.
 
 ## AMD (Vulkan) owner-machine run (MD-2) — moved to beta.2
 
 The NVIDIA CUDA run passed on 2026-11-07 (RT-GPU-01, RT-GPU-02). Still
 required: the same two checks on an AMD GPU with the Vulkan build.
 
-## Untested hosted profiles still allow 1,024 output tokens
+## Untested hosted profiles have documented, unmeasured output limits
 
 2026-11-08: Anthropic, OpenAI, OpenRouter, Ollama and LM Studio were measured
-with the owner's keys and set (FIXED-1344). Gemini, DeepSeek, Groq, Mistral,
-xAI, Together, Fireworks, NVIDIA NIM, Cerebras, Hugging Face and the generic
-OpenAI-compatible profiles still fall back to 1,024 and are all *Experimental*.
-Set each one's limit to what its provider accepts once a key can test it. Check
-also that none rejects `max_tokens` the way OpenAI's reasoning models do.
+with the owner's keys and set (FIXED-1344). 2026-11-14: Gemini, DeepSeek, Groq,
+Mistral, xAI and Cerebras declare 8,192 and Together, Fireworks, NVIDIA NIM and
+Hugging Face 4,096
+([FIXED-1435](FIXED_ITEMS.md#fixed-1435--ten-hosted-profiles-still-stopped-answers-at-1024-tokens)),
+from each provider's published limits; none was measured with a key. The
+generic OpenAI-compatible profiles keep the 1,024 fallback, since their server
+is the owner's. Measure each with a key, and check that none rejects
+`max_tokens` the way OpenAI's reasoning models do.
 
 ## Live browser sign-in needs the owner's registered clients (PL-1, PL-3)
 
@@ -1529,8 +1511,11 @@ lifecycle refusal still need dedicated running-host evidence. Do not treat
 response-failure injection as proof of those scenarios.
 
 2026-11-09 provider live check: UI entry succeeded for all three supplied keys;
-OpenAI and OpenRouter completed real turns. Anthropic reported **No credit**,
-so its inference and the stopped-turn check still need a funded connection.
+OpenAI and OpenRouter completed real turns. 2026-11-14: a funded Anthropic
+connection (identity-linked key and workspace ID typed into Models) answered
+real Chat and Build turns, and **Stop safely** ended a running tool turn as
+*Stopped at your request* (`web-access-turn-control-live`, see
+[the run record](../architecture/WEB_APP_LIVE_TEST.md#result--2026-11-14-third-round-permissions-harness-web-reads-and-work-lists)).
 
 ## Beta recovery evidence after 2026-11-09 follow-through
 
@@ -1689,16 +1674,16 @@ the Threads row actions
 to [FIXED-1420](FIXED_ITEMS.md#fixed-1420--threads-rows-showed-task-detail-and-evidence-as-captions)).
 Still open:
 
-* **Eight Settings sections still carry private copies of `.settings-card`.**
-  A shared rule now exists in `app.css` (FIXED-1406); the copies can be deleted
-  one section at a time once each is checked against it.
-* **The notice dock on a phone now sits at the bottom edge**, which can cover a
-  composer for its five seconds. It folds into the bell and stays folded for
-  the session; a dock that waits for the composer to be idle is not built.
-* **Build and Design answers keep their own footers.** Chat's answer is page
-  text with one quiet meta line ([FIXED-1423](FIXED_ITEMS.md#fixed-1423--answers-carried-three-lines-of-metadata-and-rendered-as-grey-chips));
-  Build keeps its turn inspector open while a turn runs, and Design's image
-  results were not reviewed in this round.
+* **Design's answers keep their own footer.** Chat's and Build's answers are
+  page text with one quiet meta line
+  ([FIXED-1423](FIXED_ITEMS.md#fixed-1423--answers-carried-three-lines-of-metadata-and-rendered-as-grey-chips),
+  [FIXED-1438](FIXED_ITEMS.md#fixed-1438--builds-answers-kept-a-grey-bubble-and-no-receipt));
+  Design's image results were not reviewed.
+
+The Settings card copies and the phone notice dock were closed on the third
+2026-11-14 round
+([FIXED-1443](FIXED_ITEMS.md#fixed-1443--eight-settings-sections-still-drew-their-own-card),
+[FIXED-1437](FIXED_ITEMS.md#fixed-1437--on-a-phone-a-notice-could-cover-the-composer-while-the-owner-typed)).
 
 ## Voice — listening on Linux and macOS not yet qualified
 
@@ -1734,10 +1719,12 @@ embedding space and keeps it current in the background. Still open:
   first-run background download is.
 * **Not qualified live.** No Ollama host was reachable here; the worker's
   pass is covered by tests with stand-ins.
-* **No status on screen.** The last outcome is written to
-  `logs/background-index.json`; Memory and Diagnostics do not show it yet.
+* **Status on screen — Diagnostics.** Settings › Advanced › Memory engine shows
+  the last pass ([FIXED-1426](FIXED_ITEMS.md#fixed-1426--background-indexing-had-no-status-on-screen));
+  Diagnostics does not list it among its issue cards.
 * **What else it can do in the background** (not built): rank deferred tool
   schemas by similarity to the turn, which would cut Raiker's ~9,500-token
   prompt; related-file suggestions in Build; near-duplicate memory
-  detection before approval; thread and Library search by meaning;
+  detection by meaning (a lexical check ships, [FIXED-1439](FIXED_ITEMS.md#fixed-1439--a-proposed-memory-that-repeated-an-approved-one-looked-new));
+  thread and Library search by meaning;
   routing a task to a project by similarity. Each is a separate change.

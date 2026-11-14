@@ -4,7 +4,7 @@
   import { uiPrefs } from "../prefs.svelte";
   import { askConfirm } from "../confirm.svelte";
   import { shownInline } from "../inlineDecisions.svelte";
-  import { NOT_ANSWERING } from "../errorCopy";
+  import { failure, NOT_ANSWERING } from "../errorCopy";
   import { LARGE_PASTE_CHARS } from "../composerAttachments.svelte";
   import { pickableProjects } from "../projectLifecycle";
   import { workDraft } from "../workDraft.svelte";
@@ -57,6 +57,7 @@
   import { turnFailureMessage } from "../turnFailure";
   import { retryConfirmation, retryConsequence } from "../conversationCommands";
   import TurnEvidence from "../components/TurnEvidence.svelte";
+  import TurnReceipt from "../components/TurnReceipt.svelte";
   import RewindPanel from "../components/RewindPanel.svelte";
   import TaskWorkspaceReview from "../components/TaskWorkspaceReview.svelte";
   import ExportConversationDialog from "../components/ExportConversationDialog.svelte";
@@ -393,6 +394,10 @@
       const parked = parkedByTurn(detail);
       turns = detail.turns.map((t) => restoredTurn(t, id, parked.get(t.turn_id)));
       nextId = turns.length + 1;
+      // FIXED-1427 — the transcript is on screen now. The reads below fill in
+      // chips, sources and recall; holding the loading line through them left
+      // "Loading conversation…" above a conversation that had already drawn.
+      historyLoading = false;
       await restoreAttachmentChips(id);
       await sources.refresh(id);
       await review.load();
@@ -401,8 +406,12 @@
       // honoured too.
       if (anchoredTurnId === null || anchoredTurnId === "") void scrollToEnd();
     } catch (e) {
-      historyError =
-        e instanceof ApiError ? `Could not load history (${e.status}).` : "Could not load history.";
+      historyError = failure(
+        "This conversation did not load",
+        "Nothing in it was changed.",
+        "Reload the page, or open it again from Threads.",
+        e,
+      );
     } finally {
       historyLoading = false;
     }
@@ -1937,9 +1946,7 @@
       onProjectsChanged?.();
     } catch (error) {
       projectNotice =
-        error instanceof ApiError
-          ? `Could not move this chat (${error.status}).`
-          : "Could not move this chat.";
+        failure("This chat was not moved", "It stays where it was.", "Try again, or move it from Work › Threads.", error);
     }
   }
 
@@ -2421,7 +2428,17 @@
             {#if turn.response?.turn_id || turn.events.some((event) => event.kind === "lifecycle" || event.kind === "tool")}
               <!-- UX-CHAT-02's closed line, with the same counts Chat gives it:
                    Build passed none, so a turn that read two files and paused
-                   for three decisions read only "5 calls". -->
+                   for three decisions read only "5 calls".
+                   FIXED-1438 — once the turn has finished, the receipt (model
+                   and cost) and the evidence share Chat's one quiet line; while
+                   it runs, the inspector stays open as before. -->
+              <div
+                class="turn-meta"
+                class:turn-meta-latest={turn.streaming || turn.id === turns[turns.length - 1]?.id}
+              >
+              {#if !turn.streaming && sessionId !== null && turn.response?.turn_id && turn.response.status !== "needs_approval"}
+                <TurnReceipt {sessionId} turnId={turn.response.turn_id} />
+              {/if}
               <TurnEvidence
                 sessionId={sessionId}
                 turnId={turn.response?.turn_id ?? null}
@@ -2435,6 +2452,7 @@
                 }))}
                 initiallyOpen={turn.streaming}
               />
+              </div>
             {/if}
           </div>
         </article>
@@ -3220,11 +3238,14 @@
     flex-direction: column;
     gap: 0.35rem;
   }
+  /* FIXED-1438 — Build's answer is page text, as Chat's is (FIXED-1423); the
+     owner's request keeps its bubble, which is what tells the voices apart. */
   .answer {
-    background: var(--sunken);
-    border: 1px solid var(--border);
-    border-radius: 1.15rem 1.15rem 1.15rem 0.3rem;
-    padding: 0.65rem 0.9rem;
+    background: transparent;
+    border: 0;
+    border-radius: 0;
+    padding: 0.15rem 0 0;
+    line-height: 1.65;
   }
   .bubble-text {
     margin: 0;
@@ -3442,5 +3463,21 @@
   .retry-link {
     border: 0; background: none; padding: 0; font: inherit; color: var(--accent);
     text-decoration: underline; cursor: pointer;
+  }
+  /* FIXED-1438 — Chat's quiet meta line, for Build's finished turns. */
+  .turn-meta {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: var(--space-1) var(--space-3);
+    margin-top: var(--space-1);
+    transition: opacity var(--motion-fast, 120ms) var(--ease, ease);
+  }
+  .turn-meta > :global(*) { margin-top: 0 !important; }
+  .turn-meta:not(.turn-meta-latest):not(:has(details[open])):not(:focus-within) { opacity: 0; }
+  .turn:hover .turn-meta,
+  .turn:focus-within .turn-meta { opacity: 1; }
+  @media (hover: none) {
+    .turn-meta { opacity: 1 !important; }
   }
 </style>

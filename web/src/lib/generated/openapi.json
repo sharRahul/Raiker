@@ -1540,6 +1540,52 @@
         "title": "AvailableModelsSet",
         "type": "object"
       },
+      "BackgroundIndexView": {
+        "description": "The background indexer's last pass (FIXED-1426), read from ``logs/background-index.json``.",
+        "properties": {
+          "at": {
+            "title": "At",
+            "type": "string"
+          },
+          "disabled": {
+            "title": "Disabled",
+            "type": "boolean"
+          },
+          "indexed": {
+            "title": "Indexed",
+            "type": "integer"
+          },
+          "model": {
+            "title": "Model",
+            "type": "string"
+          },
+          "reason_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason Code"
+          },
+          "state": {
+            "title": "State",
+            "type": "string"
+          }
+        },
+        "required": [
+          "state",
+          "at",
+          "model",
+          "indexed",
+          "reason_code",
+          "disabled"
+        ],
+        "title": "BackgroundIndexView",
+        "type": "object"
+      },
       "BackgroundWorkerHealth": {
         "description": "One host-tick background pass: its last success, last failure and streak.",
         "properties": {
@@ -22190,6 +22236,16 @@
             "title": "Sensitivity",
             "type": "string"
           },
+          "similar_memory": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SimilarMemory"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "source_event_id": {
             "title": "Source Event Id",
             "type": "string"
@@ -22208,7 +22264,8 @@
           "sensitivity",
           "confidence",
           "decision",
-          "created_at"
+          "created_at",
+          "similar_memory"
         ],
         "title": "MemoryProposal",
         "type": "object"
@@ -22396,6 +22453,17 @@
       },
       "MemorySettingsView": {
         "properties": {
+          "background_index": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/BackgroundIndexView"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
           "embedding_backend": {
             "default": "auto",
             "title": "Embedding Backend",
@@ -32580,6 +32648,30 @@
           }
         },
         "title": "SignInRequest",
+        "type": "object"
+      },
+      "SimilarMemory": {
+        "description": "FIXED-1439 — the approved memory a proposal closely repeats.",
+        "properties": {
+          "memory_id": {
+            "title": "Memory Id",
+            "type": "string"
+          },
+          "similarity": {
+            "title": "Similarity",
+            "type": "number"
+          },
+          "text": {
+            "title": "Text",
+            "type": "string"
+          }
+        },
+        "required": [
+          "memory_id",
+          "text",
+          "similarity"
+        ],
+        "title": "SimilarMemory",
         "type": "object"
       },
       "SkillActiveSet": {

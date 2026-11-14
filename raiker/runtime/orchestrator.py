@@ -60,8 +60,10 @@ from raiker.models.tool_call_validation import (
     validate_tool_call,
 )
 from raiker.models.tool_projection import (
+    ALWAYS_PROJECTED,
     DEFERRABLE_TOOL_NAMES,
     TOOL_SEARCH,
+    compact_for,
     project_specs,
 )
 from raiker.models.tool_registry import READ_SHAPED_TOOL_NAMES
@@ -548,7 +550,7 @@ class RuntimeOrchestrator:
         # across a boundary the owner just stood at.)
         self._revealed_tools: set[str] = set()
 
-    def _turn_tool_specs(self) -> list[ToolSpec]:
+    def _turn_tool_specs(self, provider: str | None = None, model: str | None = None) -> list[ToolSpec]:
         """The tools this turn may call: the built-ins plus projected MCP tools.
 
         Recomputed per turn because the owner can connect, pause, or kill an MCP
@@ -564,10 +566,15 @@ class RuntimeOrchestrator:
         always did. What changes is only what every request has to pay for.
         """
         store = getattr(self.tool_broker, "store", None)
+        # FIXED-1436 — a small window carries the compact core.
+        window = (
+            self._context_window_tokens(provider, model) if provider and model else None
+        )
         return project_specs(
             self.tool_specs,
             revealed=frozenset(self._revealed_tools),
             mcp_specs=mcp_tool_specs(self.workspace_root, store, self.tool_broker.principal_id),
+            compact=compact_for(window),
         )
 
     def _reveal_searched_tools(self, action: ToolAction, result: ToolResult) -> None:
@@ -585,7 +592,7 @@ class RuntimeOrchestrator:
             # A projected MCP tool is revealable on the same terms: the name
             # came back from the search's own result, and calling it still
             # passes the connector gate, the decision mode and containment.
-            if name in DEFERRABLE_TOOL_NAMES or is_mcp_tool(name):
+            if name in DEFERRABLE_TOOL_NAMES or name in ALWAYS_PROJECTED or is_mcp_tool(name):
                 self._revealed_tools.add(name)
 
     # ── C6/C4: the turn's source ledger ──────────────────────────────────────
@@ -2207,11 +2214,11 @@ class RuntimeOrchestrator:
                 reasoning = self._turn_reasoning(envelope, provider, model)
                 if reasoning is None:
                     response = await self.model_router.achat(
-                        provider, model, messages, self._turn_tool_specs()
+                        provider, model, messages, self._turn_tool_specs(provider, model)
                     )
                 else:
                     response = await self.model_router.achat(
-                        provider, model, messages, self._turn_tool_specs(), reasoning=reasoning
+                        provider, model, messages, self._turn_tool_specs(provider, model), reasoning=reasoning
                     )
             except ModelProviderError as exc:
                 last_error_code = provider_error_code(exc)
@@ -2416,10 +2423,10 @@ class RuntimeOrchestrator:
                 reasoning = self._turn_reasoning(envelope, provider, model)
                 stream = (
                     self.model_router.astream(
-                        provider, model, messages, self._turn_tool_specs(), reasoning=reasoning
+                        provider, model, messages, self._turn_tool_specs(provider, model), reasoning=reasoning
                     )
                     if reasoning is not None
-                    else self.model_router.astream(provider, model, messages, self._turn_tool_specs())
+                    else self.model_router.astream(provider, model, messages, self._turn_tool_specs(provider, model))
                 )
                 stopped_mid_stream = False
                 next_stop_check = time.monotonic() + _STOP_POLL_SECONDS

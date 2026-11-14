@@ -3,12 +3,20 @@
 
 from __future__ import annotations
 
-from typing import Any, Literal, NotRequired
+from typing import Any, Literal, NotRequired, cast
 
 from typing_extensions import TypedDict
 
 from raiker.api.wire.sessions import SourceExcerptView
 from raiker.control.views.memory import MemoryControlView, ObservationView
+
+
+class SimilarMemory(TypedDict):
+    """FIXED-1439 — the approved memory a proposal closely repeats."""
+
+    memory_id: str
+    text: str
+    similarity: float
 
 
 class MemoryProposal(TypedDict):
@@ -23,6 +31,8 @@ class MemoryProposal(TypedDict):
     confidence: float
     decision: str
     created_at: str
+    #: FIXED-1439 — set when an approved memory says nearly the same thing.
+    similar_memory: SimilarMemory | None
 
 
 class MemoryRelationshipProposal(TypedDict):
@@ -361,6 +371,7 @@ def memory_proposal(row: dict[str, Any]) -> MemoryProposal:
         "confidence": float(row.get("confidence") or 0.0),
         "decision": str(row.get("decision") or ""),
         "created_at": str(row.get("created_at") or ""),
+        "similar_memory": cast(SimilarMemory | None, row.get("similar_memory")),
     }
 
 

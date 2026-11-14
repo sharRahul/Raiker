@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { failure } from "../errorCopy";
   import { onMount } from "svelte";
   import EmptyState from "../components/EmptyState.svelte";
   import Icon from "../components/Icon.svelte";
@@ -104,8 +105,8 @@
         e instanceof ApiError
           ? e.status === 409
             ? "Nothing in scope to export — adjust the session filter, or run a turn first."
-            : `Could not export the audit log (${e.status}).`
-          : "Could not export the audit log.";
+            : failure("The audit log was not exported", "Nothing was written.", "Try again.", e)
+          : failure("The audit log was not exported", "Nothing was written.", "Try again.", e);
     } finally {
       exportBusy = false;
     }

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { failure } from "../../errorCopy";
   import { askConfirm } from "../../confirm.svelte";
   /**
    * REM-MEM-03 — the recall engine's controls, out of the personal review.
@@ -19,6 +20,7 @@
   import type { MemorySettingsView } from "../../apiTypes";
   import PageState from "../../components/PageState.svelte";
   import Icon from "../../components/Icon.svelte";
+  import { backgroundIndexCopy } from "../../backgroundIndex";
 
   let settings = $state<MemorySettingsView | null>(null);
   let loadError = $state<string | null>(null);
@@ -30,6 +32,7 @@
   const providers = $derived(settings?.embedding_providers ?? []);
   const indexTarget = $derived(providers.find((provider) => provider.space === indexProvider) ?? null);
   const pending = $derived(providers.some((provider) => (provider.pending_count ?? 0) > 0));
+  const background = $derived(backgroundIndexCopy(settings?.background_index));
 
   async function load(): Promise<void> {
     try {
@@ -51,9 +54,7 @@
       await load();
     } catch (error) {
       actionError =
-        error instanceof ApiError
-          ? `Could not change the recall backend (${error.status}).`
-          : "Could not change the recall backend.";
+        failure("The recall backend was not changed", "Recall keeps searching the space it used.", "Try again.", error);
     } finally {
       busy = false;
     }
@@ -137,6 +138,15 @@
 
     <div class="card">
       <h3>Build a meaning-based index</h3>
+      {#if background}
+        <!-- FIXED-1426 — the background indexer's last pass, so "is recall
+             keeping up?" has an answer here rather than in a log file. -->
+        <p class="background {background.tone}" role="status" data-testid="background-index">
+          <Icon name={background.tone === "ok" ? "check" : "info"} size="sm" />
+          <span>{background.text}
+            {#if background.action}<a href={background.action.href}>{background.action.label}</a>{/if}</span>
+        </p>
+      {/if}
       <!-- MEM-10 — the select above can only offer spaces that already hold
            vectors, so on a default install it offers the fallback and nothing
            else. This is the way out of that: it builds one. -->
@@ -203,5 +213,11 @@
   .index-row .field { flex: 1 1 16rem; }
   .note { display: flex; align-items: baseline; gap: 0.4rem; color: var(--text-2);
     font-size: var(--text-sm); margin: var(--space-2) 0 0; }
+  .background { display: flex; align-items: baseline; gap: 0.4rem; font-size: var(--text-sm);
+    color: var(--text-2); margin: 0 0 var(--space-3); }
+  .background :global(svg) { flex: none; align-self: center; color: var(--text-3); }
+  .background.ok :global(svg) { color: var(--ok, var(--text-3)); }
+  .background.attention :global(svg) { color: var(--warn, var(--text-3)); }
+  .background a { margin-left: 0.35rem; }
   .note :global(svg) { flex: none; align-self: center; color: var(--text-3); }
 </style>

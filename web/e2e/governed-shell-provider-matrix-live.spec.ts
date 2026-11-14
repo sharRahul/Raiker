@@ -12,7 +12,7 @@
  */
 import { expect, test, type BrowserContext, type Locator, type Page } from "@playwright/test";
 import { join } from "node:path";
-import { OWNER_CREDENTIALS, dismissFirstRunModelSetup, hostedProviderCard, keepModelAvailable, useHostedModel } from "./hosted-provider";
+import { OWNER_CREDENTIALS, dismissFirstRunModelSetup, hostedProviderCard, keepModelAvailable, useHostedModel, openPermission } from "./hosted-provider";
 import { LIVE_BASE as BASE } from "./live";
 import { HOME_GREETING } from "./home";
 
@@ -76,15 +76,7 @@ async function signIn(): Promise<void> {
 }
 
 async function setCapability(label: string, reason: string): Promise<void> {
-  await page.goto(`${BASE}/#/capabilities`);
-  const search = page.getByLabel("Search capabilities", { exact: true });
-  await expect(search).toBeVisible({ timeout: 30_000 });
-  await search.fill(label);
-  const card = page.locator(".cap.card").filter({ hasText: label }).first();
-  await expect(card).toBeVisible();
-  if ((await card.getByRole("button", { name: label }).getAttribute("aria-expanded")) !== "true") {
-    await card.getByRole("button", { name: label }).click();
-  }
+  const card = await openPermission(page, BASE, label);
   const turnOn = card.getByRole("button", { name: "Turn on" });
   if (!(await turnOn.isVisible().catch(() => false))) return;
   await turnOn.click();

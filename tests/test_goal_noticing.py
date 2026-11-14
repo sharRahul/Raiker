@@ -58,7 +58,7 @@ def test_the_same_aim_in_two_conversations_is_offered_once(client: TestClient) -
     _chat(client, h, "sess_b", "Adjust my Berlin marathon training plan, my long runs feel too short")
     offered = _suggestion(client, h, "sess_b")
     assert offered is not None
-    assert {"berlin", "marathon", "training"} <= set(str(word) for word in offered["keywords"])  # type: ignore[attr-defined]
+    assert {"berlin", "marathon", "train"} <= set(str(word) for word in offered["keywords"])  # type: ignore[attr-defined]
     assert offered["session_ids"] == ["sess_a"]
     assert str(offered["objective"]).startswith("Adjust my Berlin marathon")
     assert client.get("/api/goals", headers=h).json()["goals"] == []  # nothing was created
@@ -104,3 +104,16 @@ def test_keywords_ignore_short_and_filler_words() -> None:
     assert noticing.keywords("Please help me with the Berlin marathon plan") == frozenset({"berlin", "marathon", "plan"})
     assert noticing.same_aim(frozenset({"a", "b", "c", "d"}), frozenset({"a", "b", "c"}))
     assert not noticing.same_aim(frozenset({"a", "b"}), frozenset({"a", "b"}))
+
+
+def test_the_same_aim_matches_across_word_forms() -> None:
+    """FIXED-1440 — inflections no longer hide a shared aim."""
+    from raiker.goals.noticing import keywords, same_aim
+
+    assert same_aim(
+        keywords("Planning trips to Lisbon with flights and hotels"),
+        keywords("plan a trip to Lisbon, book a flight and a hotel"),
+    )
+    assert keywords("invoicing customers") == keywords("invoice customer")
+    # Folding never merges two different words.
+    assert not same_aim(keywords("Lisbon flights hotels"), keywords("Berlin marathon training"))

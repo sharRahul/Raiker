@@ -1360,7 +1360,7 @@
      reads as a composer control rather than as a form field, because that is
      what it is. */
   .tasks header.page-toolbar{align-items:center;margin-bottom:var(--space-2)}
-  .tasks{display:flex;flex-direction:column;min-height:var(--content-h,calc(100dvh - 8rem))}
+  .tasks{display:flex;flex-direction:column;min-height:var(--content-h,calc(100dvh - 9rem))}
   .task-dock{position:sticky;bottom:0;z-index:2;margin-top:auto;padding-top:var(--space-5);background:linear-gradient(to bottom,transparent,var(--bg) var(--space-5))}
   .task-dock .templates{margin:0 auto var(--space-3)}
   @media (max-width:700px){.task-dock .templates{flex-wrap:nowrap;justify-content:flex-start;overflow-x:auto;width:100%;scrollbar-width:none;padding-bottom:2px}.task-dock .template{flex:none}}

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { failure } from "../errorCopy";
   import MemoryControls from "../components/MemoryControls.svelte";
   import EmptyState from "../components/EmptyState.svelte";
   import { askConfirm } from "../confirm.svelte";
@@ -375,7 +376,7 @@
       sweepResult = `Removed ${result.deleted_observation_ids.length}.`;
       await load();
     } catch (e) {
-      actionError = e instanceof ApiError ? `Could not run the retention cleanup (${e.status}).` : "Could not run the retention cleanup.";
+      actionError = failure("The retention cleanup did not run", "No observation was removed.", "Try again.", e);
     } finally { busy = false; }
   }
   async function deleteObservation(observationId: string) {
@@ -656,6 +657,14 @@
       {#each pending as proposal (proposal.candidate_id)}<article class="memory-card pending">
         {#if proposalEditingId === proposal.candidate_id}<textarea rows="3" bind:value={proposalDraft} aria-label="Edit proposed memory"></textarea>{:else}<h4>{proposal.text}</h4>{/if}
         <p>Proposed from event: {proposal.source_event_id}</p>
+        {#if proposal.similar_memory}
+          <!-- FIXED-1439 — the same fact said twice is two proposals; the card
+               names the approved memory it repeats, and the owner decides. -->
+          <p class="near-duplicate" role="note" data-testid="near-duplicate">
+            <Icon name="copy" size="sm" />
+            <span>Nearly the same as an approved memory: “{proposal.similar_memory.text}”. Approving keeps both.</span>
+          </p>
+        {/if}
         <div class="meta"><span>{proposal.scope}</span><span>{proposal.sensitivity} sensitivity</span><span title={proposalEvidence(proposal.confidence).why}>{proposalEvidence(proposal.confidence).label}</span></div>
         <details><summary>View source details</summary><p>Source event: {proposal.source_event_id}. The original event remains governed by its session access.</p></details>
         <div class="card-actions">
@@ -1084,4 +1093,7 @@
     padding: 0.05rem 0.5rem; border: 1px solid var(--border); border-radius: var(--r-pill);
     background: var(--sunken); color: var(--text-2);
   }
+  .near-duplicate { display: flex; align-items: baseline; gap: 0.4rem; margin: 0.35rem 0 0; padding: 0.4rem 0.6rem;
+    border: 1px solid var(--warn-border); border-radius: var(--r-sm); background: var(--warn-soft); color: var(--text-1); font-size: var(--text-sm); }
+  .near-duplicate :global(svg) { flex: none; align-self: center; color: var(--warn); }
 </style>

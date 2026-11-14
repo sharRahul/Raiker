@@ -22,10 +22,10 @@ redesign and can ship on its own.
 
 | Item | State |
 |---|---|
-| QUI-G01 | **Report done** ([FIXED-1096](../FIXED_ITEMS.md#fixed-1096--page-size-was-not-measured-anywhere-qui-g01)). 29 of 94 measurements over budget at first; after the 2026-10-25 round only Memory › Controls (929 px) and Memory › Map (922 px) are, both at 1440×900. Becomes a failing check once they fit; RT-QUI-63 already fails on Settings › General, Privacy and Advanced and Diagnostics at 1280×800. |
+| QUI-G01 | **Report done** ([FIXED-1096](../FIXED_ITEMS.md#fixed-1096--page-size-was-not-measured-anywhere-qui-g01)). 29 of 94 measurements over budget at first. 2026-11-14: Memory › Controls now fits at 1440×900 ([FIXED-1433](../FIXED_ITEMS.md#fixed-1433--memory--controls-ran-past-its-one-screen-budget-qui-g01)) and Tasks' docked composer no longer pushes the page 9 px over. Still over: Observe › Activity (a log, by design long) and Settings › Notifications and Advanced at 1280×800. |
 | QUI-G02 | **Done** ([FIXED-1095](../FIXED_ITEMS.md#fixed-1095--user-facing-copy-used-words-the-plan-retires-qui-g02)). |
 | QUI-G03 | **Done** ([FIXED-1097](../FIXED_ITEMS.md#fixed-1097--there-was-no-single-place-to-see-every-shared-state-qui-g03)), at `#/state-gallery` in development builds. |
-| QUI-G04 | **Partly done** ([FIXED-1100](../FIXED_ITEMS.md#fixed-1100--a-long-conversation-rendered-every-turn-qui-g04)): long transcripts. Open: actions that paint first and roll back visibly. |
+| QUI-G04 | **Done.** Long transcripts ([FIXED-1100](../FIXED_ITEMS.md#fixed-1100--a-long-conversation-rendered-every-turn-qui-g04)); rename, pin and archive paint first and roll back visibly ([FIXED-1432](../FIXED_ITEMS.md#fixed-1432--rename-pin-and-archive-waited-for-the-server-before-painting-qui-g04)). |
 | QUI-G05 | **Done** ([FIXED-1098](../FIXED_ITEMS.md#fixed-1098--keyboard-use-and-zoom-were-not-checked-qui-g05)). |
 | QUI-G06 | **Partly done** ([FIXED-1099](../FIXED_ITEMS.md#fixed-1099--stop-steer-and-continue-errors-blamed-the-local-runtime-qui-g06)): the helper and the Chat, Build and Tasks errors, followed by the Memory, Models, Connections, Settings, Projects, and Approvals, Library and Sessions slices below. Other views still need their audit. |
 | QUI-G07 | Open: needs five people, not code. |

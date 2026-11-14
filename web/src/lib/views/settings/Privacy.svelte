@@ -319,13 +319,6 @@
   .section-heading { margin-bottom: var(--space-4); }
   .section-heading h2, .card-heading h3 { margin: 0; }
   .section-heading p, .card-heading p, .setting-row p { color: var(--text-2); margin: .3rem 0 0; max-width: var(--prose-measure); font-size: var(--text-sm); }
-  .settings-card {
-    background: var(--surface);
-    border: 1px solid var(--card-edge);
-    border-radius: var(--r-lg);
-    padding: var(--card-pad-y) var(--card-pad-x);
-    margin-bottom: var(--space-3);
-  }
   .rows { list-style: none; margin: var(--space-3) 0 0; padding: 0; }
   .rows li {
     display: grid;

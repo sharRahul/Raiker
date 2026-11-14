@@ -280,7 +280,6 @@
   .tray-toggle { display: flex; align-items: center; gap: var(--space-2); flex-direction: row; }
   .section-heading h2, .card-heading h3 { margin: 0; }
   .card-heading p { color: var(--text-2); margin: .3rem 0 0; }
-  .settings-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-lg); padding: var(--card-pad-y) var(--card-pad-x); margin-bottom: var(--space-4); }
   /* QUI-L03 — a setting is a row: its name and help on the left, the control
      on the right, so a card of three choices is three rows rather than three
      stacked forms. */
@@ -297,7 +296,6 @@
   label > select { grid-column: 2; grid-row: 1 / span 2; }
   label small { color: var(--text-2); font-weight: 400; font-size: var(--text-sm); }
   select { width: 100%; }
-  .settings-card { padding: var(--space-3) var(--card-pad-x) var(--space-4); margin-bottom: var(--space-3); }
   .card-heading p { font-size: var(--text-sm); }
   .resolved { color: var(--text-2); margin: var(--space-2) 0 0; font-size: var(--text-sm); }
   .resolved strong { color: var(--text-1); }

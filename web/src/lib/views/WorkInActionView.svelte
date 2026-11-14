@@ -337,11 +337,25 @@ const ACTIVE = new Set(["queued", "running", "continuing", "paused", "waiting_fo
   .floor-head p { margin:4px 0 0; color:var(--text-2); font-size:var(--text-sm); }
   .desks { display:grid; grid-template-columns:repeat(auto-fill, minmax(180px, 1fr)); gap:var(--space-4); margin-top:var(--space-4); }
   .desk { display:grid; gap:10px; justify-items:center; }
+  /* FIXED-1434 — the scene's colours come from the palette, so it follows the
+     QUI-V01 tokens and both themes instead of fixed hex values. */
+  .scene {
+    --scene-lamp: var(--warn);
+    --scene-wood: color-mix(in srgb, var(--warn) 45%, var(--text-1));
+    --scene-wood-edge: color-mix(in srgb, var(--warn) 65%, var(--text-1));
+    --scene-screen: color-mix(in srgb, var(--text-1) 85%, var(--accent));
+    --scene-screen-edge: color-mix(in srgb, var(--text-2) 70%, var(--accent));
+    --scene-screen-lit: color-mix(in srgb, var(--accent) 35%, var(--text-1));
+    --scene-skin: color-mix(in srgb, var(--warn) 70%, var(--surface));
+    --scene-skin-shade: color-mix(in srgb, var(--warn) 85%, var(--text-1));
+    --scene-ink: color-mix(in srgb, var(--text-1) 80%, var(--warn));
+    --scene-sweat: var(--info);
+  }
   .scene { position:relative; width:160px; height:120px; border:1px solid var(--border); border-radius:var(--r-md); background:linear-gradient(180deg, var(--sunken), var(--surface)); overflow:hidden; }
-  .lamp { position:absolute; top:8px; left:14px; width:14px; height:14px; border-radius:50%; background:radial-gradient(circle, #ffd87a, #f5b942); box-shadow:0 0 14px #f5b94266; animation:lamp-glow 3.4s ease-in-out infinite; }
-  .desk-surface { position:absolute; bottom:0; left:0; right:0; height:14px; background:linear-gradient(180deg, #8b5e34, #6b4524); border-top:2px solid #a87a4a; }
-  .screen { position:absolute; bottom:16px; right:12px; width:42px; height:30px; background:#1c2630; border:2px solid #3a4a55; border-radius:4px; transition:background 200ms var(--ease); }
-  .screen.lit { background:linear-gradient(180deg, #11303a, #0f2a33); box-shadow:0 0 12px color-mix(in srgb, var(--accent) 50%, transparent); animation:screen-flicker 1.4s steps(2) infinite; }
+  .lamp { position:absolute; top:8px; left:14px; width:14px; height:14px; border-radius:50%; background:radial-gradient(circle, color-mix(in srgb, var(--scene-lamp) 55%, white), var(--scene-lamp)); box-shadow:0 0 14px color-mix(in srgb, var(--scene-lamp) 40%, transparent); animation:lamp-glow 3.4s ease-in-out infinite; }
+  .desk-surface { position:absolute; bottom:0; left:0; right:0; height:14px; background:linear-gradient(180deg, var(--scene-wood-edge), var(--scene-wood)); border-top:2px solid var(--scene-wood-edge); }
+  .screen { position:absolute; bottom:16px; right:12px; width:42px; height:30px; background:var(--scene-screen); border:2px solid var(--scene-screen-edge); border-radius:4px; transition:background 200ms var(--ease); }
+  .screen.lit { background:var(--scene-screen-lit); box-shadow:0 0 12px color-mix(in srgb, var(--accent) 50%, transparent); animation:screen-flicker 1.4s steps(2) infinite; }
 
   .character { position:absolute; bottom:14px; left:54px; width:42px; height:54px; animation:char-bob 2.6s ease-in-out infinite; }
   .desk[data-mood="working"] .character { animation:char-work 0.9s ease-in-out infinite; }
@@ -349,14 +363,14 @@ const ACTIVE = new Set(["queued", "running", "continuing", "paused", "waiting_fo
   .desk[data-mood="queued"] .character { animation:char-tap 1.4s ease-in-out infinite; }
   .desk[data-mood="paused"] .character { animation:none; }
 
-  .body { position:absolute; bottom:0; left:6px; width:30px; height:34px; background:linear-gradient(180deg, #e7a55f, #d18a44); border-radius:48% 48% 42% 42%; box-shadow:inset -3px -3px 0 #b97534; }
+  .body { position:absolute; bottom:0; left:6px; width:30px; height:34px; background:linear-gradient(180deg, var(--scene-skin), var(--scene-skin-shade)); border-radius:48% 48% 42% 42%; box-shadow:inset -3px -3px 0 color-mix(in srgb, var(--scene-skin-shade) 80%, var(--text-1)); }
   .face { position:absolute; top:6px; left:0; right:0; display:flex; justify-content:center; gap:7px; }
-  .eye { width:4px; height:4px; border-radius:50%; background:#3b2a1d; transition:all 200ms var(--ease); }
+  .eye { width:4px; height:4px; border-radius:50%; background:var(--scene-ink); transition:all 200ms var(--ease); }
   .desk[data-mood="idle"] .eye { height:1.5px; border-radius:1px; }
-  .mouth { position:absolute; top:11px; width:8px; height:3px; border-bottom:1.5px solid #3b2a1d; border-radius:0 0 6px 6px; }
-  .desk[data-mood="working"] .mouth { border-bottom-color:#3b2a1d; animation:mouth-talk 0.45s steps(2) infinite; }
-  .desk[data-mood="idle"] .mouth { width:6px; height:5px; border:1.5px solid #3b2a1d; border-top:0; border-radius:0 0 6px 6px; }
-  .arm { position:absolute; bottom:8px; width:4px; height:16px; background:#d18a44; border-radius:2px; }
+  .mouth { position:absolute; top:11px; width:8px; height:3px; border-bottom:1.5px solid var(--scene-ink); border-radius:0 0 6px 6px; }
+  .desk[data-mood="working"] .mouth { border-bottom-color:var(--scene-ink); animation:mouth-talk 0.45s steps(2) infinite; }
+  .desk[data-mood="idle"] .mouth { width:6px; height:5px; border:1.5px solid var(--scene-ink); border-top:0; border-radius:0 0 6px 6px; }
+  .arm { position:absolute; bottom:8px; width:4px; height:16px; background:var(--scene-skin-shade); border-radius:2px; }
   .arm.left { left:2px; transform:rotate(8deg); }
   .arm.right { right:2px; transform:rotate(-8deg); }
   .desk[data-mood="working"] .arm.right { animation:arm-type 0.5s ease-in-out infinite; transform-origin:top center; }
@@ -364,7 +378,7 @@ const ACTIVE = new Set(["queued", "running", "continuing", "paused", "waiting_fo
 
   .zzz { position:absolute; top:-6px; left:18px; color:var(--text-3); font-size:var(--text-2xs); font-weight:700; opacity:0; animation:zzz 3.6s ease-in-out infinite; }
   .z2 { left:26px; animation-delay:1.2s; } .z3 { left:34px; font-size:var(--text-md); animation-delay:2.4s; }
-  .sweat { position:absolute; top:2px; right:4px; width:5px; height:7px; background:#9ed1ff; border-radius:50% 50% 50% 50% / 60% 60% 40% 40%; animation:sweat 1.8s ease-in infinite; opacity:0; }
+  .sweat { position:absolute; top:2px; right:4px; width:5px; height:7px; background:var(--scene-sweat); border-radius:50% 50% 50% 50% / 60% 60% 40% 40%; animation:sweat 1.8s ease-in infinite; opacity:0; }
   .motion-lines { position:absolute; top:14px; right:-4px; display:flex; flex-direction:column; gap:3px; }
   .motion-lines i { display:block; width:6px; height:1.5px; background:var(--accent); opacity:0; animation:motion 0.6s ease-out infinite; }
   .motion-lines i:nth-child(2) { animation-delay:0.2s; } .motion-lines i:nth-child(3) { animation-delay:0.4s; }
@@ -398,7 +412,7 @@ const ACTIVE = new Set(["queued", "running", "continuing", "paused", "waiting_fo
   .waitlist li { display:flex; gap:10px; align-items:center; padding:10px 0; border-bottom:1px solid var(--border); }
   .waitlist li:last-child { border:0; }
   .waitlist h3 { margin:0; font-size:var(--text-sm); } .waitlist p { margin:2px 0 0; color:var(--text-2); font-size:var(--text-sm); }
-  .wait-mark { width:14px; height:14px; flex:0 0 auto; border-radius:50%; background:#c89528; animation:wait-pulse 2.2s ease-in-out infinite; }
+  .wait-mark { width:14px; height:14px; flex:0 0 auto; border-radius:50%; background:var(--warn); animation:wait-pulse 2.2s ease-in-out infinite; }
   .empty { color:var(--text-2); font-size:var(--text-sm); }
 
   @keyframes char-bob { 50% { transform:translateY(-2px); } }
@@ -411,7 +425,7 @@ const ACTIVE = new Set(["queued", "running", "continuing", "paused", "waiting_fo
   @keyframes zzz { 0% { opacity:0; transform:translate(0,0); } 30% { opacity:1; } 100% { opacity:0; transform:translate(6px,-14px); } }
   @keyframes sweat { 0% { opacity:0; transform:translateY(0); } 30% { opacity:1; } 100% { opacity:0; transform:translateY(8px); } }
   @keyframes motion { 0% { opacity:0; transform:translateX(0); } 50% { opacity:1; } 100% { opacity:0; transform:translateX(6px); } }
-  @keyframes lamp-glow { 50% { box-shadow:0 0 22px #f5b94288; } }
+  @keyframes lamp-glow { 50% { box-shadow:0 0 22px color-mix(in srgb, var(--warn) 55%, transparent); } }
   @keyframes screen-flicker { 50% { opacity:.85; } }
   @keyframes clock-tick { 50% { transform:rotate(8deg); } }
   @keyframes wait-pulse { 50% { opacity:.5; } }

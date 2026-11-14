@@ -178,7 +178,6 @@
   .backups-head > .btn { flex: none; white-space: nowrap; }
   .backups-head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-4); }
   .holds summary { cursor: pointer; color: var(--text-2); font-size: var(--text-sm); margin-top: var(--space-2); }
-  .settings-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-lg); padding: var(--space-4) var(--card-pad-x); margin-bottom: var(--space-3); }
   .card-heading h3 { margin: 0; }
   .card-heading p { color: var(--text-2); margin: .3rem 0 0; }
   .sub { color: var(--text-2); font-size: var(--text-sm); }

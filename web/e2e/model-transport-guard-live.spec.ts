@@ -29,7 +29,7 @@ import {
   pressCardAction,
   signInAsOwner,
 } from "./hosted-provider";
-import { ANTHROPIC_KEY as KEY, ANTHROPIC_MODEL as MODEL, LIVE_BASE as BASE, sendTurn } from "./live";
+import { ANTHROPIC_KEY as KEY, ANTHROPIC_MODEL as MODEL, LIVE_BASE as BASE, sendTurn, armConfirm } from "./live";
 
 test.describe.configure({ mode: "serial" });
 
@@ -182,7 +182,7 @@ test("MT-06 — the opt-in in the dialog, dark theme at 390 px", async ({ browse
   // Leave the workspace as it was: the custom endpoint disconnected. Details is
   // still open behind the dialog that was cancelled, and Disconnect is in it.
   await expect(page.locator(".signin-overlay")).toHaveCount(0, { timeout: 30_000 });
-  page.once("dialog", (dialog) => void dialog.accept());
+  armConfirm(page);
   await page.getByRole("button", { name: /^Disconnect/ }).first().click();
   await expect((await hostedProviderCard(page, BASE, "OpenAI-compatible")).getByText("Not connected")).toBeVisible({
     timeout: 60_000,

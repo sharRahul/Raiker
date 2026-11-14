@@ -135,6 +135,40 @@
   // a macOS banner it folds into the bell, which keeps counting it; approvals
   // have their own card and never fold here.
   const visible = $derived(shown.filter((item) => !folded.includes(item.notification_id)));
+
+  // FIXED-1437 — on a phone the dock sits at the bottom edge, which is where
+  // the composer is. While the owner is typing, a notice goes straight into
+  // the bell (which still counts it) instead of covering the field for five
+  // seconds; once they stop, new notices dock as before.
+  let typing = $state(false);
+  let phone = $state(false);
+  function isTextEntry(node: Element | null): boolean {
+    if (!(node instanceof HTMLElement)) return false;
+    if (node.isContentEditable || node instanceof HTMLTextAreaElement) return true;
+    return node instanceof HTMLInputElement && ["text", "search", ""].includes(node.type);
+  }
+  $effect(() => {
+    if (typeof window === "undefined" || typeof window.matchMedia !== "function") return;
+    const query = window.matchMedia("(max-width: 700px)");
+    const onSize = () => (phone = query.matches);
+    const onFocus = () => (typing = isTextEntry(document.activeElement));
+    const onBlur = () => setTimeout(onFocus, 0);
+    onSize();
+    onFocus();
+    query.addEventListener?.("change", onSize);
+    document.addEventListener("focusin", onFocus);
+    document.addEventListener("focusout", onBlur);
+    return () => {
+      query.removeEventListener?.("change", onSize);
+      document.removeEventListener("focusin", onFocus);
+      document.removeEventListener("focusout", onBlur);
+    };
+  });
+  $effect(() => {
+    if (!phone || !typing || visible.length === 0) return;
+    folded = [...folded, ...visible.map((item) => item.notification_id)];
+  });
+
   $effect(() => {
     const newest = visible[0];
     if (newest === undefined || holding) return;

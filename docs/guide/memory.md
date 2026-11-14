@@ -50,6 +50,10 @@ why it was proposed. You can:
   recall; or
 - **Reject** it so the proposal does not become memory.
 
+When a proposal says nearly the same thing as a memory you already approved,
+its card says so and quotes that memory. Approving keeps both; rejecting or
+editing is usually what you want.
+
 A correction you make in Chat arrives here too: when a message starts *That's
 wrong*, *No,* or *Actually*, Chat offers *Remember: …?* under the answer, and
 **Save** files your own words as a proposal and approves it in one step, under
@@ -236,7 +240,9 @@ running and `model_provider_runtime` is set to **Always allow** or **Auto**,
 Raiker indexes new approved memories and managed-file chunks in the background
 every ten minutes through the same governed action as **Index**; under **Ask**
 it waits rather than asking you. `RAIKER_BACKGROUND_INDEX=off` turns it off,
-and the last pass is recorded in `logs/background-index.json`. Raiker adds the
+and the last pass is shown under **Settings → Advanced → Memory engine** (and
+recorded in `logs/background-index.json`), with a link to the setting that
+would change it when it is waiting. Raiker adds the
 `search_document:` and `search_query:` prefixes the model expects.
 
 The default lexical fallback, `raiker-local-hash-v1`, works offline and matches shared

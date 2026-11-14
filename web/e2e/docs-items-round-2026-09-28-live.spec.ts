@@ -2,7 +2,7 @@ import { expect, test, type Locator, type Page } from "@playwright/test";
 import { join } from "node:path";
 import { capture } from "./capture";
 import { DESTINATIONS, WIDTHS, settled } from "./destinations";
-import { chooseModelForTurn, signInAsOwner, useHostedModel } from "./hosted-provider";
+import { chooseModelForTurn, signInAsOwner, useHostedModel, openPermission } from "./hosted-provider";
 import { LIVE_BASE as BASE, ANTHROPIC_KEY, ANTHROPIC_MODEL as MODEL } from "./live";
 
 /**
@@ -42,15 +42,7 @@ test.setTimeout(600_000);
 test.skip(ANTHROPIC_KEY === "", "RAIKER_LIVE_ANTHROPIC_KEY is not set for this round.");
 
 async function openCapability(page: Page, label: string): Promise<Locator> {
-  await page.goto(`${BASE}/#/capabilities`);
-  const search = page.getByLabel("Search capabilities", { exact: true });
-  await expect(search).toBeVisible({ timeout: 60_000 });
-  await search.fill(label);
-  const card = page.locator(".cap.card").filter({ hasText: label }).first();
-  await expect(card).toBeVisible({ timeout: 30_000 });
-  const toggle = card.getByRole("button", { name: label });
-  if ((await toggle.getAttribute("aria-expanded")) !== "true") await toggle.click();
-  await expect(card.locator(".cap-detail")).toBeVisible({ timeout: 10_000 });
+  const card = await openPermission(page, BASE, label);
   return card;
 }
 

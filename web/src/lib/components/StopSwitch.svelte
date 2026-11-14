@@ -22,7 +22,7 @@
   import { onMount } from "svelte";
   import { failure } from "../errorCopy";
   import Icon from "./Icon.svelte";
-  import { api, ApiError } from "../api";
+  import { api } from "../api";
   import { humanize } from "../format";
   import { isActiveTask } from "../statusMaps";
   import type { EventEntry, StopAllResult, TaskView } from "../apiTypes";
@@ -41,8 +41,18 @@
   let resultEvents = $state<EventEntry[]>([]);
   let errorText = $state<string | null>(null);
   let dialogEl: HTMLDivElement | undefined = $state();
+  // FIXED-1428 — the count alone was a number with nothing behind it: after a
+  // finished answer the control read STOP 1 while Chat showed nothing running,
+  // because the one active item was a background task. The dialog names each
+  // task it would reach, so the owner can see what the 1 is before stopping it.
+  let runningTasks = $state<Pick<TaskView, "task_id" | "title" | "status" | "surface">[]>([]);
   const activeCount = $derived(counts.tasks + counts.turns + counts.commands);
   const live = $derived(activeCount > 0);
+
+  /** The status as a word an owner reads ("waiting for approval", not `awaiting_approval`). */
+  function taskStatusWord(status: string): string {
+    return status.replaceAll("_", " ");
+  }
 
   function plural(n: number, one: string, many: string): string {
     return `${n} ${n === 1 ? one : many}`;
@@ -75,6 +85,7 @@
     const [tasks, inFlight] = await Promise.allSettled([activeTasks(), api.workInFlight()]);
     if (tasks.status === "rejected") throw tasks.reason;
     const next: Counts = { ...counts, tasks: tasks.value.length };
+    runningTasks = tasks.value.map(({ task_id, title, status, surface }) => ({ task_id, title, status, surface }));
     if (inFlight.status === "fulfilled") {
       next.turns = inFlight.value.turns;
       if (inFlight.value.commands !== null) next.commands = inFlight.value.commands;
@@ -118,9 +129,7 @@
       phase = activeCount === 0 ? "empty" : "confirm";
     } catch (e) {
       errorText =
-        e instanceof ApiError
-          ? `Could not read what is running (${e.status}).`
-          : "Could not read what is running.";
+        failure("Raiker could not read what is running", "Nothing was stopped.", "Stop all still stops everything at the next safe boundary.", e);
       phase = "confirm";
     }
   }
@@ -222,6 +231,19 @@
           {/if}
           <strong>safe boundary</strong>. It is governed and audited — not a force-kill.
         </p>
+        {#if runningTasks.length > 0}
+          <ul class="reached" aria-label="Tasks this stops">
+            {#each runningTasks.slice(0, 5) as task (task.task_id)}
+              <li>
+                <a href={`#/tasks?task=${encodeURIComponent(task.task_id)}`} onclick={close}>{task.title || "Untitled task"}</a>
+                <span class="reached-status">{taskStatusWord(task.status)}</span>
+              </li>
+            {/each}
+            {#if runningTasks.length > 5}
+              <li class="reached-more"><a href="#/tasks" onclick={close}>and {runningTasks.length - 5} more in Tasks</a></li>
+            {/if}
+          </ul>
+        {/if}
         {#if errorText}<p class="error-line" role="alert">{errorText}</p>{/if}
         <div class="actions">
           <button type="button" class="btn" onclick={close}>Cancel</button>
@@ -313,6 +335,11 @@
   .stop-btn.live:hover {
     border-color: var(--danger);
   }
+  .reached { list-style: none; margin: 0 0 var(--space-3); padding: 0; display: grid; gap: 0.25rem;
+    font-size: var(--text-sm); }
+  .reached li { display: flex; justify-content: space-between; gap: var(--space-3); min-width: 0; }
+  .reached a { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+  .reached-status { color: var(--text-2); flex: none; }
   .stop-count {
     min-width: 1.15rem;
     padding: 0 0.3rem;

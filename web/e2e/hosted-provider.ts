@@ -100,31 +100,69 @@ export async function requireFirstRunWorkspace(
  * Idempotent: a capability that is already on is left alone rather than being
  * turned off and on again, so a spec can call this against a used workspace.
  */
-export async function enableCapability(
-  page: Page,
-  base: string,
-  label: string,
-  reason: string,
-): Promise<void> {
+/**
+ * Open one permission's detail pane, the way an owner reaches it after QUI-L06.
+ *
+ * The page lists permissions by category with one open beside the list, so
+ * this walks the category rail until the row appears and opens it. Returns the
+ * detail pane, which carries the row's Turn on / Turn off and mode controls.
+ * About twenty older specs searched a "Search capabilities" field and opened
+ * `.cap.card` rows in place; both are gone, and each now calls this instead.
+ */
+export async function openPermission(page: Page, base: string, label: string | RegExp): Promise<Locator> {
   await page.goto(`${base}/#/capabilities`);
-  // QUI-L06 — permissions are listed by category, one open at a time beside
-  // the list, so the helper walks the categories until it finds the row.
   const rail = page.getByRole("navigation", { name: "Permission categories" });
   await rail.waitFor({ timeout: 60_000 });
   const categories = rail.getByRole("button");
+  const name = typeof label === "string" ? new RegExp(label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")) : label;
   let found = false;
   for (let index = 1; index < (await categories.count()); index += 1) {
     await categories.nth(index).click();
-    const row = page.getByRole("option", { name: new RegExp(label) }).first();
+    const row = page.getByRole("option", { name }).first();
     if (await row.isVisible().catch(() => false)) {
       await row.click();
       found = true;
       break;
     }
   }
-  expect(found, `no permission named ${label}`).toBe(true);
-  const card = page.getByRole("article", { name: label });
+  expect(found, `no permission named ${String(label)}`).toBe(true);
+  const card = page.getByRole("article", { name }).first();
   await expect(card).toBeVisible({ timeout: 30_000 });
+  return card;
+}
+
+/** Turn one permission on or off with a reason, confirming the owner's dialog. */
+export async function setPermission(
+  page: Page,
+  base: string,
+  label: string,
+  action: "Turn on" | "Turn off",
+  reason: string,
+): Promise<void> {
+  const card = await openPermission(page, base, label);
+  const control = card.getByRole("button", { name: action, exact: true });
+  if (!(await control.isVisible().catch(() => false))) return;
+  await control.click();
+  const dialog = page.getByRole("dialog");
+  await expect(dialog).toBeVisible({ timeout: 30_000 });
+  await dialog.getByLabel("Reason (required)").fill(reason);
+  const token = dialog.getByLabel(/Confirmation token/);
+  if (await token.isVisible().catch(() => false)) await token.fill("CONFIRM");
+  const acknowledgement = dialog.getByLabel(/reviewed the threat model/);
+  if (await acknowledgement.isVisible().catch(() => false)) await acknowledgement.check();
+  await dialog.getByRole("button", { name: "Confirm change" }).click();
+  await expect(dialog).toBeHidden({ timeout: 60_000 });
+}
+
+export async function enableCapability(
+  page: Page,
+  base: string,
+  label: string,
+  reason: string,
+): Promise<void> {
+  // QUI-L06 — permissions are listed by category, one open at a time beside
+  // the list, so the helper walks the categories until it finds the row.
+  const card = await openPermission(page, base, label);
   const turnOn = card.getByRole("button", { name: "Turn on", exact: true });
   // Already on: the detail offers "Turn off" instead, and pressing anything here
   // would be a change this helper was not asked to make.
@@ -348,6 +386,21 @@ export async function connectHostedProvider(
     await page.getByRole("button", { name: "Reconnect", exact: true }).click();
   }
   await page.getByLabel(keyLabel).fill(key);
+  // Found 2026-11-14 (web-access spec on a workspace that already kept Haiku):
+  // the round's Anthropic key is identity-linked, and reconnecting it without
+  // its workspace ID saved a connection that could list no models, so the
+  // model dialog offered only Cancel and the spec timed out. The ID is read
+  // from the round's environment, like the key, and typed where the provider
+  // asks for it.
+  const workspace = provider === "Anthropic" ? (process.env.RAIKER_LIVE_ANTHROPIC_WORKSPACE ?? "") : "";
+  if (workspace) {
+    const advanced = page.locator(".sso-toggle");
+    if (await advanced.isVisible().catch(() => false)) {
+      if ((await advanced.getAttribute("aria-expanded")) === "false") await advanced.click();
+    }
+    const field = page.getByPlaceholder("wrkspc_…");
+    if (await field.isVisible().catch(() => false)) await field.fill(workspace);
+  }
   await page.locator(".signin-connect").click();
   await expect(card.getByText("Connection saved")).toBeVisible({ timeout: 60_000 });
   // The Reconnect path opens **Model details** to reach the control, and saving
@@ -538,7 +591,10 @@ export async function keepModelAvailable(
   // The card names the model it answers with by display name ("Haiku 4.5").
   const kept = card.locator("code").filter({ hasText: modelName(model) });
   if (!offered && (await kept.count()) > 0) {
-    await dialog.getByRole("button", { name: "Done" }).click();
+    // The picker closes with Done when it listed a catalogue and with Cancel
+    // when it could only offer a custom name; either leaves the kept model.
+    const done = dialog.getByRole("button", { name: /^(Done|Cancel)$/ }).first();
+    await done.click();
     await expect(dialog).toBeHidden({ timeout: 30_000 });
     return;
   }

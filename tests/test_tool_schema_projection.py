@@ -261,3 +261,35 @@ class TestTheOwnerSeesItRun:
         # nothing and changes nothing, so it must not sit in a family that
         # implies either.
         assert row.family == "plan"
+
+
+class TestSmallContextCore:
+    """FIXED-1436 — a small window carries the compact core and names the rest."""
+
+    def test_the_window_decides(self) -> None:
+        from raiker.models.tool_projection import compact_for
+
+        assert compact_for(8192) is True
+        assert compact_for(16_384) is True
+        assert compact_for(32_768) is False
+        assert compact_for(None) is False
+
+    def test_compact_carries_less_than_half_and_names_everything_else(self) -> None:
+        import json
+
+        from raiker.models.tool_projection import COMPACT_PROJECTED
+
+        def cost(specs: list) -> int:  # type: ignore[type-arg]
+            return sum(len(s.name) + len(s.description) + len(json.dumps(s.parameters)) for s in specs)
+
+        full = project_specs(default_tool_specs())
+        small = project_specs(default_tool_specs(), compact=True)
+        assert {spec.name for spec in small} == COMPACT_PROJECTED | {TOOL_SEARCH}
+        assert cost(small) * 2 < cost(full)
+        search = next(spec for spec in small if spec.name == TOOL_SEARCH)
+        # The core tools it dropped are still named, so a search can reach them.
+        assert "git_status" in search.description
+        assert "code_map_search" in search.description
+
+    def test_a_dropped_core_tool_is_found_by_its_name(self) -> None:
+        assert "git_status" in matching_tools("git_status")

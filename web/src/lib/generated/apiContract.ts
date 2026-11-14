@@ -301,6 +301,18 @@ export type AvailableModelsSet = {
   models: string[];
 };
 
+/**
+ * The background indexer's last pass (FIXED-1426), read from ``logs/background-index.json``.
+ */
+export type BackgroundIndexView = {
+  state: string;
+  at: string;
+  model: string;
+  indexed: number;
+  reason_code: string | null;
+  disabled: boolean;
+};
+
 /** One host-tick background pass: its last success, last failure and streak. */
 export type BackgroundWorkerHealth = {
   pass_name: string;
@@ -4321,6 +4333,7 @@ export type MemoryProposal = {
   confidence: number;
   decision: string;
   created_at: string;
+  similar_memory: SimilarMemory | null;
 };
 
 /** What a purge removes, and the id the owner must send back to confirm it. */
@@ -4376,6 +4389,7 @@ export type MemorySettingsView = {
   embedding_providers: EmbeddingProviderView[];
   unindexed_memories: number;
   unindexed_file_chunks: number;
+  background_index: BackgroundIndexView | null;
   vector_search_strategy: "exact_then_approximate";
   vector_search_exact_limit: number;
 };
@@ -6292,6 +6306,13 @@ export type SideTaskModelsSet = {
 
 export type SignInRequest = {
   method?: "device" | "browser";
+};
+
+/** FIXED-1439 — the approved memory a proposal closely repeats. */
+export type SimilarMemory = {
+  memory_id: string;
+  text: string;
+  similarity: number;
 };
 
 export type SkillActiveSet = {

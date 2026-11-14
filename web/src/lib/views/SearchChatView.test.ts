@@ -393,6 +393,35 @@ describe("SearchChatView organises the threads it lists", () => {
     );
   });
 
+  it("paints a rename at once and puts it back when it is refused (FIXED-1432)", async () => {
+    let release: (value: Response) => void = () => {};
+    const base = stubFetch({
+      "GET /api/work-threads/page": pageOf([thread()]),
+      "GET /api/projects": PROJECTS,
+    });
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      if (String(input) === "/api/sessions/sess_1/rename") {
+        return new Promise<Response>((resolve) => (release = resolve));
+      }
+      return (base as unknown as typeof fetch)(input, init);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    render(SearchChatView);
+    await waitFor(() => expect(screen.getByText("Release planning")).toBeInTheDocument());
+
+    const row = await openOrganise("Release planning");
+    await fireEvent.click(within(row).getByRole("button", { name: "Rename" }));
+    await fireEvent.input(screen.getByLabelText("New title for Release planning"), { target: { value: "Renamed" } });
+    await fireEvent.submit(screen.getByLabelText("New title for Release planning").closest("form")!);
+
+    // Painted before the server has answered.
+    expect(await screen.findByText("Renamed")).toBeInTheDocument();
+    release({ ok: false, status: 500, json: async () => ({ detail: "boom" }) } as Response);
+    expect(await screen.findByText("Release planning")).toBeInTheDocument();
+    expect(screen.queryByText("Renamed")).toBeNull();
+    expect(await screen.findByText(/back as it was/)).toBeInTheDocument();
+  });
+
   it("says on the row which threads are pinned", async () => {
     stubFetch({
       "GET /api/work-threads/page": pageOf([thread({ pinned: true })]),

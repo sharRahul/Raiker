@@ -28,7 +28,7 @@ import { capture } from "./capture";
 import { execFileSync } from "node:child_process";
 import { appendFileSync } from "node:fs";
 import { join } from "node:path";
-import { signInAsOwner } from "./hosted-provider";
+import { signInAsOwner, openPermission } from "./hosted-provider";
 import { LIVE_BASE as BASE, ANTHROPIC_KEY, useAnthropic } from "./live";
 
 const SHOTS = join(import.meta.dirname, "..", "..", "docs", "plans", "screenshots", "working");
@@ -66,16 +66,7 @@ async function signIn(target: Page) {
 }
 
 async function openCapability(label: string) {
-  await page.goto(`${BASE}/#/capabilities`);
-  const search = page.getByLabel("Search capabilities", { exact: true });
-  await expect(search).toBeVisible({ timeout: 30_000 });
-  await search.fill(label);
-  const card = page.locator(".cap.card").filter({ hasText: label }).first();
-  await expect(card).toBeVisible({ timeout: 30_000 });
-  if ((await card.getByRole("button", { name: label }).getAttribute("aria-expanded")) !== "true") {
-    await card.getByRole("button", { name: label }).click();
-  }
-  await expect(card.locator(".cap-detail")).toBeVisible({ timeout: 10_000 });
+  const card = await openPermission(page, BASE, label);
   return card;
 }
 

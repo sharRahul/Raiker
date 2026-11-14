@@ -20,7 +20,7 @@
 import { expect, test, type Browser, type BrowserContext, type Page } from "@playwright/test";
 import { capture } from "./capture";
 import { join } from "node:path";
-import { signInAsOwner } from "./hosted-provider";
+import { signInAsOwner, openPermission } from "./hosted-provider";
 import { LIVE_BASE as BASE, ANTHROPIC_KEY, useAnthropic } from "./live";
 
 const SHOTS = join(import.meta.dirname, "..", "..", "docs", "plans", "screenshots", "working");
@@ -157,11 +157,7 @@ test("B7 — a delegated read-only search returns findings without filling the t
 
 /** Turn one capability on at runtime level, exactly as a person would. */
 async function enableCapability(label: string) {
-  await page.goto(`${BASE}/#/capabilities`);
-  const search = page.getByLabel("Search capabilities", { exact: true });
-  await expect(search).toBeVisible({ timeout: 30_000 });
-  await search.fill(label);
-  const card = page.locator(".cap.card").filter({ hasText: label }).first();
+  const card = await openPermission(page, BASE, label);
   await card.getByRole("button", { name: label }).click();
   const turnOn = card.getByRole("button", { name: "Turn on" });
   if (await turnOn.isVisible().catch(() => false)) {
@@ -207,10 +203,7 @@ test("B8 — MCP: a connected server says whether the agent can call it, then do
   await capture(page, join(SHOTS, "b8-mcp-live-withheld.png"));
 
   // Raise the decision mode, which is exactly what the banner told the owner to do.
-  await page.goto(`${BASE}/#/capabilities`);
-  const search = page.getByLabel("Search capabilities", { exact: true });
-  await search.fill("MCP connector");
-  const mcpCard = page.locator(".cap.card").filter({ hasText: "MCP connector" }).first();
+  const mcpCard = await openPermission(page, BASE, "MCP connector");
   await mcpCard.getByRole("button", { name: "Allow", exact: true }).click();
   // Loosening a decision mode is a step-up decision, recorded with a reason.
   const modeDialog = page.getByRole("dialog");

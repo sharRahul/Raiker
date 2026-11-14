@@ -87,7 +87,6 @@
   /* Found 2026-11-07 (beta round): General's card styles are scoped to that
      file, so this section rendered as bare text with a larger body. It now
      carries the same card as its neighbours. */
-  .settings-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-lg); padding: var(--space-3) var(--card-pad-x) var(--space-4); margin-bottom: var(--space-3); }
   .card-heading h3 { margin: 0; }
   .card-heading p { color: var(--text-2); margin: .3rem 0 0; font-size: var(--text-sm); }
   .facts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.5rem; margin: 0.5rem 0; }

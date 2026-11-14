@@ -206,3 +206,32 @@ it("says it was allowed once only when the rule is refused (QUI-P05)", async () 
   await fireEvent.click(await screen.findByRole("button", { name: "Allow and keep these limits" }));
   expect(await screen.findByText(/^Allowed once\. Choose an expiry from 1 hour to 1 week\./)).toBeInTheDocument();
 });
+
+it("shows the proposed change on the card itself (FIXED-1430)", async () => {
+  const view = detail();
+  view.diff = "--- a/notes.md\n+++ b/notes.md\n@@ -1 +1 @@\n-one\n+uno\n";
+  view.diff_path = "notes.md";
+  stub(view);
+  render(SafetyCard, { props: { approval: INFO } });
+
+  const diff = await screen.findByTestId("safety-diff");
+  expect(diff).toHaveTextContent("notes.md");
+  expect(diff.textContent).toContain("uno");
+});
+
+it("folds a long change so the decision stays in view", async () => {
+  const view = detail();
+  view.diff = "--- a/notes.md\n+++ b/notes.md\n@@ -1,20 +1,20 @@\n" + Array.from({ length: 20 }, (_, i) => `-l${i}\n+L${i}`).join("\n") + "\n";
+  view.diff_path = "notes.md";
+  stub(view);
+  render(SafetyCard, { props: { approval: INFO } });
+  const diff = await screen.findByTestId("safety-diff");
+  expect(diff.textContent).not.toContain("L19");
+});
+
+it("draws no change block when the approval has no diff", async () => {
+  stub(detail({}, "arguments"));
+  render(SafetyCard, { props: { approval: INFO } });
+  await screen.findByText("Waiting for your decision");
+  expect(screen.queryByTestId("safety-diff")).toBeNull();
+});

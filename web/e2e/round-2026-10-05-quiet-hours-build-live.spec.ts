@@ -11,7 +11,7 @@ import { join } from "node:path";
 import { expect, test, type Page } from "@playwright/test";
 import { capture } from "./capture";
 import { settled } from "./destinations";
-import { chooseModelForTurn, signInAsOwner } from "./hosted-provider";
+import { chooseModelForTurn, signInAsOwner, openPermission } from "./hosted-provider";
 import { LIVE_BASE, useAnthropic } from "./live";
 
 const BASE = LIVE_BASE;
@@ -38,12 +38,7 @@ async function api<T>(page: Page, method: string, path: string, body?: unknown):
 }
 
 async function setCapability(page: Page, label: string, reason: string) {
-  await page.goto(`${BASE}/#/capabilities`);
-  const search = page.getByLabel("Search capabilities", { exact: true });
-  await expect(search).toBeVisible({ timeout: 30_000 });
-  await search.fill(label);
-  const card = page.locator(".cap.card").filter({ hasText: label }).first();
-  await expect(card).toBeVisible();
+  const card = await openPermission(page, BASE, label);
   const toggle = card.getByRole("button", { name: label });
   if ((await toggle.getAttribute("aria-expanded")) !== "true") await toggle.click();
   const turnOn = card.getByRole("button", { name: "Turn on" });

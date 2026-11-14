@@ -114,6 +114,19 @@ describe("the switch when work is running", () => {
     expect(screen.getByRole("dialog").textContent).toContain("safe boundary");
   });
 
+  it("names each task it would reach, linked to the task (FIXED-1428)", async () => {
+    stubFetch({ [TASKS]: [task("waiting_for_approval")], [IN_FLIGHT]: QUIET });
+
+    render(StopSwitch);
+    await waitFor(() => expect(stopButton().classList.contains("live")).toBe(true));
+    await fireEvent.click(stopButton());
+
+    const list = await screen.findByRole("list", { name: "Tasks this stops" });
+    const link = list.querySelector("a");
+    expect(link?.getAttribute("href")).toBe("#/tasks?task=task_waiting_for_approval_sess_1");
+    expect(list.textContent).toContain("waiting for approval");
+  });
+
   it("announces the count politely, outside the button's own label", async () => {
     stubFetch({ [TASKS]: [task("running")], [IN_FLIGHT]: QUIET });
 

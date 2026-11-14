@@ -41,7 +41,7 @@
  */
 import { expect, test, type Browser, type BrowserContext, type Page } from "@playwright/test";
 import { join } from "node:path";
-import { refreshHostedReadiness, signInAsOwner, useHostedModel } from "./hosted-provider";
+import { refreshHostedReadiness, signInAsOwner, useHostedModel, openPermission } from "./hosted-provider";
 import { LIVE_BASE as BASE, ANTHROPIC_KEY, ANTHROPIC_MODEL as MODEL } from "./live";
 
 const SHOTS = join(import.meta.dirname, "..", "..", "docs", "plans", "screenshots", "working");
@@ -85,20 +85,8 @@ async function ask(prompt: string) {
  * requests in enough seconds to earn a 429 from the API's own rate limiter — so
  * a snapshot of several capabilities navigates once and filters in place.
  */
-async function openCapability(label: string, fresh = true) {
-  const search = page.getByLabel("Search capabilities", { exact: true });
-  if (fresh || !(await search.isVisible().catch(() => false))) {
-    await page.goto(`${BASE}/#/capabilities`);
-    await expect(search).toBeVisible({ timeout: 30_000 });
-  }
-  await search.fill(label);
-  const card = page.locator(".cap.card").filter({ hasText: label }).first();
-  await expect(card).toBeVisible({ timeout: 30_000 });
-  if ((await card.getByRole("button", { name: label }).getAttribute("aria-expanded")) !== "true") {
-    await card.getByRole("button", { name: label }).click();
-  }
-  await expect(card.locator(".cap-detail")).toBeVisible({ timeout: 10_000 });
-  return card;
+async function openCapability(label: string) {
+  return openPermission(page, BASE, label);
 }
 
 async function enableCapability(label: string, reason: string) {
@@ -144,14 +132,14 @@ async function disableCapability(label: string, reason: string) {
 async function standingWriteModes(): Promise<Record<string, string>> {
   const modes: Record<string, string> = {};
   await page.goto(`${BASE}/#/capabilities`);
-  await expect(page.getByLabel("Search capabilities", { exact: true })).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByRole("navigation", { name: "Permission categories" })).toBeVisible({ timeout: 30_000 });
   // `Processes` is not read here. GEP-04 classified `process_execution` as
   // **no route**: no tool names it and no approval relays it, so Permissions
   // lists it read-only rather than as a decision with a standing mode. Build
   // still carries it in its per-turn tightening set, which is a different
   // mechanism and is what the rest of this spec measures.
   for (const capability of ["File writes", "Patch apply", "Shell commands"]) {
-    const card = await openCapability(capability, false);
+    const card = await openCapability(capability);
     for (const mode of ["Ask", "Allow", "Auto", "Deny"]) {
       const button = card.getByRole("button", { name: mode, exact: true });
       if ((await button.getAttribute("aria-pressed")) === "true") modes[capability] = mode;

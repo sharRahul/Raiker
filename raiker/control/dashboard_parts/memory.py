@@ -18,6 +18,7 @@ from typing import TYPE_CHECKING, Any, Literal, cast
 from raiker.contracts.ids import new_id, utc_now
 from raiker.control.dtos import ControlResult
 from raiker.control.views.memory import (
+    BackgroundIndexView,
     EmbeddingProviderView,
     EmbeddingSpaceView,
     MemoryControlView,
@@ -29,7 +30,33 @@ from raiker.runtime.authority.models import PrincipalType
 from raiker.storage.internal_paths import display_path, internal_io_path
 
 if TYPE_CHECKING:
+    from pathlib import Path
+
     from raiker.control.dashboard import DashboardService
+
+
+def _background_index_view(workspace_root: str | Path) -> BackgroundIndexView | None:
+    """FIXED-1426 — the background indexer's last pass, as Memory shows it.
+
+    The worker writes its outcome to ``logs/background-index.json``; before its
+    first pass there is nothing to say unless it is switched off.
+    """
+    from raiker.memory import background_index
+
+    off = background_index.disabled()
+    loaded = background_index.read_status(workspace_root)
+    if loaded is None and not off:
+        return None
+    loaded = loaded or {}
+    reason = loaded.get("reason_code")
+    return BackgroundIndexView(
+        state=str(loaded.get("state") or ("disabled" if off else "unknown")),
+        at=str(loaded.get("at") or ""),
+        model=str(loaded.get("model") or background_index.builtin_embedding.MODEL),
+        indexed=int(loaded.get("indexed") or 0),
+        reason_code=str(reason) if reason else None,
+        disabled=off,
+    )
 
 
 class MemoryService:
@@ -173,9 +200,21 @@ class MemoryService:
     def list_memory_proposals(self: DashboardService, acting_principal_id: str | None) -> list[dict[str, Any]]:
         if not self._is_human(acting_principal_id):
             return []
-        return self.store.list_memory_candidates(
+        from raiker.memory.near_duplicate import nearest_approved
+
+        proposals = self.store.list_memory_candidates(
             decision="deferred", owner_principal_id=acting_principal_id
         )
+        if not proposals:
+            return proposals
+        # FIXED-1439 — a proposal that repeats an approved memory says so.
+        approved = self.store.list_approved_memory(
+            limit=2_000, include_search_disabled=True, owner_principal_id=acting_principal_id
+        )
+        return [
+            {**row, "similar_memory": nearest_approved(str(row.get("text") or ""), approved)}
+            for row in proposals
+        ]
 
     def list_memory_relationship_proposals(
         self: DashboardService, acting_principal_id: str | None
@@ -1419,6 +1458,7 @@ class MemoryService:
             # The cache rebuilds on a durable SQLite eligibility revision. This
             # names the strategy, not a live cache hit, so a fresh process never
             # presents a warm-cache performance claim it has not earned yet.
+            background_index=_background_index_view(self.store.paths.workspace_root),
             vector_search_strategy="exact_then_approximate",
             vector_search_exact_limit=512,
             unindexed_memories=len(

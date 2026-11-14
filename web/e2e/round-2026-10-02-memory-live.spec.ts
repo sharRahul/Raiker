@@ -13,7 +13,7 @@ import { expect, test, type Page } from "@playwright/test";
 import { capture } from "./capture";
 import { settled } from "./destinations";
 import { chooseModelForTurn, signInAsOwner } from "./hosted-provider";
-import { LIVE_BASE, sendTurn, useAnthropic } from "./live";
+import { LIVE_BASE, sendTurn, useAnthropic, armConfirm } from "./live";
 
 const BASE = LIVE_BASE;
 const SHOTS = join(import.meta.dirname, "..", "..", "output", "playwright", "2026-10-02-memory-round");
@@ -183,7 +183,7 @@ test("undoing an import forgets what it wrote, and keeps what was changed since"
   const seen = watchFailures(page);
   await signInAsOwner(page, BASE);
   await openImport(page);
-  page.once("dialog", (dialog) => void dialog.accept());
+  armConfirm(page);
   const receipts = page.getByRole("region", { name: "Recent imports" });
   await receipts.locator("li").filter({ hasText: "second.json" }).getByRole("button", { name: "Undo import" }).click();
   // The staging record had its expiry changed, so it is the owner's decision now.

@@ -203,7 +203,7 @@ describe("ObserveView", () => {
     await fireEvent.click(screen.getByRole("button", { name: /build support bundle/i }));
 
     expect(
-      await screen.findByText(/could not build the support bundle \(404\)/i),
+      await screen.findByText(/the support bundle was not built \(HTTP 404/i),
     ).toBeInTheDocument();
     expect(screen.queryByLabelText(/redacted support bundle/i)).not.toBeInTheDocument();
   });

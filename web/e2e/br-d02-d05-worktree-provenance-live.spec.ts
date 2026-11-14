@@ -93,7 +93,7 @@ async function connectAnthropic(page: Page): Promise<void> {
 
 async function setUpForBuild(page: Page): Promise<void> {
   await page.goto(`${BASE}/#/capabilities`);
-  await page.getByLabel("Search capabilities", { exact: true }).waitFor({ timeout: 60_000 });
+  await page.getByRole("navigation", { name: "Permission categories" }).waitFor({ timeout: 60_000 });
   const preset = page.getByRole("region", { name: "Set up for Build" });
   if (!(await preset.isVisible().catch(() => false))) return;
   await preset.getByRole("button", { name: /^Turn on \d+$/ }).click();

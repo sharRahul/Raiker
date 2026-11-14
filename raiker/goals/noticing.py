@@ -60,10 +60,46 @@ class GoalSuggestion:
     session_titles: tuple[str, ...]
 
 
+_VOWELS = frozenset("aeiou")
+
+
+def stem(word: str) -> str:
+    """FIXED-1440 — one form per word, so an aim matches across inflections.
+
+    "Planning trips to Lisbon" and "plan a trip in Lisbon" are the same aim;
+    as raw words they shared only "lisbon". This folds the common English
+    endings (plural, -ing, -ed, -ies) conservatively — a short word is left as
+    it is — and undoubles a final consonant the ending doubled ("planning" →
+    "plan"). It is not a dictionary: it never maps one word onto another.
+    """
+    word = word.removesuffix("'s")
+    if len(word) > 4 and word.endswith("ies"):
+        return word[:-3] + "y"
+    for suffix, minimum in (("ing", 6), ("ed", 5)):
+        if len(word) >= minimum and word.endswith(suffix):
+            root = word[: -len(suffix)]
+            if not any(ch in _VOWELS for ch in root):
+                return word
+            if len(root) > 2 and root[-1] == root[-2] and root[-1] not in "lsz":
+                root = root[:-1]
+            return root
+    if len(word) > 4 and word.endswith(("ches", "shes", "sses", "xes", "zes")):
+        return word[:-2]
+    if len(word) > 3 and word.endswith("s") and not word.endswith(("ss", "us", "is")):
+        return word[:-1]
+    return word
+
+
+def _fold(word: str) -> str:
+    """:func:`stem`, then a silent final *e* dropped ("invoice" ≡ "invoicing")."""
+    word = stem(word)
+    return word[:-1] if len(word) > 4 and word.endswith("e") else word
+
+
 def keywords(text: str) -> frozenset[str]:
-    """The content words of one request."""
+    """The content words of one request, each in one form (:func:`stem`)."""
     return frozenset(
-        word.strip("'-")
+        _fold(word.strip("'-"))
         for word in _WORD.findall(text.lower())
         if len(word) > 3 and word not in _STOP
     )
@@ -97,7 +133,9 @@ def _dismissed(store: SQLiteStore, owner: str) -> list[frozenset[str]]:
         except ValueError:
             continue
         if isinstance(words, list):
-            found.append(frozenset(str(word) for word in words))
+            # A Not now kept before FIXED-1440 holds unfolded words; folding
+            # them here keeps that aim dismissed under the new matching.
+            found.append(frozenset(_fold(str(word)) for word in words))
     return found
 
 

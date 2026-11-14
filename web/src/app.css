@@ -1416,10 +1416,12 @@ time {
 /* FIXED-1406 — one Settings card, defined once. Each section kept a private
    copy of this rule, and the two that lacked one (Voice, Command downloads)
    rendered as loose text on the page while their neighbours were cards. A
-   section's own copy still wins where it tunes the padding. */
+   section's own copy still wins where it tunes the padding.
+   2026-11-14 — the eight private copies are gone; this is the only rule, and
+   its edge follows --card-edge so dark cards separate by luminance. */
 .settings-card {
   background: var(--surface);
-  border: 1px solid var(--border);
+  border: 1px solid var(--card-edge, var(--border));
   border-radius: var(--r-lg);
   padding: var(--card-pad-y, var(--space-4)) var(--card-pad-x, var(--space-4));
   margin-bottom: var(--space-3);

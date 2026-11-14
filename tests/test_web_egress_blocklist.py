@@ -291,3 +291,40 @@ def test_the_check_route_says_why_and_which_list(tmp_path: Path, monkeypatch: py
     private = client.post("/api/web-access/blocklist/test", json={"host": "127.0.0.1"}).json()
     assert private["rule"] is None and private["rule_source"] is None
     assert "private, loopback, or link-local" in private["explanation"]
+
+
+def test_an_ordinary_hidden_menu_is_not_called_suspicious() -> None:
+    """FIXED-1441 — github.com/about raised the alert on its own navigation."""
+    page = sanitize_html(
+        "<p>GitHub is where people build software.</p>"
+        "<nav hidden><a>Sign in</a><a>Copilot: write better code with AI</a></nav>"
+        '<span aria-hidden="true">Product</span>'
+    )
+    assert page.hidden_blocks_removed == 2
+    assert page.hidden_instruction_signals == 0
+    assert not page.suspicious
+    # Still removed and still noted, so the reader knows text was dropped.
+    assert any("hidden element" in note for note in page.notes)
+
+
+def test_a_direction_override_is_suspicious_on_its_own() -> None:
+    assert sanitize_text("invoice‮gpj.exe").suspicious
+
+
+def test_a_joiner_or_two_is_ordinary_and_many_are_not() -> None:
+    assert not sanitize_text("family ‍ emoji").suspicious
+    assert sanitize_text("a" + "​" * 12 + "b").suspicious
+
+
+def test_a_hidden_void_element_does_not_hide_the_rest_of_the_page() -> None:
+    """FIXED-1442 — PyPI's httpx page came back as "Skip to main content"."""
+    page = sanitize_html(
+        '<a href="#main">Skip to main content</a>'
+        '<input type="hidden" hidden value="csrf"><img src="pixel.gif" height="0">'
+        "<main><p>HTTPX is a fully featured HTTP client.</p><br><p>Install it with pip.</p>"
+        '<embed src="x.swf"></main><p>Footer</p>'
+    )
+    assert "HTTPX is a fully featured HTTP client." in page.text
+    assert "Install it with pip." in page.text
+    assert "Footer" in page.text
+    assert page.hidden_blocks_removed == 2

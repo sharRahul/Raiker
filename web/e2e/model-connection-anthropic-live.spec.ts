@@ -22,10 +22,11 @@ import {
   hostedProviderCard,
   keepModelAvailable,
   openHostedProviders,
+  openPermission,
   openProviderDetails,
   signInAsOwner,
 } from "./hosted-provider";
-import { ANTHROPIC_KEY as KEY, ANTHROPIC_MODEL as MODEL, LIVE_BASE as BASE, sendTurn } from "./live";
+import { ANTHROPIC_KEY as KEY, ANTHROPIC_MODEL as MODEL, LIVE_BASE as BASE, sendTurn, armConfirm } from "./live";
 
 test.describe.configure({ mode: "serial" });
 
@@ -35,13 +36,7 @@ const SHOTS = "../../output/playwright/2026-10-20-model-connection-anthropic";
 test.skip(KEY === "", "RAIKER_LIVE_ANTHROPIC_KEY is unset");
 
 async function setHostedModels(page: Page, on: boolean, reason: string): Promise<void> {
-  await page.goto(`${BASE}/#/capabilities`);
-  await page.getByLabel("Search permissions", { exact: true }).waitFor({ timeout: 60_000 });
-  await page.getByLabel("Search permissions", { exact: true }).fill("Hosted models");
-  const card = page.locator(".cap.card").filter({ hasText: "Hosted models" }).first();
-  await expect(card).toBeVisible({ timeout: 60_000 });
-  const toggle = card.locator("button.cap-toggle");
-  if ((await toggle.getAttribute("aria-expanded")) !== "true") await toggle.click();
+  const card = await openPermission(page, BASE, "Hosted models");
   const action = card.getByRole("button", { name: on ? "Turn on" : "Turn off", exact: true });
   if (!(await action.isVisible().catch(() => false))) return;
   await action.click();
@@ -56,6 +51,13 @@ async function setHostedModels(page: Page, on: boolean, reason: string): Promise
     await dialog.getByRole("button", { name: /Confirm change|Turn off|Turn on/ }).last().click();
     await expect(dialog).toBeHidden({ timeout: 60_000 });
   }
+}
+
+/** The posture sits in Add model's collapsed "Permissions and network" (QUI-L06). */
+async function openPostureDetails(page: Page): Promise<void> {
+  const details = page.locator("details.provider-permissions").first();
+  await details.waitFor({ timeout: 30_000 });
+  if ((await details.getAttribute("open")) === null) await details.locator("summary").click();
 }
 
 async function anthropicCard(page: Page): Promise<Locator> {
@@ -102,20 +104,18 @@ test("LC-03 — turning Hosted models off refuses the saved connection", async (
   test.setTimeout(300_000);
   await signInAsOwner(page, BASE);
   // Before revoking: Permissions says the gate is on, and why.
-  await page.goto(`${BASE}/#/capabilities`);
-  await page.getByLabel("Search permissions", { exact: true }).fill("Hosted models");
-  const row = page.locator(".cap.card").filter({ hasText: "Hosted models" }).first();
-  await row.locator("button.cap-toggle").click();
+  const row = await openPermission(page, BASE, "Hosted models");
   await expect(row.getByText(/on because you connected a provider/i)).toBeVisible({ timeout: 30_000 });
   await expect(row.getByText("On by connection")).toBeVisible();
   await expect(row.getByRole("button", { name: "Turn off", exact: true })).toBeVisible();
   await capture(page, `${SHOTS}/04a-permissions-on-by-connection.png`, row);
   await setHostedModels(page, false, "LC-03 revocation check");
   await expect(
-    page.locator(".cap.card").filter({ hasText: "Hosted models" }).first().getByText(/cannot use this/),
+    page.getByRole("article", { name: /Hosted models/ }).first().getByText(/cannot use this/),
   ).toBeVisible({ timeout: 30_000 });
   await capture(page, `${SHOTS}/04-hosted-models-off.png`);
   await openHostedProviders(page, BASE);
+  await openPostureDetails(page);
   const posture = page.getByLabel("Off-machine provider posture");
   await expect(posture.getByText(/^Off$/).first()).toBeVisible({ timeout: 30_000 });
   const card = await anthropicCard(page);
@@ -133,10 +133,12 @@ test("LC-04 — disconnecting takes the provider away", async ({ page }) => {
   await signInAsOwner(page, BASE);
   const card = await anthropicCard(page);
   await openProviderDetails(page, card);
-  page.once("dialog", (dialog) => void dialog.accept());
+  armConfirm(page);
   await page.getByRole("button", { name: /^Disconnect/ }).first().click();
   const after = await anthropicCard(page);
   await expect(after.getByText("Not connected")).toBeVisible({ timeout: 60_000 });
+  await openHostedProviders(page, BASE);
+  await openPostureDetails(page);
   await expect(
     page.getByLabel("Off-machine provider posture").getByText("Connected off-machine providers"),
   ).toBeVisible();

@@ -712,10 +712,13 @@
         />
       </div>
     {/if}
-    <div class="card-grid project-grid" id={`panel-${listView}`} role="tabpanel" aria-labelledby={`tab-${listView}`}>
+    <!-- FIXED-1431 — QUI-L12: projects are rows, like threads and goals, so
+         Work's three lists read the same way and a long list scans down one
+         edge instead of across a grid. -->
+    <div class="project-list" id={`panel-${listView}`} role="tabpanel" aria-labelledby={`tab-${listView}`}>
       {#each page(shownProjects, shownCount) as p (p.project_id)}
         <article
-          class="card card-interactive project"
+          class="project"
           class:current={p.project_id === currentProjectId && !p.is_archived}
           class:archived={p.is_archived}
           class:drag-over={dragOverId === p.project_id}
@@ -1230,12 +1233,45 @@
     flex-direction: column;
     gap: var(--space-4);
   }
-  .project-grid {
-    --card-min: 18rem;
+  .project-list {
+    display: flex;
+    flex-direction: column;
+    background: var(--surface);
+    border: 1px solid var(--card-edge, var(--border));
+    border-radius: var(--r-lg);
+    overflow: hidden;
   }
+  .project-list:empty { display: none; }
+  .project {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: var(--space-2) var(--space-4);
+    min-height: 64px;
+    padding: var(--space-2) var(--card-pad-x, var(--space-4));
+    border-top: 1px solid var(--border);
+  }
+  .project:first-child { border-top: 0; }
+  .project-open {
+    display: grid;
+    gap: 0.15rem;
+    min-width: 0;
+    padding: 0.25rem 0;
+    border: 0;
+    background: none;
+    color: inherit;
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+  }
+  .project-open:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; border-radius: var(--r-sm); }
+  .project:hover { background: var(--sunken); }
+  .project .drop-hint { grid-column: 1 / -1; }
   .project.current {
-    border-color: var(--accent-border);
-    box-shadow: 0 0 0 1px var(--accent-border), var(--shadow-1);
+    box-shadow: inset 3px 0 0 var(--accent);
+  }
+  @media (max-width: 640px) {
+    .project { grid-template-columns: minmax(0, 1fr); }
   }
   .project.archived .project-name {
     color: var(--text-2);
@@ -1329,8 +1365,7 @@
     overflow-wrap: anywhere;
   }
   .project.drag-over {
-    border-color: var(--accent);
-    box-shadow: 0 0 0 2px var(--accent), var(--shadow-2);
+    box-shadow: inset 0 0 0 2px var(--accent);
     background: var(--accent-soft);
   }
   .drop-hint {
@@ -1353,8 +1388,11 @@
   .project-actions {
     display: flex;
     gap: 0.4rem;
-    margin-top: 0.6rem;
     flex-wrap: wrap;
+    justify-content: flex-end;
+  }
+  @media (max-width: 640px) {
+    .project-actions { justify-content: flex-start; }
   }
   .context-fields { display: grid; gap: var(--space-3); margin: var(--space-3) 0; }
   .context-field { display: grid; gap: 0.35rem; color: var(--text-2); font-size: var(--text-sm); }

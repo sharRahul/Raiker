@@ -275,7 +275,6 @@
   .section-heading { margin-bottom: var(--space-3); }
   .section-heading h2,.card-heading h3 { margin:0; }
   .card-heading p { color:var(--text-2); margin:.3rem 0 0; }
-  .settings-card { background:var(--surface); border:1px solid var(--border); border-radius:var(--r-lg); padding:var(--space-4) var(--card-pad-x); margin-bottom:var(--space-3); }
   label {
     display:grid;
     gap:.3rem;

@@ -113,6 +113,20 @@ class EmbeddingSpaceView(TypedDict):
     query_embeddable: NotRequired[bool]
 
 
+class BackgroundIndexView(TypedDict):
+    """The background indexer's last pass (FIXED-1426), read from ``logs/background-index.json``."""
+
+    #: ``indexed`` · ``up_to_date`` · ``waiting_for_permission`` ·
+    #: ``model_missing`` · ``ollama_unreachable`` · ``no_owner`` · ``failed``
+    state: str
+    at: str
+    model: str
+    indexed: int
+    reason_code: str | None
+    #: ``RAIKER_BACKGROUND_INDEX=off`` — the worker is not running at all.
+    disabled: bool
+
+
 class EmbeddingProviderView(TypedDict):
     """An embedding model this install could call, and what is waiting to be embedded by it."""
 
@@ -150,5 +164,7 @@ class MemorySettingsView(View):
     unindexed_file_chunks: int = 0
     #: The retrieval implementation, stated separately from the embedding model:
     #: the owner should not have to infer whether growing history changes lookup.
+    #: FIXED-1426 — the background indexer's last pass, or ``None`` before its first.
+    background_index: BackgroundIndexView | None = None
     vector_search_strategy: Literal["exact_then_approximate"] = "exact_then_approximate"
     vector_search_exact_limit: int = 512

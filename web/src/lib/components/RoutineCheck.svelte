@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { failure } from "../errorCopy";
   /**
    * DEC-12 steps 6 and 8 — "will this routine run?", asked before 03:00 rather
    * than answered by the run that failed then, and how long one run may take.
@@ -56,7 +57,7 @@
       report = await api.taskDoctor(task.task_id);
     } catch (e) {
       report = null;
-      error = e instanceof ApiError ? `Could not check it (${e.status}).` : "Could not check it.";
+      error = failure("The routine check did not run", "The routine is unchanged.", "Try again.", e);
     } finally {
       busy = false;
     }

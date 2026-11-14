@@ -384,6 +384,14 @@ OpenRouter offers some free models only to apps on its own list. Raiker says so
 repair is another model, not another key. OpenRouter requests name Raiker as the
 calling app.
 
+**How long an answer may be.** Anthropic allows 16,000 output tokens and
+OpenAI, OpenRouter, Ollama and LM Studio 16,384, each measured with a real key.
+Gemini, DeepSeek, Groq, Mistral, xAI and Cerebras allow 8,192, and Together,
+Fireworks, NVIDIA NIM and Hugging Face 4,096 — the limits each provider
+publishes, not yet measured with a key, which is part of why those cards say
+*Experimental*. An OpenAI-compatible server of your own keeps 1,024 until you
+know what it accepts.
+
 ### Is your own server set up for agent work?
 
 A model you run yourself — Ollama, LM Studio, llama.cpp, MLX or an
@@ -409,6 +417,13 @@ When a provider does not say how much context a model has, or says something
 wrong, **Details → Context window override** sets it exactly, with the reason you
 give; turns and compaction then use that window, and the override history keeps
 every change. **Clear override** goes back to what the provider reports.
+
+A model whose window is 16,384 tokens or less gets a smaller tool list: twelve
+everyday tools (read, search, edit, shell, plan, ask you, memory and web reads)
+travel with each request and the rest are named for the model to ask for,
+which leaves more of a small window for your conversation. Nothing is refused
+by this: a tool the model asks for passes the same permission and approval it
+always does.
 
 ### Backup keys
 

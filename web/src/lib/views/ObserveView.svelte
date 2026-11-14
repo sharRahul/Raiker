@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { failure } from "../errorCopy";
   /**
    * Observability hub — one read-first destination for readiness, the audit
    * log, live work, and notification history.
@@ -272,9 +273,7 @@
           ? "Raiker did not build the support bundle: after redaction, something in it still " +
             "looked like a secret, so nothing was produced to copy. Check Settings → Security for " +
             "a credential stored where a name or label belongs."
-          : error instanceof ApiError
-            ? `Could not build the support bundle (${error.status}).`
-            : "Could not build the support bundle.";
+          : failure("The support bundle was not built", "Nothing was copied or shared.", "Try again.", error);
     } finally {
       bundleBusy = false;
     }

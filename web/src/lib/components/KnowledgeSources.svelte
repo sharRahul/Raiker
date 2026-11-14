@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { failure } from "../errorCopy";
   import { askConfirm } from "../confirm.svelte";
   /**
    * BUG-305 — what Raiker can read, in one list.
@@ -62,9 +63,7 @@
       onchange?.();
     } catch (error) {
       actionError =
-        error instanceof ApiError
-          ? `Could not stop reading that source (${error.status}).`
-          : "Could not stop reading that source.";
+        failure("The source was not removed", "Raiker still reads it.", "Try again.", error);
     } finally {
       busy = null;
     }

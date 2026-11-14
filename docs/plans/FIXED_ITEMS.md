@@ -1,5 +1,205 @@
 # Fixed items
 
+## FIXED-1445 — Ten more error messages gave a status code and no next step (QUI-G06)
+
+**Severity: Low. Area: Quiet UI / error recovery. Status: Fixed 2026-11-14.**
+
+**Observed.** Stop's read of running work, removing a knowledge source, a routine check, the audit-log export, the support bundle, moving a chat (Chat and Build), the recall backend, both index rebuilds, removing damaged vectors and the retention cleanup each read *Could not X (500).*
+
+**Fixed.** Each now uses `failure()` from `errorCopy.ts`: what failed, the HTTP status and any known reason, what it affected ("Nothing was stopped.", "It stays where it was.") and one safe next step. A reopened conversation that fails to load says *This conversation did not load … Reload the page, or open it again from Threads.*
+
+**Evidence.** `ObserveView.test.ts`, `ChatView.test.ts`, `BuildView.test.ts`; full web suite 2,894 passed.
+
+## FIXED-1444 — Older live specs could not reach Permissions, a confirm or Stop safely
+
+**Severity: Low. Area: Live test harness. Status: Fixed 2026-11-14.**
+
+**Observed.** Twenty-seven live specs searched a *Search capabilities* field and opened `.cap.card` rows that QUI-L06 replaced; eight waited for the browser's `dialog` event that the in-app confirm (QUI-F10) never fires; the web-access spec's stop case pressed a turn-control Stop that FIXED-1306 folded into Send; and `connectHostedProvider` re-entered an identity-linked Anthropic key without its workspace ID, so the model dialog listed nothing and offered only *Cancel* (the 2026-11-07 *workspace that already keeps Haiku* failure).
+
+**Fixed.** `hosted-provider.ts` gains `openPermission` (walks the category rail and returns the detail pane) and `setPermission`; seventeen specs' local helpers now call it. `live.ts` gains `armConfirm`, which answers the in-app confirm or a native one; seven specs use it. `connectHostedProvider` types `RAIKER_LIVE_ANTHROPIC_WORKSPACE` where Anthropic asks for it, and `keepModelAvailable` closes the picker with *Done* or *Cancel*. The web-access spec sets *Web fetch* off before its withheld case and stops through **Stop safely** on the composer.
+
+**Evidence.** Live, funded Anthropic: `web-access-turn-control-live` cases 1–3, steer and stop passed on a workspace that already kept Haiku; `model-connection-anthropic-live` LC-04 disconnected through the in-app confirm. Ten specs with bespoke `.cap.card` assertions remain (see [TO_BE_FIXED](TO_BE_FIXED.md#live-specs-that-predate-the-permissions-redesign)).
+
+## FIXED-1443 — Eight Settings sections still drew their own card
+
+**Severity: Low. Area: Quiet UI / Settings. Status: Fixed 2026-11-14.**
+
+**Observed.** FIXED-1406 added one `.settings-card` rule, but Account, Personalisation, Beta feedback, General, Updates, Privacy, Runtime and the Backups card kept private copies with different padding, margins and, in Privacy, a different edge.
+
+**Fixed.** The copies are deleted; `app.css` holds the only rule, and its edge follows `--card-edge`, so dark-theme cards separate by luminance as other cards do. Section-specific descendant rules (labels, lists) stay where they are. `appCss.test.ts` fails if a Settings view or component redefines the card.
+
+**Evidence.** `appCss.test.ts`; RT-1114C-01 (live: a 1 px edge and the shared radius on Settings › General).
+
+## FIXED-1442 — A hidden image or input hid the rest of a web page
+
+**Severity: High. Area: Web access / sanitiser. Status: Fixed 2026-11-14.**
+
+**Observed.** Found live in this round: `web_fetch` of PyPI's httpx page returned only *Skip to main content*, with 430 hidden elements reported. The sanitiser counted a hidden element by opening a hidden region that its end tag closed; a void element such as `<input hidden>` or `<img height="0">` has no end tag, so everything after the first one was dropped. `input` and `embed` were also in the drop set, with the same never-closed region.
+
+**Fixed.** Void elements are counted, never nested (`_VOID_ELEMENTS` in `raiker/runtime/web_sanitize.py`), are checked before the drop set, and a stray end tag for one closes nothing.
+
+**Evidence.** `tests/test_web_egress_blocklist.py::test_a_hidden_void_element_does_not_hide_the_rest_of_the_page`; live: the web-access spec's *once enabled and allowed, the agent reads a real page* case quoted PyPI's httpx summary.
+
+## FIXED-1441 — Ordinary pages raised the *suspicious text* alert
+
+**Severity: Medium. Area: Web access / sanitiser. Status: Fixed 2026-11-14.**
+
+**Observed.** RT-TOOL-20: `github.com/about` raised *This page contains text shaped like instructions to an AI*. `suspicious` was true for any hidden element or any zero-width character, and almost every real page hides navigation, dialogs and screen-reader text and uses joiners in emoji.
+
+**Fixed.** Hidden text is kept while it is removed and checked with the injection scanner (`scan_untrusted_text`) and the role-marker rule; the page is suspicious when that hidden text reads like instructions, a role marker was defanged, a direction override was present, or eight or more invisible characters were. Hidden content is still removed and noted either way.
+
+**Evidence.** `tests/test_web_egress_blocklist.py` (ordinary hidden menu, direction override, joiners in bulk, and the existing hidden-instruction case).
+
+## FIXED-1440 — Goals were noticed only when the same words recurred
+
+**Severity: Low. Area: Goals / noticing. Status: Fixed 2026-11-14.**
+
+**Observed.** QUI-F03 matched an aim by shared content words, so *Planning trips to Lisbon with flights and hotels* and *plan a trip to Lisbon, book a flight and a hotel* shared one word and were never offered as a goal.
+
+**Fixed.** `raiker/goals/noticing.py` folds each word to one form (plural, -ing, -ed, -ies, a doubled final consonant and a silent final *e*), conservatively and without a dictionary; a *Not now* kept before this change is folded the same way, so it stays dismissed. Matching by meaning with an embedding model is still open.
+
+**Evidence.** `tests/test_goal_noticing.py::test_the_same_aim_matches_across_word_forms`.
+
+## FIXED-1439 — A proposed memory that repeated an approved one looked new
+
+**Severity: Medium. Area: Memory / review. Status: Fixed 2026-11-14.**
+
+**Observed.** The same fact said in two chats became two proposals; approving both stored it twice, and forgetting it later left the other copy.
+
+**Fixed.** `raiker/memory/near_duplicate.py` compares each proposal with the owner's approved memories by content words (Jaccard ≥ 0.8, local, no model). `GET /api/memory/proposals` carries `similar_memory`, and the review card says *Nearly the same as an approved memory: “…”. Approving keeps both.* Nothing is withheld or merged.
+
+**Evidence.** `tests/test_memory_near_duplicate.py`; `MemoryView.test.ts`; API contract regenerated.
+
+## FIXED-1438 — Build's answers kept a grey bubble and no receipt
+
+**Severity: Low. Area: Quiet UI / Build. Status: Fixed 2026-11-14.**
+
+**Observed.** Chat's answer became page text with one quiet receipt line (FIXED-1423); Build still boxed its answer and showed the inspector alone, with no model or cost.
+
+**Fixed.** A finished Build turn shows the receipt (model and cost) and Evidence on Chat's one quiet line, visible for the newest turn and on hover for earlier ones; the inspector still opens while a turn runs. The answer is page text.
+
+**Evidence.** RT-1114C-06 (live, Haiku 4.5: the line reads *Haiku 4.5 · ≈ $0.0130*); `BuildView.test.ts`.
+
+## FIXED-1437 — On a phone, a notice could cover the composer while the owner typed
+
+**Severity: Low. Area: Quiet UI / notifications. Status: Fixed 2026-11-14.**
+
+**Observed.** FIXED-1415 docked notices at the bottom edge on a phone, which is where the composer is; a notice arriving mid-sentence covered the field for five seconds.
+
+**Fixed.** At 700 px or narrower, while a text field has focus, a new notice goes straight into the bell (which keeps counting it); once the owner stops typing, notices dock as before.
+
+**Evidence.** `QuietHours.test.ts` (phone width with a focused field).
+
+## FIXED-1436 — Small local models spent most of their window on tool schemas
+
+**Severity: Medium. Area: Models / prompt size. Status: Fixed 2026-11-14.**
+
+**Observed.** One Chat question to a local model was 9,459 prompt tokens before the owner typed; about 5,500 of them were the core tools' schemas.
+
+**Fixed.** A model whose advertised window is 16,384 tokens or less carries a compact core of twelve tools (read, search, edit, shell, plan, ask, memory and web reads) and names every other tool, without descriptions, on `tool_search` — about 2,600 tokens instead of 5,500. A dropped core tool is found by its name and revealed for the rest of the turn; every call passes the same gate, decision mode and approval.
+
+**Evidence.** `tests/test_tool_schema_projection.py::TestSmallContextCore`. Not measured live on a small local model here.
+
+## FIXED-1435 — Ten hosted profiles still stopped answers at 1,024 tokens
+
+**Severity: Medium. Area: Models / output limits. Status: Fixed 2026-11-14.**
+
+**Observed.** FIXED-1344 measured five providers; Gemini, DeepSeek, Groq, Mistral, xAI, Cerebras, Together, Fireworks, NVIDIA NIM and Hugging Face kept the router's 1,024 fallback.
+
+**Fixed.** Each declares a limit its provider's current models accept: 8,192 for Gemini, DeepSeek, Groq, Mistral, xAI and Cerebras; 4,096 for Together, Fireworks (which needs streaming above that), NVIDIA NIM and Hugging Face. They stay *Experimental*.
+
+**Evidence.** `tests/test_hosted_output_limits.py`. Not measured with a live key for these ten providers.
+
+## FIXED-1434 — The Workstations scene kept its own colours
+
+**Severity: Low. Area: Quiet UI / Diagnostics. Status: Fixed 2026-11-14.**
+
+**Observed.** Diagnostics › Work in action's opt-in *Workstations* scene drew desks, screens and characters in thirteen fixed hex colours outside the QUI-V01 palette.
+
+**Fixed.** The scene defines its colours from palette tokens (`--warn`, `--accent`, `--info`, `--text-1`, `--surface`) with `color-mix`, so it follows the theme.
+
+**Evidence.** `WorkInActionView.test.ts` (no hex colour in the view's styles).
+
+## FIXED-1433 — Memory › Controls ran past its one-screen budget (QUI-G01)
+
+**Severity: Low. Area: Quiet UI / Memory. Status: Fixed 2026-11-14.**
+
+**Observed.** Memory › Controls measured 929–937 px at 1440×900 against 900, and Tasks 909 px once its composer docked at the bottom.
+
+**Fixed.** *What Raiker has learned to do* and *Approvals you've given* sit side by side on a wide screen (they stack on a phone); the Tasks page's minimum height leaves room for the dock. The size report now lists only Observe › Activity (a log) and Settings › Notifications and Advanced at 1280×800.
+
+**Evidence.** `all-pages-live.spec.ts` size report; RT-1114C-04 (live: the two lists share a top edge).
+
+## FIXED-1432 — Rename, pin and archive waited for the server before painting (QUI-G04)
+
+**Severity: Low. Area: Quiet UI / Work › Threads. Status: Fixed 2026-11-14.**
+
+**Observed.** Each library action in Work › Threads changed nothing on screen until its request and a re-read of the index had returned.
+
+**Fixed.** Rename and pin paint the row at once and archive or restore takes it out of the list at once; the index is re-read after. A refusal puts the list back exactly as it was and says *… The list is back as it was.*
+
+**Evidence.** `SearchChatView.test.ts` (painted before the server answers, rolled back on a 500); RT-1114C-05 (live).
+
+## FIXED-1431 — Projects were a card grid while threads and goals were rows (QUI-L12)
+
+**Severity: Low. Area: Quiet UI / Work › Projects. Status: Fixed 2026-11-14.**
+
+**Observed.** Work's three lists read differently: Projects was a grid of cards with the actions under each name.
+
+**Fixed.** Projects are 64 px rows in one card: name, folder and activity on the left, *New chat*, *Start in Build* and the overflow on the right; on a phone the actions drop under the name. The current project is marked by an accent edge, and a drop target by an inset ring.
+
+**Evidence.** `ProjectsView.test.ts`; RT-1114C-03 (live: one column, rows ≥ 64 px, actions in the right half).
+
+## FIXED-1430 — An approval card said *this exact change* without showing it
+
+**Severity: Medium. Area: Approvals / Safety card. Status: Fixed 2026-11-14.**
+
+**Observed.** RT-TOOL-04: the Safety card for an `edit_file` read *Approving writes this exact change to src/palette.py* while the change was a page away; a `replace_all` edit did not say how many places it changes, and a notebook edit did not name its cell.
+
+**Fixed.** The card shows the proposed diff, read-only and open for a short change (folded above sixteen lines); narrowing hunks stays in Approvals. A `replace_all` edit says *Approving replaces this text in 4 places in palette.py, once.*, an insert says it inserts, and a notebook edit names *cell 3 of nb.ipynb*.
+
+**Evidence.** `SafetyCard.test.ts`; `tests/test_tool_broker.py::test_edit_proposals_say_how_many_places_and_which_cell`.
+
+## FIXED-1429 — A Build Plan turn's record said *No plan required*
+
+**Severity: Low. Area: Build / turn record. Status: Fixed 2026-11-14.**
+
+**Observed.** RT-TOOL-22: *How this turn was governed* read *No plan required for this turn.* under a Plan turn that was writing a plan; the governance pipeline's pre-flight stage and the Plan posture shared a word.
+
+**Fixed.** The pipeline's events read *Governance review: a single safe step, so no pre-flight checks were needed.* and *Governance review: multi-step checks planned before acting.*
+
+**Evidence.** `turnPhases.test.ts`, `TurnEvidence.test.ts`.
+
+## FIXED-1428 — STOP showed a count with nothing named behind it
+
+**Severity: Low. Area: Quiet UI / Stop all. Status: Fixed 2026-11-14.**
+
+**Observed.** In the 2026-10-21 round the top bar read STOP 1 after an answer had finished, with nothing running in Chat; the dialog said *This stops 1 task* without saying which.
+
+**Fixed.** The Stop dialog lists each task it would reach, with its status in words and a link to it in Tasks (five, then *and N more in Tasks*), so a background task — such as the memory-proposal pass after a turn — is named before it is stopped.
+
+**Evidence.** `StopSwitch.test.ts`; RT-1114C-08 (live).
+
+## FIXED-1427 — *Loading conversation…* stayed after a reopened conversation had drawn
+
+**Severity: Low. Area: Chat, Build. Status: Fixed 2026-11-14.**
+
+**Observed.** RT-QUI-66: after a reload the transcript, a tool row and a Safety card were on screen while the line above still read *Loading conversation…*.
+
+**Fixed.** The loading flag clears as soon as the transcript is set; attachment chips, sources and recall fill in after it. A failed load reads *This conversation did not load … Nothing in it was changed. Reload the page, or open it again from Threads.*
+
+**Evidence.** `ChatView.test.ts`, `BuildView.test.ts`; RT-1114C-07 (live, before and after a reload).
+
+## FIXED-1426 — Background indexing had no status on screen
+
+**Severity: Low. Area: Memory / built-in models. Status: Fixed 2026-11-14.**
+
+**Observed.** FIXED-1425's worker wrote its last outcome to `logs/background-index.json`, and nothing showed it.
+
+**Fixed.** `GET /api/memory/settings` carries `background_index`, and Settings › Advanced › Memory engine says what the last pass did: indexed, up to date, waiting for the model runtime's permission (with **Open Permissions**), model missing, Ollama unreachable (with **Open Models**), off, or failed with its reason.
+
+**Evidence.** `backgroundIndex.test.ts`, `MemoryEngine.test.ts`; API contract regenerated; RT-1114C-02 (live: *Waiting: the local model runtime is not set to Always allow or Auto …*).
+
 ## FIXED-1425 — Raiker had no embedding model of its own, so semantic recall waited on a button
 
 **Severity: Medium. Area: Memory / built-in models. Status: Fixed 2026-11-14 (first slice; see [TO_BE_FIXED](TO_BE_FIXED.md#built-in-embedding-model--what-the-first-slice-did-not-do)).**
@@ -2433,6 +2633,26 @@ file you can open. The two capture sets that remain — `screenshots/pages/` and
 | [FIXED-1382](#fixed-1382--linux-filesystem-flags-broke-windows-type-checking) | Low | Platform portability | Fixed 2026-11-09 |
 | [FIXED-1383](#fixed-1383--keyboard-start-evidence-depended-on-retired-receipt-wording) | Low | Beta live tests | Fixed 2026-11-09 |
 | [FIXED-1384](#fixed-1384--model-downloads-checked-redirect-hosts-after-contacting-them) | High | Model and speech downloads | Fixed 2026-11-09 |
+| [FIXED-1445](#fixed-1445--ten-more-error-messages-gave-a-status-code-and-no-next-step-qui-g06) | Low | Quiet UI / error recovery | Fixed 2026-11-14 |
+| [FIXED-1444](#fixed-1444--older-live-specs-could-not-reach-permissions-a-confirm-or-stop-safely) | Low | Live test harness | Fixed 2026-11-14 |
+| [FIXED-1443](#fixed-1443--eight-settings-sections-still-drew-their-own-card) | Low | Quiet UI / Settings | Fixed 2026-11-14 |
+| [FIXED-1442](#fixed-1442--a-hidden-image-or-input-hid-the-rest-of-a-web-page) | High | Web access / sanitiser | Fixed 2026-11-14 |
+| [FIXED-1441](#fixed-1441--ordinary-pages-raised-the-suspicious-text-alert) | Medium | Web access / sanitiser | Fixed 2026-11-14 |
+| [FIXED-1440](#fixed-1440--goals-were-noticed-only-when-the-same-words-recurred) | Low | Goals / noticing | Fixed 2026-11-14 |
+| [FIXED-1439](#fixed-1439--a-proposed-memory-that-repeated-an-approved-one-looked-new) | Medium | Memory / review | Fixed 2026-11-14 |
+| [FIXED-1438](#fixed-1438--builds-answers-kept-a-grey-bubble-and-no-receipt) | Low | Quiet UI / Build | Fixed 2026-11-14 |
+| [FIXED-1437](#fixed-1437--on-a-phone-a-notice-could-cover-the-composer-while-the-owner-typed) | Low | Quiet UI / notifications | Fixed 2026-11-14 |
+| [FIXED-1436](#fixed-1436--small-local-models-spent-most-of-their-window-on-tool-schemas) | Medium | Models / prompt size | Fixed 2026-11-14 |
+| [FIXED-1435](#fixed-1435--ten-hosted-profiles-still-stopped-answers-at-1024-tokens) | Medium | Models / output limits | Fixed 2026-11-14 |
+| [FIXED-1434](#fixed-1434--the-workstations-scene-kept-its-own-colours) | Low | Quiet UI / Diagnostics | Fixed 2026-11-14 |
+| [FIXED-1433](#fixed-1433--memory--controls-ran-past-its-one-screen-budget-qui-g01) | Low | Quiet UI / Memory | Fixed 2026-11-14 |
+| [FIXED-1432](#fixed-1432--rename-pin-and-archive-waited-for-the-server-before-painting-qui-g04) | Low | Quiet UI / Work › Threads | Fixed 2026-11-14 |
+| [FIXED-1431](#fixed-1431--projects-were-a-card-grid-while-threads-and-goals-were-rows-qui-l12) | Low | Quiet UI / Work › Projects | Fixed 2026-11-14 |
+| [FIXED-1430](#fixed-1430--an-approval-card-said-this-exact-change-without-showing-it) | Medium | Approvals / Safety card | Fixed 2026-11-14 |
+| [FIXED-1429](#fixed-1429--a-build-plan-turns-record-said-no-plan-required) | Low | Build / turn record | Fixed 2026-11-14 |
+| [FIXED-1428](#fixed-1428--stop-showed-a-count-with-nothing-named-behind-it) | Low | Quiet UI / Stop all | Fixed 2026-11-14 |
+| [FIXED-1427](#fixed-1427--loading-conversation-stayed-after-a-reopened-conversation-had-drawn) | Low | Chat, Build | Fixed 2026-11-14 |
+| [FIXED-1426](#fixed-1426--background-indexing-had-no-status-on-screen) | Low | Memory / built-in models | Fixed 2026-11-14 |
 | [FIXED-1425](#fixed-1425--raiker-had-no-embedding-model-of-its-own-so-semantic-recall-waited-on-a-button) | Medium | Memory / built-in models | Fixed 2026-11-14 |
 | [FIXED-1424](#fixed-1424--voice-install-test-and-preview-did-not-work) | High | Voice | Fixed 2026-11-14 |
 | [FIXED-1423](#fixed-1423--answers-carried-three-lines-of-metadata-and-rendered-as-grey-chips) | Medium | Chat / response presentation | Fixed 2026-11-14 |

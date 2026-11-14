@@ -149,3 +149,13 @@ describe("WorkInActionView", () => {
     ).toBeInTheDocument();
   });
 });
+
+describe("the Workstations scene's colours (FIXED-1434)", () => {
+  it("come from palette tokens, not fixed hex values", async () => {
+    const { readFileSync } = await import("node:fs");
+    const { resolve } = await import("node:path");
+    const source = readFileSync(resolve(process.cwd(), "src/lib/views/WorkInActionView.svelte"), "utf8");
+    const style = source.slice(source.indexOf("<style>"));
+    expect(style.match(/#[0-9a-fA-F]{3,8}\b/g) ?? []).toEqual([]);
+  });
+});

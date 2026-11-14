@@ -276,7 +276,7 @@ describe("TasksView", () => {
     render(TasksView);
     const alert = await screen.findByRole("alert");
     expect(alert).toHaveTextContent(/couldn't load tasks/i);
-    expect(alert).toHaveTextContent(/unavailable \(404\)/i);
+    expect(alert).toHaveTextContent(/\(HTTP 404[,)].*(Reload the page|Press Refresh)\./);
   });
 
   it("does not create a task when instructions contain only whitespace", async () => {

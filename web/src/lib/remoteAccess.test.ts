@@ -9,6 +9,7 @@ import {
   exposureSentence,
   formFrom,
   httpsLabel,
+  isRemoteHost,
   mfaReadiness,
   proxyExample,
   stateLabel,
@@ -76,5 +77,18 @@ describe("the form", () => {
     proxy.proxyKind = "socket";
     proxy.proxySocket = "/run/raiker/proxy.sock";
     expect(proxyExample(proxy)).toContain("reverse_proxy unix//run/raiker/proxy.sock");
+  });
+});
+
+describe("isRemoteHost (BUG-359 lock screen note)", () => {
+  it("reads loopback names and addresses as this computer", () => {
+    for (const host of ["", "localhost", "app.localhost", "127.0.0.1", "127.8.0.1", "[::1]", "::1"]) {
+      expect(isRemoteHost(host)).toBe(false);
+    }
+  });
+  it("reads any other address as another device", () => {
+    for (const host of ["192.168.1.20", "raiker.tail1234.ts.net", "fd12::3", "example.com"]) {
+      expect(isRemoteHost(host)).toBe(true);
+    }
   });
 });

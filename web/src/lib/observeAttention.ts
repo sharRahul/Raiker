@@ -73,6 +73,13 @@ export interface AttentionInputs {
   approvals: ApprovalView[] | null;
   security: SecurityHealth[] | null;
   unreadNotifications: number | null;
+  /**
+   * FIXED-1426 follow-through — the background indexer's last pass, in the
+   * owner's words (`backgroundIndexCopy`). Optional and never an all-clear on
+   * its own: absent means it was not read, and only an `attention` tone is an
+   * issue here; Memory › Engine keeps the full status.
+   */
+  backgroundIndex?: { tone: "ok" | "attention" | "quiet"; text: string; action?: { label: string; href: string } } | null;
 }
 
 /**
@@ -362,6 +369,19 @@ export function attentionItems(inputs: AttentionInputs): AttentionItem[] {
       detail: "The same record the bell in the context bar reads from.",
       href: "#/observe?tab=notifications",
       linkLabel: "Open notification history",
+    });
+  }
+
+  // 5. Background indexing. Recall falls back to matching words while the
+  //    embedding model cannot run; it waits, it does not block anything.
+  if (inputs.backgroundIndex?.tone === "attention") {
+    items.push({
+      id: "background-index",
+      tone: "waiting",
+      title: "Recall is matching words only",
+      detail: inputs.backgroundIndex.text,
+      href: inputs.backgroundIndex.action?.href ?? "#/settings?tab=advanced&kind=memory-engine",
+      linkLabel: inputs.backgroundIndex.action?.label ?? "Open Memory engine",
     });
   }
 

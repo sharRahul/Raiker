@@ -290,7 +290,7 @@ describe("Settings → Notifications, quiet hours", () => {
     for (const label of ["Approval needed", "Input needed", "Response ready", "Task failed", "Background task finished"]) {
       expect(screen.getByLabelText(label)).toBeChecked();
     }
-    expect(screen.getByText(/inside Raiker they always show/)).toBeInTheDocument();
+    expect(screen.getByText(/work is waiting on them/)).toBeInTheDocument();
     await fireEvent.click(screen.getByLabelText("Extensions and MCP servers"));
     expect(save).toHaveBeenCalledWith({ "notification.interrupt.extensions": false });
   });

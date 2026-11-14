@@ -230,13 +230,15 @@ specs updated in PR #245 are the model.
 **2026-11-14 — reduced** ([FIXED-1444](FIXED_ITEMS.md#fixed-1444--older-live-specs-could-not-reach-permissions-a-confirm-or-stop-safely)).
 `openPermission` and `setPermission` in `hosted-provider.ts` now walk the rail;
 seventeen specs call them, including `model-connection-anthropic-live`
-LC-03/LC-04 and `web-access-turn-control-live`. Ten still assert the old
+LC-03/LC-04 and `web-access-turn-control-live`. **2026-11-15 — reduced again**
+([FIXED-1467](FIXED_ITEMS.md#fixed-1467--three-live-specs-still-drove-the-permissions-page-qui-l06-replaced)):
+`bug-239-unset-gate-honesty`, `bug-58-known-limits` and
+`round-2026-10-02-memory` moved to the detail pane. Seven still assert the old
 layout itself and need a case-by-case rewrite: `b9-repository-code-map`,
-`bug-239-unset-gate-honesty`, `bug-58-known-limits` (its list check),
 `gcr-provider-validation-and-workspace`, `memory-restart-provider-composer`,
-`release-readiness-2026-09-13`, `removal-review-permissions-2026-09-14`,
-`round-2026-09-04-priority`, `round-2026-09-15-typed-and-authority` and
-`round-2026-10-02-memory`. LC-03's first check expects *On by connection*,
+`release-readiness-2026-09-13` (its *Common permissions* region and inline
+mode buttons), `removal-review-permissions-2026-09-14`,
+`round-2026-09-04-priority` and `round-2026-09-15-typed-and-authority`. LC-03's first check expects *On by connection*,
 which holds only on a workspace where the gate was never turned on by hand.
 
 ## Windows high-DPI window restoration
@@ -283,7 +285,7 @@ tiny model from ggerganov/whisper.cpp, and the upstream JFK WAV sample.
 ## Reading order
 
 1. **Open-defect index** — the table below is the current source of truth for status.
-2. **Open defect records** — BUG-194, BUG-248, BUG-287, BUG-339, BUG-348, BUG-354, BUG-355, BUG-356 and BUG-359, in numeric order.
+2. **Open defect records** — BUG-194, BUG-248, BUG-287, BUG-339, BUG-348, BUG-355, BUG-356 and BUG-359, in numeric order.
 3. **Verification follow-up** — newly observed failures that still need triage.
 4. **Reference baseline and decisions** — verified behavior and historical direction; these sections do not add open defects.
 
@@ -322,11 +324,10 @@ Evidence: `screenshots/not-working/` (defects),
 | [BUG-248](#bug-248--twenty-seven-live-specs-still-sign-in-inside-a-test-body) | Low | Live test harness | Open remainder — reduced again 2026-09-29 by four (`composer-parity-and-turn-honesty`, `fts5-mem03-bug194`, `mem04-bug194-observations`, `bug-37-39-40-41`), each re-run live and brought up to the product; converting them found [FIXED-632](FIXED_ITEMS.md#fixed-632--an-approval-card-covered-settings-save-changes) and [FIXED-633](FIXED_ITEMS.md#fixed-633--choosing-the-default-density-closed-the-panel-it-was-chosen-in). Ten sign in on their own: three must, and seven provider scenarios can now be converted one at a time with reachable providers |
 | [BUG-287](#bug-287--the-image-provider-round-trip-is-unverified-against-a-real-provider) | Medium | Design / image runtime / live evidence | Open remainder — reduced 2026-10-18: real OpenAI generation, edit, four-result variation, lineage, permission-off refusal and empty-allowlist refusal passed; a source-image provider refusal and a live research-reference **Sent with** check remain |
 | [BUG-339](#bug-339--the-issue-to-pull-request-routine-has-a-template-and-no-runner) | Low | Tasks / routines | Open remainder — reduced 2026-10-18 ([FIXED-950](FIXED_ITEMS.md#fixed-950--the-issue-to-pull-request-routine-can-now-be-scheduled-as-a-build-task-bug-339-reduced)): the template schedules a governed Build task from Settings → GitHub; RR-40 live evidence against a consented repository remains; 2026-10-19 the pull request receipt ([FIXED-974](FIXED_ITEMS.md#fixed-974--a-pull-request-raiker-opened-was-known-only-from-the-create-response-br-12)) and the task's repository binding ([FIXED-976](FIXED_ITEMS.md#fixed-976--a-scheduled-build-task-ran-in-whatever-repository-build-was-pointed-at-br-02)) the run will read back are in place |
-| [BUG-348](#bug-348--the-design-canvas-is-edited-by-keyboard-and-inspector-only-and-five-dw-requirements-are-still-partial) | Medium | Design / composition | Open remainder — reduced 2026-10-20 ([FIXED-998](FIXED_ITEMS.md#fixed-998--a-layer-could-only-be-moved-with-the-arrow-keys-dw-02-bug-348) to [FIXED-1010](FIXED_ITEMS.md#fixed-1010--after-a-restart-the-design-agent-said-no-chat-model-was-connected)): pointer editing, imports, components, notes, vector PDF and proposal receipts ship; selecting inside a group on the canvas, brand-guide import, system-level components and presentation export remain |
-| [BUG-354](#bug-354--the-workspace-key-cannot-be-rotated-in-place) | Low | Storage / memory key | Open — found 2026-10-20 writing the MEM-KEY-05 runbook; the runbook gives the export/import route |
-| [BUG-355](#bug-355--goals-ship-without-intake-from-chat-validator-backed-criteria-or-a-restart-scenario) | Medium | Goals / personal agent | Open remainder of PA-D01 — the first slice shipped 2026-10-20 ([FIXED-1039](FIXED_ITEMS.md#fixed-1039--an-outcome-could-live-only-in-a-chat-transcript-there-was-no-durable-goal-goal-01-pa-d01) to [FIXED-1048](FIXED_ITEMS.md#fixed-1048--a-goal-had-no-budget-across-its-steps-goal-10-pa-d01)) |
-| [BUG-356](#bug-356--execution-profiles-govern-goal-steps-only-and-cover-one-data-class) | Medium | Execution profiles / models / data handling | Open remainder of PA-D02 — the first slice shipped 2026-10-20 ([FIXED-1049](FIXED_ITEMS.md#fixed-1049--there-was-nowhere-to-say-where-a-goals-work-may-run-prof-01-pa-d02) to [FIXED-1051](FIXED_ITEMS.md#fixed-1051--changing-the-boundary-would-have-applied-silently-to-work-in-flight-prof-03-pa-d02)) |
-| [BUG-359](#bug-359--remote-access-is-verified-live-on-linux-only-and-has-five-known-limits) | Low | Host / remote access | Open remainder of BUG-347/BUG-358 — remote access shipped 2026-10-26 ([FIXED-1266](FIXED_ITEMS.md#fixed-1266--a-proxy-that-sent-no-forwarding-header-was-still-read-as-local-bug-347-review) to [FIXED-1273](FIXED_ITEMS.md#fixed-1273--security-settings-showed-their-defaults-as-the-accounts-state-while-loading-found-live)); live runs on Linux only, and five limits named in the record |
+| [BUG-348](#bug-348--the-design-canvas-is-edited-by-keyboard-and-inspector-only-and-five-dw-requirements-are-still-partial) | Medium | Design / composition | Open remainder — reduced 2026-10-20 ([FIXED-998](FIXED_ITEMS.md#fixed-998--a-layer-could-only-be-moved-with-the-arrow-keys-dw-02-bug-348) to [FIXED-1010](FIXED_ITEMS.md#fixed-1010--after-a-restart-the-design-agent-said-no-chat-model-was-connected)): pointer editing, imports, components, notes, vector PDF and proposal receipts ship; 2026-11-15 selecting inside a group on the canvas ([FIXED-1457](FIXED_ITEMS.md#fixed-1457--a-layer-inside-a-group-could-not-be-selected-on-the-canvas-bug-348-dw-02)); brand-guide import, system-level components and presentation export remain |
+| [BUG-355](#bug-355--goals-ship-without-intake-from-chat-validator-backed-criteria-or-a-restart-scenario) | Medium | Goals / personal agent | Open remainder of PA-D01 — 2026-11-15 a goal starts from a Build answer ([FIXED-1456](FIXED_ITEMS.md#fixed-1456--a-goal-could-be-started-from-chat-but-not-from-build-bug-355)); the first slice shipped 2026-10-20 ([FIXED-1039](FIXED_ITEMS.md#fixed-1039--an-outcome-could-live-only-in-a-chat-transcript-there-was-no-durable-goal-goal-01-pa-d01) to [FIXED-1048](FIXED_ITEMS.md#fixed-1048--a-goal-had-no-budget-across-its-steps-goal-10-pa-d01)) |
+| [BUG-356](#bug-356--execution-profiles-govern-goal-steps-only-and-cover-one-data-class) | Medium | Execution profiles / models / data handling | Open remainder of PA-D02 — 2026-11-15 Chat and Build are held to the profile and a custom endpoint on this machine is local ([FIXED-1454](FIXED_ITEMS.md#fixed-1454--a-custom-endpoint-on-this-machine-counted-as-hosted-bug-356), [FIXED-1455](FIXED_ITEMS.md#fixed-1455--execution-profiles-bounded-goal-steps-and-nothing-else-bug-356)); the first slice shipped 2026-10-20 ([FIXED-1049](FIXED_ITEMS.md#fixed-1049--there-was-nowhere-to-say-where-a-goals-work-may-run-prof-01-pa-d02) to [FIXED-1051](FIXED_ITEMS.md#fixed-1051--changing-the-boundary-would-have-applied-silently-to-work-in-flight-prof-03-pa-d02)) |
+| [BUG-359](#bug-359--remote-access-is-verified-live-on-linux-only-and-has-five-known-limits) | Low | Host / remote access | Open remainder of BUG-347/BUG-358 — remote access shipped 2026-10-26 ([FIXED-1266](FIXED_ITEMS.md#fixed-1266--a-proxy-that-sent-no-forwarding-header-was-still-read-as-local-bug-347-review) to [FIXED-1273](FIXED_ITEMS.md#fixed-1273--security-settings-showed-their-defaults-as-the-accounts-state-while-loading-found-live)); live runs on Linux only; 2026-11-15 four of the five limits and the cosmetic notes closed ([FIXED-1446](FIXED_ITEMS.md#fixed-1446--the-lock-screen-on-another-device-said-on-this-computer-bug-359) to [FIXED-1451](FIXED_ITEMS.md#fixed-1451--every-request-through-a-reverse-proxy-shared-one-rate-limit-bucket-bug-359)) |
 
 The open defects below retain their original reproductions and remediation contracts. Closed defect evidence is in [`FIXED_ITEMS.md`](FIXED_ITEMS.md); previously removed topic-review rationale remains in Git history.
 
@@ -811,7 +812,6 @@ receipts, and passed 7/7 live. What is still a gap against
 
 | Requirement | What exists | What is missing |
 |---|---|---|
-| DW-02 direct manipulation | Drag, resize and rotate handles, multi-select, align, distribute, snapping and guides | Clicking a layer inside a group on the canvas selects the group; its children are selected from Layers |
 | DW-06 system sources and components | Tokens files (CSS, JSON), a picture's colours, typed values; components kept in their document | Importing from a brand-guide document (PDF); components shared through a design system across documents |
 | DW-11 formats | PNG, raster PDF, vector PDF, SVG, JSON | Presentation and document formats; vector PDF text beyond Windows-1252 (counted and written as `?`) |
 
@@ -821,39 +821,13 @@ slightly different place on screen than in the file; Check measures with the
 export font. T-11 and T-12 still need the five model-driven runs the Testing
 protocol requires.
 
-**Proposed fix.** One slice per row, each with its own live evidence: canvas
-selection inside groups (double-click to enter a group), then a brand-guide
+**Proposed fix.** One slice per row, each with its own live evidence (canvas
+selection inside groups shipped 2026-11-15 as FIXED-1457): a brand-guide
 reader through the existing document attachment extraction, then system-level
 components, then a presentation export.
 
 **Required user-interface outcome.** The remaining rows are reachable from the
 Documents workspace and absent until they are.
-
-## BUG-354 — The workspace key cannot be rotated in place
-
-**Severity: Low. Area: Storage / memory key. Status: Open — found 2026-10-20
-writing the MEM-KEY-05 runbook ([FIXED-1036](FIXED_ITEMS.md#fixed-1036--the-memory-key-had-no-runbook-and-nothing-checked-the-key-stays-out-of-memory-mem-key-05)).**
-
-**Observed.** `.raiker/app.key` is generated once per workspace and derives the
-SQLCipher database key (`raiker/auth/app_key.py`, `SQLiteStore._open_keyed`).
-Nothing rekeys the database: there is no `PRAGMA rekey` path, no route and no
-setting. An owner who believes the key was copied off the machine can only
-export memories and import them into a new workspace, which leaves
-conversations, review history and backups behind.
-
-**Root cause.** Rotation was never in scope; backups record a key fingerprint
-and restore requires the same key, so a rekey also has to say what happens to
-backups made with the old key.
-
-**Proposed fix.** An owner-started, step-up-verified **Rotate workspace key**:
-take a verified backup, `PRAGMA rekey` the live database to a new key written
-atomically beside the old one, re-verify, then retire the old key file; mark
-older backups as needing the retired key, which the owner can keep or discard.
-Fail closed and leave the old key in place on any error.
-
-**Required user-interface outcome.** **Settings → Security & sign-in** offers
-the rotation, says which existing backups will still need the old key, and
-reports the new key fingerprint after a verified rekey.
 
 ## BUG-355 — Goals ship without intake from Chat, validator-backed criteria or a restart scenario
 
@@ -868,7 +842,7 @@ remain:
 
 | Requirement | What exists | What is missing |
 |---|---|---|
-| Outcome intake | **Work → Goals** form; from Chat, **Make this a goal** and goals noticed in conversation fill it in ([FIXED-1252](FIXED_ITEMS.md#fixed-1252--the-same-aim-across-conversations-was-never-offered-as-a-goal-qui-f03)) | Starting a goal from a Build turn; asking only for materially missing facts |
+| Outcome intake | **Work → Goals** form; from Chat, **Make this a goal** and goals noticed in conversation fill it in ([FIXED-1252](FIXED_ITEMS.md#fixed-1252--the-same-aim-across-conversations-was-never-offered-as-a-goal-qui-f03)) | Asking only for materially missing facts (a Build answer's **Make this a goal** shipped 2026-11-15, FIXED-1456) |
 | Criteria validators | *Met when its steps finish* (a record the steps finished) and *You confirm it* | A Build step's `completed_verified` outcome, a destination read-back or another independent validator as evidence |
 | Leases and recovery | Each step is a task with the task's own claim generation and lease; an interrupted dispatch fails after two minutes rather than re-filing; the host-restart scenario runs in CI (FIXED-1331, 2026-11-08) | A goal-level lease for concurrent coordinators across hosts |
 | Pause | Files nothing new and parks unclaimed steps; a running step finishes its current turn | A pause that reaches a running step's next safe boundary without stopping it |
@@ -891,19 +865,18 @@ to [FIXED-1051](FIXED_ITEMS.md#fixed-1051--changing-the-boundary-would-have-appl
 before it runs, across the owner's whole fallback chain, and withholds personal
 memory from a hosted step where it says so. It does not yet reach:
 
-* **Ordinary Chat, Build and scheduled tasks.** The specification makes the
-  active profile the ceiling for all new work; today it bounds goal steps only.
-  Settings says so.
+* **Scheduled tasks.** The specification makes the active profile the ceiling
+  for all new work. Goal steps, Chat and Build turns are held to it
+  (FIXED-1455, 2026-11-15); a scheduled task's run is not yet. A refused Chat
+  turn names the profile in its answer but shows the generic *Not done — The
+  turn failed before it finished* header and no **Open Settings** link a goal
+  step has, and it names the provider by id (*anthropic (hosted)*).
 * **Hosts.** Steps run on this host; a profile cannot yet name a private
   always-on host or a remote executor (PA-D07).
 * **Other data classes.** Attachments, research references and selected files
   are not yet steps' inputs, so there is nothing to withhold; when they are,
   the profile needs a field per class.
 * **Egress and retention constraints** per provider.
-* **Placement of a custom endpoint.** A model profile's placement is its
-  `local_only` flag, so a generic OpenAI-compatible endpoint on `localhost`
-  reads as hosted and Private local refuses it. Conservative, and stated on the
-  Settings page, but wrong for that owner.
 
 **Proposed fix.** Extend enforcement to every prompt route through the
 gateway's model selection (the same chain check), classify a custom endpoint by
@@ -931,32 +904,28 @@ What remains:
 2. **Restart from Settings needs a service manager.** A host not registered
    with `systemd --user` or `launchd` (and every Windows host) exits on
    Restart; the owner opens Raiker again. Settings says so.
-3. **A changed TLS certificate needs a restart.** The private listener loads
-   the certificate and key once at start; a renewed certificate is served from
-   the next start.
-4. **Every request through a reverse proxy shares one rate-limit bucket**,
-   because the proxy is the only peer Raiker sees on that listener and
-   forwarding headers are never believed. A busy proxy can throttle the owner's
-   own remote session; it cannot reach the local listener's bucket.
-5. **A certificate path in a check message can show as `[REDACTED_SECRET]`**:
-   the response redactor treats a path under a temporary directory named like a
-   secret as one. The check result is right; only the wording loses the path.
+3. ~~A changed TLS certificate needs a restart~~ — closed 2026-11-15
+   ([FIXED-1449](FIXED_ITEMS.md#fixed-1449--a-renewed-tls-certificate-was-served-only-after-a-restart-bug-359)).
+4. ~~Every request through a reverse proxy shares one rate-limit bucket~~ —
+   closed 2026-11-15 for signed-in sessions
+   ([FIXED-1451](FIXED_ITEMS.md#fixed-1451--every-request-through-a-reverse-proxy-shared-one-rate-limit-bucket-bug-359)).
+5. ~~A certificate path in a check message can show as `[REDACTED_SECRET]`~~ —
+   closed 2026-11-15
+   ([FIXED-1450](FIXED_ITEMS.md#fixed-1450--a-certificate-path-in-a-remote-access-check-could-read-as-redacted_secret-bug-359)).
 
-Seen in the final live round's screenshots, cosmetic: the lock screen on
-another device still headlines its note *On this computer*; the *Remote access
-is suspended* notice stays in the notification tray after two-step sign-in is
-turned on again; and the coloured *On* state sits a little left of the other
-rows' values.
+The three cosmetic notes from the final live round (the remote lock screen's
+*On this computer*, the suspension notice that stayed after MFA, the *On* state
+left of the other values) closed 2026-11-15 as FIXED-1446 to FIXED-1448. The
+remote lock screen and the certificate reload were verified by unit tests, not
+by a live round from a second device.
 
 The IPv6 private-address path (`fc00::/7`) is unit-tested and was not run
 live; mobile apps that will sign in remotely are later work and need the same
 password-and-code rule.
 
-**Proposed fix.** Run RT-SEC-04 to RT-SEC-12 on a Windows and a macOS host;
-reload the TLS context on a file change (or offer *Reload certificate* in
-Details); key the proxy bucket by session once signed in; narrow the redactor
-rule for file paths in check messages; say *From another device* on the remote lock
-screen; mark the suspension notice read when MFA is on again.
+**Proposed fix.** Run RT-SEC-04 to RT-SEC-12 on a Windows and a macOS host,
+including a sign-in from a second device and a certificate renewal while
+running.
 
 **Required user-interface outcome.** None beyond today's: Settings → Security →
 Remote access already says when a restart is needed, and Details shows the
@@ -982,15 +951,12 @@ the layout round shipped [FIXED-1101](FIXED_ITEMS.md#fixed-1101--the-shell-was-w
 to [FIXED-1123](FIXED_ITEMS.md#fixed-1123--chats-readiness-steps-disappeared-with-the-models-overview-qui-l08).
 These parts of the same items are not done:
 
-* **QUI-G01 — three measurements are still over budget** after the
-  2026-11-14 round ([FIXED-1433](FIXED_ITEMS.md#fixed-1433--memory--controls-ran-past-its-one-screen-budget-qui-g01)):
-  Observe › Activity (a log, long by design) at both sizes, and Settings ›
-  Notifications (1,273 px) and Advanced (1,246 px) at 1280×800 against 1,200.
-  The report is in `all-pages-live.spec.ts`; it becomes a failing check once
-  these fit or Activity is exempted.
-* **QUI-G06 — about 190 other error messages** still give a status code, or
+* **QUI-G06 — about 170 other error messages** still give a status code, or
   *Could not X*, without what it affected and a next step (eleven more moved
-  2026-11-14, [FIXED-1445](FIXED_ITEMS.md#fixed-1445--ten-more-error-messages-gave-a-status-code-and-no-next-step-qui-g06)). The pattern and the
+  2026-11-14, [FIXED-1445](FIXED_ITEMS.md#fixed-1445--ten-more-error-messages-gave-a-status-code-and-no-next-step-qui-g06),
+  and twenty on 2026-11-15, [FIXED-1461](FIXED_ITEMS.md#fixed-1461--twenty-more-error-messages-gave-a-status-code-and-no-next-step-qui-g06)).
+  QUI-G01's budgets all fit and are a failing check since 2026-11-15
+  ([FIXED-1460](FIXED_ITEMS.md#fixed-1460--tasks-ran-9-px-past-one-screen-and-the-size-budgets-were-only-a-report-qui-g01)). The pattern and the
   helper are in `web/src/lib/errorCopy.ts`; the ones on Stop, steer, continuing,
   export, upload, file lookup and saving a task are done.
 * **QUI-L11 — the moves out of Diagnostics.** Overview as issue cards and
@@ -1178,9 +1144,10 @@ Raiker's side is ready to take them; something outside it is not.
   fixtures only and Settings shows *Could not reach the feed* there. Run
   RT-TOOL-20 on a host that can reach them and read a URLhaus-listed host.
 * **`tests/test_lock_screen_recovery.py` fails intermittently under parallel
-  load.** Twice in this round one of its tests failed in a three-shard parallel
+  load.** Twice in one round one of its tests failed in a three-shard parallel
   run and passed alone and in every rerun (the restore and same-origin cases).
-  Not reproduced on CI; triage the timing it depends on.
+  2026-11-15: three concurrent runs of the file (16 tests each) passed; not
+  reproduced here or on CI. Kept as a watch item.
 * **`tests/test_tool_broker.py::test_run_command_returns_feedback_only_for_exact_active_session_grant`
   and `tests/test_api_approvals.py::TestApprovalsResolve::test_approved_shell_executes_once_with_bounded_evidence`
   fail in a container that cannot enforce the native sandbox.** Triaged
@@ -1245,13 +1212,14 @@ and [03, QUI-H04](quiet-ui/03_WELCOME_HOME_AND_CHAT.md#status).
   share three uncommon words can still match. **Not now** keeps a wrong offer
   from returning. Matching by meaning would use the built-in embedding model
   where the owner has allowed it.
-* **Older live specs answer native prompts.** The confirms moved to
-  `armConfirm` ([FIXED-1444](FIXED_ITEMS.md#fixed-1444--older-live-specs-could-not-reach-permissions-a-confirm-or-stop-safely));
-  four specs still answer a native `prompt()` with text
-  (`project-error-recovery`, `round-2026-10-02-memory`,
-  `round-2026-10-05-readiness-decisions`) or dismiss every dialog
-  (`qui-a08-diagrams-and-fixes`, `bug-305-306-2026-09-20`). Check each page
-  still asks that way before converting it.
+* **Older live specs answer native prompts.** 2026-11-15: the app's last
+  `window.prompt` calls moved to Raiker's own dialog
+  ([FIXED-1468](FIXED_ITEMS.md#fixed-1468--the-app-still-asked-for-text-in-the-browsers-own-prompt-box))
+  and `project-error-recovery` fills it. Settings' leave guard is still a
+  synchronous native confirm, so `round-2026-10-05-readiness-decisions` keeps
+  answering it; `qui-a08-diagrams-and-fixes` and `bug-305-306-2026-09-20`
+  dismiss any native dialog as a safety net. Moving the leave guard to the
+  in-app dialog needs navigation to wait on an async answer.
 * **One approvals test is load-sensitive.**
   `tests/test_api_approvals.py::TestApprovalsResolve::test_approved_shell_executes_once_with_bounded_evidence`
   failed once in a full local shard under load and passes alone and in its
@@ -1274,10 +1242,9 @@ and the document was deleted. Still open from it:
   said it overrides the general guidance. Above three blocks the answer offers
   **Create document**. Nothing enforces either rule in the runtime, because the
   runtime cannot tell whether the owner asked for a report or for a table.
-* **A corrected-block retry streams twice.** On a local model, the first answer
-  streams, then the corrected one streams after it, and the final response
-  replaces both. Not seen live (this round used a hosted model, which is not
-  retried).
+* ~~A corrected-block retry streams twice~~ — closed 2026-11-15
+  ([FIXED-1465](FIXED_ITEMS.md#fixed-1465--a-corrected-block-retry-showed-the-answer-twice));
+  verified by unit tests, not live (no local model in this sandbox).
 * **Diagrams on the final layout, live.** The round's key ran out of credit
   before RT-DGM-02 to RT-DGM-04 could be re-run on the rerouted layout; the
   same stored answers were re-drawn and inspected instead. Five model-driven
@@ -1461,8 +1428,12 @@ answers, and auto no longer plans a context below 12,288 tokens
 a machine that cannot fit that is told the model does not fit. 2026-11-14: a model whose window is 16,384 tokens or less carries a compact
 twelve-tool core, about 2,600 schema tokens instead of 5,500
 ([FIXED-1436](FIXED_ITEMS.md#fixed-1436--small-local-models-spent-most-of-their-window-on-tool-schemas)).
-Still open: measure the whole prompt on a small local model, and trim the
-~1,000-token standing instructions and the Memory Brief for such a window.
+2026-11-15: such a window also gets short standing instructions and half the
+Memory Brief (Chat 1,017 → 276 tokens, Build 930 → 257, Design 1,248 → 507;
+[FIXED-1464](FIXED_ITEMS.md#fixed-1464--a-small-window-model-spent-a-sixth-of-its-window-on-raikers-standing-instructions)).
+Still open: measure a whole real turn's prompt on a small local model (no
+local model runs in this sandbox), and the identity and clock blocks, which are
+unchanged.
 
 ## AMD (Vulkan) owner-machine run (MD-2) — moved to beta.2
 
@@ -1672,13 +1643,9 @@ notice dock, Goals' title, the Approvals toolbar, the Build Terminal panel and
 the Threads row actions
 ([FIXED-1414](FIXED_ITEMS.md#fixed-1414--models-said-no-default-model-is-chosen-beside-chat-default)
 to [FIXED-1420](FIXED_ITEMS.md#fixed-1420--threads-rows-showed-task-detail-and-evidence-as-captions)).
-Still open:
-
-* **Design's answers keep their own footer.** Chat's and Build's answers are
-  page text with one quiet meta line
-  ([FIXED-1423](FIXED_ITEMS.md#fixed-1423--answers-carried-three-lines-of-metadata-and-rendered-as-grey-chips),
-  [FIXED-1438](FIXED_ITEMS.md#fixed-1438--builds-answers-kept-a-grey-bubble-and-no-receipt));
-  Design's image results were not reviewed.
+Design's picture detail took the same quiet line on 2026-11-15
+([FIXED-1462](FIXED_ITEMS.md#fixed-1462--designs-picture-detail-kept-a-five-row-table-of-its-own)).
+Still open from these sweeps: nothing found.
 
 The Settings card copies and the phone notice dock were closed on the third
 2026-11-14 round
@@ -1719,12 +1686,32 @@ embedding space and keeps it current in the background. Still open:
   first-run background download is.
 * **Not qualified live.** No Ollama host was reachable here; the worker's
   pass is covered by tests with stand-ins.
-* **Status on screen — Diagnostics.** Settings › Advanced › Memory engine shows
-  the last pass ([FIXED-1426](FIXED_ITEMS.md#fixed-1426--background-indexing-had-no-status-on-screen));
-  Diagnostics does not list it among its issue cards.
+* ~~Status on screen — Diagnostics~~ — closed 2026-11-15
+  ([FIXED-1463](FIXED_ITEMS.md#fixed-1463--diagnostics-did-not-say-when-recall-had-fallen-back-to-matching-words)).
 * **What else it can do in the background** (not built): rank deferred tool
   schemas by similarity to the turn, which would cut Raiker's ~9,500-token
   prompt; related-file suggestions in Build; near-duplicate memory
-  detection by meaning (a lexical check ships, [FIXED-1439](FIXED_ITEMS.md#fixed-1439--a-proposed-memory-that-repeated-an-approved-one-looked-new));
+  detection by meaning shipped 2026-11-15 ([FIXED-1466](FIXED_ITEMS.md#fixed-1466--a-proposed-memory-that-repeated-an-approved-one-in-other-words-looked-new));
   thread and Library search by meaning;
   routing a task to a project by similarity. Each is a separate change.
+
+## 2026-11-15 round — found, not fixed
+
+* **OpenAI and OpenRouter could not be reached from this sandbox.** Both keys
+  were entered through **Add model** and saved (`PUT …/connection` 200), but
+  the session's network policy refuses `api.openai.com` and `openrouter.ai`, so
+  the model dialog read *Provider unreachable* and RT-1115-08 could not pass.
+  Re-run RT-1115-08 (`fixed-1446-1468-round-live.spec.ts`) on a host whose
+  network allows both.
+* **A refused Chat turn reads as a failure.** An execution-profile refusal
+  (FIXED-1455) shows *Not done — The turn failed before it finished* above the
+  correct explanation, with no **Open Settings** link, and names the provider
+  by id. The stream's final event is `execution_profile_refused`; ChatView and
+  BuildView should draw it the way a goal step's refusal is drawn.
+* **The project overview's counts can stay on *Loading…*.** In RT-1115-05's
+  capture, a project just opened read *Loading file count…*, *Loading task
+  count…* and *Loading image count…* beside resolved Chats and Checkpoints.
+  It may be a capture taken mid-load; check whether those reads settle and say
+  so when they fail.
+* **Settings' leave guard is still the browser's confirm** (see the native
+  prompts item above).

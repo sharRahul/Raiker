@@ -33,6 +33,19 @@ export const MODE_CHOICES: { mode: RemoteMode; label: string; detail: string }[]
   },
 ];
 
+/**
+ * BUG-359 — whether a page served at `hostname` is being used from another
+ * device. Loopback names and addresses are this computer; an empty name (a
+ * test or a file page) is treated as this computer too.
+ */
+export function isRemoteHost(hostname: string): boolean {
+  const host = hostname.trim().toLowerCase().replace(/^\[|\]$/g, "");
+  if (host === "" || host === "localhost" || host.endsWith(".localhost")) return false;
+  if (host === "::1" || host === "0:0:0:0:0:0:0:1") return false;
+  if (/^127\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(host)) return false;
+  return true;
+}
+
 export function modeLabel(mode: RemoteMode): string {
   return MODE_CHOICES.find((choice) => choice.mode === mode)?.label ?? mode;
 }
@@ -168,7 +181,7 @@ export function exposureSentence(form: RemoteForm): string {
  */
 export async function withFreshMfa<T>(password: string, code: string, run: () => Promise<T>): Promise<T> {
   const control = getToken();
-  const { token } = await auth.elevate(password, code);
+  const { token } = await auth.elevate(password, code || undefined);
   setToken(token);
   try {
     return await run();

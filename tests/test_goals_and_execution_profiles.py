@@ -592,3 +592,70 @@ def test_every_goal_and_profile_change_reaches_the_audit_log(
     assert {"execution_profile_created", "goal_accepted", "goal_started", "goal_step_started", "goal_stopped"} <= kinds
     for outcome in ("completed", "partial", "failed"):
         assert f"goal_{outcome}" in EVENT_TYPES
+
+
+# --- BUG-356: the active profile bounds Chat and Build too --------------------
+
+
+def _ready(monkeypatch: pytest.MonkeyPatch) -> None:
+    import raiker.api.routes_prompts as prompts
+
+    async def ready(*_args: Any, **_kwargs: Any) -> None:
+        return None
+
+    monkeypatch.setattr(prompts, "_require_model_ready", ready)
+
+
+def test_a_chat_turn_outside_the_active_profile_is_not_sent(
+    workspace: Path, account: tuple[str, str], chain: list[tuple[str, bool]], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _ready(monkeypatch)
+    client, h = _client(workspace, account)
+    _profile(client, h, "private_local")
+    refused = client.post("/api/prompts", json={"text": "hello", "model_profile": MODEL[0], "model": MODEL[1]}, headers=h)
+    assert refused.status_code == 409, refused.text
+    detail = refused.json()["detail"]
+    assert detail["reason_code"] == "execution_profile_refuses_model"
+    assert "Private local" in detail["message"] and "anthropic (hosted)" in detail["message"]
+    assert detail["settings_route"] == "#/settings?tab=execution-profiles"
+    # Nothing ran: no turn reached a model.
+    assert SQLiteStore(workspace).list_tasks() == []
+
+
+def test_a_chat_turn_streams_the_profile_refusal_as_its_final_event(
+    workspace: Path, account: tuple[str, str], chain: list[tuple[str, bool]], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _ready(monkeypatch)
+    client, h = _client(workspace, account)
+    _profile(client, h, "private_local")
+    with client.stream("POST", "/api/prompts/stream", json={"text": "hello"}, headers=h) as stream:
+        body = "".join(stream.iter_text())
+    assert "execution_profile_refused" in body and "not allow anthropic (hosted)" in body
+
+
+def test_with_no_profile_chosen_a_chat_turn_is_not_bounded(workspace: Path, account: tuple[str, str]) -> None:
+    from raiker.api.routes_prompts import _execution_profile_refusal
+
+    assert _execution_profile_refusal(workspace, account[0], None, MODEL[0], MODEL[1]) is None
+
+
+def test_a_custom_endpoint_on_this_machine_reads_as_local(workspace: Path, account: tuple[str, str], monkeypatch: pytest.MonkeyPatch) -> None:
+    from raiker.goals.profiles import placement_is_local
+    from raiker.models.registry import ModelProfileRegistry
+
+    generic = ModelProfileRegistry.load().resolve_profile_id("generic-openai-compatible")
+    store = SQLiteStore(workspace)
+    import raiker.models.connections as connections
+
+    for endpoint, local in (
+        ("http://127.0.0.1:8000/v1", True),
+        ("http://localhost:1234/v1", True),
+        ("http://192.168.1.20:8000/v1", False),
+        ("https://api.example.com/v1", False),
+    ):
+        monkeypatch.setattr(connections, "get_model_connection", lambda *_a, e=endpoint: {"endpoint": e})
+        assert placement_is_local(store, account[0], generic) is local, endpoint
+    # A vendor profile stays hosted whatever its address.
+    anthropic = ModelProfileRegistry.load().resolve_profile_id("anthropic-hosted")
+    monkeypatch.setattr(connections, "get_model_connection", lambda *_a: {"endpoint": "http://127.0.0.1:9/v1"})
+    assert placement_is_local(store, account[0], anthropic) is False

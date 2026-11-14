@@ -499,11 +499,19 @@ memory you had forgotten stays forgotten.
 `app.key`. A backup without its key cannot be opened by Raiker or anyone else —
 that is the protection working, and there is no back door.
 
-**Rotating the key.** Raiker does not offer in-place key rotation yet. To move to
-a new key today, export your memories (**Controls → Export**), start a
-new workspace — which generates a new key — and import them there. Records keep
-their text and provenance; review history and conversations stay with the old
-workspace.
+**Rotating the key.** If you think `app.key` was copied off the machine,
+rotate it: **Settings → Security → Encryption and the vault → Workspace key →
+Rotate**, then your password (and authenticator code, with two-step sign-in).
+Raiker takes a verified backup first, re-keys the database to a new key,
+re-seals two-step sign-in and its other sealed secrets, checks the result, and
+only then retires the old key. Anything that fails leaves the old key in force.
+The page then shows the new fingerprint and a **Retired key** row: backups made
+before the rotation still need that key, so Raiker keeps it in
+`.raiker/retired-keys/` and they stay restorable as a separate copy (Backups
+marks them *Made with a retired key*). **Discard** removes a retired key; the
+backups that needed it can no longer be opened. Copy the new `app.key`
+somewhere safe again after a rotation. A crash part-way is finished or undone
+on the next start, by whichever key opens the database.
 
 **Diagnosing key-page protection.** **Settings → Security → Database
 encryption** shows whether key memory is *Locked in memory* or *Degraded on

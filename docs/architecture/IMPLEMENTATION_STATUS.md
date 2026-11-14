@@ -100,8 +100,9 @@ Ambient recall follows the [SQLCipher memory decision](MEMORY_AND_CONTEXT_STRATE
 each turn, the owner chooses **Off**, **Brief only** or **Search when relevant**
 (Incognito wins), and every answer records which mode and backend it ran under.
 History search is bounded, redacted and never promoted; an external
-`MemoryAdapter` contract exists with **no provider enabled**; in-place key
-rotation is not offered ([BUG-354](../plans/TO_BE_FIXED.md#bug-354--the-workspace-key-cannot-be-rotated-in-place)).
+`MemoryAdapter` contract exists with **no provider enabled**; the workspace
+key rotates in place from Settings › Security, keeping retired keys for older
+backups ([FIXED-1452](../plans/FIXED_ITEMS.md#fixed-1452--the-workspace-key-could-not-be-rotated-in-place-bug-354)).
 
 Durable **goals** and Settings-owned **execution profiles** ship as the first
 slices of PA-D01, PA-D02 and PA-D06 (implemented 2026-10-20,

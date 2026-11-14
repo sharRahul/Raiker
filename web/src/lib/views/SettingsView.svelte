@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { failure } from "../errorCopy";
   import { onMount } from "svelte";
   import { applyTheme, loadThemeChoice, saveThemeChoice, type ThemeChoice } from "../theme";
   import PageState from "../components/PageState.svelte";
@@ -130,7 +131,7 @@
       status = s.status;
       loaded = true;
     } catch (e) {
-      loadError = e instanceof ApiError ? `Unavailable (${e.status})` : "Unavailable";
+      loadError = failure("Settings could not be read", "No setting was changed.", "Reload the page.", e);
     }
   }
 

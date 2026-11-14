@@ -267,7 +267,7 @@ work runs (top bar), and so is the count of running items.
   deletion journal exist.
 - The support bundle refuses to build if anything secret-shaped survives
   redaction.
-- BUG-354: the workspace key cannot be rotated in place.
+- ~~BUG-354: the workspace key cannot be rotated in place~~ — closed 2026-11-15 (FIXED-1452, FIXED-1453).
 
 | ID | Item | State | P | Effort | Work left |
 |---|---|---|---|---|---|
@@ -276,7 +276,7 @@ work runs (top bar), and so is the count of running items.
 | MM-3 | No credential or private-data leaks to models or logs | ✅ | — | — | `Data safety drills` now provides required automated transport/key/recovery regressions. **2026-11-08:** the canary drill runs in Data safety drills; it found the memory mirror holding secrets in plain text ([FIXED-1330](FIXED_ITEMS.md#fixed-1330--a-memorys-readable-mirror-held-passwords-and-card-numbers-in-plain-text-mm-3-found-by-the-drill)). See [data-safety evidence](DATA_SAFETY_EVIDENCE.md). |
 | MM-4 | Backup, migration, corruption recovery | ✅ | — | — | Automated backup and lock-screen recovery checks are required in `Data safety drills`. **2026-11-08:** the destructive drill (truncate, flipped pages, missing key, full disk) runs in Data safety drills; it found a full disk answering a bare 500 ([FIXED-1329](FIXED_ITEMS.md#fixed-1329--a-full-disk-reached-the-owner-as-a-bare-500-mm-4-found-by-the-drill)) |
 | MM-5 | No unexpected cloud transmission | 🟡 | P0 | M | `scripts/verify_egress_audit.py` rejects a capture shorter than 30 minutes or with an unapproved host. Still required: owner-machine local-profile recording while all features are used, then attach its redacted verifier report and capture hash. |
-| MM-6 | Key rotation (BUG-354) | 🔴 | P2 | M | After beta; documented as a known limitation |
+| MM-6 | Key rotation (BUG-354) | ✅ | — | — | Closed 2026-11-15: verified backup, `PRAGMA rekey`, re-sealed secrets, retired keys for older backups ([FIXED-1452](FIXED_ITEMS.md#fixed-1452--the-workspace-key-could-not-be-rotated-in-place-bug-354), [FIXED-1453](FIXED_ITEMS.md#fixed-1453--settings-could-not-rotate-the-workspace-key-or-say-which-backups-need-the-old-one-bug-354)); RT-1115-02 live |
 
 **UI / UX.**
 - Settings → **Privacy** gains a *"What leaves this computer"* panel, listing

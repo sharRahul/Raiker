@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { failure } from "../errorCopy";
   /**
    * The Build workspace's right rail: what is running in the background, and
    * how to start something that keeps running.
@@ -76,7 +77,7 @@
     } catch (error) {
       tasks = null;
       loadError =
-        error instanceof ApiError ? `Background work unavailable (${error.status}).` : "Background work unavailable.";
+        failure("Background work could not be read", "Running work is not affected.", "Refresh the panel.", error);
     }
   }
 

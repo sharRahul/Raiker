@@ -447,6 +447,8 @@ VERIFIED: frozenset[tuple[str, str]] = frozenset(
         ("GET", "/api/backups"),
         ("POST", "/api/backups"),
         ("POST", "/api/backups/{backup_id}/verify"),
+        ("POST", "/api/security/workspace-key/rotate"),
+        ("DELETE", "/api/security/workspace-key/retired/{fingerprint}"),
         ("POST", "/api/backups/{backup_id}/restore"),
         ("GET", "/api/recovery/backups"),
         ("POST", "/api/recovery/restore"),

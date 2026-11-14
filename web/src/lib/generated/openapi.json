@@ -1854,11 +1854,19 @@
           "key_fingerprint": {
             "title": "Key Fingerprint",
             "type": "string"
+          },
+          "retired_key_fingerprints": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Retired Key Fingerprints",
+            "type": "array"
           }
         },
         "required": [
           "backups",
-          "key_fingerprint"
+          "key_fingerprint",
+          "retired_key_fingerprints"
         ],
         "title": "BackupsView",
         "type": "object"
@@ -18663,6 +18671,48 @@
         "title": "IssuedSessionView",
         "type": "object"
       },
+      "KeyRotated": {
+        "description": "BUG-354 — a verified re-key of the workspace database.",
+        "properties": {
+          "backup_id": {
+            "title": "Backup Id",
+            "type": "string"
+          },
+          "backups_on_retired_key": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Backups On Retired Key",
+            "type": "array"
+          },
+          "new_fingerprint": {
+            "title": "New Fingerprint",
+            "type": "string"
+          },
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          },
+          "old_fingerprint": {
+            "title": "Old Fingerprint",
+            "type": "string"
+          },
+          "resealed": {
+            "title": "Resealed",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "ok",
+          "old_fingerprint",
+          "new_fingerprint",
+          "backup_id",
+          "resealed",
+          "backups_on_retired_key"
+        ],
+        "title": "KeyRotated",
+        "type": "object"
+      },
       "KnowledgeSource": {
         "description": "One thing Raiker may read: a file it holds, or a folder the owner granted (BUG-305).",
         "properties": {
@@ -29069,6 +29119,17 @@
             "title": "Ok",
             "type": "boolean"
           },
+          "path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Path"
+          },
           "severity": {
             "enum": [
               "error",
@@ -29084,7 +29145,8 @@
           "ok",
           "message",
           "field",
-          "severity"
+          "severity",
+          "path"
         ],
         "title": "RemoteAccessCheckView",
         "type": "object"
@@ -30318,6 +30380,24 @@
           "resumable"
         ],
         "title": "ResumeHandle",
+        "type": "object"
+      },
+      "RetiredKeyDiscarded": {
+        "properties": {
+          "fingerprint": {
+            "title": "Fingerprint",
+            "type": "string"
+          },
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "ok",
+          "fingerprint"
+        ],
+        "title": "RetiredKeyDiscarded",
         "type": "object"
       },
       "RevertImageRequest": {
@@ -32653,6 +32733,14 @@
       "SimilarMemory": {
         "description": "FIXED-1439 — the approved memory a proposal closely repeats.",
         "properties": {
+          "basis": {
+            "enum": [
+              "words",
+              "meaning"
+            ],
+            "title": "Basis",
+            "type": "string"
+          },
           "memory_id": {
             "title": "Memory Id",
             "type": "string"
@@ -32669,7 +32757,8 @@
         "required": [
           "memory_id",
           "text",
-          "similarity"
+          "similarity",
+          "basis"
         ],
         "title": "SimilarMemory",
         "type": "object"
@@ -55183,6 +55272,65 @@
           }
         },
         "summary": "Scan Security"
+      }
+    },
+    "/api/security/workspace-key/retired/{fingerprint}": {
+      "delete": {
+        "description": "BUG-354 — discard a retired key; backups made with it can no longer be opened.",
+        "operationId": "discard_retired_key_api_security_workspace_key_retired__fingerprint__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "fingerprint",
+            "required": true,
+            "schema": {
+              "title": "Fingerprint",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RetiredKeyDiscarded"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Discard Retired Key"
+      }
+    },
+    "/api/security/workspace-key/rotate": {
+      "post": {
+        "description": "BUG-354 — re-key the workspace database in place, after a verified backup.\n\nIt replaces the one secret the workspace has, so it takes a recent step-up\n(an elevated session), as deleting a managed project does.",
+        "operationId": "rotate_workspace_key_api_security_workspace_key_rotate_post",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/KeyRotated"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Rotate Workspace Key"
       }
     },
     "/api/sessions": {

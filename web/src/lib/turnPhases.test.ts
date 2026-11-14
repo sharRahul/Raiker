@@ -122,3 +122,30 @@ describe("turnPhases", () => {
     expect(summarizeEvent(retried)).toBe("Retried anthropic / claude once after provider_connection_failed.");
   });
 });
+
+describe("a corrected-block retry streams once (Quiet UI visual answers)", () => {
+  it("withdraws the uncorrected answer when the runtime retries it", () => {
+    expect(
+      collectText([
+        lifecycle("model_request_started"),
+        delta("Here is the table: ```raiker:table {broken"),
+        lifecycle("typed_block_retry"),
+        lifecycle("model_request_started"),
+        delta("Here is the table, corrected."),
+      ]),
+    ).toBe("Here is the table, corrected.");
+  });
+  it("keeps text from earlier requests in the same turn", () => {
+    expect(
+      collectText([
+        lifecycle("model_request_started"),
+        delta("I read the file."),
+        lifecycle("model_request_started"),
+        delta("Broken block"),
+        lifecycle("typed_block_retry"),
+        lifecycle("model_request_started"),
+        delta("Fixed block"),
+      ]),
+    ).toBe("I read the file.\n\nFixed block");
+  });
+});

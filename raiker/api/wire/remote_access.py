@@ -24,6 +24,8 @@ class RemoteAccessCheckView(TypedDict):
     message: str
     field: str | None
     severity: Literal["error", "warning", "info"]
+    #: The file or folder the message is about (BUG-359), shown beside it.
+    path: str | None
 
 
 class RemoteAccessProblem(TypedDict):

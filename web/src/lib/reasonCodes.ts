@@ -112,6 +112,23 @@ const REASON_CODES: Record<string, ReasonCopy> = {
     plain: "Deleting a project's folder needs your password again.",
     remediation: "Enter your password (or authenticator code) to confirm it is you.",
   },
+  // BUG-354 — rotating or discarding a workspace key replaces its one secret.
+  key_rotation_requires_step_up: {
+    plain: "Changing the workspace key needs your password again.",
+    remediation: "Enter your password (and authenticator code, if you use one) to confirm it is you.",
+  },
+  key_rotation_project_move_pending: {
+    plain: "A project folder move is still in progress, and it is signed with the current key.",
+    remediation: "Finish or cancel the move in Work › Projects, then rotate the key.",
+  },
+  key_rotation_backup_failed: {
+    plain: "Raiker could not take the verified backup it makes first, so the key was not changed.",
+    remediation: "Check Settings › Backups, then try again.",
+  },
+  execution_profile_refuses_model: {
+    plain: "Your execution profile does not allow this model.",
+    remediation: "Choose a model it allows, or change the profile in Settings › Execution profiles.",
+  },
   project_delete_confirmation_required: {
     plain: "The delete was not confirmed.",
     remediation: "Type the project's name to confirm.",

@@ -349,7 +349,7 @@
       {#if visibleChecks.length > 0}
         <ul class="checks" aria-label="Checks">
           {#each visibleChecks as check (check.code + check.message)}
-            <li class="check-{check.ok ? check.severity : 'error'}">{check.message}</li>
+            <li class="check-{check.ok ? check.severity : 'error'}">{check.message}{#if check.path} <code class="check-path">{check.path}</code>{/if}</li>
           {/each}
         </ul>
       {/if}
@@ -365,7 +365,7 @@
         <dt>When</dt><dd>When Raiker next restarts. Until then nothing changes.</dd>
       </dl>
       {#each checks.filter((check) => check.severity === "warning") as check (check.code)}
-        <p class="sub small">{check.message}</p>
+        <p class="sub small">{check.message}{#if check.path} <code class="check-path">{check.path}</code>{/if}</p>
       {/each}
       {#if form.mode !== "local"}
         <label class="confirm">
@@ -463,8 +463,11 @@
   .setting-row {
     display: grid;
     /* FIXED-1391 — a fixed action column, so values line up down the page
-       whether a row has one button, two, or none. */
-    grid-template-columns: minmax(10rem, 1fr) minmax(0, 1.4fr) minmax(7.5rem, max-content);
+       whether a row has one button, two, or none. BUG-359: a max-content
+       column grew on the Remote access row (Change and Turn off), so that
+       row's coloured state sat left of every other value; the column is now
+       fixed wide enough for two small buttons. */
+    grid-template-columns: minmax(10rem, 1fr) minmax(0, 1.4fr) 11.5rem;
     align-items: center;
     gap: var(--space-3);
     min-height: 52px;
@@ -476,6 +479,7 @@
   .setting-value { color: var(--text-2); font-size: var(--text-sm); }
   .row-actions { display: flex; gap: var(--space-2); }
   .state { font-weight: 500; }
+  .check-path { overflow-wrap: anywhere; font-size: var(--text-xs); }
   .state-ok { color: var(--ok, var(--text-1)); }
   .state-warn { color: var(--warn, var(--text-1)); }
   .state-danger { color: var(--danger); }

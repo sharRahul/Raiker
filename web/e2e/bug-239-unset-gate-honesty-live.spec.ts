@@ -12,7 +12,7 @@
  */
 import { expect, test } from "@playwright/test";
 import { capture } from "./capture";
-import { signInAsOwner } from "./hosted-provider";
+import { openPermission, signInAsOwner } from "./hosted-provider";
 import { LIVE_BASE as BASE } from "./live";
 
 const SHOTS = "../../docs/plans/screenshots/working";
@@ -25,35 +25,24 @@ test("an untouched gate says which of the three things it means", async ({ page 
   });
 
   await signInAsOwner(page, BASE);
-  await page.goto(`${BASE}/#/capabilities`);
 
-  const webFetch = page.locator(".cap.card", { hasText: "Web fetch" }).first();
-  await expect(webFetch).toBeVisible({ timeout: 30_000 });
+  // 2026-11-15 — Permissions is a category rail and a list-detail view
+  // (QUI-L06); the card is the detail pane `openPermission` returns.
+  const webFetch = await openPermission(page, BASE, "Web fetch");
 
-  // The row, before anything is opened: it no longer claims Off about a
-  // capability the runtime would run.
-  await expect(webFetch.getByText("On by default")).toBeVisible();
-  await expect(webFetch.getByText("Off", { exact: true })).toHaveCount(0);
-
-  // And the card says why, rather than leaving it to be discovered from
-  // behaviour.
-  await webFetch.getByRole("button", { name: /Web fetch/ }).click();
-  await expect(page.getByText(/an empty table on a new install is not a refusal/i))
-    .toBeVisible();
-  // And the only action it really has is the one it offers. Turning a running
-  // capability "on" is the FIXED-288 contradiction the other way round.
-  await expect(webFetch.getByRole("button", { name: "Turn off" })).toBeVisible();
-  await expect(webFetch.getByRole("button", { name: "Turn on" })).toHaveCount(0);
+  // It no longer claims Off about a capability the runtime would run, and it
+  // says why rather than leaving it to be discovered from behaviour.
+  await expect(webFetch.getByText(/On by default/).first()).toBeVisible();
+  await expect(webFetch.getByText(/an empty table on a new install is not a refusal/i)).toBeVisible();
+  // The only action it really has is the one it offers (FIXED-288).
+  await expect(webFetch.getByRole("button", { name: "Turn off", exact: true })).toBeVisible();
+  await expect(webFetch.getByRole("button", { name: "Turn on", exact: true })).toHaveCount(0);
   await capture(page, `${SHOTS}/bug-239-unset-gate-honesty.png`, webFetch);
 
   // A capability whose empty table really does mean off is untouched by this.
-  // Read from the row's one summary, which is where availability has been said
-  // since it and the separate chip beside it were merged: asserting an exact
-  // "Off" element was asserting a chip that no longer exists, and the spec had
-  // been failing on the harness rather than on the product.
-  const shell = page.locator(".cap.card", { hasText: "Shell commands" }).first();
-  await expect(shell.locator(".cap-summary")).toHaveText(/^Off · /);
-  await expect(shell.getByText("On by default")).toHaveCount(0);
+  const shell = await openPermission(page, BASE, "Shell commands");
+  await expect(shell.getByText(/On by default/)).toHaveCount(0);
+  await expect(shell.getByRole("button", { name: "Turn on", exact: true })).toBeVisible();
 
   expect(consoleErrors).toEqual([]);
 });

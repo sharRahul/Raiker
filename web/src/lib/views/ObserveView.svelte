@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { backgroundIndexCopy, type BackgroundIndexCopy } from "../backgroundIndex";
   import { failure } from "../errorCopy";
   /**
    * Observability hub — one read-first destination for readiness, the audit
@@ -134,12 +135,14 @@
   // REM-OBSERVE — the exceptions, and what an empty list of them may claim.
   // `null` for `unreadNotifications` while the read is in flight or failed, so
   // an unread count that could not be read is not counted as zero.
+  let backgroundIndex = $state<BackgroundIndexCopy | null>(null);
   const attentionInputs = $derived({
     diagnostics,
     approvals,
     security,
     unreadNotifications:
       notifications === null ? null : notifications.filter((n) => !n.read).length,
+    backgroundIndex,
   });
   const attention = $derived(attentionItems(attentionInputs));
 
@@ -178,6 +181,9 @@
         linkLabel: "Live board",
       },
       { label: "Notifications", value: unread === 0 ? "All read" : `${unread} unread`, href: "#/observe?tab=notifications", linkLabel: "History" },
+      ...(backgroundIndex && backgroundIndex.tone !== "attention"
+        ? [{ label: "Background indexing", value: backgroundIndex.text, href: "#/settings?tab=advanced&kind=memory-engine", linkLabel: "Memory engine" }]
+        : []),
     ];
   });
 
@@ -247,12 +253,18 @@
       } catch {
         security = null;
       }
+      // The background indexer's last pass, read on its own and allowed to
+      // fail: an unread status is simply not listed.
+      try {
+        backgroundIndex = backgroundIndexCopy((await api.memorySettings()).background_index);
+      } catch {
+        backgroundIndex = null;
+      }
     } catch (error) {
       // A failed read never invents a green status: the overview says it could
       // not reach the runtime and offers a retry, rather than showing stale
       // readiness as if it were current.
-      loadError =
-        error instanceof ApiError ? `Unavailable (${error.status})` : "Could not reach Raiker";
+      loadError = error instanceof ApiError ? `Status could not be read (HTTP ${error.status})` : "Could not reach Raiker";
       offline = !(error instanceof ApiError);
     }
   }

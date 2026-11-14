@@ -661,10 +661,19 @@ step that could reach one recalls no memory and the memory tools answer
 *withheld*, as under Incognito.
 
 Saving a profile writes a new version. Goals running under the old one pause
-until you resume them, and Resume checks them against the new one. A custom
-OpenAI-compatible endpoint counts as hosted even when it runs on this machine,
-so Private local refuses it. Profiles bound goal steps only today; ordinary
-Chat, Build and scheduled tasks are not yet held to them
+until you resume them, and Resume checks them against the new one.
+
+**Chat and Build are held to it too.** Once you have chosen a profile, a Chat
+or Build turn whose model — or any fallback — the profile does not allow is not
+sent: the answer reads *Not sent: your active execution profile, Private local,
+does not allow anthropic (hosted)* and points to Settings › Execution profiles.
+A project bound to its own profile uses that one. With no profile chosen,
+conversations are not bounded.
+
+A custom OpenAI-compatible endpoint is **on this machine** when its saved
+address is (`localhost`, `127.0.0.1`), so Private local admits it; any other
+address, a private-network one included, counts as hosted. Scheduled tasks are
+not yet held to a profile
 ([BUG-356](../plans/TO_BE_FIXED.md#bug-356--execution-profiles-govern-goal-steps-only-and-cover-one-data-class)).
 
 ### Give context deliberately
@@ -682,8 +691,9 @@ work or stop the scheduler. Held decisions remain in the inbox. See
 
 ### What the next personal-agent stages will add
 
-Goals and execution profiles have shipped as a first slice. Still planned:
-starting a goal from Chat, validator-backed criteria, inspectable personal
+Goals and execution profiles have shipped as a first slice, and **Make this a
+goal** starts one from a finished Chat or Build answer. Still planned:
+validator-backed criteria, inspectable personal
 preferences, opt-in proactive checks, provider-confirmed effects, and proposed
 reusable skills from verified work. These are planned outcomes, not controls
 available in the current interface.

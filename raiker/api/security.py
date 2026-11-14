@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import json
 import time
 from collections import defaultdict, deque
@@ -365,6 +366,24 @@ SIGN_IN_PATHS: Final = frozenset(
 SESSION_RATE_MULTIPLIER: Final = 5
 
 
+#: How many proven sessions the proxy listener keeps a bucket for (BUG-359).
+PROVEN_SESSION_LIMIT: Final = 64
+
+
+def _session_credential(scope: Scope) -> bytes | None:
+    """The bearer token or session cookie a request presents, raw; ``None`` without one."""
+    for name, value in scope.get("headers") or []:
+        if name == b"authorization" and value[:7].lower() == b"bearer ":
+            return value[7:].strip() or None
+    for name, value in scope.get("headers") or []:
+        if name == b"cookie":
+            for part in value.split(b";"):
+                key, _, token = part.strip().partition(b"=")
+                if key == b"raiker_session" and token:
+                    return token
+    return None
+
+
 def _presents_session(scope: Scope) -> bool:
     """Whether the request carries a session credential (not whether it is valid)."""
     for name, value in scope.get("headers") or []:
@@ -402,6 +421,12 @@ class RateLimitMiddleware:
         self._loopback_only = loopback_only
         self._hits: dict[str, deque[float]] = defaultdict(deque)
         self._last_sweep = time.monotonic()
+        # BUG-359 limit 4 — sessions the auth check has accepted on the proxy
+        # listener, by digest, most recent last. Only a credential that was
+        # answered without a 401 or 403 earns a bucket of its own, so a forged
+        # token per request cannot mint fresh windows: it stays in the shared
+        # proxy bucket.
+        self._proven: dict[str, None] = {}
 
     def _client_key(self, scope: Scope) -> str:
         from raiker.api.proxy_guard import (
@@ -464,8 +489,17 @@ class RateLimitMiddleware:
             self._sweep(now)
         key = self._client_key(scope)
         limit = self._max
+        digest: str | None = None
         if scope.get("path") not in SIGN_IN_PATHS and _presents_session(scope):
             key, limit = f"{key}|session", self._max * SESSION_RATE_MULTIPLIER
+            from raiker.api.proxy_guard import PROXY_RATE_KEY
+
+            if key.startswith(PROXY_RATE_KEY):
+                credential = _session_credential(scope)
+                if credential is not None:
+                    digest = hashlib.sha256(credential).hexdigest()[:24]
+                    if digest in self._proven:
+                        key = f"{PROXY_RATE_KEY}|session|{digest}"
         hits = self._hits[key]
         cutoff = now - self._window
         while hits and hits[0] < cutoff:
@@ -474,7 +508,27 @@ class RateLimitMiddleware:
             await _send_json(send, 429, {"ok": False, "reason_code": "rate_limited"})
             return
         hits.append(now)
-        await self.app(scope, receive, send)
+        if digest is None:
+            await self.app(scope, receive, send)
+            return
+
+        async def observe(message: Message) -> None:
+            if message["type"] == "http.response.start":
+                self._record_session(digest, int(message.get("status", 0)))
+            await send(message)
+
+        await self.app(scope, receive, observe)
+
+    def _record_session(self, digest: str, status_code: int) -> None:
+        """Remember a proxy-listener session the auth check accepted; forget a refused one."""
+        if status_code in (401, 403):
+            self._proven.pop(digest, None)
+            return
+        if 200 <= status_code < 400:
+            self._proven.pop(digest, None)
+            self._proven[digest] = None
+            while len(self._proven) > PROVEN_SESSION_LIMIT:
+                self._proven.pop(next(iter(self._proven)))
 
 
 class StaticCacheMiddleware:

@@ -377,66 +377,47 @@
         </section>
       {/if}
 
-      <section class="panel" aria-label="Detail">
-        <h3>Detail</h3>
-        <dl class="facts">
-          <div>
-            <dt>Made</dt>
-            <dd>
-              {KIND_LABEL[selected.generation.kind ?? "create"] ?? "Generated"}
-              {#if selected.generation.kind === "revert" && selected.generation.restored_generation_id}
-                <!-- The version whose picture this carries, which the parent
-                     link (the version it was made on top of) cannot say. -->
-                {@const restored = turns.find((item) => item.generation_id === selected!.generation.restored_generation_id)}
-                {#if restored}
-                  <button
-                    type="button"
-                    class="link"
-                    onclick={() => (selectedId = restored.generation_id)}
-                  >{restored.prompt}</button>
-                {:else}
-                  <span class="muted">a version no longer stored</span>
-                {/if}
-              {:else if selected.parent}
-                <button
-                  type="button"
-                  class="link"
-                  onclick={() => (selectedId = selected!.parent!.generation_id)}
-                >{selected.parent.prompt}</button>
-              {:else if selected.generation.source_generation_id}
-                <!-- The source is gone. An origin, not a broken row: a source
-                     can be forgotten while the images made from it remain. -->
-                <span class="muted">an image no longer stored</span>
-              {/if}
-            </dd>
-          </div>
+      <!-- Quiet UI consistency (2026-11-15) — the picture's receipt as one
+           quiet line, the way Chat's and Build's answers carry theirs
+           (FIXED-1423, FIXED-1438), instead of a five-row table of its own. -->
+      <section class="panel detail" aria-label="Detail">
+        <p class="receipt-line" data-testid="design-receipt">
           {#if selected.generation.kind === "import"}
             <!-- DW-04 — the owner's own file: no provider and no model made it. -->
-            <div><dt>Source</dt><dd>Your file, {selected.generation.prompt}. No provider has seen it.</dd></div>
+            <span>Your file, {selected.generation.prompt}. No provider has seen it.</span>
           {:else}
-            <div><dt>Model</dt><dd>{selected.generation.model}</dd></div>
+            <span>{selected.generation.model}</span>
           {/if}
           <!-- REM-DESIGN-01 — the recorded size is what was *asked for*, and
-               for a provider Raiker sends no size to it was never asked. It
-               printed here beside the picture as though it described it. -->
-          <div>
-            <dt>Size</dt>
-            <dd>
-              {#if sizeWasSent(selected.generation)}
-                {selected.generation.size}
-              {:else}
-                <span class="muted">chosen by {providerName(selected.generation.provider)}</span>
-              {/if}
-            </dd>
-          </div>
-          <div><dt>When</dt><dd>{relativeTime(selected.generation.created_at)}</dd></div>
+               for a provider Raiker sends no size to it was never asked. -->
+          <span>
+            {#if sizeWasSent(selected.generation)}
+              {selected.generation.size}
+            {:else}
+              <span class="muted">chosen by {providerName(selected.generation.provider)}</span>
+            {/if}
+          </span>
+          <span>{relativeTime(selected.generation.created_at)}</span>
           {#if filedIn !== undefined}
-            <!-- UX-DESIGN-02 — where it was filed when it was made. Captured on
-                 the row at submission; changing the project selector later
-                 does not move it. -->
-            <div><dt>Filed in</dt><dd>{filedIn(selected.generation.project_id)}</dd></div>
+            <!-- UX-DESIGN-02 — where it was filed when it was made. -->
+            <span>Filed in {filedIn(selected.generation.project_id)}</span>
           {/if}
-        </dl>
+        </p>
+        <p class="made-line">
+          {KIND_LABEL[selected.generation.kind ?? "create"] ?? "Generated"}
+          {#if selected.generation.kind === "revert" && selected.generation.restored_generation_id}
+            {@const restored = turns.find((item) => item.generation_id === selected!.generation.restored_generation_id)}
+            {#if restored}
+              <button type="button" class="link" onclick={() => (selectedId = restored.generation_id)}>{restored.prompt}</button>
+            {:else}
+              <span class="muted">a version no longer stored</span>
+            {/if}
+          {:else if selected.parent}
+            <button type="button" class="link" onclick={() => (selectedId = selected!.parent!.generation_id)}>{selected.parent.prompt}</button>
+          {:else if selected.generation.source_generation_id}
+            <span class="muted">an image no longer stored</span>
+          {/if}
+        </p>
         <div class="asset-actions">
           <a class="download" href={shot(selected.generation)} target="_blank" rel="noopener">
             Open full size
@@ -843,15 +824,9 @@
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: var(--space-2);
   }
-  .facts { display: grid; gap: 0.4rem; margin: 0; }
-  .facts div { display: grid; grid-template-columns: 4.2rem minmax(0, 1fr); gap: var(--space-2); }
-  .facts dt { color: var(--text-3); font-size: var(--text-xs); }
-  .facts dd {
-    margin: 0;
-    color: var(--text-2);
-    font-size: var(--text-xs);
-    overflow-wrap: anywhere;
-  }
+  .receipt-line { display: flex; flex-wrap: wrap; gap: 0 0.5rem; margin: 0; color: var(--text-3); font-size: var(--text-xs); }
+  .receipt-line > span + span::before { content: "·"; margin-right: 0.5rem; color: var(--text-3); }
+  .made-line { margin: var(--space-1) 0 0; color: var(--text-2); font-size: var(--text-sm); }
   .link {
     padding: 0;
     border: 0;

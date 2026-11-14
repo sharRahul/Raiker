@@ -16,6 +16,48 @@ PR #106: the **user-owned fallback sequence** and **prompt caching + normalised
 cache-hit metrics**.
 
 
+## Result — 2026-11-15 (Workspace key, execution profiles, remote access and budgets)
+
+A Linux workspace served by `raiker-web --port 8765` on a fresh workspace
+(`scripts/reset_live_workspace.py`), built from this round's SPA and backend.
+Anthropic was connected through **Add model** with an identity-linked key and
+its workspace ID typed into the UI from the round's environment (RT-1114-01
+passed on its second attempt; the first stopped at the setup sheet). OpenAI and
+OpenRouter keys were typed into **Add model** too; this session's network
+refuses both providers' hosts, so they could not be checked (RT-1115-08,
+blocked by the environment). No key, token or workspace ID appears in a spec,
+log or capture. Spec: `web/e2e/fixed-1446-1468-round-live.spec.ts`. Result:
+**7 of 7 passed**, RT-1115-08 blocked.
+
+| # | Scenario | Verification | Result |
+|---|---|---|---|
+| RT-1115-01 | Settings › Security: every card's values start within 1 px of each other; the workspace key sits under *Encryption and the vault* | FIXED-1448, FIXED-1453 | Passed |
+| RT-1115-02 | **Rotate** with the password: *Rotated and verified*, a new fingerprint, *1 sealed secret was re-sealed*, the old key kept for 1 backup, and Backups marks that backup *Made with a retired key* | FIXED-1452, FIXED-1453 | Passed |
+| RT-1115-03 | With *Private local* active, a Haiku 4.5 Chat turn is not sent and names the profile; with *Cloud-first* active the same kind of turn answers | FIXED-1455 | Passed |
+| RT-1115-04 | A real Haiku 4.5 Build turn offers **Make this a goal**; the Goals form opens *Filled in from “Build · …”* | FIXED-1456 | Passed |
+| RT-1115-05 | **Attach a folder** asks in Raiker's own dialog (**Attach** disabled until a path is typed); no native dialog fires | FIXED-1468 | Passed |
+| RT-1115-06 | Diagnostics lists *Recall is matching words only* with **Open Permissions** | FIXED-1463 | Passed |
+| RT-1115-07 | Tasks' counts share the toolbar; Settings › Notifications at 1280×800 is ≤ 1,200 px with the categories in columns | FIXED-1458, FIXED-1460 | Passed |
+| RT-1115-08 | OpenAI and OpenRouter connect and pass **Test** | — | Blocked (sandbox network refuses both hosts) |
+
+**Also run live.** `all-pages-live` *size budgets (QUI-G01)*, now a failing
+check: 0 of 78 measurements over budget (the first run this round found Tasks
+at 909 px and, after the Workspace key card was added, Security at 1,251 px;
+both fixed). `bug-239-unset-gate-honesty-live` 1/1 and
+`round-2026-10-02-memory-live` *by goal* on the rewritten Permissions steps.
+
+**Found during the run.** Tasks' composer dock was sized to the full content
+height under Work's tab strip (FIXED-1460). Recorded, not fixed: a refused Chat
+turn's header reads as a failure, and a project overview briefly showed
+*Loading … count…* (see [TO_BE_FIXED](../plans/TO_BE_FIXED.md#2026-11-15-round--found-not-fixed)).
+
+**Captures.** `output/playwright/2026-11-15-round/` — `01-security-aligned`,
+`02-key-rotated`, `02b-backup-retired-key`, `03-profile-refused`,
+`03b-cloud-first-answers`, `04-build-goal-action`, `04b-goal-form`,
+`05-attach-dialog`, `06-diagnostics-indexing`, `07-tasks-toolbar`,
+`07b-notifications`. Inspected at original resolution; no key, token or
+workspace ID is visible.
+
 ## Result — 2026-11-14 (Third round: permissions harness, web reads and work lists)
 
 A Linux workspace served by `raiker-web --port 8765` at 1440×1000 (1440×900

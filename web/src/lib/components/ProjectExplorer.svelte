@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { failure } from "../errorCopy";
   /**
    * One file tree for both kinds of project root.
    *
@@ -134,7 +135,7 @@
       }
     } catch (e) {
       indexSummary =
-        e instanceof ApiError ? `Indexing failed (${e.status}).` : "Indexing failed.";
+        failure("Indexing failed", "The project's files are not changed.", "Try Index again.", e);
     } finally {
       indexing = false;
     }

@@ -2,7 +2,7 @@
   import { failure } from "../errorCopy";
   import MemoryControls from "../components/MemoryControls.svelte";
   import EmptyState from "../components/EmptyState.svelte";
-  import { askConfirm } from "../confirm.svelte";
+  import { askConfirm, askText } from "../confirm.svelte";
   import Icon from "../components/Icon.svelte";
   import PageState from "../components/PageState.svelte";
   import { api, ApiError } from "../api";
@@ -150,14 +150,14 @@
     }
     catch (e) {
       if (!current()) return;
-      memories = null; settings = null; loadError = e instanceof ApiError ? `Unavailable (${e.status})` : "Unavailable";
+      memories = null; settings = null; loadError = failure("Memory could not be read", "No memory was changed.", "Reload the page.", e);
     }
   }
   async function toggleIncognito() {
     if (!settings || busy) return;
     busy = true; actionError = null;
     try { await api.setMemoryIncognito(!settings.incognito); await load(); }
-    catch (e) { actionError = e instanceof ApiError ? `Could not update memory use (${e.status}). Refresh Memory to check the current setting before trying again.` : "Could not update memory use. Refresh Memory to check the current setting before trying again."; }
+    catch (e) { actionError = failure("Memory use was not updated", "The setting may not have changed.", "Refresh Memory to check it before trying again.", e); }
     finally { busy = false; }
   }
   // MEM-MODE-02 — the owner's ambient-recall mode. Incognito still wins on the
@@ -166,7 +166,7 @@
     if (!settings || busy || settings.recall_mode === mode) return;
     busy = true; actionError = null;
     try { await api.setMemoryRecallMode(mode); await load(); }
-    catch (e) { actionError = e instanceof ApiError ? `Could not change the recall mode (${e.status}). Refresh Memory to check the current mode before trying again.` : "Could not change the recall mode. Refresh Memory to check the current mode before trying again."; }
+    catch (e) { actionError = failure("The recall mode was not changed", "The mode may not have changed.", "Refresh Memory to check it before trying again.", e); }
     finally { busy = false; }
   }
   async function togglePin(m: MemoryControlView) {
@@ -189,7 +189,9 @@
     catch { actionError = archived ? "Could not archive this memory. Refresh Memory to check its status before trying again." : "Could not restore this memory. Refresh Memory to check its status before trying again."; }
   }
   async function decideProposal(proposal: MemoryProposal, decision: "approved" | "rejected", editedText?: string) {
-    const reason = decision === "rejected" ? window.prompt("Why should this proposal be rejected?", "Not useful as durable memory") : "";
+    const reason = decision === "rejected"
+      ? await askText({ title: "Reject this proposal?", confirmLabel: "Reject", input: { label: "Why should it be rejected?", value: "Not useful as durable memory" } })
+      : "";
     if (decision === "rejected" && reason === null) return;
     try {
       await api.decideMemoryProposal(proposal.candidate_id, { decision, edited_text: editedText, reason: reason ?? "", expected_decision: proposal.decision });
@@ -211,9 +213,14 @@
     } catch { actionError = "This relationship could not be decided. Refresh in case it changed elsewhere."; }
   }
   async function changeScope(m: MemoryControlView) {
-    const scope = window.prompt("New scope (account, project, project:<id>, session, or session:<id>)", m.scope);
+    const scope = await askText({
+      title: "Change where this memory applies",
+      body: "account, project, project:<id>, session or session:<id>.",
+      confirmLabel: "Next",
+      input: { label: "New scope", value: m.scope, required: true },
+    });
     if (!scope || scope === m.scope) return;
-    const reason = window.prompt("Why is this scope appropriate?", "Owner-requested scope change");
+    const reason = await askText({ title: "Why is this scope right?", confirmLabel: "Change scope", input: { label: "Reason", value: "Owner-requested scope change" } });
     if (reason === null) return;
     try { await api.changeMemoryScope(m.memory_id, scope, m.updated_at, reason); await load(); }
     catch { actionError = "Could not change scope. Refresh in case this memory changed elsewhere."; }
@@ -223,7 +230,12 @@
     catch { actionError = "Could not load this memory's history. Close the history panel and open it again."; }
   }
   async function reviewExpiry(m: MemoryControlView) {
-    const value = window.prompt("Review/expiry date as ISO-8601, or leave blank for no expiry", m.expires_at ?? "");
+    const value = await askText({
+      title: "Review or expiry date",
+      body: "An ISO-8601 date, or leave it blank for no expiry.",
+      confirmLabel: "Save date",
+      input: { label: "Date", value: m.expires_at ?? "", placeholder: "2027-01-31" },
+    });
     if (value === null) return;
     try { await api.setMemoryExpiry(m.memory_id, value.trim() || null); await load(); }
     catch { actionError = "Could not save this memory’s review or expiry date. Refresh Memory to check the dates before trying again."; }
@@ -231,7 +243,13 @@
   async function purge(m: MemoryControlView) {
     try {
       const preview = await api.previewMemoryPurge(m.memory_id);
-      const confirmation = window.prompt(`Permanent deletion removes ${preview.artifacts.length} active artifact(s). Backups: ${preview.backup_disposition}. Type ${m.memory_id} to continue.`);
+      const confirmation = await askText({
+        title: "Delete this memory permanently?",
+        body: `It removes ${preview.artifacts.length} active artifact(s). Backups: ${preview.backup_disposition}.`,
+        confirmLabel: "Delete permanently",
+        danger: true,
+        input: { label: `Type ${m.memory_id} to continue`, required: true },
+      });
       if (confirmation !== m.memory_id) return;
       await api.purgeMemory(m.memory_id);
       await load();
@@ -662,7 +680,7 @@
                names the approved memory it repeats, and the owner decides. -->
           <p class="near-duplicate" role="note" data-testid="near-duplicate">
             <Icon name="copy" size="sm" />
-            <span>Nearly the same as an approved memory: “{proposal.similar_memory.text}”. Approving keeps both.</span>
+            <span>{proposal.similar_memory.basis === "meaning" ? "Says the same as" : "Nearly the same as"} an approved memory: “{proposal.similar_memory.text}”. Approving keeps both.</span>
           </p>
         {/if}
         <div class="meta"><span>{proposal.scope}</span><span>{proposal.sensitivity} sensitivity</span><span title={proposalEvidence(proposal.confidence).why}>{proposalEvidence(proposal.confidence).label}</span></div>

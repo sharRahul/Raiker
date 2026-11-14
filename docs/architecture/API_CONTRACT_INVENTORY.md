@@ -12,7 +12,7 @@ operation answers with, and whether OpenAPI describes it (OPT-01/OPT-02 —
 * **deferred** — the body has no declared type; a test fails while any is.
 * **special** — a stream, a file or another non-JSON transport; hand-written.
 
-**531 operations: 515 verified, 0 eligible, 0 deferred, 16 special.**
+**533 operations: 517 verified, 0 eligible, 0 deferred, 16 special.**
 
 | Method | Path | Request | Response | Status | Why |
 |---|---|---|---|---|---|
@@ -454,6 +454,8 @@ operation answers with, and whether OpenAPI describes it (OPT-01/OPT-02 —
 | GET | `/api/security/health` |  | SecurityHealthView[] | verified | DashboardService.list_security_health |
 | POST | `/api/security/health-check` |  | SecurityHealthView[] | verified | DashboardService.check_security_health |
 | POST | `/api/security/scan` |  | SecurityFindingView[] | verified | DashboardService.scan_security |
+| DELETE | `/api/security/workspace-key/retired/{fingerprint}` |  | RetiredKeyDiscarded | verified | declared by cast |
+| POST | `/api/security/workspace-key/rotate` |  | KeyRotated | verified | declared by cast |
 | GET | `/api/sessions` |  | SessionView[] | verified | DashboardService.list_sessions |
 | DELETE | `/api/sessions/bulk` | BulkDeleteSessionsRequest | SessionsDeleted | verified | declared SessionsDeleted |
 | DELETE | `/api/sessions/{session_id}` |  | SessionDeleted | verified | declared SessionDeleted |

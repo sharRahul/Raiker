@@ -442,3 +442,43 @@ def test_the_runner_stops_both_listeners_together(tmp_path: Path) -> None:
     with pytest.raises(httpx.HTTPError):
         httpx.get(f"http://127.0.0.1:{proxy_port}/api/health", timeout=2)
 
+
+
+def _drive(middleware: RateLimitMiddleware, scope: dict[str, Any]) -> int:
+    import asyncio
+
+    sent: list[dict[str, Any]] = []
+
+    async def receive() -> dict[str, Any]:
+        return {"type": "http.request", "body": b""}
+
+    async def send(message: dict[str, Any]) -> None:
+        sent.append(message)
+
+    asyncio.run(middleware(scope, receive, send))  # type: ignore[arg-type]
+    return int(next(m for m in sent if m["type"] == "http.response.start")["status"])
+
+
+def test_a_proven_proxy_session_gets_its_own_window_and_a_forged_one_does_not() -> None:
+    """BUG-359 limit 4 — the owner's remote session is not throttled by the proxy's other traffic."""
+    valid = {b"Bearer good"}
+
+    async def app(scope: dict[str, Any], receive: Any, send: Any) -> None:
+        token = dict(scope["headers"]).get(b"authorization", b"")
+        await send({"type": "http.response.start", "status": 200 if token in valid else 401, "headers": []})
+        await send({"type": "http.response.body", "body": b""})
+
+    middleware = RateLimitMiddleware(app=app, max_requests=1, window_seconds=60, loopback_only=True)  # type: ignore[arg-type]
+    base = {"type": "http", "method": "GET", "path": "/api/x", "client": ("127.0.0.1", 1), "server": ("127.0.0.1", 9), REMOTE_SCOPE_KEY: True}
+
+    def scope(token: bytes) -> dict[str, Any]:
+        return {**base, "headers": [(b"authorization", token)]}
+
+    # The first good request is counted in the shared session bucket and proves the token.
+    assert _drive(middleware, scope(b"Bearer good")) == 200
+    # Forged tokens fill the shared bucket (limit 1 x multiplier 5) and are throttled there.
+    codes = [_drive(middleware, scope(f"Bearer forged{i}".encode())) for i in range(6)]
+    assert codes[-1] == 429
+    assert codes.count(401) == 4
+    # The proven session still answers: it counts in a window of its own.
+    assert _drive(middleware, scope(b"Bearer good")) == 200

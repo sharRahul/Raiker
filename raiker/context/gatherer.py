@@ -66,6 +66,11 @@ DEFAULT_GATE_STATE = "disabled"
 DEFAULT_DECISION_MODE_NAME = "ask"
 
 
+
+#: The Memory Brief on a small context window (see ``_memory_brief``).
+COMPACT_BRIEF_MAX_ITEMS = 4
+COMPACT_BRIEF_TOKEN_BUDGET = 200
+
 class ContextScopeError(ValueError):
     """A turn asked for a retrieval boundary that cannot be honoured.
 
@@ -152,6 +157,7 @@ class ContextGatherer:
         project_id: str | None = None,
         max_items: int = 20,
         max_chars: int = 12000,
+        compact_brief: bool = False,
     ) -> ContextBundle:
         """Assemble one turn's bounded context under an explicit retrieval boundary.
 
@@ -226,7 +232,9 @@ class ContextGatherer:
                 include_memory=effective_mode == "search_when_relevant",
             ),
             "memory_brief": lambda: (
-                self._memory_brief(store, owner_principal_id, brief_project_id, disclosure)
+                self._memory_brief(
+                    store, owner_principal_id, brief_project_id, disclosure, compact=compact_brief
+                )
                 if effective_mode in {"brief", "search_when_relevant"}
                 else None
             ),
@@ -339,12 +347,27 @@ class ContextGatherer:
         owner_principal_id: str | None,
         project_id: str | None,
         disclosure: dict[str, object],
+        *,
+        compact: bool = False,
     ) -> ContextItem | None:
-        """MEM-BRIEF-01 — the bounded Memory Brief as one context item."""
+        """MEM-BRIEF-01 — the bounded Memory Brief as one context item.
+
+        A small context window gets half the brief (four items, 200 tokens):
+        the highest-ranked memories still arrive, and the rest stay reachable
+        through recall.
+        """
         if not owner_principal_id:
             return None
-        brief = build_memory_brief(
-            store, owner_principal_id=owner_principal_id, project_id=project_id
+        brief = (
+            build_memory_brief(
+                store,
+                owner_principal_id=owner_principal_id,
+                project_id=project_id,
+                max_items=COMPACT_BRIEF_MAX_ITEMS,
+                token_budget=COMPACT_BRIEF_TOKEN_BUDGET,
+            )
+            if compact
+            else build_memory_brief(store, owner_principal_id=owner_principal_id, project_id=project_id)
         )
         disclosure["brief_omitted"] = len(brief.omitted)
         if not brief.items:

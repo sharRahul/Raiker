@@ -40,7 +40,7 @@ describe("WorkInActionView", () => {
     render(WorkInActionView);
     const alert = await screen.findByRole("alert");
     expect(alert).toHaveTextContent(/couldn't load live work/i);
-    expect(alert).toHaveTextContent(/unavailable \(404\)/i);
+    expect(alert).toHaveTextContent(/\(HTTP 404[,)].*(Reload the page|Press Refresh)\./);
   });
 
   it("shows real subagent assignment, task progress, and waiting schedules", async () => {

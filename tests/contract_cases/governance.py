@@ -313,7 +313,20 @@ def _vault_cleared(ws: Path, client: TestClient, _h: dict[str, str]) -> Call:
     return "/api/vault/key", None, elevated
 
 
+def _key_rotated(ws: Path, _client: TestClient, _h: dict[str, str]) -> Call:
+    return "/api/security/workspace-key/rotate", None, _elevated(ws)
+
+
+def _retired_key(ws: Path, client: TestClient, _h: dict[str, str]) -> Call:
+    elevated = _elevated(ws)
+    rotated = client.post("/api/security/workspace-key/rotate", headers=elevated)
+    assert rotated.status_code == 200, rotated.text
+    return f"/api/security/workspace-key/retired/{rotated.json()['old_fingerprint']}", None, elevated
+
+
 CASES: Cases = {
+    ("POST", "/api/security/workspace-key/rotate"): _key_rotated,
+    ("DELETE", "/api/security/workspace-key/retired/{fingerprint}"): _retired_key,
     ("GET", "/api/approvals/resumable"): _resumable,
     ("POST", "/api/approvals/{approval_id}/answer"): _answer,
     ("POST", "/api/approvals/{approval_id}/replace"): _replace,

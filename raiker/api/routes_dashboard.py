@@ -160,7 +160,14 @@ from raiker.auth.vault_key_file import ensure_vault_key
 from raiker.control.dashboard import DashboardService
 from raiker.control.dashboard_parts.attention import AttentionFeedView
 from raiker.control.views.projects import ProjectDeletionPreviewView
-from raiker.control.views.security import AuthSessionView, BackupRestored, BackupsView, BackupView
+from raiker.control.views.security import (
+    AuthSessionView,
+    BackupRestored,
+    BackupsView,
+    BackupView,
+    KeyRotated,
+    RetiredKeyDiscarded,
+)
 from raiker.control.views.tasks import TASK_RECURRENCES, TaskView
 from raiker.control.web_read_models import WebReadModels
 from raiker.models.codex_app_server import CodexSubscriptionSessions
@@ -843,6 +850,47 @@ async def delete_backup(
             result.reason_code,
         )
     return serialize_dto(Ok())
+
+
+@router.post("/api/security/workspace-key/rotate")
+async def rotate_workspace_key(
+    request: Request,
+    auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+) -> dict[str, Any]:
+    """BUG-354 — re-key the workspace database in place, after a verified backup.
+
+    It replaces the one secret the workspace has, so it takes a recent step-up
+    (an elevated session), as deleting a managed project does.
+    """
+    if auth_data[0].scope != "elevated":
+        raise refusal(status.HTTP_403_FORBIDDEN, "key_rotation_requires_step_up")
+    result = await asyncio.to_thread(_service(request).rotate_workspace_key, auth_data[0].principal_id)
+    if not result.ok:
+        raise refusal(
+            status.HTTP_403_FORBIDDEN if result.reason_code == "not_authorized_human" else status.HTTP_409_CONFLICT,
+            result.reason_code,
+        )
+    answer = cast(KeyRotated, result.data)
+    return serialize_dto(answer)
+
+
+@router.delete("/api/security/workspace-key/retired/{fingerprint}")
+async def discard_retired_key(
+    fingerprint: str,
+    request: Request,
+    auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+) -> dict[str, Any]:
+    """BUG-354 — discard a retired key; backups made with it can no longer be opened."""
+    if auth_data[0].scope != "elevated":
+        raise refusal(status.HTTP_403_FORBIDDEN, "key_rotation_requires_step_up")
+    result = _service(request).discard_retired_key(auth_data[0].principal_id, fingerprint)
+    if not result.ok:
+        raise refusal(
+            status.HTTP_404_NOT_FOUND if result.reason_code == "retired_key_not_found" else status.HTTP_403_FORBIDDEN,
+            result.reason_code,
+        )
+    answer = cast(RetiredKeyDiscarded, result.data)
+    return serialize_dto(answer)
 
 
 @router.get("/api/notifications/delivery")

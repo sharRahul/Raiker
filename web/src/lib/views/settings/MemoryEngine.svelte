@@ -83,7 +83,7 @@
       await load();
     } catch (error) {
       actionError =
-        error instanceof ApiError ? `The index could not be built (${error.status}).` : "The index could not be built.";
+        failure("The index could not be built", "The previous index is still used.", "Try Rebuild again.", error);
     } finally {
       busy = false;
     }

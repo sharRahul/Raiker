@@ -95,10 +95,24 @@ export function groupPhases(events: StreamEvent[]): PhaseRow[] {
 export function collectText(events: StreamEvent[]): string {
   let text = "";
   let paragraphPending = false;
+  // Where the current model request's text began, so a corrected-block retry
+  // can take it back (below).
+  let requestStart = 0;
 
   for (const ev of events) {
     if (ev.kind === "lifecycle" && ev.event_type === "model_request_started") {
       if (text.length > 0) paragraphPending = true;
+      requestStart = text.length;
+      continue;
+    }
+    // Quiet UI visual answers — a local model's answer whose raiker: block
+    // could not be drawn is asked once more for the whole answer, corrected.
+    // The first answer had already streamed, so the owner saw it twice: once
+    // as written and again corrected. The runtime says it is retrying; the
+    // uncorrected text is withdrawn here and the corrected one takes its place.
+    if (ev.kind === "lifecycle" && ev.event_type === "typed_block_retry") {
+      text = text.slice(0, requestStart).replace(/\n+$/, "");
+      paragraphPending = false;
       continue;
     }
     if (ev.kind !== "text_delta" || ev.text.length === 0) continue;

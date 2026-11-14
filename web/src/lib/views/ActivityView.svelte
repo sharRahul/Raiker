@@ -71,7 +71,7 @@
       });
     } catch (e) {
       events = null;
-      loadError = e instanceof ApiError ? `Unavailable (${e.status})` : "Unavailable";
+      loadError = failure("Activity could not be read", "Nothing was changed.", "Reload the page.", e);
     }
   }
 

@@ -5,6 +5,7 @@
 // reach the project it was filed under, and background work must be reachable
 // and dismissible.
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/svelte";
+import { takeGoalDraft } from "../goalHandoff";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { AgentResponse, CodeReposView, ProjectsList, StreamEvent } from "../apiTypes";
 import { makeGate, stubFetch, openComposerAttach, openComposerProject, startComposerDictation, installLocalRecordingFake } from "../test-helpers";
@@ -492,6 +493,21 @@ describe("Build composer modes", () => {
 
     expect(await screen.findByRole("button", { name: "Read aloud" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Copy response" })).toBeInTheDocument();
+  });
+
+  it("offers Make this a goal on a finished Build answer, bound to the project (BUG-355)", async () => {
+    stubFetch(baseRoutes());
+    respondWith("Build answer");
+    await renderBuildWithProject();
+    await fireEvent.input(await screen.findByLabelText("Describe the change"), { target: { value: "Ship the release notes" } });
+    await fireEvent.click(sendButton());
+    await fireEvent.click(await screen.findByRole("button", { name: "Make this a goal" }));
+    const draft = takeGoalDraft();
+    expect(draft?.title).toBe("Ship the release notes");
+    expect(draft?.objective).toContain("Ship the release notes");
+    expect(draft?.projectId).toBeTruthy();
+    expect(draft?.fromTitle).toMatch(/^Build/);
+    expect(window.location.hash).toBe("#/work?tab=goals");
   });
 
   it("preserves the change and disables Send when the exact model is unready", async () => {

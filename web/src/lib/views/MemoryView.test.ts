@@ -97,7 +97,7 @@ describe("MemoryView", () => {
     render(MemoryView, { props: { tab: "memories" } });
     const alert = await screen.findByRole("alert");
     expect(alert).toHaveTextContent(/couldn't load memories/i);
-    expect(alert).toHaveTextContent(/unavailable \(404\)/i);
+    expect(alert).toHaveTextContent(/\(HTTP 404[,)].*(Reload the page|Press Refresh)\./);
   });
 
   it("lists memories with provenance and sensitivity", async () => {

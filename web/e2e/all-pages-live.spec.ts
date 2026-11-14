@@ -103,7 +103,7 @@ test("no destination bleeds sideways at any width", async ({ page }) => {
  * the run and printed, and fails only if nothing could be measured. Once the
  * long pages are rebuilt the last line becomes `expect(over).toEqual([])`.
  */
-test("size budgets report (QUI-G01)", async ({ page }, testInfo) => {
+test("size budgets (QUI-G01)", async ({ page }, testInfo) => {
   test.setTimeout(600_000);
   await signInAsOwner(page, BASE);
   const rows: { viewport: string; route: string; height: number; controls: number; over: string[] }[] = [];
@@ -120,4 +120,6 @@ test("size budgets report (QUI-G01)", async ({ page }, testInfo) => {
   await testInfo.attach("size-budgets.json", { body: JSON.stringify(rows, null, 2), contentType: "application/json" });
   console.log(`QUI-G01: ${over.length} of ${rows.length} measurements over budget\n${over.join("\n")}`);
   expect(rows.length).toBe(BUDGET_VIEWPORTS.length * DESTINATIONS.length);
+  // QUI-G01 — a failing check since 2026-11-14 (FIXED-1446..1448 fitted the last pages).
+  expect(over).toEqual([]);
 });

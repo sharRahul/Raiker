@@ -26,6 +26,8 @@ on them (found while building BUG-358's apply-and-restart):
 from __future__ import annotations
 
 import asyncio
+import logging
+import os
 import signal
 import socket
 import threading
@@ -71,6 +73,62 @@ class RemoteSocket:
     tls_key: str | None = None
 
 
+_log = logging.getLogger(__name__)
+
+#: How often the remote listener looks at its certificate files (BUG-359).
+CERTIFICATE_POLL_SECONDS = 30.0
+
+
+class CertificateReloader:
+    """Serve a renewed certificate without a restart (BUG-359, limit 3).
+
+    uvicorn builds one ``SSLContext`` at start and every new handshake reads
+    it, so loading the renewed chain into that same context is enough: open
+    connections keep the certificate they negotiated, the next one gets the
+    new one. A pair that does not load together (a half-written renewal, a key
+    that does not match) leaves the old certificate in place and is tried
+    again on the next change.
+    """
+
+    def __init__(self, context: Any, cert: str, key: str) -> None:
+        self._context = context
+        self._cert = cert
+        self._key = key
+        self._seen = self._stamp()
+        self.reloads = 0
+        self.last_error: str | None = None
+
+    def _stamp(self) -> tuple[float, int, float, int] | None:
+        try:
+            cert, key = os.stat(self._cert), os.stat(self._key)
+        except OSError:
+            return None
+        return (cert.st_mtime, cert.st_size, key.st_mtime, key.st_size)
+
+    def check(self) -> bool:
+        """Reload when either file changed; ``True`` when a new chain was loaded."""
+        stamp = self._stamp()
+        if stamp is None or stamp == self._seen:
+            return False
+        try:
+            self._context.load_cert_chain(self._cert, self._key)
+        except (OSError, ValueError, Exception) as error:  # noqa: BLE001 - keep serving the old one
+            self.last_error = error.__class__.__name__
+            _log.warning("Remote listener kept its certificate: the renewed pair did not load (%s)", self.last_error)
+            self._seen = stamp
+            return False
+        self._seen = stamp
+        self.reloads += 1
+        self.last_error = None
+        _log.info("Remote listener loaded its renewed certificate")
+        return True
+
+    async def watch(self, stop: Any, interval: float = CERTIFICATE_POLL_SECONDS) -> None:
+        while not stop():
+            await asyncio.sleep(interval)
+            self.check()
+
+
 def _config(app: Any, **options: Any) -> uvicorn.Config:
     # BUG-347 — uvicorn's own proxy-header handling would rewrite the socket
     # peer from X-Forwarded-For whenever the peer is 127.0.0.1, so a header
@@ -99,15 +157,32 @@ def serve(app: Any, local: socket.socket, remote: RemoteSocket | None = None) ->
 
     app.state.request_stop = request_stop
 
+    reloader = (
+        CertificateReloader(companion.config.ssl, remote.tls_cert, remote.tls_key)
+        if companion is not None
+        and remote is not None
+        and remote.tls_cert
+        and remote.tls_key
+        and companion.config.ssl is not None
+        else None
+    )
+
     async def run() -> None:
         task = (
             asyncio.create_task(companion.serve(sockets=[remote.sock]))
             if companion is not None and remote is not None
             else None
         )
+        watcher = (
+            asyncio.create_task(reloader.watch(lambda: main.should_exit))
+            if reloader is not None
+            else None
+        )
         try:
             await main.serve(sockets=[local])
         finally:
+            if watcher is not None:
+                watcher.cancel()
             if companion is not None and task is not None:
                 companion.should_exit = True
                 await task

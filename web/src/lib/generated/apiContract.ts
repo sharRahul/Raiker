@@ -365,6 +365,7 @@ export type BackupView = {
 export type BackupsView = {
   backups: BackupView[];
   key_fingerprint: string;
+  retired_key_fingerprints: string[];
 };
 
 /** Would this host be reachable, said without fetching it. */
@@ -3639,6 +3640,16 @@ export type IssuedSessionView = {
   csrf_token: string | null;
 };
 
+/** BUG-354 — a verified re-key of the workspace database. */
+export type KeyRotated = {
+  ok: boolean;
+  old_fingerprint: string;
+  new_fingerprint: string;
+  backup_id: string;
+  resealed: number;
+  backups_on_retired_key: string[];
+};
+
 /** One thing Raiker may read: a file it holds, or a folder the owner granted (BUG-305). */
 export type KnowledgeSource = {
   source_id: string;
@@ -5608,6 +5619,7 @@ export type RemoteAccessCheckView = {
   message: string;
   field: string | null;
   severity: "error" | "warning" | "info";
+  path: string | null;
 };
 
 export type RemoteAccessChecksView = {
@@ -5834,6 +5846,11 @@ export type ResumeHandle = {
   queue_position?: number;
   queue_total?: number;
   queued_calls?: number;
+};
+
+export type RetiredKeyDiscarded = {
+  ok: boolean;
+  fingerprint: string;
 };
 
 export type RevertImageRequest = {
@@ -6313,6 +6330,7 @@ export type SimilarMemory = {
   memory_id: string;
   text: string;
   similarity: number;
+  basis: "words" | "meaning";
 };
 
 export type SkillActiveSet = {
@@ -8255,6 +8273,10 @@ export const contract = {
     call<SecurityHealthView[]>("POST", "/api/security/health-check"),
   scanSecurity: () =>
     call<SecurityFindingView[]>("POST", "/api/security/scan"),
+  discardRetiredKey: (fingerprint: string) =>
+    call<RetiredKeyDiscarded>("DELETE", `/api/security/workspace-key/retired/${encodeURIComponent(fingerprint)}`),
+  rotateWorkspaceKey: () =>
+    call<KeyRotated>("POST", "/api/security/workspace-key/rotate"),
   listSessions: (query: { limit?: number; project_id?: string; include_archived?: boolean; origin?: string } = {}) =>
     request<SessionView[]>(withQuery("/api/sessions", query)),
   deleteSessions: (body: BulkDeleteSessionsRequest) =>

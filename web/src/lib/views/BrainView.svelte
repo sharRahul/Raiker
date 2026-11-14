@@ -1,4 +1,6 @@
 <script lang="ts">
+  import { askText } from "../confirm.svelte";
+  import { failure } from "../errorCopy";
   import { onMount } from "svelte";
   import { forceCenter, forceCollide, forceLink, forceManyBody, forceSimulation, type Simulation, type SimulationNodeDatum } from "d3-force";
   import EmptyState from "../components/EmptyState.svelte";
@@ -160,7 +162,7 @@
       graph = received(loaded);
     } catch (error) {
       if (seq !== graphSeq) return;
-      loadError = error instanceof ApiError ? `Unavailable (${error.status})` : "Unavailable";
+      loadError = failure("Knowledge could not be read", "No source was changed.", "Reload the page.", error);
       // The graph already on screen stays on screen — throwing away the only
       // answer anyone has helps nobody — and stops being called live.
       graph = freshnessFailed(graph, error instanceof ApiError ? `HTTP ${error.status}` : "unreachable");
@@ -431,7 +433,11 @@
   // places to reach it.
   async function rejectRelationship(edge: BrainEdge) {
     if (!edge.relationship_id || !edge.owner_can_reject) return;
-    const reason = window.prompt("Why is this relationship incorrect?", "Incorrect relationship");
+    const reason = await askText({
+      title: "Reject this relationship?",
+      confirmLabel: "Reject",
+      input: { label: "Why is it incorrect?", value: "Incorrect relationship", required: true },
+    });
     if (!reason?.trim()) return;
     try { await api.rejectMemoryRelationship(edge.relationship_id, reason.trim()); await load(); }
     // Found while closing NEW-MAP-01: this wrote `loadError`, so one failed

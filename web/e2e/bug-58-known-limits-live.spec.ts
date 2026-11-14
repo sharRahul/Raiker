@@ -45,7 +45,7 @@
 import { expect, test, type Browser, type BrowserContext, type Page } from "@playwright/test";
 import { capture } from "./capture";
 import { join } from "node:path";
-import { requireFirstRunWorkspace, signInAsOwner, openPermission } from "./hosted-provider";
+import { openPermission, requireFirstRunWorkspace, signInAsOwner } from "./hosted-provider";
 import { LIVE_BASE as BASE, ANTHROPIC_KEY, useAnthropic } from "./live";
 
 const SHOTS = join(import.meta.dirname, "..", "..", "docs", "plans", "screenshots", "working");
@@ -256,18 +256,15 @@ test("the web bullet — fetch withholds by default and search is not configured
 
 test("the shell/network/process bullet — Permissions carries all three, told apart", async () => {
   test.setTimeout(120_000);
-  await page.goto(`${BASE}/#/capabilities`);
-  const search = page.getByLabel("Search capabilities", { exact: true });
-  await expect(search).toBeVisible({ timeout: 30_000 });
-
+  // 2026-11-15 — Permissions is a category rail with a list and a detail
+  // (QUI-L06); each control is found by name through `openPermission`.
   // The README distinguishes shell (approvals execute) from network and process
   // (approvals stay metadata-only). All three have to exist as owner controls
   // for that sentence to be about anything the owner can see.
-  for (const term of ["Shell", "Network", "Process"]) {
-    await search.fill(term);
-    await expect(page.locator(".cap.card").first()).toBeVisible({ timeout: 30_000 });
+  for (const term of [/Shell/, /Network/, /Process/]) {
+    const card = await openPermission(page, BASE, term);
+    await expect(card).toBeVisible({ timeout: 30_000 });
   }
-  await search.fill("Shell");
-  await expect(page.locator(".cap.card").first()).toBeVisible({ timeout: 30_000 });
+  await openPermission(page, BASE, /Shell/);
   await capture(page, join(SHOTS, "bug-58-execution-capabilities.png"));
 });

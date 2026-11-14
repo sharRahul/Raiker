@@ -44,3 +44,25 @@ def notify_remote_access_suspended(store: SQLiteStore, *, reason: str) -> str | 
         subject_id="remote_access",
     )
     return notification_id
+
+
+def resolve_remote_access_suspended(store: SQLiteStore) -> int:
+    """Mark unread suspension notices read once two-step sign-in is on again (BUG-359).
+
+    The notice said "turn it on again"; once the owner has, it is no longer
+    news, so it leaves the tray instead of reading as a live problem. Returns
+    how many were marked. Never raises.
+    """
+    owner = store.original_account_principal_id()
+    if not owner:
+        return 0
+    marked = 0
+    try:
+        for row in store.list_notifications(owner, unread_only=True, limit=500):
+            if row.get("kind") == REMOTE_ACCESS_SUSPENDED_KIND and store.mark_notification_read(
+                str(row["notification_id"]), owner
+            ):
+                marked += 1
+    except Exception:  # noqa: BLE001 - a stale notice is cosmetic
+        return marked
+    return marked

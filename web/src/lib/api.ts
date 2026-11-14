@@ -434,6 +434,9 @@ export const api = {
   verifyBackup: (backupId: string) => contract.verifyBackup(backupId),
   restoreBackup: (backupId: string) => contract.restoreBackup(backupId),
   deleteBackup: (backupId: string) => contract.deleteBackup(backupId),
+  // BUG-354 — both need an elevated session (see withFreshMfa).
+  rotateWorkspaceKey: () => contract.rotateWorkspaceKey(),
+  discardRetiredKey: (fingerprint: string) => contract.discardRetiredKey(fingerprint),
   acknowledgeHeldNotifications: (notificationIds: string[]) =>
     contract.acknowledgeHeldNotifications({ notification_ids: notificationIds }),
   sendTestNotice: () => contract.sendTestNotice(),

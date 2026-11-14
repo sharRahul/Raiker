@@ -5,7 +5,7 @@
   import Badge from "../components/Badge.svelte";
   import Icon from "../components/Icon.svelte";
   import PageState from "../components/PageState.svelte";
-  import { api, ApiError } from "../api";
+  import { api } from "../api";
   import type {
     CheckpointCaptureHealth,
     Diagnostics,
@@ -59,7 +59,7 @@
       integrity = await api.memoryIntegrity();
     } catch (e) {
       integrity = null;
-      integrityError = e instanceof ApiError ? `Unavailable (${e.status})` : "Unavailable";
+      integrityError = failure("The integrity check could not be read", "Nothing was changed.", "Run the check again.", e);
     }
   }
 
@@ -140,14 +140,14 @@
       diag = await api.diagnostics();
     } catch (e) {
       diag = null;
-      loadError = e instanceof ApiError ? `Unavailable (${e.status})` : "Unavailable";
+      loadError = failure("Diagnostics could not be read", "Nothing was changed.", "Reload the page.", e);
     }
     healthError = null;
     try {
       health = await api.securityHealth();
     } catch (e) {
       health = null;
-      healthError = e instanceof ApiError ? `Unavailable (${e.status})` : "Unavailable";
+      healthError = failure("Health could not be read", "Nothing was changed.", "Reload the page.", e);
     }
 
     await loadIntegrity();

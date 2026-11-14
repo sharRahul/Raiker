@@ -185,6 +185,25 @@ describe("the Documents workspace", () => {
     ]);
   });
 
+  it("enters a group on double-click so a layer inside it is selected on the canvas (BUG-348)", async () => {
+    const INNER = { ...TITLE, id: "inner", type: "rect", name: "Inner", x: 120, y: 120, w: 80, h: 80, fill: "#cccccc" };
+    const CARD = { ...TITLE, id: "card", type: "group", name: "Card", x: 100, y: 100, w: 200, h: 200, children: [INNER] };
+    stubFetch(routes({ "GET /api/design/documents/ddoc_1": view([CARD]) }));
+    await openLaunch();
+    const canvas = screen.getByRole("application", { name: /Canvas: Frame 1/ });
+    const groupHit = () => canvas.querySelector('[data-layer="card"] > rect.hit[aria-label^="Card"]');
+    const innerHit = () => canvas.querySelector('[data-layer="inner"] > rect.hit') as Element;
+    expect(groupHit()).not.toBeNull();
+    await fireEvent.dblClick(groupHit()!);
+    expect(await screen.findByTestId("entered-group")).toHaveTextContent("Inside Card");
+    expect(groupHit()).toBeNull();
+    await fireEvent.click(innerHit());
+    expect(screen.getByRole("application", { name: /Inner selected/ })).toBeInTheDocument();
+    await fireEvent.keyDown(canvas, { key: "Escape" });
+    expect(screen.queryByTestId("entered-group")).toBeNull();
+    expect(screen.getByRole("application", { name: /Card selected/ })).toBeInTheDocument();
+  });
+
   it("says when a proposal's outcome is unknown and offers to ask again", async () => {
     stubFetch(
       routes({

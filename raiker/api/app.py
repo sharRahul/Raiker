@@ -623,6 +623,12 @@ def create_app(
     # every store read then answers 503 ``store_key_missing`` through the
     # handler below, and the lock screen says what to restore, instead of the
     # host failing to start with nothing on screen at all.
+    # BUG-354 — a key rotation a crash interrupted is finished, or undone,
+    # before anything opens the store with either key.
+    from raiker.storage.key_rotation import finish_interrupted_rotation
+
+    with suppress(Exception):
+        finish_interrupted_rotation(app.state.workspace_root)
     with suppress(StoreUnavailableError):
         ensure_app_key(app.state.workspace_root)
     if executor_registry is not None:

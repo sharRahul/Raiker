@@ -114,12 +114,35 @@ class SecurityService:
 
     def list_backups(self: DashboardService) -> BackupsView:
         from raiker.storage.backup import key_fingerprint, list_backups
+        from raiker.storage.key_rotation import retired_fingerprints
 
         root = Path(self.store.paths.workspace_root)
         return {
             "backups": [cast(BackupView, record.to_dict()) for record in list_backups(root)],
             "key_fingerprint": key_fingerprint(root),
+            "retired_key_fingerprints": retired_fingerprints(root),
         }
+
+    def rotate_workspace_key(self: DashboardService, acting_principal_id: str | None) -> ControlResult:
+        """BUG-354 — re-key the workspace in place, after a verified backup."""
+        from raiker.storage.key_rotation import KeyRotationError, rotate_workspace_key
+
+        if not self._is_human(acting_principal_id):
+            return ControlResult(ok=False, reason_code="not_authorized_human")
+        try:
+            result = rotate_workspace_key(self.store)
+        except KeyRotationError as exc:
+            return ControlResult(ok=False, reason_code=exc.reason, data={"detail": str(exc)})
+        return ControlResult(ok=True, data={"ok": True, **result.to_dict()})
+
+    def discard_retired_key(self: DashboardService, acting_principal_id: str | None, fingerprint: str) -> ControlResult:
+        from raiker.storage.key_rotation import discard_retired_key
+
+        if not self._is_human(acting_principal_id):
+            return ControlResult(ok=False, reason_code="not_authorized_human")
+        if not discard_retired_key(Path(self.store.paths.workspace_root), fingerprint):
+            return ControlResult(ok=False, reason_code="retired_key_not_found")
+        return ControlResult(ok=True, data={"ok": True, "fingerprint": fingerprint})
 
     def create_backup(self: DashboardService, acting_principal_id: str | None) -> ControlResult:
         from raiker.storage.backup import BackupError, create_backup

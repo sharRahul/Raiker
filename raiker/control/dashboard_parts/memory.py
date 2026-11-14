@@ -211,10 +211,34 @@ class MemoryService:
         approved = self.store.list_approved_memory(
             limit=2_000, include_search_disabled=True, owner_principal_id=acting_principal_id
         )
-        return [
-            {**row, "similar_memory": nearest_approved(str(row.get("text") or ""), approved)}
-            for row in proposals
-        ]
+        by_meaning = self._meaning_matcher(acting_principal_id or "", approved)
+        rows = []
+        for row in proposals:
+            text = str(row.get("text") or "")
+            similar = nearest_approved(text, approved) or (by_meaning(text) if by_meaning else None)
+            rows.append({**row, "similar_memory": similar})
+        return rows
+
+    def _meaning_matcher(self: DashboardService, owner: str, approved: list[dict[str, Any]]) -> Any:
+        """A by-meaning near-duplicate check, or ``None`` when no real embedding may run."""
+        try:
+            from raiker.memory.near_duplicate import nearest_by_meaning, stored_vectors
+            from raiker.memory.query_embedding import (
+                GovernedQueryEmbedder,
+                query_embedding_available,
+            )
+            from raiker.vector.backends import resolve_embedding_backend
+
+            backend = resolve_embedding_backend(self.store, owner_principal_id=owner)
+            if not query_embedding_available(self.store, owner, backend):
+                return None
+            vectors = stored_vectors(self.store, backend.model_label, owner)
+            if not vectors:
+                return None
+            embedder = GovernedQueryEmbedder(self.store, owner, session_id="memory-proposals")
+        except Exception:  # noqa: BLE001 - the words check still answers
+            return None
+        return lambda text: nearest_by_meaning(text, approved, vectors, lambda t: embedder(backend, t))
 
     def list_memory_relationship_proposals(
         self: DashboardService, acting_principal_id: str | None

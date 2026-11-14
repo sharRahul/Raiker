@@ -207,7 +207,8 @@ test("Permissions says what Raiker can do by goal", async ({ page }) => {
   await expect(goals.getByText(/remember things about you/)).toBeVisible();
   await capture(page, join(SHOTS, "09-permissions-goals.png"), goals);
   await goals.getByRole("button", { name: /Change: .*read web pages/ }).click();
-  await expect(page.locator(".cap.card").filter({ hasText: "Web fetch" }).first()).toBeInViewport({ timeout: 30_000 });
+  // 2026-11-15 — the link opens Web fetch in Permissions' detail pane (QUI-L06).
+  await expect(page.getByRole("article", { name: /Web fetch/ }).first()).toBeInViewport({ timeout: 30_000 });
   expect(seen.failures).toEqual([]);
   expect(seen.consoleErrors).toEqual([]);
 });

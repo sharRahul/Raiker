@@ -410,8 +410,16 @@ location / {
 }
 ```
 
-Every request through the proxy is rate limited in one bucket (the proxy is
-the only peer Raiker sees there). A Unix socket is created with mode `0660`,
+Requests through the proxy share one rate-limit bucket until they sign in
+(the proxy is the only peer Raiker sees there); once Raiker has accepted your
+session, your requests count in a window of their own, so other traffic through
+the same proxy cannot throttle you. A forged session never earns one.
+
+A **renewed TLS certificate** (Private network) is picked up without a
+restart: Raiker looks at the certificate and key files every 30 seconds and
+loads a new pair for the next connection. A pair that does not load together —
+a half-written renewal — leaves the old certificate in use until the files
+change again. A Unix socket is created with mode `0660`,
 so the proxy's user needs Raiker's group; a stale socket left by an earlier run
 is replaced; a socket another process is serving, or any other file at that
 path, is not. Unix sockets are not offered on Windows.

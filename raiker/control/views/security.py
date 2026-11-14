@@ -160,6 +160,27 @@ class BackupsView(TypedDict):
     backups: list[BackupView]
     #: The fingerprint of this workspace's key, to compare with each backup's.
     key_fingerprint: str
+    #: BUG-354 — keys a rotation retired and Raiker still keeps; a backup whose
+    #: fingerprint is here opens with that key, as a separate copy.
+    retired_key_fingerprints: list[str]
+
+
+class KeyRotated(TypedDict):
+    """BUG-354 — a verified re-key of the workspace database."""
+
+    ok: bool
+    old_fingerprint: str
+    new_fingerprint: str
+    #: The verified backup taken first, with the old key.
+    backup_id: str
+    #: Sealed secrets (MFA seeds, signing seeds, command material) re-sealed.
+    resealed: int
+    backups_on_retired_key: list[str]
+
+
+class RetiredKeyDiscarded(TypedDict):
+    ok: bool
+    fingerprint: str
 
 
 class BackupRestored(TypedDict):

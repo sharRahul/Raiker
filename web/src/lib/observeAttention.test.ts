@@ -285,3 +285,21 @@ describe("BUG-347 / BUG-358 remote access on Diagnostics", () => {
       .toEqual(["remote:refused", "remote:listener"]);
   });
 });
+
+describe("background indexing on the overview (FIXED-1426 follow-through)", () => {
+  const base: AttentionInputs = { diagnostics: null, approvals: [], security: [], unreadNotifications: 0 };
+  it("lists a stalled indexer as waiting, with its own way out", () => {
+    const items = attentionItems({
+      ...base,
+      backgroundIndex: { tone: "attention", text: "Ollama is not reachable on this computer.", action: { label: "Open Models", href: "#/models" } },
+    });
+    const item = items.find((entry) => entry.id === "background-index");
+    expect(item?.tone).toBe("waiting");
+    expect(item?.detail).toContain("Ollama is not reachable");
+    expect(item?.href).toBe("#/models");
+  });
+  it("lists nothing when the indexer is up to date or was not read", () => {
+    expect(attentionItems({ ...base, backgroundIndex: { tone: "ok", text: "Up to date." } }).some((i) => i.id === "background-index")).toBe(false);
+    expect(attentionItems({ ...base, backgroundIndex: null }).some((i) => i.id === "background-index")).toBe(false);
+  });
+});

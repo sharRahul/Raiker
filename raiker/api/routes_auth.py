@@ -213,6 +213,10 @@ async def mfa_activate(body: MfaCodeRequest, request: Request) -> dict[str, Any]
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)
         ) from exc
+    from raiker.notify.remote_access_notifier import resolve_remote_access_suspended
+    from raiker.storage.sqlite import SQLiteStore
+
+    resolve_remote_access_suspended(SQLiteStore(_ws(request)))
     return serialize_dto(Ok())
 
 

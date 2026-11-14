@@ -46,6 +46,7 @@
   import EmptyState from "../components/EmptyState.svelte";
   import PageState from "../components/PageState.svelte";
   import Icon from "../components/Icon.svelte";
+  import { goalTitle, requestGoalDraft } from "../goalHandoff";
   import AnswerParts from "../components/AnswerParts.svelte";
   import GuideLink from "../components/GuideLink.svelte";
   import RepoConnector from "../components/RepoConnector.svelte";
@@ -715,6 +716,17 @@
     projects?.projects.find((project) => project.project_id === projectId) ?? null,
   );
   const projectReady = $derived(projectId !== "" && selectedProject !== null);
+
+  /** BUG-355 — this Build request, as a goal's intake in Work › Goals, bound to this project. */
+  function makeGoal(prompt: string) {
+    requestGoalDraft({
+      title: goalTitle(prompt),
+      objective: prompt,
+      fromTitle: selectedProject ? `Build · ${selectedProject.name}` : "Build",
+      projectId: projectId || null,
+    });
+    window.location.hash = "#/work?tab=goals";
+  }
   // QUI-F04 — a Build turn being written shows in the top bar's live work line.
   $effect(() => {
     if (!streaming) {
@@ -2382,6 +2394,18 @@
                   aria-label={copiedTurnId === String(turn.id) ? "Response copied" : "Copy response"}
                   title={copiedTurnId === String(turn.id) ? "Response copied" : "Copy response"}
                 ><Icon name={copiedTurnId === String(turn.id) ? "check" : "copy"} size="sm" /></button>
+                {#if turn.response?.status === "completed" && turn.prompt.trim() !== ""}
+                  <!-- BUG-355 — a goal started from a Build turn, as Chat's
+                       action does: the Goals form opens filled in with this
+                       request and this project; nothing exists until Save. -->
+                  <button
+                    type="button"
+                    class="copy-message"
+                    onclick={() => makeGoal(turn.prompt)}
+                    aria-label="Make this a goal"
+                    title="Make this a goal"
+                  ><Icon name="goal" size="sm" /></button>
+                {/if}
                 </div>
               {/if}
             {:else if !turn.streaming && turn.error === null && turn.response !== null && turn.response.status !== "needs_approval"}

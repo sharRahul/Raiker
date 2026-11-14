@@ -414,6 +414,50 @@ class _TurnRefusal:
     detail: dict[str, object] | None = None
 
 
+def _execution_profile_refusal(
+    workspace: str | Path,
+    owner: str,
+    project_id: str | None,
+    model_profile: str | None,
+    model: str | None,
+) -> dict[str, object] | None:
+    """BUG-356 — the active execution profile is the ceiling for Chat and Build too.
+
+    A goal step was judged against its profile across the owner's whole
+    fallback chain; an ordinary turn was not judged at all, so *Private local*
+    bounded a goal and nothing else. The same check now runs before a turn's
+    first token: when the owner (or the turn's project) has a profile, every
+    model the turn could run on must be one it allows. With no profile chosen,
+    nothing changes — a goal waits for one, a conversation never did.
+    """
+    from raiker.goals import profiles as profile_store
+
+    store = SQLiteStore(workspace)
+    try:
+        profile, source = profile_store.resolve_for(store, owner=owner, project_id=project_id)
+    except Exception:  # noqa: BLE001 - an unreadable profile table bounds nothing new
+        return None
+    if profile is None:
+        return None
+    refused = profile_store.chain_refusal(
+        profile_store.model_chain(store, owner, profile, model_profile, model)
+    )
+    if not refused:
+        return None
+    where = "this project's" if source == "project" else "your active"
+    return {
+        "reason_code": "execution_profile_refuses_model",
+        "profile_id": profile.profile_id,
+        "profile_name": profile.name,
+        "refused": refused,
+        "settings_route": "#/settings?tab=execution-profiles",
+        "message": (
+            f"Not sent: {where} execution profile, {profile.name}, does not allow {refused}. "
+            "Choose a model it allows, or change the profile in Settings › Execution profiles."
+        ),
+    }
+
+
 async def _prepare_turn(
     body: PromptRequest, request: Request, session: ApiSession, principal: Principal
 ) -> _PreparedTurn | _TurnRefusal:
@@ -466,6 +510,21 @@ async def _prepare_turn(
             ),
             detail=exc.detail(),
         )
+    profile_refusal = _execution_profile_refusal(
+        workspace, session.principal_id, turn_project_id, body.model_profile, body.model
+    )
+    if profile_refusal is not None:
+        return _TurnRefusal(
+            kind="profile",
+            response=AgentResponse(
+                request_id=envelope.request_id,
+                session_id=envelope.session_id,
+                turn_id=envelope.turn_id,
+                status="failed",
+                message=str(profile_refusal["message"]),
+            ),
+            detail=profile_refusal,
+        )
     _record_attachment_refs(workspace, envelope, session.principal_id)
     if retry_of:
         SQLiteStore(workspace).record_turn_retry(
@@ -488,7 +547,7 @@ async def submit_prompt(
     session, principal = _auth_data
     prepared = await _prepare_turn(body, request, session, principal)
     if isinstance(prepared, _TurnRefusal):
-        if prepared.kind == "not_ready":
+        if prepared.kind in {"not_ready", "profile"}:
             raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=prepared.detail)
         refused: AgentResponse = prepared.response
         return serialize_dto(refused)
@@ -534,6 +593,15 @@ async def stream_prompt(
                     StreamEvent(
                         kind=FINAL,
                         event_type="model_not_ready",
+                        payload=refusal.detail or {},
+                        response=refusal.response,
+                    )
+                )
+            elif refusal.kind == "profile":
+                yield _sse(
+                    StreamEvent(
+                        kind=FINAL,
+                        event_type="execution_profile_refused",
                         payload=refusal.detail or {},
                         response=refusal.response,
                     )

@@ -17,6 +17,8 @@ class SimilarMemory(TypedDict):
     memory_id: str
     text: str
     similarity: float
+    #: "words" (shared content words) or "meaning" (the built-in embedding model).
+    basis: Literal["words", "meaning"]
 
 
 class MemoryProposal(TypedDict):

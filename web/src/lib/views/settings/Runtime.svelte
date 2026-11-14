@@ -286,11 +286,13 @@
         ? "New executions run under this runtime. What each one may actually do is decided by Permissions, project boundaries, and your approvals."
         : "New executions are refused. Work already running continues to its next safe boundary."}
     </p>
-    <dl>
-      <div><dt>State</dt><dd>{running ? "Accepting new executions" : "Not accepting new executions"}</dd></div>
-      <div><dt>Last changed</dt><dd>{mode.activated_at ? formatTimestamp(mode.activated_at) : "Not recorded"}</dd></div>
-      <div><dt>Changed by</dt><dd>{mode.activated_by || "Administrator"}</dd></div>
-    </dl>
+    <!-- QUI-G01 — state, when and by whom, as one line: three labelled columns
+         between two rules ran Advanced past its 1.5-screen budget at 1280×800. -->
+    <p class="meta" data-testid="runtime-state-line">
+      {running ? "Accepting new executions" : "Not accepting new executions"}
+      · changed {mode.activated_at ? formatTimestamp(mode.activated_at) : "at a time not recorded"}
+      by {mode.activated_by || "Administrator"}
+    </p>
     <div class="actions">
       <a href="#/activity">View change history</a>
       <a class="btn btn-ghost btn-sm" href="#/capabilities"><Icon name="capabilities" size="sm" /> Review permissions</a>
@@ -531,8 +533,8 @@
   .form-advanced label { max-width: none; }
   .status { color: var(--ok); font-size: var(--text-sm); } .status.stopped { color: var(--warn); }
   .eyebrow { color: var(--accent); font-size: var(--text-xs); font-weight: 700; }
-  dl { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--space-3); padding: var(--space-4) 0; border-block: 1px solid var(--border); } dl div { display: grid; gap: .2rem; } dt { color: var(--text-3); font-size: var(--text-xs); } dd { margin: 0; }
+  .meta { margin: var(--space-2) 0 0; color: var(--text-2); font-size: var(--text-sm); }
   .actions { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); margin-top: var(--space-5); }
   .danger-zone { margin-top: var(--space-5); border-color: color-mix(in srgb, var(--danger) 40%, var(--border)); } .danger-zone h4 { margin-top: var(--space-4); } .error { color: var(--danger); }
-  @media (max-width: 40rem) { dl { grid-template-columns: 1fr; } .actions { align-items: stretch; flex-direction: column; } .environment-form { grid-template-columns: minmax(0, 1fr); } }
+  @media (max-width: 40rem) { .actions { align-items: stretch; flex-direction: column; } .environment-form { grid-template-columns: minmax(0, 1fr); } }
 </style>

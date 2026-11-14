@@ -11,6 +11,7 @@
 
   let dialogElement = $state<HTMLDialogElement>();
   let confirmButton = $state<HTMLButtonElement>();
+  let inputElement = $state<HTMLInputElement>();
   let returnFocus: HTMLElement | null = null;
   const request = $derived(confirmState.current);
 
@@ -21,7 +22,7 @@
       if (typeof dialogElement.showModal === "function") dialogElement.showModal();
       else dialogElement.setAttribute("open", "");
     }
-    queueMicrotask(() => confirmButton?.focus());
+    queueMicrotask(() => (request?.input ? inputElement?.select() : confirmButton?.focus()));
   });
 
   function finish(answer: boolean): void {
@@ -59,6 +60,20 @@
   >
     <h2 id="confirm-title">{request.title}</h2>
     {#if request.body}<p id="confirm-body">{request.body}</p>{/if}
+    {#if request.input}
+      <label class="field">
+        <span>{request.input.label}</span>
+        <input
+          class="input"
+          bind:this={inputElement}
+          value={request.text ?? ""}
+          placeholder={request.input.placeholder}
+          oninput={(event) => {
+            if (confirmState.current) confirmState.current.text = event.currentTarget.value;
+          }}
+        />
+      </label>
+    {/if}
     <div class="actions">
       <button type="button" class="btn btn-ghost" onclick={() => finish(false)}>Cancel</button>
       <button
@@ -67,6 +82,7 @@
         class:btn-danger={request.danger}
         class:btn-primary={!request.danger}
         bind:this={confirmButton}
+        disabled={request.input?.required === true && (request.text ?? "").trim() === ""}
         onclick={() => finish(true)}
       >{request.confirmLabel}</button>
     </div>
@@ -78,5 +94,7 @@
   .confirm-dialog{color:var(--text-1);width:min(440px,calc(100vw - 2rem));max-height:calc(100dvh - var(--space-6));overflow:auto;overflow-wrap:anywhere;padding:var(--space-5);border:1px solid var(--border);border-radius:var(--r-lg);background:var(--dialog-bg);box-shadow:var(--shadow-2)}
   h2{margin:0;font-size:var(--text-md)}
   p{margin:var(--space-2) 0 0;color:var(--text-2);font-size:var(--text-sm)}
+  .field{display:grid;gap:var(--space-1);margin-top:var(--space-3);font-size:var(--text-sm);color:var(--text-2)}
+  .field input{width:100%}
   .actions{display:flex;flex-wrap:wrap;justify-content:flex-end;gap:var(--space-2);margin-top:var(--space-5)}
 </style>

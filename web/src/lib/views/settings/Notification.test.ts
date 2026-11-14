@@ -23,7 +23,7 @@ describe("Notification settings", () => {
   it("says plainly that muting is not deciding", () => {
     render(Notification, { settings: {}, save: vi.fn() });
     expect(
-      screen.getByText(/an approval nobody is alerted about still waits for you/i),
+      screen.getByText(/an approval still waits for you/i),
     ).toBeInTheDocument();
   });
 

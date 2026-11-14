@@ -108,7 +108,7 @@
     notice = null;
     try {
       const changed = await contract.setActiveExecutionProfile({ profile_id: profileId });
-      said(changed.goals_paused, `${changed.profile?.name ?? "The profile"} is now active for new goals.`);
+      said(changed.goals_paused, `${changed.profile?.name ?? "The profile"} is now active for new goals and conversations.`);
       await load();
     } catch (err) {
       notice = failure("The active profile change was not confirmed", "The boundary for new goals is unconfirmed.", "Refresh the active profile before starting work.", err) + (reason(err) ? " " + goalRefusal(reason(err)) : "");
@@ -137,9 +137,10 @@
 <section class="settings-section" aria-labelledby="xprof-h">
   <h2 id="xprof-h">Execution profiles</h2>
   <p class="muted">
-    The boundary a goal's work runs under: which models it may reach, whether your personal memory may go to a hosted
-    model with it, and its budget. Goals use the active profile, or their project's. A prompt, memory or agent can never
-    choose or change one.
+    The boundary your work runs under: which models it may reach, whether your personal memory may go to a hosted
+    model with it, and a goal's budget. Goals, Chat and Build use the active profile, or their project's: a turn whose
+    model, or any fallback, the profile does not allow is not sent. A prompt, memory or agent can never choose or
+    change one.
   </p>
 
   {#if loadError}
@@ -216,8 +217,8 @@
       </ul>
     {/if}
     <p class="muted small">
-      A model's placement comes from its profile: a custom OpenAI-compatible endpoint reads as hosted even when it runs on
-      this machine, so Private local refuses it.
+      A model's placement comes from its profile. A custom OpenAI-compatible endpoint is on this machine when its saved
+      address is (localhost or 127.0.0.1); any other address, a private-network one included, reads as hosted.
     </p>
   {/if}
 </section>

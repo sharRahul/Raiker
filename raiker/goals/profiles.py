@@ -305,6 +305,37 @@ def resolve_for(store: Any, *, owner: str, project_id: str | None) -> tuple[Exec
     return None, "none"
 
 
+#: Profiles whose server is the owner's own, so its saved address says where it runs.
+OWNER_ENDPOINT_PROVIDERS = frozenset({"openai-compatible"})
+
+
+def placement_is_local(store: Any, owner: str, resolved: Any) -> bool:
+    """Whether a model profile runs on this machine, for an execution profile (BUG-356).
+
+    A shipped local profile (Ollama, LM Studio, llama.cpp) is local by
+    declaration. A generic OpenAI-compatible profile has no placement of its
+    own: its server is whatever the owner saved, so it is local exactly when
+    that saved route is this machine (``localhost``, a loopback address). A
+    private-network address is another machine and stays hosted, and every
+    vendor profile stays hosted whatever its address, since its endpoint is
+    the vendor's. Anything that cannot be read is hosted: an unknown model is
+    never assumed to be local.
+    """
+    if bool(getattr(resolved, "local_only", False)):
+        return True
+    if getattr(resolved, "provider", "") not in OWNER_ENDPOINT_PROVIDERS:
+        return False
+    try:
+        from raiker.models.connections import get_model_connection
+        from raiker.models.endpoint_policy import classify_endpoint
+        from raiker.models.readiness import effective_endpoint
+
+        connection = get_model_connection(store, owner, resolved.profile_id)
+        return classify_endpoint(effective_endpoint(resolved, connection)) == "local_machine"
+    except Exception:  # noqa: BLE001 - unreadable is hosted
+        return False
+
+
 @dataclass(frozen=True)
 class ChainEntry:
     profile_id: str
@@ -344,7 +375,7 @@ def model_chain(
         except Exception:  # noqa: BLE001
             entries.append(ChainEntry(profile_id or "unselected", "unknown", False, False))
             continue
-        local = bool(resolved.local_only)
+        local = placement_is_local(store, owner, resolved)
         entries.append(
             ChainEntry(
                 resolved.profile_id,

@@ -5,8 +5,9 @@
  * and 1.25 screens at 1280×800; a Settings sub-page fits in 1.5 screens; and
  * no more than 60 interactive controls are visible at once, list rows aside.
  *
- * The sweep starts as a report (`all-pages-live.spec.ts` writes it) and becomes
- * a failing check once the long pages are rebuilt (01, QUI-L06 – L11).
+ * The sweep started as a report and has been a failing check since
+ * 2026-11-14, when the last three pages over budget were fitted. A log is long
+ * by design, so it is exempt (`BUDGET_EXEMPT`).
  */
 import type { Page } from "@playwright/test";
 
@@ -18,6 +19,9 @@ export const BUDGET_VIEWPORTS = [
 /** Settings sub-pages are allowed more room than a destination page. */
 export const SETTINGS_SCREENS = 1.5;
 export const MAX_VISIBLE_CONTROLS = 60;
+
+/** Routes whose length is their content, not their layout: a log grows with use. */
+export const BUDGET_EXEMPT: ReadonlySet<string> = new Set(["observe?tab=activity", "activity"]);
 
 export interface PageSize {
   /** Full scroll height of the routed view, in CSS pixels. */
@@ -48,6 +52,7 @@ export async function measurePage(page: Page): Promise<PageSize> {
 
 /** What a page is over budget by, in words; empty when it is within it. */
 export function overBudget(route: string, size: PageSize, viewport: { height: number; screens: number }): string[] {
+  if (BUDGET_EXEMPT.has(route)) return [];
   const screens = route.startsWith("settings") ? Math.max(viewport.screens, SETTINGS_SCREENS) : viewport.screens;
   const limit = Math.round(viewport.height * screens);
   const over: string[] = [];

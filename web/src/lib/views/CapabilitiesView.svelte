@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { failure } from "../errorCopy";
   import { onPermissionsChanged } from "../permissionSync";
   import ApprovalModeControl from "../components/ApprovalModeControl.svelte";
   import { goalSummaries } from "../permissionGoals";
@@ -419,7 +420,7 @@
       if (read !== loadSeq) return;
       gates = null;
       selectedCaps = new Set();
-      loadError = e instanceof ApiError ? `Unavailable (${e.status})` : "Unavailable";
+      loadError = failure("Permissions could not be read", "No permission was changed.", "Reload the page.", e);
     } finally {
       if (read === loadSeq) refreshing = false;
     }

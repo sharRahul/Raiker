@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { failure } from "../../errorCopy";
   /**
    * Settings › Voice — voice spec §6.2.
    *
@@ -69,7 +70,7 @@
       status = await api.voiceStatus();
       loadError = null;
     } catch (e) {
-      loadError = e instanceof ApiError ? `Voice settings could not be read (${e.status}).` : "Voice settings could not be read.";
+      loadError = failure("Voice settings could not be read", "Nothing was changed.", "Reload the page.", e);
     }
   }
 

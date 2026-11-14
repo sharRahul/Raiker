@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { failure } from "../errorCopy";
   /**
    * DEC-24 step 5 — backups Raiker makes itself, and restoring one somewhere new.
    *
@@ -54,7 +55,7 @@
       view = answer;
       loadError = null;
     } catch (e) {
-      loadError = e instanceof ApiError ? `Backups could not be read (${e.status}).` : "Backups could not be read.";
+      loadError = failure("Backups could not be read", "Your backups are not changed.", "Reload the page.", e);
     }
   }
 
@@ -158,6 +159,10 @@
             <span title={backup.created_at}>{relativeTime(backup.created_at)}</span>
             <span>{size(backup.size_bytes)} · {backup.counts.sessions ?? 0} conversations · {backup.counts.approved_memory ?? 0} memories{filesLabel(backup)}</span>
             <span class="state" data-testid="backup-state">{STATE[backup.state] ?? backup.state}{backup.detail ? ` — ${backup.detail}` : ""}</span>
+            {#if view.key_fingerprint !== backup.key_fingerprint && (view.retired_key_fingerprints ?? []).includes(backup.key_fingerprint)}
+              <!-- BUG-354 — made before a key rotation: it opens with the retired key Raiker keeps. -->
+              <span class="retired" data-testid="backup-retired-key">Made with a retired key, which Raiker keeps</span>
+            {/if}
           </div>
           <div class="row-actions">
             <button type="button" class="btn btn-ghost btn-sm" disabled={busy !== null} onclick={() => verify(backup)}>Verify</button>

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { failure } from "../../errorCopy";
   import { onMount } from "svelte";
   import FormDialog from "../../components/FormDialog.svelte";
   import { auth, getToken, setToken, ApiError } from "../../api";
@@ -129,7 +130,7 @@
       // the account is still here. Restore the session and say so.
       if (e instanceof ApiError && e.status >= 400 && e.status < 500) {
         setToken(control);
-        notice = { kind: "error", text: `Could not delete account (${e.status}).` };
+        notice = { kind: "error", text: failure("The account was not deleted", "Nothing was deleted.", "Check your password and try again.", e) };
         return;
       }
       setToken(null);

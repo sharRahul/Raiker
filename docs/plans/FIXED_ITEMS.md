@@ -1,5 +1,231 @@
 # Fixed items
 
+## FIXED-1468 — The app still asked for text in the browser's own prompt box
+
+**Severity: Low. Area: Quiet UI / dialogs. Status: Fixed 2026-11-15.**
+
+**Observed.** QUI-F10 moved every confirmation into Raiker's own dialog, but seven questions that needed a few words back — attaching a folder to a project, rejecting a relationship or a memory proposal, a memory's scope, its review date and the purge confirmation — still opened `window.prompt`: a grey system box naming the site, not the action. One live spec (`project-error-recovery`) answered it as a native dialog.
+
+**Fixed.** `askText` in `confirm.svelte.ts` asks through the same `ConfirmDialog`, with a labelled field, the action named on its button, and a required field that cannot be confirmed empty. All seven call sites use it; none of the app's own code calls `window.prompt` now. Settings' leave guard still uses a synchronous native confirm (it runs inside navigation); `round-2026-10-05-readiness-decisions` answers that one, as before.
+
+**Evidence.** `ConfirmDialog.test.ts` (two new cases); RT-1115-05 (live: *Attach a folder* opens Raiker's dialog with **Attach** disabled until a path is typed, and no native dialog fires). `project-error-recovery-live` now fills the in-app field.
+
+## FIXED-1467 — Three live specs still drove the Permissions page QUI-L06 replaced
+
+**Severity: Low. Area: Live test harness. Status: Fixed 2026-11-15.**
+
+**Observed.** `bug-239-unset-gate-honesty`, `bug-58-known-limits` (its list check) and `round-2026-10-02-memory` looked for `.cap.card` rows and a *Search capabilities* field, so each timed out before testing anything.
+
+**Fixed.** Each now opens the permission through `openPermission` (the category rail and the detail pane) and asserts against the detail card; `round-2026-10-02-memory` follows *Change* from the goal summary to the Web fetch detail.
+
+**Evidence.** Live: `bug-239-unset-gate-honesty-live` 1/1 and `round-2026-10-02-memory-live` *by goal* passed. `bug-58-known-limits` needs a first-run workspace and was type-checked only. Seven specs remain (see [TO_BE_FIXED](TO_BE_FIXED.md#live-specs-that-predate-the-permissions-redesign)).
+
+## FIXED-1466 — A proposed memory that repeated an approved one in other words looked new
+
+**Severity: Low. Area: Memory / review. Status: Fixed 2026-11-15.**
+
+**Observed.** FIXED-1439 flags a proposal whose *words* match an approved memory; *I fly out of Lisbon* and *My home airport is LIS* share none and passed as new.
+
+**Fixed.** `nearest_by_meaning` (`raiker/memory/near_duplicate.py`) compares the proposal with the approved memories' stored vectors in the owner's embedding space (cosine ≥ 0.9), embedding the proposal through the same governed path recall uses (`GovernedQueryEmbedder`). It runs only when the words check found nothing and a real embedding model may run (`query_embedding_available`); otherwise nothing is claimed. The card says *Says the same as* for a meaning match and *Nearly the same as* for a words match (`SimilarMemory.basis`).
+
+**Evidence.** `tests/test_memory_near_duplicate.py` (by meaning, below threshold, no embedding allowed, no vectors, words basis); `MemoryView.test.ts`.
+
+## FIXED-1465 — A corrected-block retry showed the answer twice
+
+**Severity: Low. Area: Visual answers / streaming. Status: Fixed 2026-11-15.**
+
+**Observed.** On a local model, an answer whose `raiker:` block could not be drawn is asked once more, corrected. The first answer had already streamed, so the owner saw it, then the corrected one after it, until the final response replaced both.
+
+**Fixed.** The runtime already announces the retry (`typed_block_retry`). `collectText` (`turnPhases.ts`) remembers where each model request's text began and withdraws the uncorrected request's text when the retry arrives; earlier requests' text in the same turn is kept.
+
+**Evidence.** `turnPhases.test.ts` (two new cases).
+
+## FIXED-1464 — A small-window model spent a sixth of its window on Raiker's standing instructions
+
+**Severity: Medium. Area: Models / prompt size. Status: Fixed 2026-11-15.**
+
+**Observed.** FIXED-1436 gave a ≤16,384-token window the compact tool core; the standing instructions (about 1,000 tokens on Chat) and an eight-item Memory Brief still went in full.
+
+**Fixed.** On the same threshold (`compact_for`), `_system_messages(..., compact=True)` sends short forms of the identity, typed-answer and Build-protocol instructions; every safety rule stays (untrusted data, `tool_search`, the Build floor, units and sources on figures). The Memory Brief is halved to four items and 200 tokens. Measured with the brief's chars/4 estimate: Chat 1,017 → 276 tokens, Build 930 → 257, Design 1,248 → 507.
+
+**Evidence.** `tests/test_small_window_prompt.py` (ratios, the kept rules, answer style, brief size and threshold); the existing prompt, typed-answer and context suites pass.
+
+## FIXED-1463 — Diagnostics did not say when recall had fallen back to matching words
+
+**Severity: Low. Area: Diagnostics / memory. Status: Fixed 2026-11-15.**
+
+**Observed.** FIXED-1426 put the background indexer's status in Settings › Advanced › Memory engine; Diagnostics' attention list did not mention it, so *Recall is matching words only* was visible only to someone who looked there.
+
+**Fixed.** The overview reads the indexer's status on its own (allowed to fail) and lists a stalled one as a *waiting* issue with the indexer's own way out (*Open Permissions*, *Open Models*); an indexer that is up to date is a row under *What is working*. Its load error now says *Status could not be read (HTTP …)*.
+
+**Evidence.** `observeAttention.test.ts` (two new cases); RT-1115-06 (live: *Recall is matching words only — Waiting: the local model runtime is not set to Always allow or Auto…*, with **Open Permissions**).
+
+## FIXED-1462 — Design's picture detail kept a five-row table of its own
+
+**Severity: Low. Area: Quiet UI / Design. Status: Fixed 2026-11-15.**
+
+**Observed.** Chat's and Build's answers carry one quiet receipt line (FIXED-1423, FIXED-1438); a Design picture's detail was a labelled table of Made, Model, Size, When and Filed in.
+
+**Fixed.** The detail is one quiet line — model (or *Your file … No provider has seen it*), size (or *chosen by* the provider), when, *Filed in* — and one line for what it was made from, with the same links.
+
+**Evidence.** `DesignView.test.ts` and the component suite (93 files) pass unchanged in meaning (*chosen by Gemini*, *Filed in Unfiled*).
+
+## FIXED-1461 — Twenty more error messages gave a status code and no next step (QUI-G06)
+
+**Severity: Low. Area: Quiet UI / error recovery. Status: Fixed 2026-11-15.**
+
+**Observed.** Background work, backups, indexing, a routine limit, Checkpoints, Activity, Running work, Tasks, Knowledge, Permissions, Diagnostics (three reads), Memory (load, memory use, recall mode), Settings, account deletion, Voice and the index rebuild each read *Unavailable (500)* or *Could not X (500).*
+
+**Fixed.** Each uses `failure()`: what failed, the HTTP status and reason, what it affected (*No task was changed or stopped.*) and one next step (*Press Refresh.*).
+
+**Evidence.** Full web suite 306 files, 2,905 tests passed; seven route-level error tests now check the next step.
+
+## FIXED-1460 — Tasks ran 9 px past one screen, and the size budgets were only a report (QUI-G01)
+
+**Severity: Low. Area: Quiet UI / layout. Status: Fixed 2026-11-15.**
+
+**Observed.** Live this round: the empty Work › Tasks page was 909 px at 1440×900; its docked composer was sized to the whole content height, ignoring Work's tab strip. The size report also flagged Security (1,251 px at 1280×800) once this round's Workspace key card was added.
+
+**Fixed.** Tasks' minimum height subtracts the tab strip, and its counts share the toolbar's line. The workspace key rows sit inside *Encryption and the vault* instead of a card of their own. `all-pages-live.spec.ts` *size budgets* now fails on any page over budget; a log (Observe › Activity) is exempt (`BUDGET_EXEMPT`).
+
+**Evidence.** Live: *size budgets (QUI-G01)* — 0 of 78 measurements over budget; RT-1115-07.
+
+## FIXED-1459 — Settings › Advanced ran past its budget at 1280×800 (QUI-G01)
+
+**Severity: Low. Area: Quiet UI / Settings. Status: Fixed 2026-11-15.**
+
+**Observed.** 1,246 px against 1,200: the runtime card spent three labelled columns between two rules on its state, when it changed and by whom.
+
+**Fixed.** One line: *Accepting new executions · changed 11/14/2026, 7:26 PM by system*.
+
+**Evidence.** Live size report (above).
+
+## FIXED-1458 — Settings › Notifications ran past its budget at 1280×800 (QUI-G01)
+
+**Severity: Low. Area: Quiet UI / Settings. Status: Fixed 2026-11-15.**
+
+**Observed.** 1,273 px against 1,200: four paragraphs of explanation, the interrupt categories one per row, and a separate *The record* card.
+
+**Fixed.** Each explanation says the one thing it must (an approval still waits; it never leaves this machine; one summary when quiet hours end); the categories sit in columns; *The record* joins *Try it*.
+
+**Evidence.** `Notification.test.ts`, `QuietHours.test.ts`; live size report; RT-1115-07 (≤ 1,200 px).
+
+## FIXED-1457 — A layer inside a group could not be selected on the canvas (BUG-348, DW-02)
+
+**Severity: Medium. Area: Design / canvas. Status: Fixed 2026-11-15.**
+
+**Observed.** A group's hit area was drawn over its children, so clicking anything inside a group selected the group; its children were reachable from Layers only.
+
+**Fixed.** Double-clicking a group (or Enter with it selected) enters it: its hit area steps aside, its children take clicks and drags, a dashed outline marks the group, and the stage says *Inside Card — Escape leaves the group*. Escape, or a click on the canvas outside, leaves it with the group selected.
+
+**Evidence.** `DesignDocuments.test.ts` (*enters a group on double-click…*).
+
+## FIXED-1456 — A goal could be started from Chat but not from Build (BUG-355)
+
+**Severity: Low. Area: Goals / Build. Status: Fixed 2026-11-15.**
+
+**Observed.** **Make this a goal** sat beside Chat's finished answers only; a Build request worth tracking had to be retyped in Work › Goals.
+
+**Fixed.** A finished Build answer has the same action: the Goals form opens filled with the request, bound to the Build project, and says *Filled in from “Build · ‹project›”*. Nothing exists until Save.
+
+**Evidence.** `BuildView.test.ts`; RT-1115-04 (live: a real Haiku 4.5 Build turn, the action, and the filled form).
+
+## FIXED-1455 — Execution profiles bounded goal steps and nothing else (BUG-356)
+
+**Severity: Medium. Area: Execution profiles / Chat and Build. Status: Fixed 2026-11-15.**
+
+**Observed.** With *Private local* active, a goal step on a hosted model was refused, but an ordinary Chat or Build turn on the same model was sent.
+
+**Fixed.** `_prepare_turn` checks the turn's model and every fallback against the active (or project-bound) profile with the same `model_chain`/`chain_refusal` the goal coordinator uses, before the first token. A refused turn is not sent: JSON answers 409 `execution_profile_refuses_model`; a stream ends with `execution_profile_refused` and the message *Not sent: your active execution profile, Private local, does not allow anthropic (hosted). Choose a model it allows, or change the profile in Settings › Execution profiles.* With no profile chosen, conversations are not bounded. Settings now says profiles govern Goals, Chat and Build.
+
+**Evidence.** `tests/test_goals_and_execution_profiles.py` (JSON refusal, streamed refusal, no profile); RT-1115-03 (live: refused under Private local, answered under Cloud-first).
+
+## FIXED-1454 — A custom endpoint on this machine counted as hosted (BUG-356)
+
+**Severity: Low. Area: Execution profiles / models. Status: Fixed 2026-11-15.**
+
+**Observed.** A model's placement was its profile's `local_only` flag, so a generic OpenAI-compatible endpoint at `127.0.0.1` read as hosted and Private local refused it.
+
+**Fixed.** `placement_is_local` classifies a generic OpenAI-compatible profile by its saved route (`classify_endpoint` of `effective_endpoint`): local exactly when it is this machine. A private-network address stays hosted (another machine), every vendor profile stays hosted whatever its address, and anything unreadable is hosted.
+
+**Evidence.** `tests/test_goals_and_execution_profiles.py::test_a_custom_endpoint_on_this_machine_reads_as_local`.
+
+## FIXED-1453 — Settings could not rotate the workspace key or say which backups need the old one (BUG-354)
+
+**Severity: Low. Area: Settings / Security and Backups. Status: Fixed 2026-11-15.**
+
+**Observed.** BUG-354's required outcome: Security offers the rotation, says which backups will still need the old key, and reports the new fingerprint.
+
+**Fixed.** *Encryption and the vault* gains **Workspace key** (fingerprint, **Rotate**) and a **Retired key** row per kept key (*kept for N backups*, **Discard**). Rotate opens a dialog that says how many backups will need the current key and asks for the password (and code, with two-step sign-in) for a five-minute elevated session; the result names the new fingerprint and the backups still on the old key. Backups marks those *Made with a retired key, which Raiker keeps*. Every Security card's values now share one column.
+
+**Evidence.** `WorkspaceKeySettings.test.ts` (three cases), `BackupsCard.test.ts`; RT-1115-01 and RT-1115-02 (live: values aligned within 1 px; rotation changed the fingerprint, *1 sealed secret was re-sealed*, the pre-rotation backup listed as made with a retired key).
+
+## FIXED-1452 — The workspace key could not be rotated in place (BUG-354)
+
+**Severity: Low. Area: Storage / workspace key. Status: Fixed 2026-11-15.**
+
+**Observed.** `.raiker/app.key` derives the SQLCipher key and seals MFA seeds, the machine issuer's seed and command material. An owner who believed it copied could only export memories into a new workspace.
+
+**Fixed.** `raiker/storage/key_rotation.py`: refuse while a project move holds HMAC reservations; take a verified `pre_key_rotation` backup; stage the new key as `app.key.next` (0600, exclusive); take cached connections out of use; `PRAGMA rekey` (in place, WAL included); `quick_check` under the new key; re-seal every Fernet token the old key made, in one transaction; then retire the old key to `.raiker/retired-keys/<fingerprint>.key` and `os.replace` the new one in. A crash part-way is finished or undone at the next start by whichever key opens the database (`finish_interrupted_rotation`). `app_fernet` opens tokens with the current or a retired key, so a token written in the switch-over instant stays readable. Backups verify and restore (as a separate copy) with the retired key matching their fingerprint; restoring one *in place* is refused. `POST /api/security/workspace-key/rotate` and `DELETE …/retired/{fingerprint}` need an elevated session.
+
+**Evidence.** `tests/test_workspace_key_rotation.py` (re-key, re-seal, MFA sign-in after rotation, old backup verified and restored, interrupted rotation both ways, project-move refusal); API contract cases for both routes.
+
+## FIXED-1451 — Every request through a reverse proxy shared one rate-limit bucket (BUG-359)
+
+**Severity: Low. Area: Host / remote access. Status: Fixed 2026-11-15.**
+
+**Observed.** A busy proxy could throttle the owner's own remote session: every request on the proxy listener counted in `proxy-listener`.
+
+**Fixed.** `RateLimitMiddleware` remembers (by digest, at most 64) the sessions the auth check accepted on the proxy listener — a response that was not 401 or 403 — and counts a proven session in its own window. A forged or refused token stays in the shared bucket, so minting tokens buys nothing.
+
+**Evidence.** `tests/test_proxied_loopback.py::test_a_proven_proxy_session_gets_its_own_window_and_a_forged_one_does_not`.
+
+## FIXED-1450 — A certificate path in a remote-access check could read as `[REDACTED_SECRET]` (BUG-359)
+
+**Severity: Low. Area: Host / remote access. Status: Fixed 2026-11-15.**
+
+**Observed.** Check messages carried the path in the sentence, and free text gets the redactor's strict scan, which read a path under a token-shaped temporary folder as a secret.
+
+**Fixed.** Checks carry the file or folder in a separate `path` field, a locator the redactor scans with its path rules (every credential shape still applies); the sentence names it by kind (*This file does not exist…*), and Settings shows the path beside it.
+
+**Evidence.** `tests/test_remote_certificate_reload.py::test_a_check_keeps_its_path_through_the_response_redactor`; the remote-access suites.
+
+## FIXED-1449 — A renewed TLS certificate was served only after a restart (BUG-359)
+
+**Severity: Low. Area: Host / remote access. Status: Fixed 2026-11-15.**
+
+**Observed.** The private listener loaded its certificate once at start.
+
+**Fixed.** `CertificateReloader` (`raiker/api/server_runner.py`) checks the certificate and key files every 30 seconds and loads a changed pair into the listener's own `SSLContext`, so the next handshake gets it; open connections keep theirs. A pair that does not load together keeps the old certificate until the files change again.
+
+**Evidence.** `tests/test_remote_certificate_reload.py` (a real TLS handshake before and after renewal; a half-written renewal keeps the old certificate).
+
+## FIXED-1448 — Remote access's coloured state sat left of every other value (BUG-359)
+
+**Severity: Low. Area: Quiet UI / Settings › Security. Status: Fixed 2026-11-15.**
+
+**Observed.** Each row is its own grid with a `max-content` action column, so the row with **Change** and **Turn off** narrowed its value column.
+
+**Fixed.** The action column is a fixed width on every Security card, so values line up down the page whatever the buttons.
+
+**Evidence.** RT-1115-01 (live: every value's left edge within 1 px).
+
+## FIXED-1447 — *Remote access is suspended* stayed in the tray after two-step sign-in was back (BUG-359)
+
+**Severity: Low. Area: Notifications / remote access. Status: Fixed 2026-11-15.**
+
+**Fixed.** Activating two-step sign-in marks unread suspension notices read (`resolve_remote_access_suspended`); other notices are untouched.
+
+**Evidence.** `tests/test_remote_access_notice_resolve.py`.
+
+## FIXED-1446 — The lock screen on another device said *On this computer* (BUG-359)
+
+**Severity: Low. Area: Sign-in / remote access. Status: Fixed 2026-11-15.**
+
+**Fixed.** The note reads the page's own address: a loopback name or address is this computer; anything else shows *From another device — You are signing in to Raiker on another computer…*.
+
+**Evidence.** `remoteAccess.test.ts` (`isRemoteHost`).
+
 ## FIXED-1445 — Ten more error messages gave a status code and no next step (QUI-G06)
 
 **Severity: Low. Area: Quiet UI / error recovery. Status: Fixed 2026-11-14.**
@@ -2633,6 +2859,29 @@ file you can open. The two capture sets that remain — `screenshots/pages/` and
 | [FIXED-1382](#fixed-1382--linux-filesystem-flags-broke-windows-type-checking) | Low | Platform portability | Fixed 2026-11-09 |
 | [FIXED-1383](#fixed-1383--keyboard-start-evidence-depended-on-retired-receipt-wording) | Low | Beta live tests | Fixed 2026-11-09 |
 | [FIXED-1384](#fixed-1384--model-downloads-checked-redirect-hosts-after-contacting-them) | High | Model and speech downloads | Fixed 2026-11-09 |
+| [FIXED-1468](#fixed-1468--the-app-still-asked-for-text-in-the-browsers-own-prompt-box) | Low | Quiet UI / dialogs | Fixed 2026-11-15 |
+| [FIXED-1467](#fixed-1467--three-live-specs-still-drove-the-permissions-page-qui-l06-replaced) | Low | Live test harness | Fixed 2026-11-15 |
+| [FIXED-1466](#fixed-1466--a-proposed-memory-that-repeated-an-approved-one-in-other-words-looked-new) | Low | Memory / review | Fixed 2026-11-15 |
+| [FIXED-1465](#fixed-1465--a-corrected-block-retry-showed-the-answer-twice) | Low | Visual answers / streaming | Fixed 2026-11-15 |
+| [FIXED-1464](#fixed-1464--a-small-window-model-spent-a-sixth-of-its-window-on-raikers-standing-instructions) | Medium | Models / prompt size | Fixed 2026-11-15 |
+| [FIXED-1463](#fixed-1463--diagnostics-did-not-say-when-recall-had-fallen-back-to-matching-words) | Low | Diagnostics / memory | Fixed 2026-11-15 |
+| [FIXED-1462](#fixed-1462--designs-picture-detail-kept-a-five-row-table-of-its-own) | Low | Quiet UI / Design | Fixed 2026-11-15 |
+| [FIXED-1461](#fixed-1461--twenty-more-error-messages-gave-a-status-code-and-no-next-step-qui-g06) | Low | Quiet UI / error recovery | Fixed 2026-11-15 |
+| [FIXED-1460](#fixed-1460--tasks-ran-9-px-past-one-screen-and-the-size-budgets-were-only-a-report-qui-g01) | Low | Quiet UI / layout | Fixed 2026-11-15 |
+| [FIXED-1459](#fixed-1459--settings--advanced-ran-past-its-budget-at-1280800-qui-g01) | Low | Quiet UI / Settings | Fixed 2026-11-15 |
+| [FIXED-1458](#fixed-1458--settings--notifications-ran-past-its-budget-at-1280800-qui-g01) | Low | Quiet UI / Settings | Fixed 2026-11-15 |
+| [FIXED-1457](#fixed-1457--a-layer-inside-a-group-could-not-be-selected-on-the-canvas-bug-348-dw-02) | Medium | Design / canvas | Fixed 2026-11-15 |
+| [FIXED-1456](#fixed-1456--a-goal-could-be-started-from-chat-but-not-from-build-bug-355) | Low | Goals / Build | Fixed 2026-11-15 |
+| [FIXED-1455](#fixed-1455--execution-profiles-bounded-goal-steps-and-nothing-else-bug-356) | Medium | Execution profiles / Chat and Build | Fixed 2026-11-15 |
+| [FIXED-1454](#fixed-1454--a-custom-endpoint-on-this-machine-counted-as-hosted-bug-356) | Low | Execution profiles / models | Fixed 2026-11-15 |
+| [FIXED-1453](#fixed-1453--settings-could-not-rotate-the-workspace-key-or-say-which-backups-need-the-old-one-bug-354) | Low | Settings / Security and Backups | Fixed 2026-11-15 |
+| [FIXED-1452](#fixed-1452--the-workspace-key-could-not-be-rotated-in-place-bug-354) | Low | Storage / workspace key | Fixed 2026-11-15 |
+| [FIXED-1451](#fixed-1451--every-request-through-a-reverse-proxy-shared-one-rate-limit-bucket-bug-359) | Low | Host / remote access | Fixed 2026-11-15 |
+| [FIXED-1450](#fixed-1450--a-certificate-path-in-a-remote-access-check-could-read-as-redacted_secret-bug-359) | Low | Host / remote access | Fixed 2026-11-15 |
+| [FIXED-1449](#fixed-1449--a-renewed-tls-certificate-was-served-only-after-a-restart-bug-359) | Low | Host / remote access | Fixed 2026-11-15 |
+| [FIXED-1448](#fixed-1448--remote-accesss-coloured-state-sat-left-of-every-other-value-bug-359) | Low | Quiet UI / Settings › Security | Fixed 2026-11-15 |
+| [FIXED-1447](#fixed-1447--remote-access-is-suspended-stayed-in-the-tray-after-two-step-sign-in-was-back-bug-359) | Low | Notifications / remote access | Fixed 2026-11-15 |
+| [FIXED-1446](#fixed-1446--the-lock-screen-on-another-device-said-on-this-computer-bug-359) | Low | Sign-in / remote access | Fixed 2026-11-15 |
 | [FIXED-1445](#fixed-1445--ten-more-error-messages-gave-a-status-code-and-no-next-step-qui-g06) | Low | Quiet UI / error recovery | Fixed 2026-11-14 |
 | [FIXED-1444](#fixed-1444--older-live-specs-could-not-reach-permissions-a-confirm-or-stop-safely) | Low | Live test harness | Fixed 2026-11-14 |
 | [FIXED-1443](#fixed-1443--eight-settings-sections-still-drew-their-own-card) | Low | Quiet UI / Settings | Fixed 2026-11-14 |
@@ -37334,7 +37583,7 @@ MT-04 assert neither *enable its gate* nor *could not be reached* appears.
 
 **Observed.** Where the SQLCipher key comes from, how to verify and restore an encrypted backup, what machine loss means, and how to read the key-page posture were spread over code comments and a backups section.
 
-**Fixed.** [The memory key and recovery](../guide/memory.md#the-memory-key-and-recovery) in the memory guide: key source and `store_key_missing`, keeping a copy of `app.key`, verify, restore, machine loss, the export/import route in place of rotation ([BUG-354](TO_BE_FIXED.md#bug-354--the-workspace-key-cannot-be-rotated-in-place)), and the `cipher_memory_security` posture fields.
+**Fixed.** [The memory key and recovery](../guide/memory.md#the-memory-key-and-recovery) in the memory guide: key source and `store_key_missing`, keeping a copy of `app.key`, verify, restore, machine loss, the export/import route in place of rotation ([BUG-354](#fixed-1452--the-workspace-key-could-not-be-rotated-in-place-bug-354), closed 2026-11-15), and the `cipher_memory_security` posture fields.
 
 **Evidence.** `tests/test_memory_key_never_leaves.py` — the key and its derived form appear in no database bytes, memory export, log line or adapter payload.
 

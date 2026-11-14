@@ -17,6 +17,7 @@
   // governed backend directly; no fabricated state.
   import FormDialog from "../../components/FormDialog.svelte";
   import RemoteAccessSettings from "../../components/RemoteAccessSettings.svelte";
+  import WorkspaceKeySettings from "../../components/WorkspaceKeySettings.svelte";
   import { askConfirm } from "../../confirm.svelte";
   import { relativeTime } from "../../format";
   import type { DeviceSessionView } from "../../generated/apiContract";
@@ -498,6 +499,8 @@
     <span class="setting-value">{!settingsLoaded ? "Reading…" : vaultState === "configured_valid" ? "Set" : "Missing — connections fail closed"}</span>
     <button type="button" class="btn btn-sm" onclick={() => openPanel("vault")}>{vaultState === "configured_valid" ? "Change" : "Set up"}</button>
   </div>
+  <!-- BUG-354 — the workspace key sits with the encryption it opens. -->
+  <WorkspaceKeySettings {mfaEnrolled} embedded />
 </section>
 
 <section class="card" aria-labelledby="security-findings-h">
@@ -864,8 +867,9 @@
   .setting-row {
     display: grid;
     /* FIXED-1391 — a fixed action column, so values line up down the page
-       whether a row has one button, two, or none. */
-    grid-template-columns: minmax(10rem, 1fr) minmax(0, 1.4fr) minmax(7.5rem, max-content);
+       whether a row has one button, two, or none. The width matches Remote
+       access's two-button column, so values line up across every card. */
+    grid-template-columns: minmax(10rem, 1fr) minmax(0, 1.4fr) 11.5rem;
     align-items: center;
     gap: var(--space-3);
     min-height: 52px;

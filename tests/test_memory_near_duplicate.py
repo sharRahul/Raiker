@@ -31,3 +31,23 @@ def test_nothing_close_is_none() -> None:
 
 def test_empty_text_is_never_a_duplicate() -> None:
     assert nearest_approved("", [{"memory_id": "m", "text": ""}]) is None
+
+
+def test_the_same_fact_in_other_words_is_found_by_meaning() -> None:
+    from raiker.memory.near_duplicate import nearest_by_meaning
+
+    approved = [{"memory_id": "m1", "text": "My home airport is LIS."}, {"memory_id": "m2", "text": "I like tea."}]
+    vectors = {"m1": [1.0, 0.0, 0.1], "m2": [0.0, 1.0, 0.0]}
+    found = nearest_by_meaning("I fly out of Lisbon", approved, vectors, lambda _t: [0.98, 0.02, 0.1])
+    assert found is not None and found["memory_id"] == "m1" and found["basis"] == "meaning"
+    # Below the threshold, or with no embedding allowed, nothing is claimed.
+    assert nearest_by_meaning("x", approved, vectors, lambda _t: [0.6, 0.6, 0.0]) is None
+    assert nearest_by_meaning("x", approved, vectors, lambda _t: None) is None
+    assert nearest_by_meaning("x", approved, {}, lambda _t: [1.0, 0.0, 0.0]) is None
+
+
+def test_the_words_match_says_its_basis() -> None:
+    from raiker.memory.near_duplicate import nearest_approved
+
+    found = nearest_approved("The owner prefers window seats", [{"memory_id": "m", "text": "prefers window seats"}])
+    assert found is not None and found["basis"] == "words"

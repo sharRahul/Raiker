@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { askText } from "../confirm.svelte";
   import LibraryView from "./LibraryView.svelte";
   import ProjectLimits from "../components/ProjectLimits.svelte";
   import ShowMore from "../components/ShowMore.svelte";
@@ -296,10 +297,13 @@
   }
 
   async function attachToExisting(projectId: string) {
-    const path = window.prompt(
-      "Full path to the folder. It is read where it lives — Raiker copies nothing.",
-    );
-    if (path === null || path.trim() === "") return;
+    const path = await askText({
+      title: "Attach a folder",
+      body: "It is read where it lives — Raiker copies nothing.",
+      confirmLabel: "Attach",
+      input: { label: "Full path to the folder", placeholder: "/home/you/projects/site", required: true },
+    });
+    if (path === null || path === "") return;
     try {
       attachError = null;
       await api.attachProjectFolder(projectId, path.trim(), true);

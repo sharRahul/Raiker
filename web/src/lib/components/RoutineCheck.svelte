@@ -9,7 +9,7 @@
    * owner's quiet hours — and starts nothing. Each line says what it found and
    * links to where it is fixed. Unknown is said as unknown.
    */
-  import { api, ApiError } from "../api";
+  import { api } from "../api";
   import type { RoutineDoctor, TaskView } from "../generated/apiContract";
   import Icon from "./Icon.svelte";
 
@@ -91,7 +91,7 @@
       onChanged?.(updated);
       if (report) await check();
     } catch (e) {
-      limitNotice = e instanceof ApiError ? `Not saved (${e.status}).` : "Not saved.";
+      limitNotice = failure("The limit was not saved", "The routine keeps its previous limit.", "Try again.", e);
     }
   }
 </script>

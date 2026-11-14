@@ -170,6 +170,11 @@ class Check:
     message: str
     field: str | None = None
     severity: Literal["error", "warning", "info"] = "error"
+    #: BUG-359 — the file or folder the message is about, kept out of the
+    #: sentence. Free text gets the redactor's strict scan, which read a path
+    #: under a token-shaped temporary folder as a secret; a ``path`` field is a
+    #: locator and keeps every credential rule without that false match.
+    path: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -260,9 +265,9 @@ def _tls_checks(config: RemoteAccessConfig) -> list[Check]:
         if not path.is_absolute():
             checks.append(Check("tls_path_relative", False, f"Give the full path to {path.name}.", name))
         elif not path.is_file():
-            checks.append(Check("tls_unreadable", False, f"{path} does not exist or is not a file.", name))
+            checks.append(Check("tls_unreadable", False, "This file does not exist or is not a file.", name, path=str(path)))
         elif not os.access(path, os.R_OK):
-            checks.append(Check("tls_unreadable", False, f"Raiker cannot read {path}.", name))
+            checks.append(Check("tls_unreadable", False, "Raiker cannot read this file.", name, path=str(path)))
     if checks:
         return checks
     if sys.platform != "win32":
@@ -273,8 +278,9 @@ def _tls_checks(config: RemoteAccessConfig) -> list[Check]:
                     "tls_key_exposed",
                     False,
                     f"Other users on this computer can read the private key (mode {mode:o}). "
-                    f"Run: chmod 600 {key}",
+                    "Run chmod 600 on it.",
                     "tls_key",
+                    path=str(key),
                 )
             )
     try:
@@ -395,14 +401,14 @@ def _socket_checks(raw: str | None, *, already_held: bool, bind_test: bool) -> l
         ]
     parent = path.parent
     if not parent.is_dir():
-        return [Check("socket_parent_missing", False, f"The folder {parent} does not exist. Create it first.", "proxy_socket")]
+        return [Check("socket_parent_missing", False, "This folder does not exist. Create it first.", "proxy_socket", path=str(parent))]
     if not os.access(parent, os.W_OK | os.X_OK):
-        return [Check("socket_parent_not_writable", False, f"Raiker cannot create files in {parent}.", "proxy_socket")]
+        return [Check("socket_parent_not_writable", False, "Raiker cannot create files in this folder.", "proxy_socket", path=str(parent))]
     if path.exists() or path.is_symlink():
         if not stat.S_ISSOCK(path.lstat().st_mode):
-            return [Check("socket_path_taken", False, f"{path} exists and is not a socket. Raiker will not replace it.", "proxy_socket")]
+            return [Check("socket_path_taken", False, "This path exists and is not a socket. Raiker will not replace it.", "proxy_socket", path=str(path))]
         if bind_test and not already_held and _socket_in_use(path):
-            return [Check("socket_in_use", False, f"{path} is in use by another program.", "proxy_socket")]
+            return [Check("socket_in_use", False, "This socket is in use by another program.", "proxy_socket", path=str(path))]
     return [
         Check(
             "socket_permissions",

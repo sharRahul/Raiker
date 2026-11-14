@@ -1,10 +1,11 @@
 <script lang="ts">
+  import { failure } from "../errorCopy";
   import Icon from "../components/Icon.svelte";
   import EmptyState from "../components/EmptyState.svelte";
   import PageState from "../components/PageState.svelte";
   import RewindPanel from "../components/RewindPanel.svelte";
   import GuideLink from "../components/GuideLink.svelte";
-  import { api, ApiError } from "../api";
+  import { api } from "../api";
   import type { Checkpoint } from "../apiTypes";
   import { humanize, relativeTime, shortId } from "../format";
   import { conversationLink } from "../turnAnchor";
@@ -55,7 +56,7 @@
       checkpoints = await api.checkpoints(sessionFilter.trim() || undefined, projectId ?? undefined);
     } catch (e) {
       checkpoints = null;
-      loadError = e instanceof ApiError ? `Unavailable (${e.status})` : "Unavailable";
+      loadError = failure("Checkpoints could not be read", "No checkpoint was changed.", "Reload the page.", e);
     }
   }
 

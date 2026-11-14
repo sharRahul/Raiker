@@ -78,7 +78,6 @@ These are open at the time of the beta and tracked in
 - **Release proof is still being completed.** The beta requires an exact-commit
   credential/privacy canary, destructive recovery drill, and 30-minute
   local-only egress recording before sign-off.
-- **The workspace encryption key cannot be rotated** in place yet.
 - **Windows window size at 150% display scaling** can drift by a few pixels
   between restarts.
 

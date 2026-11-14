@@ -89,8 +89,11 @@ test("RT-PROJECT-RECOVERY-04: instructions, root and export failures give safe r
   await page.getByRole("button", { name: "Save context", exact: true }).click();
   await expect(page.getByRole("alert").filter({ hasText: "Saving project instructions was not confirmed" })).toContainText("copy it before reopening");
   await page.route("**/api/projects/*/root/attach", route => route.fulfill(failed));
-  page.once("dialog", dialog => dialog.accept("/tmp/example-folder"));
   await page.getByRole("button", { name: "Attach a folder", exact: true }).click();
+  // 2026-11-15 — the folder is asked for in Raiker's own dialog (askText), not the browser's prompt.
+  const ask = page.getByRole("dialog", { name: "Attach a folder" });
+  await ask.getByLabel("Full path to the folder").fill("/tmp/example-folder");
+  await ask.getByRole("button", { name: "Attach", exact: true }).click();
   await expect(page.getByRole("alert").filter({ hasText: "Changing the project folder was not confirmed" })).toContainText("check its folder");
   await page.route("**/api/projects/*/export", route => route.fulfill(failed));
   await page.getByRole("button", { name: "Export project", exact: true }).click();

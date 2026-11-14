@@ -10,7 +10,7 @@ describe("BuildSidePanel", () => {
 
     render(BuildSidePanel, { onclose: vi.fn() });
 
-    await waitFor(() => expect(screen.getByText("Background work unavailable.")).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText(/Background work could not be read\. Running work is not affected/)).toBeInTheDocument());
     expect(screen.queryByText("Nothing running")).not.toBeInTheDocument();
   });
 

@@ -116,6 +116,20 @@ def key_fingerprint(workspace_root: Path) -> str:
     return hashlib.sha256(("raiker-backup-key:" + _key_hex(workspace_root)).encode()).hexdigest()[:16]
 
 
+def _key_for(workspace_root: Path, fingerprint: str) -> bytes | None:
+    """The key a backup with ``fingerprint`` needs: the current one or a retired one (BUG-354)."""
+    from raiker.auth.app_key import retired_key_path
+
+    root = Path(workspace_root)
+    if fingerprint == key_fingerprint(root):
+        return ensure_app_key(root)
+    path = retired_key_path(root, fingerprint)
+    try:
+        return path.read_bytes().strip() if path.is_file() else None
+    except OSError:
+        return None
+
+
 def _sha256(path: Path) -> str:
     digest = hashlib.sha256()
     with path.open("rb") as handle:
@@ -385,11 +399,13 @@ def verify_backup(workspace_root: Path, backup_id: str) -> BackupRecord:
         state, detail = "damaged", "The database file is missing from this backup."
     elif _sha256(database) != record.sha256:
         state, detail = "damaged", "The database file no longer matches the checksum taken when it was made."
-    elif record.key_fingerprint != key_fingerprint(root):
+    elif (backup_key := _key_for(root, record.key_fingerprint)) is None:
         state, detail = "unreadable", "This backup was made with another workspace key."
     else:
         try:
-            integrity, _migrations, _counts, _generation = _inspect(database, _key_hex(root))
+            integrity, _migrations, _counts, _generation = _inspect(
+                database, hashlib.sha256(backup_key).hexdigest()
+            )
         except BackupError as exc:
             state, detail = "unreadable", str(exc)
         else:
@@ -463,14 +479,25 @@ def restore_backup(workspace_root: Path, backup_id: str) -> RestoredWorkspace:
         for name in FILE_TREES:
             if (source / name).is_dir():
                 _copy_tree(source / name, runtime / name)
-        shutil.copy2(app_key_path(root), runtime / "app.key")
-        integrity, _migrations, _counts, _generation = _inspect(runtime / DATABASE, _key_hex(root))
+        # BUG-354 — a backup made before a key rotation opens with the retired
+        # key, so the copy gets that key, not the running workspace's.
+        backup_key = _key_for(root, checked.key_fingerprint)
+        if backup_key is None:
+            raise BackupError("backup_not_verified", "The key this backup needs is no longer kept.")
+        if backup_key == ensure_app_key(root):
+            shutil.copy2(app_key_path(root), runtime / "app.key")
+        else:
+            from raiker.auth.secure_io import atomic_write_private
+
+            atomic_write_private(runtime / "app.key", backup_key, exclusive=True)
+        copy_hex = hashlib.sha256(backup_key).hexdigest()
+        integrity, _migrations, _counts, _generation = _inspect(runtime / DATABASE, copy_hex)
         if integrity != "ok":
             raise BackupError("restore_damaged", integrity[:200])
         # DEC-24 step 5 — the running workspace's later deletions, applied to
         # the copy before anyone opens it.
         applied = _reapply_after(destination, root, checked.created_at)
-        _integrity, _migrations, counts, _generation = _inspect(runtime / DATABASE, _key_hex(root))
+        _integrity, _migrations, counts, _generation = _inspect(runtime / DATABASE, copy_hex)
     except BaseException:
         shutil.rmtree(destination, ignore_errors=True)
         raise
@@ -517,6 +544,11 @@ def restore_in_place(workspace_root: Path, backup_id: str) -> InPlaceRestore:
     checked = verify_backup(root, backup_id)
     if checked.state != "verified":
         raise BackupError("backup_not_verified", checked.detail)
+    if checked.key_fingerprint != key_fingerprint(root):
+        raise BackupError(
+            "backup_needs_retired_key",
+            "This backup was made before the workspace key was rotated. Restore it as a separate copy instead.",
+        )
     runtime = internal_io_path(root / ".raiker")
     live_db = runtime / DATABASE
     source = backups_dir(root) / backup_id

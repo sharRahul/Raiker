@@ -470,7 +470,7 @@
         ...(sessionId ? { session_id: sessionId } : {}),
       });
     }
-    catch (error) { tasks = null; loadError = error instanceof ApiError ? `Unavailable (${error.status})` : "Unavailable"; }
+    catch (error) { tasks = null; loadError = failure("Tasks could not be read", "No task was changed or stopped.", "Press Refresh.", error); }
     try { approvals = await api.approvals(); } catch { approvals = []; }
     try {
       deliveries = new Map((await contract.listRoutineDeliveries()).deliveries.map((row) => [row.task_id, row]));
@@ -778,6 +778,11 @@
        every other page's toolbar reads. -->
   <header class="head-row page-toolbar">
     <button type="button" class="btn btn-ghost btn-sm" onclick={load}><Icon name="refresh" size="sm" /> Refresh</button>
+    <!-- QUI-G01 — the counts share the toolbar's line: a row of their own ran
+         the empty Tasks page 9 px past one screen at 1440×900. -->
+    {#if tasks !== null && !loadError}
+      <div class="summary"><span><strong>{active.length}</strong> open</span><span><strong>{scheduled.length}</strong> scheduled</span><span><strong>{history.length}</strong> finished</span></div>
+    {/if}
     <GuideLink route="tasks" />
   </header>
 
@@ -805,7 +810,6 @@
   {#if loadError}<PageState state="error" title="Couldn't load tasks" detail={loadError} />
   {:else if tasks === null}<PageState state="loading" title="Loading tasks…" lines={3} />
   {:else}
-    <div class="summary"><span><strong>{active.length}</strong> open</span><span><strong>{scheduled.length}</strong> scheduled</span><span><strong>{history.length}</strong> finished</span></div>
     {#if rows.length === 0}<div class="card">
         <EmptyState
           icon="tasks"
@@ -1338,7 +1342,7 @@
 </section>
 
 <style>
-  .tasks{width:100%}.tasks header,.task-main,footer,.history-row{align-items:flex-start;display:flex;gap:var(--space-3);justify-content:space-between}.tasks header{margin-bottom:var(--space-4)}h3,h4{margin:0}.task p{color:var(--text-2);font-size:var(--text-sm);margin:.35rem 0 0}.summary{display:flex;gap:var(--space-4);margin:var(--space-4) 0}.summary span{color:var(--text-2);font-size:var(--text-sm)}.summary strong{color:var(--text-1);font-size:var(--text-base)}.work-list,.history{display:grid;gap:var(--space-2);margin-top:var(--space-4)}.task{margin-left:calc(var(--depth) * 1.15rem);max-width:calc(100% - var(--depth) * 1.15rem)}.task-title{display:flex;gap:.5rem}.branch{color:var(--accent);min-width:.8rem}.task h4{font-size:var(--text-base)}.task-attachments{display:flex;flex-wrap:wrap;gap:.4rem;margin-top:.7rem}.task-attachments span{align-items:center;background:var(--sunken);border:1px solid var(--border);border-radius:var(--r-sm);color:var(--text-2);display:flex;font-size:var(--text-xs);gap:.3rem;max-width:100%;overflow-wrap:anywhere;padding:.35rem .5rem}.step{color:var(--accent)!important}.continuing{align-items:center;background:var(--accent-soft);border:1px solid var(--accent-border);border-radius:var(--r-sm);color:var(--text-1)!important;display:flex;font-size:var(--text-sm);gap:.4rem;margin-top:.6rem!important;padding:.4rem .6rem}.blocked{align-items:center;background:var(--warn-soft);border:1px solid var(--warn-border);border-radius:var(--r-sm);color:var(--text-1)!important;display:flex;flex-wrap:wrap;font-size:var(--text-sm);gap:.4rem;margin-top:.6rem!important;padding:.4rem .6rem}.recovery{align-items:center;display:flex;flex-wrap:wrap;gap:.35rem;margin-left:auto}.recovery-note{color:var(--text-3);font-size:var(--text-xs)}.progress{background:var(--sunken);border-radius:var(--r-pill);height:6px;margin-top:.7rem;overflow:hidden}.progress div{background:var(--accent);height:100%}footer{align-items:center;color:var(--text-3);font-size:var(--text-xs);margin-top:.8rem}.task-actions{align-items:center;display:flex;flex-wrap:wrap;gap:.4rem}.thread-link{align-items:center;display:inline-flex;gap:.3rem;text-decoration:none}.history-row{align-items:center;border-bottom:1px solid var(--border);padding:.65rem 0}.history-row span:last-child{color:var(--text-3);font-size:var(--text-sm)}.history-main{display:grid;gap:.15rem;min-width:0;flex:1 1 auto}.when{color:var(--text-3);font-size:var(--text-sm);white-space:nowrap}.history-title{color:var(--text-1);text-decoration:none}.history-title:hover{text-decoration:underline}.outcome{color:var(--text-2);font-size:var(--text-sm);margin:.4rem 0 0}.history-main .outcome{margin:0}.delivery-failed{align-items:center;color:var(--warn-text,var(--text-1));display:flex;flex-wrap:wrap;font-size:var(--text-sm);gap:.35rem;margin:0}.notice{color:var(--success);margin:var(--space-3) 0}
+  .tasks{width:100%}.tasks header,.task-main,footer,.history-row{align-items:flex-start;display:flex;gap:var(--space-3);justify-content:space-between}.tasks header{margin-bottom:var(--space-4)}h3,h4{margin:0}.task p{color:var(--text-2);font-size:var(--text-sm);margin:.35rem 0 0}.summary{align-items:baseline;display:flex;gap:var(--space-4);margin:0 auto 0 var(--space-3);align-self:center}.summary span{color:var(--text-2);font-size:var(--text-sm)}.summary strong{color:var(--text-1);font-size:var(--text-base)}.work-list,.history{display:grid;gap:var(--space-2);margin-top:var(--space-4)}.task{margin-left:calc(var(--depth) * 1.15rem);max-width:calc(100% - var(--depth) * 1.15rem)}.task-title{display:flex;gap:.5rem}.branch{color:var(--accent);min-width:.8rem}.task h4{font-size:var(--text-base)}.task-attachments{display:flex;flex-wrap:wrap;gap:.4rem;margin-top:.7rem}.task-attachments span{align-items:center;background:var(--sunken);border:1px solid var(--border);border-radius:var(--r-sm);color:var(--text-2);display:flex;font-size:var(--text-xs);gap:.3rem;max-width:100%;overflow-wrap:anywhere;padding:.35rem .5rem}.step{color:var(--accent)!important}.continuing{align-items:center;background:var(--accent-soft);border:1px solid var(--accent-border);border-radius:var(--r-sm);color:var(--text-1)!important;display:flex;font-size:var(--text-sm);gap:.4rem;margin-top:.6rem!important;padding:.4rem .6rem}.blocked{align-items:center;background:var(--warn-soft);border:1px solid var(--warn-border);border-radius:var(--r-sm);color:var(--text-1)!important;display:flex;flex-wrap:wrap;font-size:var(--text-sm);gap:.4rem;margin-top:.6rem!important;padding:.4rem .6rem}.recovery{align-items:center;display:flex;flex-wrap:wrap;gap:.35rem;margin-left:auto}.recovery-note{color:var(--text-3);font-size:var(--text-xs)}.progress{background:var(--sunken);border-radius:var(--r-pill);height:6px;margin-top:.7rem;overflow:hidden}.progress div{background:var(--accent);height:100%}footer{align-items:center;color:var(--text-3);font-size:var(--text-xs);margin-top:.8rem}.task-actions{align-items:center;display:flex;flex-wrap:wrap;gap:.4rem}.thread-link{align-items:center;display:inline-flex;gap:.3rem;text-decoration:none}.history-row{align-items:center;border-bottom:1px solid var(--border);padding:.65rem 0}.history-row span:last-child{color:var(--text-3);font-size:var(--text-sm)}.history-main{display:grid;gap:.15rem;min-width:0;flex:1 1 auto}.when{color:var(--text-3);font-size:var(--text-sm);white-space:nowrap}.history-title{color:var(--text-1);text-decoration:none}.history-title:hover{text-decoration:underline}.outcome{color:var(--text-2);font-size:var(--text-sm);margin:.4rem 0 0}.history-main .outcome{margin:0}.delivery-failed{align-items:center;color:var(--warn-text,var(--text-1));display:flex;flex-wrap:wrap;font-size:var(--text-sm);gap:.35rem;margin:0}.notice{color:var(--success);margin:var(--space-3) 0}
   /* COMPOSER-10 — the details, when asked for. A grid rather than a column so
      four short fields do not become four full-width rows. */
   .task-details{display:grid;gap:var(--space-3);margin:var(--space-2) 0}
@@ -1360,7 +1364,10 @@
      reads as a composer control rather than as a form field, because that is
      what it is. */
   .tasks header.page-toolbar{align-items:center;margin-bottom:var(--space-2)}
-  .tasks{display:flex;flex-direction:column;min-height:var(--content-h,calc(100dvh - 9rem))}
+  /* QUI-G01 — the dock sits at the bottom of the room Work leaves under its
+     tab strip (about 4rem with its gap); the full content height pushed the
+     page 9 px past one screen at 1440×900. */
+  .tasks{display:flex;flex-direction:column;min-height:calc(var(--content-h,calc(100dvh - 9rem)) - 4.25rem)}
   .task-dock{position:sticky;bottom:0;z-index:2;margin-top:auto;padding-top:var(--space-5);background:linear-gradient(to bottom,transparent,var(--bg) var(--space-5))}
   .task-dock .templates{margin:0 auto var(--space-3)}
   @media (max-width:700px){.task-dock .templates{flex-wrap:nowrap;justify-content:flex-start;overflow-x:auto;width:100%;scrollbar-width:none;padding-bottom:2px}.task-dock .template{flex:none}}

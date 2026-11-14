@@ -578,6 +578,60 @@
     });
   }
 
+  /* ── Entering a group (BUG-348, DW-02) ── */
+  // A group's hit area is drawn over its children, so a click inside a group
+  // selected the group and its children were reachable from Layers only.
+  // Double-clicking a group enters it: its own hit area steps aside and its
+  // children take clicks, as in every design tool. Escape, or a click on the
+  // canvas outside, leaves it with the group selected.
+  let enteredGroup = $state<string | null>(null);
+
+  /** The path of group ids from the frame down to the entered group. */
+  const openGroups = $derived.by(() => {
+    if (enteredGroup === null || !frame) return new Set<string>();
+    const path: string[] = [];
+    const walk = (nodes: DesignNode[]): boolean => {
+      for (const item of nodes) {
+        path.push(item.id);
+        if (item.id === enteredGroup) return true;
+        if (item.children && walk(item.children)) return true;
+        path.pop();
+      }
+      return false;
+    };
+    return walk(frame.nodes) ? new Set(path) : new Set<string>();
+  });
+
+  function enterGroup(node: DesignNode) {
+    if (node.type !== "group" || !node.children?.length) return;
+    enteredGroup = node.id;
+    selectedId = null;
+    multi = [];
+    canvasEl?.focus();
+  }
+
+  function leaveGroup(): boolean {
+    if (enteredGroup === null) return false;
+    const left = enteredGroup;
+    enteredGroup = null;
+    selectedId = left;
+    multi = [];
+    return true;
+  }
+
+  const enteredName = $derived.by(() => {
+    if (enteredGroup === null || !frame) return null;
+    const find = (nodes: DesignNode[]): DesignNode | null => {
+      for (const item of nodes) {
+        if (item.id === enteredGroup) return item;
+        const inner = item.children ? find(item.children) : null;
+        if (inner) return inner;
+      }
+      return null;
+    };
+    return find(frame.nodes)?.name ?? null;
+  });
+
   /* ── Canvas keyboard ── */
   let canvasEl = $state<SVGSVGElement | undefined>();
 
@@ -589,8 +643,14 @@
       return;
     }
     if (event.key === "Escape") {
+      if (leaveGroup()) return;
       selectedId = null;
       multi = [];
+      return;
+    }
+    if (event.key === "Enter" && selected && selected.type === "group") {
+      event.preventDefault();
+      enterGroup(selected);
       return;
     }
     if (!selected || !frame) return;
@@ -1041,6 +1101,7 @@
       {#if node.children}
         {#each node.children as child (child.id)}{@render layer(child)}{/each}
       {/if}
+      {#if !openGroups.has(node.id)}
       <rect
         class="hit"
         class:selected={isSelected}
@@ -1065,8 +1126,17 @@
           pick(node.id, event.shiftKey || event.metaKey || event.ctrlKey);
           canvasEl?.focus();
         }}
+        ondblclick={(event) => {
+          if (node.type !== "group") return;
+          event.stopPropagation();
+          enterGroup(node);
+        }}
         onkeydown={() => {}}
       />
+      {/if}
+      {#if openGroups.has(node.id) && node.id === enteredGroup}
+        <rect class="entered" x={b.x} y={b.y} width={Math.max(b.w, 4)} height={Math.max(b.h, 4)} />
+      {/if}
     </g>
   {/if}
 {/snippet}
@@ -1289,7 +1359,8 @@
       <section class="stage" aria-label="Canvas">
         {#if frame}
           <p class="stage-head muted">
-            {frame.name} · {frame.width}×{frame.height} — drag a layer to move it (it snaps to edges and centres; hold Alt to place freely), drag a handle to resize or rotate, Shift-click to select more. Arrow keys nudge (Shift for 10px), Delete removes, Ctrl+Z undoes.
+            {#if enteredName}<span class="entered-note" data-testid="entered-group">Inside {enteredName} — Escape leaves the group.</span>{/if}
+            {frame.name} · {frame.width}×{frame.height} — double-click a group to select inside it; drag a layer to move it (it snaps to edges and centres; hold Alt to place freely), drag a handle to resize or rotate, Shift-click to select more. Arrow keys nudge (Shift for 10px), Delete removes, Ctrl+Z undoes.
           </p>
           <!-- The canvas is one keyboard stop: arrows move the selected layer,
                Delete removes it, Escape clears the selection, Ctrl+Z undoes.
@@ -1312,6 +1383,7 @@
                 swallowClick = false;
                 return;
               }
+              if (leaveGroup()) return;
               selectedId = null;
               multi = [];
             }}
@@ -1894,4 +1966,7 @@
   @media (prefers-reduced-motion: reduce) {
     .canvas :global(*) { transition: none; }
   }
+  /* BUG-348 — the group being edited: a dashed outline that takes no clicks. */
+  .canvas .entered { fill: none; stroke: var(--accent); stroke-dasharray: 6 4; stroke-width: 1.5; pointer-events: none; vector-effect: non-scaling-stroke; }
+  .entered-note { display: block; color: var(--text-1); font-weight: 600; }
 </style>

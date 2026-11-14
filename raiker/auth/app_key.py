@@ -18,7 +18,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from cryptography.fernet import Fernet
+from cryptography.fernet import Fernet, MultiFernet
 
 from raiker.auth.secure_io import atomic_write_private
 from raiker.storage.internal_paths import internal_io_path
@@ -32,6 +32,40 @@ def app_key_path(workspace_root: str | Path) -> Path:
     return internal_io_path(
         Path(workspace_root).resolve() / _KEY_DIRNAME / _KEY_FILENAME
     )
+
+
+def next_key_path(workspace_root: str | Path) -> Path:
+    """BUG-354 — where a rotation stages the new key before the re-key."""
+    return app_key_path(workspace_root).with_name(_KEY_FILENAME + ".next")
+
+
+def retired_keys_dir(workspace_root: str | Path) -> Path:
+    """BUG-354 — keys a rotation retired, kept for the backups made with them."""
+    return internal_io_path(Path(workspace_root).resolve() / _KEY_DIRNAME / "retired-keys")
+
+
+def retired_key_path(workspace_root: str | Path, fingerprint: str) -> Path:
+    return retired_keys_dir(workspace_root) / f"{fingerprint}.key"
+
+
+def retired_keys(workspace_root: str | Path) -> list[bytes]:
+    """Every retired key this workspace still keeps, newest file first."""
+    directory = retired_keys_dir(workspace_root)
+    try:
+        paths = sorted(
+            (path for path in directory.iterdir() if path.suffix == ".key"),
+            key=lambda path: path.stat().st_mtime,
+            reverse=True,
+        )
+    except OSError:
+        return []
+    keys: list[bytes] = []
+    for path in paths:
+        try:
+            keys.append(path.read_bytes().strip())
+        except OSError:
+            continue
+    return keys
 
 
 def _store_exists(workspace_root: str | Path) -> bool:
@@ -66,5 +100,18 @@ def ensure_app_key(workspace_root: str | Path) -> bytes:
     return key
 
 
-def app_fernet(workspace_root: str | Path) -> Fernet:
-    return Fernet(ensure_app_key(workspace_root))
+def app_fernet(workspace_root: str | Path) -> MultiFernet:
+    """Seal with the current key; open with it or any retired one (BUG-354).
+
+    A rotation re-seals every token it finds, but a token written by another
+    thread in the instant before the new key took over would otherwise be
+    unreadable for good.
+    """
+    current = Fernet(ensure_app_key(workspace_root))
+    retired = []
+    for key in retired_keys(workspace_root):
+        try:
+            retired.append(Fernet(key))
+        except ValueError:
+            continue
+    return MultiFernet([current, *retired])

@@ -1,8 +1,9 @@
 <script lang="ts">
+  import { failure } from "../errorCopy";
   import { onMount } from "svelte";
   import Icon from "../components/Icon.svelte";
   import PageState from "../components/PageState.svelte";
-  import { api, ApiError } from "../api";
+  import { api } from "../api";
   import type { BrainNode, BrainView } from "../apiTypes";
 
   // `continuing` is a granted approval being replayed into a parked scheduled
@@ -21,7 +22,7 @@ const ACTIVE = new Set(["queued", "running", "continuing", "paused", "waiting_fo
     try {
       brain = await api.brain();
     } catch (error) {
-      loadError = error instanceof ApiError ? `Unavailable (${error.status})` : "Unavailable";
+      loadError = failure("Running work could not be read", "Running work is not affected.", "Reload the page.", error);
     } finally {
       refreshing = false;
     }

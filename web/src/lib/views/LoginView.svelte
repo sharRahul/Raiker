@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onMount, tick } from "svelte";
   import { auth, createInstance, health, ApiError } from "../api";
+  import { isRemoteHost } from "../remoteAccess";
   import type { RecoveryRestored } from "../generated/apiContract";
   import Icon from "../components/Icon.svelte";
   import Logo from "../components/Logo.svelte";
@@ -29,6 +30,10 @@
   let ticket = $state("");
   let recoveryCode = $state("");
   let bootstrapAllowed = $state(false);
+  // BUG-359 — the lock screen reached through Remote access is on another
+  // device, so "On this computer" was wrong there. The page's own address is
+  // the honest signal: a loopback host is this computer, anything else is not.
+  const signingInRemotely = isRemoteHost(typeof window === "undefined" ? "" : window.location.hostname);
   let error = $state<string | null>(null);
   // Set once a recovery has changed the password, so the unlock form it returns
   // to says so rather than looking like nothing happened.
@@ -519,8 +524,13 @@
         <div id="privacy-note" class="privacy">
           <span class="privacy-icon" aria-hidden="true"><Icon name="info" size="md" /></span>
           <div>
-            <strong>On this computer</strong>
-            <p>Your credentials and session remain on this Raiker instance.</p>
+            {#if signingInRemotely}
+              <strong>From another device</strong>
+              <p>You are signing in to Raiker on another computer. Your credentials and session remain on that Raiker instance.</p>
+            {:else}
+              <strong>On this computer</strong>
+              <p>Your credentials and session remain on this Raiker instance.</p>
+            {/if}
           </div>
         </div>
       {:else}

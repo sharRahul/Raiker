@@ -149,10 +149,8 @@
 <section class="card">
   <h3>Where a notice reaches you</h3>
   <p class="sub">
-    A notice is raised when something you were not watching happens — a
-    background run finishing, a decision arriving, a security finding. Both
-    switches below decide where you <em>see</em> it. Neither decides anything:
-    an approval nobody is alerted about still waits for you.
+    Where you <em>see</em> a run finishing, a decision arriving or a security finding. Neither switch decides
+    anything: an approval still waits for you.
   </p>
 
   <label class="toggle">
@@ -164,9 +162,7 @@
     Show unread notices inside Raiker
   </label>
   <p class="sub detail">
-    The newest unread notice, docked in the corner of whatever page you are on.
-    Opening it marks it read and takes you to what it is about. The bell in the
-    top bar counts them whether this is on or off.
+    The newest one, docked in a corner; opening it marks it read. The bell counts them either way.
   </p>
 
   <label class="toggle">
@@ -174,9 +170,7 @@
     Alert me outside Raiker
   </label>
   <p class="sub detail">
-    The same unread notices as a desktop notification, shown only while Raiker is
-    not the window you are looking at. It uses the browser's own notifications
-    and never leaves this machine.
+    A desktop notification while Raiker is in the background. It never leaves this machine.
   </p>
   {#if desktopBlocked}
     <p class="blocked" role="status">{desktopBlocked}</p>
@@ -186,10 +180,8 @@
 <section class="card" aria-labelledby="quiet-hours-heading">
   <h3 id="quiet-hours-heading">Quiet hours</h3>
   <p class="sub">
-    During quiet hours nothing interrupts you — not approvals, not routines that stop, not
-    security notices. Everything is still recorded, the bell still counts it, and work that
-    needs a decision waits for one. When they end you get one summary of what is still
-    unread, not every notice again.
+    Nothing interrupts you; everything is still recorded and counted. When they end, one summary of what is
+    still unread.
   </p>
   <label class="toggle">
     <input
@@ -259,28 +251,30 @@
 <section class="card" aria-labelledby="interrupt-heading">
   <h3 id="interrupt-heading">What interrupts you</h3>
   <p class="sub">
-    Desktop alerts appear only while Raiker is in the background. A notice you turn off here is
-    still recorded and counted by the bell. <strong>Approval needed</strong> and
-    <strong>Input needed</strong> turn off only the desktop alert: inside Raiker they always show,
-    because work is waiting on them.
+    A notice turned off is still recorded. <strong>Approval needed</strong> and <strong>Input needed</strong>
+    turn off only the desktop alert: work is waiting on them.
   </p>
-  {#each categories as item (item.category)}
-    <label class="toggle">
-      <input
-        type="checkbox"
-        checked={item.on}
-        onchange={(e) => save({ [`notification.interrupt.${item.category}`]: e.currentTarget.checked })}
-      />
-      {item.label}
-    </label>
-  {/each}
+  <!-- QUI-G01 — the categories in two columns: one per row ran the page past
+       its 1.5-screen budget at 1280×800. -->
+  <div class="categories">
+    {#each categories as item (item.category)}
+      <label class="toggle">
+        <input
+          type="checkbox"
+          checked={item.on}
+          onchange={(e) => save({ [`notification.interrupt.${item.category}`]: e.currentTarget.checked })}
+        />
+        {item.label}
+      </label>
+    {/each}
+  </div>
 </section>
 
 <section class="card" aria-labelledby="test-heading">
   <h3 id="test-heading">Try it</h3>
   <p class="sub">
-    A test notice takes the same path a real one does — the same record, the same quiet hours,
-    the same desktop alert — using what is saved, not what is on this page.
+    A test notice takes the path a real one does, with what is saved. Every notice is recorded whether or not
+    it was shown — <a href="#/observe?tab=notifications">Open notifications</a>.
   </p>
   <button type="button" class="btn btn-sm" disabled={testState === "sending"} onclick={() => void sendTest()}>
     {testState === "sending" ? "Sending…" : "Send a test notice"}
@@ -288,16 +282,8 @@
   {#if testResult}<p class="state" role="status" data-testid="test-notice-result">{testResult}</p>{/if}
 </section>
 
-<section class="card">
-  <h3>The record</h3>
-  <p class="sub">
-    Every notice is recorded whether or not either switch showed it, so turning
-    both off loses nothing.
-    <a href="#/observe?tab=notifications">Open notifications</a>.
-  </p>
-</section>
-
 <style>
+  .categories { display: grid; grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr)); column-gap: var(--space-4); }
   .toggle {
     display: flex;
     align-items: center;

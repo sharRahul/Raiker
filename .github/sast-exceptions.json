@@ -976,6 +976,22 @@
       "owner": "Raiker maintainers",
       "reason": "Memory deletion/purge source lookup appends only a fixed owner clause; the memory and owner IDs are bound parameters",
       "expires": "2027-05-10"
+    },
+    {
+      "path": "raiker/storage/key_rotation.py",
+      "rule": "S608",
+      "fingerprint": "6e1eafc16c8f836a",
+      "owner": "Raiker maintainers",
+      "reason": "BUG-354 key rotation re-seal: the table and column identifiers come from this database's own sqlite_master and PRAGMA table_info (never from a request), are double-quoted with embedded quotes doubled, and every value (the Fernet prefix, old and new tokens) is a bound parameter",
+      "expires": "2027-05-15"
+    },
+    {
+      "path": "raiker/storage/key_rotation.py",
+      "rule": "S608",
+      "fingerprint": "92970dfd40ee74c3",
+      "owner": "Raiker maintainers",
+      "reason": "BUG-354 key rotation re-seal: the table and column identifiers come from this database's own sqlite_master and PRAGMA table_info (never from a request), are double-quoted with embedded quotes doubled, and every value (the Fernet prefix, old and new tokens) is a bound parameter",
+      "expires": "2027-05-15"
     }
   ]
 }

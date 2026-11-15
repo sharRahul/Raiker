@@ -5,7 +5,7 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
 import { join } from "node:path";
 import { capture } from "./capture";
-import { signInAsOwner } from "./hosted-provider";
+import { openPermission, signInAsOwner } from "./hosted-provider";
 import { LIVE_BASE as BASE } from "./live";
 
 const SHOTS = join(import.meta.dirname, "..", "..", "docs", "plans", "screenshots", "working");
@@ -44,13 +44,9 @@ test.beforeEach(async ({ page }) => {
 
 test("memory authority and all four saved provider paths survive a host restart", async ({ page }) => {
   test.setTimeout(300_000);
-  await page.goto(`${BASE}/#/capabilities`);
-  const search = page.getByLabel("Search capabilities", { exact: true });
-  await expect(search).toBeVisible({ timeout: 30_000 });
-  await search.fill("Memory store");
-  const memory = page.locator(".cap.card", { hasText: "Memory store" }).first();
-  await memory.getByRole("button", { name: "Memory store" }).click();
-  await expect(memory.getByRole("button", { name: "Turn off" })).toBeVisible();
+  // QUI-L06 — the permission opens in the detail pane beside its category.
+  const memory = await openPermission(page, BASE, /^Memory store/);
+  await expect(memory.getByRole("button", { name: "Turn off", exact: true })).toBeVisible();
   await expect(memory.getByRole("button", { name: "Allow", exact: true })).toHaveAttribute("aria-pressed", "true");
   await capture(page, join(SHOTS, "memory-write-allow-after-restart.png"));
 

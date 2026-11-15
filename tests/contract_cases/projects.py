@@ -56,6 +56,20 @@ def _on_attached(suffix: str, body: object = None) -> Seed:
     return seed
 
 
+def _instruction_review(ws: Path, client: TestClient, h: dict[str, str]) -> Call:
+    """RAIKER.md — review the attached project's file by the digest the owner saw."""
+    project_id = _attached(ws, client, h)
+    (ws.parent / "attached-folder" / "RAIKER.md").write_bytes(b"Run the linter.\n")
+    view = client.get(f"/api/projects/{project_id}/instruction-files", headers=h).json()
+    digest = next(s["digest"] for s in view["sources"] if s["scope"] == "project")
+    return (f"/api/projects/{project_id}/instruction-files/review", {"scope": "project", "digest": digest})
+
+
+def _global_review(_ws: Path, client: TestClient, h: dict[str, str]) -> Call:
+    created = client.post("/api/instruction-files/global/starter", headers=h).json()
+    return ("/api/instruction-files/global/review", {"scope": "global", "digest": created["source"]["digest"]})
+
+
 def _restored(_ws: Path, client: TestClient, h: dict[str, str]) -> Call:
     project_id = _project(client, h)
     client.put(f"/api/projects/{project_id}/archive", headers=h)
@@ -170,6 +184,16 @@ CASES: Cases = {
     ("PUT", "/api/projects/{project_id}/limits"): _on_project(
         "/limits", {"repositories": ["acme/site"], "web_domains": ["example.com"], "connections": []}
     ),
+    ("GET", "/api/projects/{project_id}/instruction-files"): _on_attached("/instruction-files"),
+    ("PUT", "/api/projects/{project_id}/instruction-files"): _on_attached("/instruction-files", {"enabled": True}),
+    ("POST", "/api/projects/{project_id}/instruction-files/review"): _instruction_review,
+    ("POST", "/api/projects/{project_id}/instruction-files/disable"): _on_attached(
+        "/instruction-files/disable", {"scope": "project"}
+    ),
+    ("GET", "/api/instruction-files/global"): plain("/api/instruction-files/global"),
+    ("POST", "/api/instruction-files/global/starter"): plain("/api/instruction-files/global/starter"),
+    ("POST", "/api/instruction-files/global/review"): _global_review,
+    ("POST", "/api/instruction-files/global/disable"): plain("/api/instruction-files/global/disable"),
     ("GET", "/api/projects/{project_id}/deletion-preview"): _on_project("/deletion-preview"),
     ("DELETE", "/api/projects/{project_id}"): _delete_attached,
     ("PUT", "/api/projects/{project_id}/move"): _move,

@@ -47,6 +47,7 @@ from raiker.api.routes_guide import router as guide_router
 from raiker.api.routes_host import router as host_router
 from raiker.api.routes_images import router as images_router
 from raiker.api.routes_instances import router as instances_router
+from raiker.api.routes_instruction_files import router as instruction_files_router
 from raiker.api.routes_knowledge_files import router as knowledge_files_router
 from raiker.api.routes_language import router as language_router
 from raiker.api.routes_library import router as library_router
@@ -729,6 +730,7 @@ def create_app(
     app.include_router(library_router)
     app.include_router(remote_access_router)
     app.include_router(project_limits_router)
+    app.include_router(instruction_files_router)
     app.include_router(limit_rules_router)
     app.include_router(knowledge_files_router)
     app.include_router(project_roots_router)

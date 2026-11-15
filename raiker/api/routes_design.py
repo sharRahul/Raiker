@@ -99,6 +99,8 @@ EXPORT_FORMATS = {
     "pdf": "application/pdf",
     "vector_pdf": "application/pdf",
     "json": "application/json",
+    # BUG-348 / DW-11 — the whole document as a deck, one slide per frame.
+    "pptx": "application/vnd.openxmlformats-officedocument.presentationml.presentation",
 }
 #: The file extension a download is named with, where it is not the format's name.
 EXPORT_EXTENSIONS = {"vector_pdf": "pdf"}
@@ -656,6 +658,18 @@ def _render(row: dict[str, Any], frame_id: str, fmt: str, scale: float, load: An
         return render_svg(document, frame_id, load).encode("utf-8"), {}
     if fmt == "vector_pdf":
         return render_pdf(document, frame_id, load)
+    if fmt == "pptx":
+        from raiker.design.deck import build_pptx
+
+        def slide(fid: str) -> tuple[bytes, int, int]:
+            image = render_raster(document, fid, load, scale=scale)
+            return encode_raster(image, "png"), image.width, image.height
+
+        frames = list(document.get("frames") or [])
+        # The chosen frame opens the deck; the rest follow in document order.
+        ordered = sorted(frames, key=lambda f: 0 if f.get("id") == frame_id else 1)
+        data = build_pptx(ordered, slide, title=str(document.get("title") or row.get("title") or "Raiker design"))
+        return data, {"slides": min(len(ordered), 60)}
     if fmt == "json":
         frame = find_frame(document, frame_id)
         payload = {"schema": document.get("schema"), "document_id": row["document_id"],
@@ -689,8 +703,8 @@ async def export_design_frame(document_id: str, body: DesignExportRequest, reque
         raise refusal(status.HTTP_422_UNPROCESSABLE_CONTENT, "export_too_large") from exc
     if len(data) > MAX_EXPORT_BYTES:
         raise refusal(status.HTTP_422_UNPROCESSABLE_CONTENT, "export_too_large")
-    settings = {"scale": body.scale if fmt in ("png", "pdf") else 1.0,
-                "renderer": f"pillow:{raster_font_name()}" if fmt in ("png", "pdf") else fmt,
+    settings = {"scale": body.scale if fmt in ("png", "pdf", "pptx") else 1.0,
+                "renderer": f"pillow:{raster_font_name()}" if fmt in ("png", "pdf", "pptx") else fmt,
                 "pdf_pages": "raster" if fmt == "pdf" else ("vector" if fmt == "vector_pdf" else None), **drawn}
     if fmt == "vector_pdf":
         settings["renderer"] = "raiker-pdf/1"

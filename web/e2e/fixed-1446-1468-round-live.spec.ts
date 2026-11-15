@@ -107,7 +107,7 @@ test("RT-1115-03 the active execution profile bounds a Chat turn", async ({ page
   const composer = page.getByRole("group", { name: "Message composer" });
   await composer.getByRole("textbox").first().fill("Say hello in three words.");
   await composer.getByRole("button", { name: /^Send/ }).click();
-  await expect(page.getByText(/Not sent: your active execution profile, Private local, does not allow anthropic \(hosted\)/)).toBeVisible({ timeout: 60_000 });
+  await expect(page.getByText(/Not sent: your active execution profile, Private local, does not allow Anthropic \(hosted\)/)).toBeVisible({ timeout: 60_000 });
   await capture(page, `${OUT}/03-profile-refused.png`);
 
   await createProfile(page, "Cloud-first");

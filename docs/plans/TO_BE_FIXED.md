@@ -233,12 +233,15 @@ seventeen specs call them, including `model-connection-anthropic-live`
 LC-03/LC-04 and `web-access-turn-control-live`. **2026-11-15 — reduced again**
 ([FIXED-1467](FIXED_ITEMS.md#fixed-1467--three-live-specs-still-drove-the-permissions-page-qui-l06-replaced)):
 `bug-239-unset-gate-honesty`, `bug-58-known-limits` and
-`round-2026-10-02-memory` moved to the detail pane. Seven still assert the old
-layout itself and need a case-by-case rewrite: `b9-repository-code-map`,
-`gcr-provider-validation-and-workspace`, `memory-restart-provider-composer`,
-`release-readiness-2026-09-13` (its *Common permissions* region and inline
-mode buttons), `removal-review-permissions-2026-09-14`,
-`round-2026-09-04-priority` and `round-2026-09-15-typed-and-authority`. LC-03's first check expects *On by connection*,
+`round-2026-10-02-memory` moved to the detail pane. **2026-11-16 — reduced again**
+([FIXED-1482](FIXED_ITEMS.md#fixed-1482--five-live-specs-still-drove-the-permissions-page-qui-l06-replaced)):
+`b9-repository-code-map`, `gcr-provider-validation-and-workspace`,
+`memory-restart-provider-composer`, `round-2026-09-04-priority` and
+`round-2026-09-15-typed-and-authority` use the rail helpers (type-checked, not
+yet re-run live). Two still assert the old layout itself and need a
+case-by-case rewrite: `release-readiness-2026-09-13` (its *Common permissions*
+region and inline mode buttons) and `removal-review-permissions-2026-09-14`
+(its closed-row summary and grouped *GIT* list). LC-03's first check expects *On by connection*,
 which holds only on a workspace where the gate was never turned on by hand.
 
 ## Windows high-DPI window restoration
@@ -813,7 +816,7 @@ receipts, and passed 7/7 live. What is still a gap against
 | Requirement | What exists | What is missing |
 |---|---|---|
 | DW-06 system sources and components | Tokens files (CSS, JSON), a picture's colours, typed values; components kept in their document | Importing from a brand-guide document (PDF); components shared through a design system across documents |
-| DW-11 formats | PNG, raster PDF, vector PDF, SVG, JSON | Presentation and document formats; vector PDF text beyond Windows-1252 (counted and written as `?`) |
+| DW-11 formats | PNG, raster PDF, vector PDF, SVG, JSON, and a PowerPoint deck of every frame (2026-11-16, [FIXED-1486](FIXED_ITEMS.md#fixed-1486--a-design-could-not-be-shown-as-a-presentation-bug-348-dw-11)) | Document formats (DOCX); slides as editable shapes rather than pictures; vector PDF text beyond Windows-1252 (counted and written as `?`) |
 
 The canvas also draws text in the browser's font while PNG and both PDFs use the
 host's raster font (recorded with each export), so a line can break in a
@@ -822,9 +825,9 @@ export font. T-11 and T-12 still need the five model-driven runs the Testing
 protocol requires.
 
 **Proposed fix.** One slice per row, each with its own live evidence (canvas
-selection inside groups shipped 2026-11-15 as FIXED-1457): a brand-guide
-reader through the existing document attachment extraction, then system-level
-components, then a presentation export.
+selection inside groups shipped 2026-11-15 as FIXED-1457, the slide deck
+2026-11-16 as FIXED-1486): a brand-guide reader through the existing document
+attachment extraction, then system-level components.
 
 **Required user-interface outcome.** The remaining rows are reachable from the
 Documents workspace and absent until they are.
@@ -843,7 +846,7 @@ remain:
 | Requirement | What exists | What is missing |
 |---|---|---|
 | Outcome intake | **Work → Goals** form; from Chat, **Make this a goal** and goals noticed in conversation fill it in ([FIXED-1252](FIXED_ITEMS.md#fixed-1252--the-same-aim-across-conversations-was-never-offered-as-a-goal-qui-f03)) | Asking only for materially missing facts (a Build answer's **Make this a goal** shipped 2026-11-15, FIXED-1456) |
-| Criteria validators | *Met when its steps finish* (a record the steps finished) and *You confirm it* | A Build step's `completed_verified` outcome, a destination read-back or another independent validator as evidence |
+| Criteria validators | *Met when its steps finish*, *You confirm it*, and *Met when Build's checks pass* — every linked Build step's turn `completed_verified` (2026-11-16, [FIXED-1480](FIXED_ITEMS.md#fixed-1480--a-goal-criterion-could-not-be-met-by-builds-own-verified-checks-bug-355)) | A destination read-back (a sent message or saved event read back) as evidence |
 | Leases and recovery | Each step is a task with the task's own claim generation and lease; an interrupted dispatch fails after two minutes rather than re-filing; the host-restart scenario runs in CI (FIXED-1331, 2026-11-08) | A goal-level lease for concurrent coordinators across hosts |
 | Pause | Files nothing new and parks unclaimed steps; a running step finishes its current turn | A pause that reaches a running step's next safe boundary without stopping it |
 
@@ -865,12 +868,12 @@ to [FIXED-1051](FIXED_ITEMS.md#fixed-1051--changing-the-boundary-would-have-appl
 before it runs, across the owner's whole fallback chain, and withholds personal
 memory from a hosted step where it says so. It does not yet reach:
 
-* **Scheduled tasks.** The specification makes the active profile the ceiling
-  for all new work. Goal steps, Chat and Build turns are held to it
-  (FIXED-1455, 2026-11-15); a scheduled task's run is not yet. A refused Chat
-  turn names the profile in its answer but shows the generic *Not done — The
-  turn failed before it finished* header and no **Open Settings** link a goal
-  step has, and it names the provider by id (*anthropic (hosted)*).
+* ~~**Scheduled tasks**~~ — closed 2026-11-16: a scheduled run is held to the
+  profile ([FIXED-1477](FIXED_ITEMS.md#fixed-1477--a-scheduled-task-ran-outside-the-active-execution-profile-bug-356)),
+  a refused turn reads *Not sent* with **Open Settings**
+  ([FIXED-1475](FIXED_ITEMS.md#fixed-1475--a-turn-raiker-refused-before-sending-read-as-a-failure-bug-356))
+  and names *Anthropic (hosted)*
+  ([FIXED-1476](FIXED_ITEMS.md#fixed-1476--a-profile-refusal-named-the-provider-by-its-id)).
 * **Hosts.** Steps run on this host; a profile cannot yet name a private
   always-on host or a remote executor (PA-D07).
 * **Other data classes.** Attachments, research references and selected files
@@ -941,7 +944,11 @@ The focused regression set, documentation contracts, Ruff, mypy, and web checks 
 - `tests/test_git_write_path.py::TestBranchProposal::test_a_non_repository_fails_closed` (returned no `error` object)
 - `tests/test_notification_quiet_hours.py::test_the_os_command_obeys_the_stored_desktop_decision` (configured `true` notifier returned `failed` instead of `sent`)
 
-These are not closed by this documentation/live-test pass. They need follow-up investigation to determine which are Windows-environment assumptions and which are regressions in command, Git proposal, or notification behavior.
+2026-11-16: the push and branch proposal failures were one defect — a plain
+folder inside another repository was judged as that repository — fixed in
+[FIXED-1484](FIXED_ITEMS.md#fixed-1484--a-folder-inside-another-repository-was-treated-as-a-repository-2026-10-19-windows-failures).
+The notifier failure is the Windows host having no `true` command (an
+environment assumption in the test). The rest are not closed by this pass. They need follow-up investigation to determine which are Windows-environment assumptions and which are regressions in command, Git proposal, or notification behavior.
 
 ## 2026-10-21 Quiet UI round 2 — what is still open
 
@@ -954,7 +961,8 @@ These parts of the same items are not done:
 * **QUI-G06 — about 170 other error messages** still give a status code, or
   *Could not X*, without what it affected and a next step (eleven more moved
   2026-11-14, [FIXED-1445](FIXED_ITEMS.md#fixed-1445--ten-more-error-messages-gave-a-status-code-and-no-next-step-qui-g06),
-  and twenty on 2026-11-15, [FIXED-1461](FIXED_ITEMS.md#fixed-1461--twenty-more-error-messages-gave-a-status-code-and-no-next-step-qui-g06)).
+  twenty on 2026-11-15, [FIXED-1461](FIXED_ITEMS.md#fixed-1461--twenty-more-error-messages-gave-a-status-code-and-no-next-step-qui-g06),
+  and twenty-two on 2026-11-16, [FIXED-1483](FIXED_ITEMS.md#fixed-1483--twenty-two-more-error-messages-gave-no-effect-or-next-step-qui-g06)).
   QUI-G01's budgets all fit and are a failing check since 2026-11-15
   ([FIXED-1460](FIXED_ITEMS.md#fixed-1460--tasks-ran-9-px-past-one-screen-and-the-size-budgets-were-only-a-report-qui-g01)). The pattern and the
   helper are in `web/src/lib/errorCopy.ts`; the ones on Stop, steer, continuing,
@@ -1206,13 +1214,19 @@ and [03, QUI-H04](quiet-ui/03_WELCOME_HOME_AND_CHAT.md#status).
   by default, small transparent window that reacts only to *needs your
   decision* and *done*. It waits for the companion's art
   ([08](quiet-ui/08_BRAND_AND_VISUAL_SYSTEM.md#status)).
-* **Goals are noticed by shared word forms, not by meaning.** Inflections now
+* ~~**Goals are noticed by shared word forms, not by meaning.**~~ Closed
+  2026-11-16 where the owner's embedding model may run
+  ([FIXED-1481](FIXED_ITEMS.md#fixed-1481--a-goal-said-in-other-words-was-not-noticed)).
+  Kept for the record: Inflections now
   match ([FIXED-1440](FIXED_ITEMS.md#fixed-1440--goals-were-noticed-only-when-the-same-words-recurred));
   synonyms ("trip" and "holiday") do not, and two unrelated requests that
   share three uncommon words can still match. **Not now** keeps a wrong offer
   from returning. Matching by meaning would use the built-in embedding model
   where the owner has allowed it.
-* **Older live specs answer native prompts.** 2026-11-15: the app's last
+* ~~**Older live specs answer native prompts.**~~ Closed 2026-11-16: the
+  leave guard asks in Raiker's dialog
+  ([FIXED-1479](FIXED_ITEMS.md#fixed-1479--leaving-settings-with-unsaved-changes-asked-in-the-browsers-confirm-box)).
+  Kept for the record: 2026-11-15: the app's last
   `window.prompt` calls moved to Raiker's own dialog
   ([FIXED-1468](FIXED_ITEMS.md#fixed-1468--the-app-still-asked-for-text-in-the-browsers-own-prompt-box))
   and `project-error-recovery` fills it. Settings' leave guard is still a
@@ -1697,21 +1711,50 @@ embedding space and keeps it current in the background. Still open:
 
 ## 2026-11-15 round — found, not fixed
 
-* **OpenAI and OpenRouter could not be reached from this sandbox.** Both keys
+* ~~**OpenAI and OpenRouter could not be reached from this sandbox.**~~
+  Closed 2026-11-16: on an environment that allows both hosts RT-1115-08
+  passed ([run record](../architecture/WEB_APP_LIVE_TEST.md#result--2026-11-16-raikermd-refusals-and-the-leave-guard)). Both keys
   were entered through **Add model** and saved (`PUT …/connection` 200), but
   the session's network policy refuses `api.openai.com` and `openrouter.ai`, so
   the model dialog read *Provider unreachable* and RT-1115-08 could not pass.
   Re-run RT-1115-08 (`fixed-1446-1468-round-live.spec.ts`) on a host whose
   network allows both.
-* **A refused Chat turn reads as a failure.** An execution-profile refusal
+* ~~**A refused Chat turn reads as a failure.**~~ Closed 2026-11-16
+  ([FIXED-1475](FIXED_ITEMS.md#fixed-1475--a-turn-raiker-refused-before-sending-read-as-a-failure-bug-356)). An execution-profile refusal
   (FIXED-1455) shows *Not done — The turn failed before it finished* above the
   correct explanation, with no **Open Settings** link, and names the provider
   by id. The stream's final event is `execution_profile_refused`; ChatView and
   BuildView should draw it the way a goal step's refusal is drawn.
-* **The project overview's counts can stay on *Loading…*.** In RT-1115-05's
+* ~~**The project overview's counts can stay on *Loading…*.**~~ Closed
+  2026-11-16 ([FIXED-1478](FIXED_ITEMS.md#fixed-1478--a-projects-overview-could-sit-on-loading--count)). In RT-1115-05's
   capture, a project just opened read *Loading file count…*, *Loading task
   count…* and *Loading image count…* beside resolved Chats and Checkpoints.
   It may be a capture taken mid-load; check whether those reads settle and say
   so when they fail.
-* **Settings' leave guard is still the browser's confirm** (see the native
-  prompts item above).
+* ~~**Settings' leave guard is still the browser's confirm**~~ — closed
+  2026-11-16 ([FIXED-1479](FIXED_ITEMS.md#fixed-1479--leaving-settings-with-unsaved-changes-asked-in-the-browsers-confirm-box)).
+
+## 2026-11-16 round — found, not fixed
+
+* **The first Chat turn after connecting a provider can read *This model
+  connection must be checked again*.** Saving a connection invalidates its
+  readiness; the composer's check that follows can land after the first send,
+  which the server then refuses as stale. Sending again answers. Seen on
+  RT-1114-01 in both the 2026-11-15 and 2026-11-16 rounds. Fix: have the send
+  wait on (or re-run) the readiness check the connection save started, instead
+  of reading the invalidated row.
+* **A refused first turn's profile save returns 403.** A new conversation
+  whose first turn is refused before it is stored still tries to save its
+  conversation profile, and `PUT /api/sessions/{id}/profile` answers 403
+  `unknown_session:…` (an unknown session should be 404, and the client should
+  not send it). Harmless — the error is swallowed — but it is noise in the log.
+* **Two live specs still assert the old Permissions layout**
+  (`release-readiness-2026-09-13`, `removal-review-permissions-2026-09-14`); the
+  five moved this round (FIXED-1482) were type-checked, not re-run live.
+* **This container cannot enforce the native sandbox**, so about forty Python
+  tests that run real shell, plugin and MCP stdio processes fail here with
+  `native_sandbox_required` and pass on CI's runners (unchanged from the
+  2026-11-14 triage above). Build's **Run** is disabled on such a host.
+* **Design slides are pictures.** The Design deck (FIXED-1486) is one
+  picture per slide; editable text and shapes, and DOCX, remain under BUG-348.
+

@@ -387,10 +387,62 @@ def model_chain(
     return entries
 
 
+def _provider_name(provider: str) -> str:
+    """The owner-facing provider name ("Anthropic", not ``anthropic``)."""
+    try:
+        from raiker.models.registry import ModelProfileRegistry
+
+        return ModelProfileRegistry.load().provider_display_name(provider)
+    except Exception:  # noqa: BLE001 - a name is presentation; fall back to a readable id
+        return provider.replace("-", " ").replace("_", " ").title()
+
+
 def chain_refusal(entries: Iterable[ChainEntry]) -> str:
-    """The first entry the profile refuses, as ``provider (where)``; "" when none."""
+    """The first entry the profile refuses, as ``Provider (where)``; "" when none.
+
+    Named the way Models names it, so a refusal reads *Anthropic (hosted)* and
+    not the provider's id (2026-11-15 round).
+    """
     for entry in entries:
         if not entry.allowed:
             where = "on this machine" if entry.local else "hosted"
-            return f"{entry.provider} ({where})"
+            return f"{_provider_name(entry.provider)} ({where})"
     return ""
+
+
+def turn_refusal(
+    store: Any,
+    owner: str,
+    project_id: str | None,
+    model_profile: str | None,
+    model: str | None,
+) -> dict[str, object] | None:
+    """BUG-356 — the active execution profile is the ceiling for all new work.
+
+    One check for every turn that is not a goal step: Chat, Build and a
+    scheduled task's run. When the owner (or the work's project) has a profile,
+    every model the turn could run on — the chosen one and the owner's whole
+    fallback sequence — must be one it allows. With no profile chosen nothing
+    changes. Returns the refusal detail, or ``None`` when the turn may run.
+    """
+    try:
+        profile, source = resolve_for(store, owner=owner, project_id=project_id)
+    except Exception:  # noqa: BLE001 - an unreadable profile table bounds nothing new
+        return None
+    if profile is None:
+        return None
+    refused = chain_refusal(model_chain(store, owner, profile, model_profile, model))
+    if not refused:
+        return None
+    where = "this project's" if source == "project" else "your active"
+    return {
+        "reason_code": "execution_profile_refuses_model",
+        "profile_id": profile.profile_id,
+        "profile_name": profile.name,
+        "refused": refused,
+        "settings_route": "#/settings?tab=execution-profiles",
+        "message": (
+            f"Not sent: {where} execution profile, {profile.name}, does not allow {refused}. "
+            "Choose a model it allows, or change the profile in Settings › Execution profiles."
+        ),
+    }

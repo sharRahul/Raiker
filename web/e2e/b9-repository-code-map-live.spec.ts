@@ -23,7 +23,7 @@ import { expect, test, type Browser, type BrowserContext, type Page } from "@pla
 import { capture } from "./capture";
 import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { signInAsOwner } from "./hosted-provider";
+import { openPermission, setPermission, signInAsOwner } from "./hosted-provider";
 import { LIVE_BASE as BASE, ANTHROPIC_KEY, useAnthropic } from "./live";
 
 const SHOTS = join(import.meta.dirname, "..", "..", "docs", "plans", "screenshots", "working");
@@ -51,35 +51,24 @@ async function signIn(target: Page) {
   await signInAsOwner(target, BASE);
 }
 
+/**
+ * QUI-L06 — permissions are a category rail and a detail pane now; the shared
+ * helpers walk the rail. The label is anchored so "Code map" never opens a
+ * neighbouring permission whose name starts with it.
+ */
+function exactly(label: string): RegExp {
+  return new RegExp(`^${label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`);
+}
+
 async function openCapability(label: string) {
-  await page.goto(`${BASE}/#/capabilities`);
-  const search = page.getByLabel("Search capabilities", { exact: true });
-  await expect(search).toBeVisible({ timeout: 30_000 });
-  await search.fill(label);
-  // Exact match: "Code map" is a prefix of other capability labels, and toggling
-  // a neighbouring capability would make this spec assert nothing.
-  const header = page.getByRole("button", { name: label, exact: true });
-  await expect(header).toBeVisible({ timeout: 30_000 });
-  const card = page.locator(".cap.card").filter({ has: header });
-  if ((await header.getAttribute("aria-expanded")) !== "true") await header.click();
-  await expect(card.locator(".cap-detail")).toBeVisible({ timeout: 10_000 });
-  return card;
+  return openPermission(page, BASE, exactly(label));
 }
 
 async function setCapability(label: string, action: "Turn on" | "Turn off", reason: string) {
   const card = await openCapability(label);
-  const control = card.getByRole("button", { name: action });
+  const control = card.getByRole("button", { name: action, exact: true });
   await expect(control).toBeVisible({ timeout: 10_000 });
-  await control.click();
-  const dialog = page.getByRole("dialog");
-  await expect(dialog).toBeVisible({ timeout: 10_000 });
-  await dialog.getByLabel("Reason (required)").fill(reason);
-  const token = dialog.getByLabel(/Confirmation token/);
-  if (await token.isVisible().catch(() => false)) await token.fill("CONFIRM");
-  const ack = dialog.getByRole("checkbox");
-  if (await ack.isVisible().catch(() => false)) await ack.check();
-  await dialog.getByRole("button", { name: "Confirm change" }).click();
-  await expect(dialog).toBeHidden({ timeout: 30_000 });
+  await setPermission(page, BASE, label, action, reason);
 }
 
 async function buildComposer() {
@@ -92,7 +81,7 @@ async function setCapabilityIfOffered(
   reason: string,
 ) {
   const card = await openCapability(label);
-  if (await card.getByRole("button", { name: action }).isVisible().catch(() => false)) {
+  if (await card.getByRole("button", { name: action, exact: true }).isVisible().catch(() => false)) {
     await setCapability(label, action, reason);
   }
 }

@@ -340,6 +340,9 @@ EVENT_TYPES = {
     "skill_deactivated",
     "skill_deleted",
     "skills_indexed",
+    # RAIKER.md — a Build turn carried reviewed instruction files (scopes,
+    # states and digest prefixes only; never the text or a path).
+    "instruction_files_loaded",
     # The Knowledge Map's access to one folder on this machine was granted or
     # withdrawn. The payload carries the path deliberately: what an owner opened
     # to the graph, and when, is the whole substance of the record — and

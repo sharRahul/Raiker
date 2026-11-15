@@ -101,7 +101,7 @@
       indexNotice =
         e instanceof ApiError && e.reasonCode === "code_map_gate_disabled"
           ? "Code map indexing is turned off. Turn it on in Permissions → Workspace."
-          : "Could not index this repository.";
+          : "This repository was not indexed. Build can still read its files; the code map is out of date. Choose Index again in a moment.";
     } finally {
       indexing = false;
     }
@@ -185,7 +185,7 @@
       await api.selectCodeRepo(repoId);
       await onchanged();
     } catch {
-      error = "Could not change the active repository.";
+      error = "The active repository was not changed. Build still works in the one shown as active. Check that Raiker is running, then choose the repository again.";
     } finally {
       busy = false;
     }
@@ -271,7 +271,7 @@
       await api.disconnectCodeRepo(target.repo_id);
       await onchanged();
     } catch {
-      error = "Could not disconnect that repository.";
+      error = "That repository is still connected. Nothing in it was changed. Reload this page, then try Disconnect again.";
     } finally {
       busy = false;
     }

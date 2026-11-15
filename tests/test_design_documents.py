@@ -445,3 +445,32 @@ def test_another_owner_reads_nothing(api: Any) -> None:
 
     assert design_store.get_document(SQLiteStore(ws), owner="someone-else", document_id=doc["document_id"]) is None
     assert base64  # imported for fixtures that embed bytes
+
+
+
+def test_a_document_exports_as_slides_one_per_frame(api: Any) -> None:
+    """BUG-348 / DW-11 — the presentation format: every frame a slide, its words as alt text."""
+    import zipfile
+
+    client, h, _ws = api
+    doc = _new(client, h)
+    _ops(client, h, doc, 1, [_text("t", color="#000000")])
+    response = client.post(f"/api/design/documents/{doc['document_id']}/exports",
+                           json={"frame_id": "frame-1", "format": "pptx"}, headers=h)
+    assert response.status_code == 200, response.text
+    made = response.json()
+    assert made["format"] == "pptx" and made["settings"]["slides"] >= 1
+    download = client.get(f"/api/design/exports/{made['export_id']}/bytes", headers=h)
+    assert download.headers["content-type"].startswith(
+        "application/vnd.openxmlformats-officedocument.presentationml.presentation"
+    )
+    assert download.headers["content-disposition"].endswith('.pptx"')
+    with zipfile.ZipFile(io.BytesIO(download.content)) as deck:
+        names = set(deck.namelist())
+        assert {"[Content_Types].xml", "ppt/presentation.xml", "ppt/slides/slide1.xml", "ppt/media/frame1.png"} <= names
+        slide = deck.read("ppt/slides/slide1.xml").decode()
+        assert 'descr="Hello' in slide
+        picture = Image.open(io.BytesIO(deck.read("ppt/media/frame1.png")))
+        assert picture.size == (1080, 1080)
+        presentation = deck.read("ppt/presentation.xml").decode()
+        assert 'cx="10287000" cy="10287000"' in presentation

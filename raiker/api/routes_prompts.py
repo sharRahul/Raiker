@@ -432,30 +432,44 @@ def _execution_profile_refusal(
     """
     from raiker.goals import profiles as profile_store
 
+    return profile_store.turn_refusal(SQLiteStore(workspace), owner, project_id, model_profile, model)
+
+def _instruction_files_refusal(
+    workspace: str | Path, owner: str, project_id: str | None
+) -> dict[str, object] | None:
+    """RAIKER.md — a Build turn on a project using file instructions waits for a review.
+
+    Only a project the owner turned file instructions on for is checked, so
+    every other project behaves exactly as before. A file that is new, changed,
+    unsafe, oversized or unreadable stops the turn before a provider call, with
+    the route to review it: work planned without the owner's rules is not run,
+    and the turn does not retry in a loop.
+    """
+    if not project_id:
+        return None
+    from raiker.context import raiker_md
+
     store = SQLiteStore(workspace)
     try:
-        profile, source = profile_store.resolve_for(store, owner=owner, project_id=project_id)
-    except Exception:  # noqa: BLE001 - an unreadable profile table bounds nothing new
+        user_id = store.principal_user_id(owner)
+        project = store.load_project(project_id, user_id=user_id) if user_id else None
+        if not user_id or project is None or not raiker_md.project_enabled(store, user_id, project_id):
+            return None
+        state = raiker_md.status_for_project(store, workspace, user_id, owner, project)
+    except Exception:  # noqa: BLE001 - an unreadable state fails closed below
+        return {
+            "reason_code": "instruction_files_unreadable",
+            "project_id": project_id,
+            "sources": [],
+            "settings_route": f"#/projects?project={project_id}",
+            "message": (
+                "Not sent: this project uses file instructions and Raiker could not read their "
+                "state. Open the project's settings to check them, or turn file instructions off."
+            ),
+        }
+    if not state.blocking:
         return None
-    if profile is None:
-        return None
-    refused = profile_store.chain_refusal(
-        profile_store.model_chain(store, owner, profile, model_profile, model)
-    )
-    if not refused:
-        return None
-    where = "this project's" if source == "project" else "your active"
-    return {
-        "reason_code": "execution_profile_refuses_model",
-        "profile_id": profile.profile_id,
-        "profile_name": profile.name,
-        "refused": refused,
-        "settings_route": "#/settings?tab=execution-profiles",
-        "message": (
-            f"Not sent: {where} execution profile, {profile.name}, does not allow {refused}. "
-            "Choose a model it allows, or change the profile in Settings › Execution profiles."
-        ),
-    }
+    return raiker_md.refusal_detail(project, state.blocking)
 
 
 async def _prepare_turn(
@@ -525,6 +539,19 @@ async def _prepare_turn(
             ),
             detail=profile_refusal,
         )
+    instruction_refusal = _instruction_files_refusal(workspace, session.principal_id, turn_project_id)
+    if instruction_refusal is not None:
+        return _TurnRefusal(
+            kind="instructions",
+            response=AgentResponse(
+                request_id=envelope.request_id,
+                session_id=envelope.session_id,
+                turn_id=envelope.turn_id,
+                status="failed",
+                message=str(instruction_refusal["message"]),
+            ),
+            detail=instruction_refusal,
+        )
     _record_attachment_refs(workspace, envelope, session.principal_id)
     if retry_of:
         SQLiteStore(workspace).record_turn_retry(
@@ -547,7 +574,7 @@ async def submit_prompt(
     session, principal = _auth_data
     prepared = await _prepare_turn(body, request, session, principal)
     if isinstance(prepared, _TurnRefusal):
-        if prepared.kind in {"not_ready", "profile"}:
+        if prepared.kind in {"not_ready", "profile", "instructions"}:
             raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=prepared.detail)
         refused: AgentResponse = prepared.response
         return serialize_dto(refused)
@@ -602,6 +629,15 @@ async def stream_prompt(
                     StreamEvent(
                         kind=FINAL,
                         event_type="execution_profile_refused",
+                        payload=refusal.detail or {},
+                        response=refusal.response,
+                    )
+                )
+            elif refusal.kind == "instructions":
+                yield _sse(
+                    StreamEvent(
+                        kind=FINAL,
+                        event_type="instruction_files_need_review",
                         payload=refusal.detail or {},
                         response=refusal.response,
                     )

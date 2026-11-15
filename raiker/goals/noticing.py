@@ -21,7 +21,9 @@ from __future__ import annotations
 
 import hashlib
 import json
+import math
 import re
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from typing import Any
@@ -37,6 +39,11 @@ MIN_OVERLAP = 0.5
 LOOKBACK_DAYS = 30
 #: The most other conversations read per check: enough for a month of use.
 MAX_SESSIONS = 200
+#: By meaning (2026-11-15): the cosine two requests' embeddings must reach to be
+#: the same aim in other words ("plan our trip to Kyoto" / "sort out the Japan
+#: holiday"), and how many recent other conversations are embedded per check.
+MEANING_THRESHOLD = 0.85
+MEANING_CANDIDATES = 20
 
 _WORD = re.compile(r"[a-zà-ÿ0-9][a-zà-ÿ0-9'-]+")
 
@@ -147,10 +154,59 @@ def _goal_aims(store: SQLiteStore, owner: str) -> list[frozenset[str]]:
     return [keywords(f"{row['title']} {row['objective']}") for row in rows]
 
 
+def _cosine(a: list[float], b: list[float]) -> float:
+    dot = sum(x * y for x, y in zip(a, b, strict=False))
+    na = math.sqrt(sum(x * x for x in a))
+    nb = math.sqrt(sum(y * y for y in b))
+    return dot / (na * nb) if na and nb and len(a) == len(b) else 0.0
+
+
+def _by_meaning(
+    request: str,
+    others: list[Any],
+    embed: Callable[[str], list[float] | None],
+) -> dict[str, str]:
+    """Other conversations whose request says the same aim in other words.
+
+    Runs only when the word check found nothing and the owner's embedding model
+    may run (``embed`` returns ``None`` otherwise); the most recent
+    :data:`MEANING_CANDIDATES` conversations are compared, each once.
+    """
+    query = embed(request)
+    if not query:
+        return {}
+    matched: dict[str, str] = {}
+    seen: set[str] = set()
+    for row in others:
+        other_id = str(row["session_id"])
+        if other_id in seen:
+            continue
+        seen.add(other_id)
+        if len(seen) > MEANING_CANDIDATES:
+            break
+        text = str(row["prompt_text"] or "").strip()
+        if len(keywords(text)) < 2:
+            continue
+        vector = embed(text)
+        if vector and _cosine(query, vector) >= MEANING_THRESHOLD:
+            matched[other_id] = str(row["title"] or "Untitled chat")
+    return matched
+
+
 def suggestion_for(
-    store: SQLiteStore, *, owner_principal_id: str, user_id: str | None, session_id: str
+    store: SQLiteStore,
+    *,
+    owner_principal_id: str,
+    user_id: str | None,
+    session_id: str,
+    embed: Callable[[str], list[float] | None] | None = None,
 ) -> GoalSuggestion | None:
-    """The goal to offer under this conversation's latest request, or ``None``."""
+    """The goal to offer under this conversation's latest request, or ``None``.
+
+    ``embed`` is the owner's governed embedding function, given only where the
+    built-in embedding model may run; with it, an aim said in other words in
+    another conversation is noticed too. Without it nothing changes.
+    """
     session = store.load_session(session_id)
     if session is None or (user_id and session.get("user_id") not in (None, user_id)):
         return None
@@ -190,6 +246,11 @@ def suggestion_for(
             matched[other_id] = str(row["title"] or "Untitled chat")
         if len(matched) >= MAX_SESSIONS:
             break
+    if not matched and embed is not None:
+        try:
+            matched = _by_meaning(request, list(others), embed)
+        except Exception:  # noqa: BLE001 - noticing is a convenience, never a failure
+            matched = {}
     if not matched:
         return None
 

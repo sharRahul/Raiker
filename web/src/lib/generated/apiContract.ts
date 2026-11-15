@@ -2947,6 +2947,11 @@ export type GithubRepoConnected = {
   branch: string | null;
 };
 
+/** The signed-in account's global RAIKER.md. */
+export type GlobalInstructionFileView = {
+  source: InstructionFileSource;
+};
+
 /** An owner action on a goal, named against the revision the owner saw. */
 export type GoalActionRequest = {
   base_revision: number;
@@ -3577,6 +3582,37 @@ export type InstanceCreateRequest = {
 export type InstanceCreated = {
   name: string;
   url: string;
+};
+
+/** RAIKER.md — stop using a file; restoring the same bytes later does not reactivate it. */
+export type InstructionFileDisableRequest = {
+  scope?: "global" | "project";
+};
+
+/** RAIKER.md — approve the exact revision on the owner's screen, by its digest. */
+export type InstructionFileReviewRequest = {
+  scope?: "global" | "project";
+  digest: string;
+};
+
+/** One RAIKER.md: its scope, state in words, digest and the redacted preview. */
+export type InstructionFileSource = {
+  scope: "global" | "project";
+  label: string;
+  state: "absent" | "empty" | "disabled" | "unreviewed" | "approved" | "changed" | "unsafe" | "unreadable" | "invalid" | "oversized" | "root_unavailable";
+  reason: string;
+  digest: string;
+  chars: number;
+  bytes: number;
+  reviewed_digest: string;
+  reviewed_at: string;
+  preview?: string;
+  path?: string;
+};
+
+/** RAIKER.md — turn a project's file instructions on or off. */
+export type InstructionFilesEnabledRequest = {
+  enabled: boolean;
 };
 
 export type InterruptCategory = {
@@ -5271,6 +5307,14 @@ export type ProjectFolderAttached = {
 export type ProjectFolderDetached = {
   ok: boolean;
   project_id: string;
+};
+
+/** Whether a project uses file instructions, and the state of both files. */
+export type ProjectInstructionFilesView = {
+  project_id: string;
+  enabled: boolean;
+  needs_review: boolean;
+  sources: InstructionFileSource[];
 };
 
 /** QUI-F21 — the repositories, sites and connections a project's work may reach. */
@@ -7907,6 +7951,14 @@ export const contract = {
     call<ImageReverted>("POST", `/api/images/${encodeURIComponent(generationId)}/revert`, { body }),
   createInstance: (body: InstanceCreateRequest) =>
     call<InstanceCreated>("POST", "/api/instances", { body }),
+  getGlobalInstructionFile: () =>
+    request<GlobalInstructionFileView>("/api/instruction-files/global"),
+  disableGlobalInstructionFile: () =>
+    call<GlobalInstructionFileView>("POST", "/api/instruction-files/global/disable"),
+  reviewGlobalInstructionFile: (body: InstructionFileReviewRequest) =>
+    call<GlobalInstructionFileView>("POST", "/api/instruction-files/global/review", { body }),
+  createGlobalInstructionFile: () =>
+    call<GlobalInstructionFileView>("POST", "/api/instruction-files/global/starter"),
   interrupts: (body: InterruptRequest) =>
     call<InterruptResult>("POST", "/api/interrupts", { body }),
   revokeKnowledgeSource: (query: { kind: string; source_id: string }) =>
@@ -8207,6 +8259,14 @@ export const contract = {
     request<ProjectDeletionPreviewView>(`/api/projects/${encodeURIComponent(projectId)}/deletion-preview`),
   getProjectFiles: (projectId: string) =>
     request<ProjectFilesView>(`/api/projects/${encodeURIComponent(projectId)}/files`),
+  getProjectInstructionFiles: (projectId: string) =>
+    request<ProjectInstructionFilesView>(`/api/projects/${encodeURIComponent(projectId)}/instruction-files`),
+  setProjectInstructionFiles: (projectId: string, body: InstructionFilesEnabledRequest) =>
+    call<ProjectInstructionFilesView>("PUT", `/api/projects/${encodeURIComponent(projectId)}/instruction-files`, { body }),
+  disableProjectInstructionFile: (projectId: string, body: InstructionFileDisableRequest) =>
+    call<ProjectInstructionFilesView>("POST", `/api/projects/${encodeURIComponent(projectId)}/instruction-files/disable`, { body }),
+  reviewProjectInstructionFile: (projectId: string, body: InstructionFileReviewRequest) =>
+    call<ProjectInstructionFilesView>("POST", `/api/projects/${encodeURIComponent(projectId)}/instruction-files/review`, { body }),
   getProjectLimits: (projectId: string) =>
     request<ProjectLimitsView>(`/api/projects/${encodeURIComponent(projectId)}/limits`),
   setProjectLimits: (projectId: string, body: ProjectLimitsRequest) =>

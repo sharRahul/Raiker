@@ -1,5 +1,154 @@
 # Fixed items
 
+## FIXED-1486 — A design could not be shown as a presentation (BUG-348, DW-11)
+
+**Severity: Medium. Area: Design / export. Status: Fixed 2026-11-16.**
+
+**Observed.** BUG-348 listed presentation formats as the last missing DW-11 export: a design with several frames could leave Raiker only one frame at a time, as PNG, PDF, SVG or JSON.
+
+**Fixed.** **Export › Slides — every frame (PowerPoint)** writes a `.pptx` deck (`raiker/design/deck.py`): one slide per frame in document order with the chosen frame first, each drawn by the raster renderer PNG and PDF use (so it shows what Check measured), sized to the first frame's aspect within PowerPoint's limits, the frame's words kept as the picture's alternative text. The file is plain Office Open XML written by Raiker, with no new dependency; the export records the slide count with its version and hash like every other export.
+
+**Evidence.** `tests/test_design_documents.py::test_a_document_exports_as_slides_one_per_frame`; a two-frame deck opened in LibreOffice (two pages rendered) and parsed by python-pptx with both slides' alternative text intact (local check only; python-pptx is not a Raiker dependency).
+
+## FIXED-1485 — A release started before CI finished was refused as if checks had failed
+
+**Severity: Low. Area: Release workflow. Status: Fixed 2026-11-16.**
+
+**Observed.** Release run `43640908209` was dispatched at 21:05 on `e1b8b144`, while CI and the llama.cpp engine jobs were still running (they passed at 21:08–21:09). The Plan gate refused correctly but said only *required release verification has not passed: Engine tests (macos-15), Python tests (shard 1 of 3)…*, which reads as a failure to investigate.
+
+**Fixed.** The gate in `.github/workflows/release.yml` now sorts what is missing into *still running (start the release again once they pass)*, *did not pass (conclusion)* and *never ran on this commit*. What it requires is unchanged.
+
+**Evidence.** `tests/test_release_workflow.py`, `tests/test_desktop_release.py` (34 passed); the workflow parses.
+
+## FIXED-1484 — A folder inside another repository was treated as a repository (2026-10-19 Windows failures)
+
+**Severity: Medium. Area: Git / Build. Status: Fixed 2026-11-16.**
+
+**Observed.** Two of the five 2026-10-19 Windows full-suite failures — a push proposal on a plain folder answered `push_egress_denied`, a branch proposal returned no error — had one cause: `git rev-parse --is-inside-work-tree` walks up, and the test's temporary folder sat under a checked-out home. A plain folder inside any repository was therefore judged as that repository, and a commit, branch or push could act on one the owner never selected.
+
+**Fixed.** `_repository` (`raiker/tools/git.py`) also asks for `--show-toplevel` and refuses with `not_a_git_repository` unless the selected folder is the repository's own top level. The third failure (`test_the_os_command_obeys_the_stored_desktop_decision`) is the Windows host having no `true` command, an environment assumption; it stays recorded.
+
+**Evidence.** `tests/test_git_push_path.py::TestProposalFailsClosed::test_a_plain_folder_inside_another_repository_is_not_one`; every `tests/test_git*.py` passes.
+
+## FIXED-1483 — Twenty-two more error messages gave no effect or next step (QUI-G06)
+
+**Severity: Low. Area: Quiet UI / errors. Status: Fixed 2026-11-16.**
+
+**Observed.** Messages such as *Could not change the active repository.*, *Could not revoke the grant.* and *Couldn't read the working tree.* said what failed and nothing about what it affected or what to do.
+
+**Fixed.** Twenty-two messages now say what failed, what it affected and the next step: the price registry, repository select/disconnect/index, provider catalogue refresh, the Hugging Face token, both vendor-download buttons, three Brain source actions, scheduling an agent, Build's checkpoints, the export dialog, five Security actions, patch review and both Build artifact reads.
+
+**Evidence.** Web unit suite 2,912 passed; no test asserted the old wording.
+
+## FIXED-1482 — Five live specs still drove the Permissions page QUI-L06 replaced
+
+**Severity: Low. Area: Live test harness. Status: Fixed 2026-11-16.**
+
+**Observed.** `b9-repository-code-map`, `memory-restart-provider-composer`, `round-2026-09-15-typed-and-authority`, `round-2026-09-04-priority` and `gcr-provider-validation-and-workspace` searched *Search capabilities* and clicked `.cap.card` rows, so each timed out before testing anything.
+
+**Fixed.** Each opens and sets permissions through `openPermission` and `setPermission` in `web/e2e/hosted-provider.ts` (the category rail and detail pane); `b9` anchors *Code map* so a neighbouring permission is never toggled. `removal-review-permissions-2026-09-14` and `release-readiness-2026-09-13` assert the old layout itself and stay open.
+
+**Evidence.** ESLint and the TypeScript compiler pass on all five; they were not run live this round (each needs its own fixture state).
+
+## FIXED-1481 — A goal said in other words was not noticed
+
+**Severity: Low. Area: Goals / noticing. Status: Fixed 2026-11-16.**
+
+**Observed.** Goals were noticed by shared word forms only (FIXED-1440): *Plan our holiday to Kyoto* and *Organise the Japan vacation itinerary* share no words and were never offered as one aim.
+
+**Fixed.** When the words find nothing and the owner's embedding model may run (`query_embedding_available`), `suggestion_for` compares the request with the twenty most recent other conversations by meaning (cosine ≥ 0.85) through the same governed embedder memory recall uses. With no model allowed nothing changes; a failing embedder is a quiet no.
+
+**Evidence.** `tests/test_goal_noticing.py` (two new cases: synonyms matched, unrelated requests not joined, a broken embedder offers nothing).
+
+## FIXED-1480 — A goal criterion could not be met by Build's own verified checks (BUG-355)
+
+**Severity: Medium. Area: Goals / validators. Status: Fixed 2026-11-16.**
+
+**Observed.** BUG-355's *criteria validators* row: a criterion was met only by *its steps finish* or *you confirm it*. A Build step's `completed_verified` outcome — Raiker's own record that each declared check ran after the last change and passed — could not count.
+
+**Fixed.** A new validator, **Met when Build's checks pass** (`build_verified`). Accepting a plan refuses one linked to a non-Build step (`goal_build_criterion_needs_build_steps`). When every linked step is done, the coordinator judges each step's last Build turn with the same `build_turn_outcome` Build's outcome line uses; only `completed_verified` is evidence, recorded with the turn ids. Anything short of it leaves the criterion unmet, so the goal ends partial or failed, never completed on the model's word.
+
+**Evidence.** `tests/test_goals_and_execution_profiles.py` (refusal for a Chat step; met for `completed_verified`, unmet for `completed_unverified`).
+
+## FIXED-1479 — Leaving Settings with unsaved changes asked in the browser's confirm box
+
+**Severity: Low. Area: Quiet UI / dialogs. Status: Fixed 2026-11-16.**
+
+**Observed.** The last native dialog (FIXED-1468 note): Settings' leave guard ran inside navigation and had to answer synchronously, so it used `window.confirm`.
+
+**Fixed.** A leave guard may now answer with a promise (`leaveGuard.ts`); the shell stays on the page while it waits and follows the link once the answer is yes (`allowLeaveOnce`). Settings asks **Leave Settings without saving?** in `ConfirmDialog`, with **Leave without saving** named on its button. No code in the app calls `window.confirm` or `window.prompt` for its own questions now.
+
+**Evidence.** `leaveGuard.test.ts` (two new cases), `SettingsView.test.ts` (leave guard cases on the async answer); `round-2026-10-05-readiness-decisions-live` answers the in-app dialog and asserts no native one; RT-1116-04.
+
+## FIXED-1478 — A project's overview could sit on *Loading … count…*
+
+**Severity: Low. Area: Work / projects. Status: Fixed 2026-11-16.**
+
+**Observed.** Found 2026-11-15 (RT-1115-05): a project just opened read *Loading file count…*, *Loading task count…* and *Loading image count…*. The three reads ran one after another under one flag, so a slow gallery held all three; closing a project mid-load also left the flag up.
+
+**Fixed.** The reads run together and each count has its own flag, settling the moment its read lands, with its own *Unavailable* on failure; closing a project clears them.
+
+**Evidence.** Web unit suite; RT-1116-05 (live: every count settled).
+
+## FIXED-1477 — A scheduled task ran outside the active execution profile (BUG-356)
+
+**Severity: Medium. Area: Execution profiles / tasks. Status: Fixed 2026-11-16.**
+
+**Observed.** BUG-356: goal steps, Chat and Build were held to the active profile; a scheduled task's run was not, so *Private local* did not stop a routine sending to a hosted model.
+
+**Fixed.** The profile check is one function (`profiles.turn_refusal`) used by the prompt route and the scheduler. A scheduled run that is not a goal step is judged against the owner's (or the task's project's) profile across the whole fallback chain before it starts; a refusal cancels that run with *Not run: … does not allow Anthropic (hosted)…* and nothing reaches a model.
+
+**Evidence.** `tests/test_goals_and_execution_profiles.py::test_a_scheduled_run_outside_the_active_profile_does_not_start`.
+
+## FIXED-1476 — A profile refusal named the provider by its id
+
+**Severity: Low. Area: Execution profiles / copy. Status: Fixed 2026-11-16.**
+
+**Observed.** *does not allow anthropic (hosted)* — the provider's id, where Models says *Anthropic*.
+
+**Fixed.** `chain_refusal` names the provider through the model registry's display names (*Anthropic (hosted)*, *OpenAI (hosted)*), for goal steps, turns and scheduled runs alike.
+
+**Evidence.** `tests/test_goals_and_execution_profiles.py`; RT-1116-03.
+
+## FIXED-1475 — A turn Raiker refused before sending read as a failure (BUG-356)
+
+**Severity: Medium. Area: Chat / Build. Status: Fixed 2026-11-16.**
+
+**Observed.** Found 2026-11-15: an execution-profile refusal showed *Not done — The turn failed before it finished* above the explanation, with no way to the setting.
+
+**Fixed.** A final stream event `execution_profile_refused` or `instruction_files_need_review` is drawn as one quiet line: **Not sent** · the reason, and **Open Settings** or **Review RAIKER.md** (`refusalFromFinal`), in Chat and Build. The failure header and the *No answer text* placeholder are not drawn for it; a route that is not an in-app address is replaced by the setting's own.
+
+**Evidence.** `chatPresentation.test.ts` (three new cases); RT-1116-01 and RT-1116-03.
+
+## FIXED-1474 — Build's context inspector did not say which instruction files a turn follows
+
+**Severity: Low. Area: Build / RAIKER.md. Status: Fixed 2026-11-16.**
+
+**Observed.** With RAIKER.md (FIXED-1472) a Build turn can follow files the owner reviewed; the composer gave no way to see which, or that one waited for review.
+
+**Fixed.** On a project using file instructions, Build's context inspector lists *Instruction files: In use: Global RAIKER.md, RAIKER.md* and any file waiting with its reason; a file that needs review also puts *RAIKER.md needs review* on the summary line, with **Review** to the project. Read when the project changes and after every turn.
+
+**Evidence.** RT-1116-01 (live: the changed file is named in the inspector).
+
+## FIXED-1473 — There was nowhere to keep instructions for Build across all projects
+
+**Severity: Medium. Area: Settings / RAIKER.md. Status: Fixed 2026-11-16.**
+
+**Observed.** Instructions were per project (encrypted owner records); the approved RAIKER.md design adds an account-wide global file.
+
+**Fixed.** Settings › Personalisation › **Global RAIKER.md** shows the account's own file path (`.raiker/user-instructions/<user id>/RAIKER.md` in the data folder), **Create starter file** (never overwrites), the redacted text as Build would see it, and **Review and use**, **Approve this revision**, **Turn off**. It applies to projects with file instructions on.
+
+**Evidence.** `tests/test_raiker_md.py::test_the_global_file_is_the_accounts_own`; RT-1116-02.
+
+## FIXED-1472 — Build could not follow a reviewed RAIKER.md (RAIKER_MD)
+
+**Severity: Medium. Area: Build / instructions. Status: Fixed 2026-11-16.**
+
+**Observed.** The owner approved RAIKER.md global and project-root instruction files on 2026-11-10; nothing was implemented.
+
+**Fixed.** As designed ([RAIKER.md instructions](../architecture/RAIKER_MD_INSTRUCTIONS.md)): a project uses file instructions only after the owner turns them on (which approves nothing); only the project root's `RAIKER.md` and the account's global file are read, never a subdirectory's, an alias or an import; each read is pinned (no links, devices, FIFOs or second hard links, the opened handle must be the named file), whole (8,192 bytes, 4,000 characters, UTF-8, no NUL) and redacted. **Review and use** binds the owner, scope, project, root identity, SHA-256 and projection version, and refuses bytes that changed since the preview. A Build turn on a project whose file is new, changed, unsafe or unreadable is not sent; approved revisions go into the turn as their own labelled system message, below the owner's request and project instructions, re-read every turn and outside the history, so compaction never summarises them away. Events carry scopes, states and digests, never text or paths.
+
+**Evidence.** `tests/test_raiker_md.py` (23 cases); contract cases for the eight routes; RT-1116-01 (live, real Haiku 4.5 Build turns: the reviewed file was followed, a changed file stopped the next turn as *Not sent*).
 ## FIXED-1471 — Design's image-model control drew two focus rings and a one-item list
 
 **Severity: Low. Area: Quiet UI / Design composer. Status: Fixed 2026-11-15.**
@@ -2889,6 +3038,21 @@ file you can open. The two capture sets that remain — `screenshots/pages/` and
 | [FIXED-1382](#fixed-1382--linux-filesystem-flags-broke-windows-type-checking) | Low | Platform portability | Fixed 2026-11-09 |
 | [FIXED-1383](#fixed-1383--keyboard-start-evidence-depended-on-retired-receipt-wording) | Low | Beta live tests | Fixed 2026-11-09 |
 | [FIXED-1384](#fixed-1384--model-downloads-checked-redirect-hosts-after-contacting-them) | High | Model and speech downloads | Fixed 2026-11-09 |
+| [FIXED-1486](#fixed-1486--a-design-could-not-be-shown-as-a-presentation-bug-348-dw-11) | Medium | Design / export | Fixed 2026-11-16 |
+| [FIXED-1485](#fixed-1485--a-release-started-before-ci-finished-was-refused-as-if-checks-had-failed) | Low | Release workflow | Fixed 2026-11-16 |
+| [FIXED-1484](#fixed-1484--a-folder-inside-another-repository-was-treated-as-a-repository-2026-10-19-windows-failures) | Medium | Git / Build | Fixed 2026-11-16 |
+| [FIXED-1483](#fixed-1483--twenty-two-more-error-messages-gave-no-effect-or-next-step-qui-g06) | Low | Quiet UI / errors | Fixed 2026-11-16 |
+| [FIXED-1482](#fixed-1482--five-live-specs-still-drove-the-permissions-page-qui-l06-replaced) | Low | Live test harness | Fixed 2026-11-16 |
+| [FIXED-1481](#fixed-1481--a-goal-said-in-other-words-was-not-noticed) | Low | Goals / noticing | Fixed 2026-11-16 |
+| [FIXED-1480](#fixed-1480--a-goal-criterion-could-not-be-met-by-builds-own-verified-checks-bug-355) | Medium | Goals / validators | Fixed 2026-11-16 |
+| [FIXED-1479](#fixed-1479--leaving-settings-with-unsaved-changes-asked-in-the-browsers-confirm-box) | Low | Quiet UI / dialogs | Fixed 2026-11-16 |
+| [FIXED-1478](#fixed-1478--a-projects-overview-could-sit-on-loading--count) | Low | Work / projects | Fixed 2026-11-16 |
+| [FIXED-1477](#fixed-1477--a-scheduled-task-ran-outside-the-active-execution-profile-bug-356) | Medium | Execution profiles / tasks | Fixed 2026-11-16 |
+| [FIXED-1476](#fixed-1476--a-profile-refusal-named-the-provider-by-its-id) | Low | Execution profiles / copy | Fixed 2026-11-16 |
+| [FIXED-1475](#fixed-1475--a-turn-raiker-refused-before-sending-read-as-a-failure-bug-356) | Medium | Chat / Build | Fixed 2026-11-16 |
+| [FIXED-1474](#fixed-1474--builds-context-inspector-did-not-say-which-instruction-files-a-turn-follows) | Low | Build / RAIKER.md | Fixed 2026-11-16 |
+| [FIXED-1473](#fixed-1473--there-was-nowhere-to-keep-instructions-for-build-across-all-projects) | Medium | Settings / RAIKER.md | Fixed 2026-11-16 |
+| [FIXED-1472](#fixed-1472--build-could-not-follow-a-reviewed-raikermd-raiker_md) | Medium | Build / instructions | Fixed 2026-11-16 |
 | [FIXED-1471](#fixed-1471--designs-image-model-control-drew-two-focus-rings-and-a-one-item-list) | Low | Quiet UI / Design composer | Fixed 2026-11-15 |
 | [FIXED-1470](#fixed-1470--the-first-run-model-step-offered-only-decide-later-with-models-ready-to-choose) | Medium | First-run setup | Fixed 2026-11-15 |
 | [FIXED-1469](#fixed-1469--builds-composer-put-the-model-and-then-send-on-a-second-row) | Low | Quiet UI / composer | Fixed 2026-11-15 |

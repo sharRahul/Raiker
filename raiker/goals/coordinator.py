@@ -231,9 +231,16 @@ class GoalCoordinator:
             raise GoalError("goal_model_not_configured")
         linked = {cid for step in goal["steps"] for cid in step["criterion_ids"]}
         for criterion in goal["criteria"]:
-            if criterion["validator"] == "steps_finish" and criterion["criterion_id"] not in linked:
+            if criterion["validator"] in {"steps_finish", "build_verified"} and criterion["criterion_id"] not in linked:
                 # It could never be met: no step would ever count as its evidence.
                 raise GoalError("goal_criterion_has_no_step", criterion["criterion_id"])
+            if criterion["validator"] == "build_verified" and any(
+                step["surface"] != "build"
+                for step in goal["steps"]
+                if criterion["criterion_id"] in step["criterion_ids"]
+            ):
+                # Only a Build turn has declared checks to verify against.
+                raise GoalError("goal_build_criterion_needs_build_steps", criterion["criterion_id"])
         profile, _source = profile_store.resolve_for(self.store, owner=owner, project_id=goal.get("project_id"))
         if profile is None:
             raise GoalError("no_execution_profile")
@@ -408,6 +415,13 @@ class GoalCoordinator:
         if cap is not None and self.spend(owner, goal).total_usd >= Decimal(str(cap)):
             return f"spent at least ${cap}"
         return ""
+
+    def is_goal_step(self, task: Any) -> bool:
+        """Whether ``task`` is one of a goal's steps (judged by its goal's own profile)."""
+        try:
+            return goal_store.goal_for_task(self.store, task.task_id) is not None
+        except Exception:  # noqa: BLE001 - an unreadable goal table is not a goal step
+            return False
 
     def guard_task(self, task: Any) -> tuple[str, str] | None:
         """Called by the scheduler just before it runs a claimed task.
@@ -653,10 +667,60 @@ class GoalCoordinator:
                     {"step_id": step["step_id"], "task_id": task_id, "memory_withheld": withhold_memory})
         return True
 
+    def _build_verified(self, owner: str, steps: list[dict[str, Any]]) -> list[str] | None:
+        """BUG-355 — the turn ids proving every step verified, or ``None``.
+
+        Each step's task ran its Build turn in the task's own conversation; the
+        last turn there is judged exactly as Build's outcome line judges it
+        (``classify_build_turn``), from the turn's tool actions, command runs and
+        the project's declared checks. Anything short of ``completed_verified``
+        — no checks declared, a check not re-run after the last change, a
+        failing check, a stopped turn — is not evidence.
+        """
+        from raiker.control.dashboard import DashboardService
+
+        service = DashboardService(self.workspace_root)
+        user_id = self.store.principal_user_id(owner)
+        proofs: list[str] = []
+        for step in steps:
+            task = self.store.load_task(str(step.get("task_id") or "")) if step.get("task_id") else None
+            if task is None:
+                return None
+            session_id = str(getattr(task, "run_session_id", "") or "")
+            turns = self.store.list_turns(session_id, limit=500) if session_id else []
+            if not turns:
+                return None
+            turn_id = str(turns[-1]["turn_id"])
+            try:
+                outcome = service.build_turn_outcome(
+                    session_id, turn_id, user_id=user_id, owner_principal_id=owner
+                )
+            except Exception:  # noqa: BLE001 - an unreadable record proves nothing
+                return None
+            if not outcome or outcome.get("outcome") != "completed_verified":
+                return None
+            proofs.append(turn_id)
+        return proofs
+
     def _auto_evidence(self, goal: dict[str, Any]) -> None:
-        """``steps_finish`` criteria whose every linked step is done get that evidence."""
+        """Deterministic evidence: ``steps_finish`` and ``build_verified`` criteria."""
+        owner = str(goal.get("owner_principal_id") or goal.get("owner") or "")
         with self.store.connect() as connection:
             for criterion in goal["criteria"]:
+                if criterion["validator"] == "build_verified" and not criterion.get("evidence_kind"):
+                    linked = [s for s in goal["steps"] if criterion["criterion_id"] in s["criterion_ids"]]
+                    if not linked or not all(s["state"] == "done" for s in linked) or not owner:
+                        continue
+                    proofs = self._build_verified(owner, linked)
+                    if proofs is None:
+                        continue
+                    connection.execute(
+                        "UPDATE goal_criteria SET evidence_kind = 'build_verified', evidence_ref = ?, verified_at = ? "
+                        "WHERE goal_id = ? AND criterion_id = ?",
+                        (",".join(proofs), utc_now(), goal["goal_id"], criterion["criterion_id"]),
+                    )
+                    criterion["evidence_kind"] = "build_verified"
+                    continue
                 if criterion["validator"] != "steps_finish" or criterion.get("evidence_kind"):
                     continue
                 linked = [s for s in goal["steps"] if criterion["criterion_id"] in s["criterion_ids"]]

@@ -12,7 +12,7 @@ operation answers with, and whether OpenAPI describes it (OPT-01/OPT-02 —
 * **deferred** — the body has no declared type; a test fails while any is.
 * **special** — a stream, a file or another non-JSON transport; hand-written.
 
-**533 operations: 517 verified, 0 eligible, 0 deferred, 16 special.**
+**541 operations: 525 verified, 0 eligible, 0 deferred, 16 special.**
 
 | Method | Path | Request | Response | Status | Why |
 |---|---|---|---|---|---|
@@ -269,6 +269,10 @@ operation answers with, and whether OpenAPI describes it (OPT-01/OPT-02 —
 | POST | `/api/images/{generation_id}/restore` |  | ImageLifecycleChanged | verified | declared ImageLifecycleChanged |
 | POST | `/api/images/{generation_id}/revert` | RevertImageRequest | ImageReverted | verified | declared ImageReverted |
 | POST | `/api/instances` | InstanceCreateRequest | InstanceCreated | verified | declared InstanceCreated |
+| GET | `/api/instruction-files/global` |  | GlobalInstructionFileView | verified | declared GlobalInstructionFileView |
+| POST | `/api/instruction-files/global/disable` |  | GlobalInstructionFileView | verified | declared GlobalInstructionFileView |
+| POST | `/api/instruction-files/global/review` | InstructionFileReviewRequest | GlobalInstructionFileView | verified | declared GlobalInstructionFileView |
+| POST | `/api/instruction-files/global/starter` |  | GlobalInstructionFileView | verified | declared GlobalInstructionFileView |
 | POST | `/api/interrupts` | InterruptRequest | InterruptResult | verified | declared InterruptResult |
 | DELETE | `/api/knowledge-sources` |  | KnowledgeSourceRevoked | verified | DashboardService.revoke_knowledge_source |
 | GET | `/api/knowledge-sources` |  | KnowledgeSources | verified | DashboardService.knowledge_sources |
@@ -420,6 +424,10 @@ operation answers with, and whether OpenAPI describes it (OPT-01/OPT-02 —
 | GET | `/api/projects/{project_id}/deletion-preview` |  | ProjectDeletionPreviewView | verified | declared ProjectDeletionPreviewView |
 | POST | `/api/projects/{project_id}/export` |  |  | special | special |
 | GET | `/api/projects/{project_id}/files` |  | ProjectFilesView | verified | WebReadModels.project_files |
+| GET | `/api/projects/{project_id}/instruction-files` |  | ProjectInstructionFilesView | verified | declared ProjectInstructionFilesView |
+| PUT | `/api/projects/{project_id}/instruction-files` | InstructionFilesEnabledRequest | ProjectInstructionFilesView | verified | declared ProjectInstructionFilesView |
+| POST | `/api/projects/{project_id}/instruction-files/disable` | InstructionFileDisableRequest | ProjectInstructionFilesView | verified | declared ProjectInstructionFilesView |
+| POST | `/api/projects/{project_id}/instruction-files/review` | InstructionFileReviewRequest | ProjectInstructionFilesView | verified | declared ProjectInstructionFilesView |
 | GET | `/api/projects/{project_id}/limits` |  | ProjectLimitsView | verified | declared ProjectLimitsView |
 | PUT | `/api/projects/{project_id}/limits` | ProjectLimitsRequest | ProjectLimitsView | verified | declared ProjectLimitsView |
 | GET | `/api/projects/{project_id}/managed-files` |  | ManagedFileList | verified | _list |

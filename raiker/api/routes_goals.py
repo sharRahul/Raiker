@@ -122,6 +122,26 @@ def _plan(body: CreateGoalRequest | UpdateGoalPlanRequest, has_project: bool) ->
 # ── Goals ────────────────────────────────────────────────────────────────
 
 
+def _meaning_embedder(store: SQLiteStore, owner: str) -> Any:
+    """The governed embedding function, or ``None`` where no real model may run.
+
+    The same path memory recall and the near-duplicate check use: it embeds
+    only through the owner's allowed embedding backend, and a hosted backend
+    the owner has not allowed for recall is never reached from here.
+    """
+    try:
+        from raiker.memory.query_embedding import GovernedQueryEmbedder, query_embedding_available
+        from raiker.vector.backends import resolve_embedding_backend
+
+        backend = resolve_embedding_backend(store, owner_principal_id=owner)
+        if not query_embedding_available(store, owner, backend):
+            return None
+        embedder = GovernedQueryEmbedder(store, owner, session_id="goal-noticing")
+    except Exception:  # noqa: BLE001 - noticing falls back to words
+        return None
+    return lambda text: embedder(backend, text)
+
+
 @router.get("/api/goals/suggestion")
 async def goal_suggestion(request: Request, session_id: str) -> dict[str, Any]:
     """QUI-F03 — whether this conversation's latest request is an aim worth tracking.
@@ -133,7 +153,11 @@ async def goal_suggestion(request: Request, session_id: str) -> dict[str, Any]:
     owner, _principal = _owner(request)
     store = SQLiteStore(_ws(request))
     found = noticing.suggestion_for(
-        store, owner_principal_id=owner, user_id=store.principal_user_id(owner), session_id=session_id
+        store,
+        owner_principal_id=owner,
+        user_id=store.principal_user_id(owner),
+        session_id=session_id,
+        embed=_meaning_embedder(store, owner),
     )
     answer: GoalSuggestionAnswer = {
         "session_id": session_id,

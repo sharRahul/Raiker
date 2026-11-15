@@ -241,6 +241,25 @@ class ProjectLimitsRequest(StrictRequest):
     connections: list[str] = Field(default_factory=list, max_length=20)
 
 
+class InstructionFilesEnabledRequest(StrictRequest):
+    """RAIKER.md — turn a project's file instructions on or off."""
+
+    enabled: bool
+
+
+class InstructionFileReviewRequest(StrictRequest):
+    """RAIKER.md — approve the exact revision on the owner's screen, by its digest."""
+
+    scope: Literal["global", "project"] = "project"
+    digest: str = Field(min_length=64, max_length=64, pattern=r"^[0-9a-f]{64}$")
+
+
+class InstructionFileDisableRequest(StrictRequest):
+    """RAIKER.md — stop using a file; restoring the same bytes later does not reactivate it."""
+
+    scope: Literal["global", "project"] = "project"
+
+
 class RegisterRequest(StrictRequest):
     username: str
     password: str

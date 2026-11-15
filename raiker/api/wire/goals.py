@@ -62,7 +62,8 @@ class GoalCriterionView(TypedDict):
     text: str
     mandatory: bool
     validator: str
-    #: ``steps_finished`` (every linked step finished) or ``owner_confirmed``.
+    #: ``steps_finished`` (every linked step finished), ``build_verified`` (every
+    #: linked Build turn was ``completed_verified``) or ``owner_confirmed``.
     evidence_kind: str | None
     evidence_ref: str | None
     evidence_note: str | None

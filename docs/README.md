@@ -62,6 +62,9 @@ Canonical technical references:
   boundaries and fail-closed behavior.
 - [Security and policy](architecture/SECURITY_AND_POLICY.md) — security
   philosophy and operational rules.
+- [RAIKER.md instructions](architecture/RAIKER_MD_INSTRUCTIONS.md) — reviewed
+  global and project-root instruction files for Build: discovery, review,
+  limits and what they can never grant.
 - [Remote access](architecture/REMOTE_ACCESS.md) — how another device reaches
   Raiker: the remote listener, mandatory two-step sign-in, sessions, and the
   configuration lifecycle.

@@ -312,7 +312,7 @@
       tokenOpen = false;
       notice = "Hugging Face token saved in the encrypted vault.";
     } catch {
-      error = "Could not save the Hugging Face token.";
+      error = "The Hugging Face token was not saved. Downloads that need it will be refused. Check the token, then choose Save again.";
     }
   }
 </script>

@@ -207,7 +207,7 @@ def test_private_local_refuses_a_hosted_model_by_name_and_files_nothing(
     goal = _act(client, h, _goal(client, h), "accept").json()
     refused = _act(client, h, goal, "start")
     assert refused.status_code == 409
-    assert "profile_blocks_model:anthropic (hosted)" in refused.text
+    assert "profile_blocks_model:Anthropic (hosted)" in refused.text
     assert SQLiteStore(workspace).list_tasks() == []
 
 
@@ -219,7 +219,7 @@ def test_a_fallback_outside_the_profile_blocks_as_surely_as_the_primary(
     _profile(client, h, "private_local")
     goal = _act(client, h, _goal(client, h), "accept").json()
     refused = _act(client, h, goal, "start")
-    assert refused.status_code == 409 and "openai (hosted)" in refused.text
+    assert refused.status_code == 409 and "OpenAI (hosted)" in refused.text
 
 
 def test_provider_allowlist_and_validation(workspace: Path, account: tuple[str, str]) -> None:
@@ -344,7 +344,7 @@ def test_pause_parks_unclaimed_steps_and_resume_rechecks_the_chain(
     )
     paused = _read(client, h, goal["goal_id"])
     refused = _act(client, h, paused, "resume")
-    assert refused.status_code == 409 and "openai (hosted)" in refused.text
+    assert refused.status_code == 409 and "OpenAI (hosted)" in refused.text
     chain[:] = [("anthropic", False)]
     resumed = _act(client, h, paused, "resume")
     assert resumed.status_code == 200, resumed.text
@@ -500,7 +500,7 @@ def test_model_chain_judges_the_selected_model_and_every_fallback(
     assert [(e.provider, e.local, e.allowed) for e in entries] == [
         ("ollama", True, True), ("anthropic", False, False), ("unknown", False, False),
     ]
-    assert profile_store.chain_refusal(entries) == "anthropic (hosted)"
+    assert profile_store.chain_refusal(entries) == "Anthropic (hosted)"
 
 
 def test_profile_and_goal_changes_are_human_only(workspace: Path, account: tuple[str, str], monkeypatch: pytest.MonkeyPatch) -> None:
@@ -571,7 +571,7 @@ def test_model_chain_starts_from_the_goals_own_model(
     assert record is not None
     entries = profile_store.model_chain(store, account[0], record, *MODEL)
     assert seen[-1] == MODEL
-    assert profile_store.chain_refusal(entries) == "anthropic (hosted)"
+    assert profile_store.chain_refusal(entries) == "Anthropic (hosted)"
 
 
 def test_every_goal_and_profile_change_reaches_the_audit_log(
@@ -616,7 +616,7 @@ def test_a_chat_turn_outside_the_active_profile_is_not_sent(
     assert refused.status_code == 409, refused.text
     detail = refused.json()["detail"]
     assert detail["reason_code"] == "execution_profile_refuses_model"
-    assert "Private local" in detail["message"] and "anthropic (hosted)" in detail["message"]
+    assert "Private local" in detail["message"] and "Anthropic (hosted)" in detail["message"]
     assert detail["settings_route"] == "#/settings?tab=execution-profiles"
     # Nothing ran: no turn reached a model.
     assert SQLiteStore(workspace).list_tasks() == []
@@ -630,7 +630,7 @@ def test_a_chat_turn_streams_the_profile_refusal_as_its_final_event(
     _profile(client, h, "private_local")
     with client.stream("POST", "/api/prompts/stream", json={"text": "hello"}, headers=h) as stream:
         body = "".join(stream.iter_text())
-    assert "execution_profile_refused" in body and "not allow anthropic (hosted)" in body
+    assert "execution_profile_refused" in body and "not allow Anthropic (hosted)" in body
 
 
 def test_with_no_profile_chosen_a_chat_turn_is_not_bounded(workspace: Path, account: tuple[str, str]) -> None:
@@ -659,3 +659,119 @@ def test_a_custom_endpoint_on_this_machine_reads_as_local(workspace: Path, accou
     anthropic = ModelProfileRegistry.load().resolve_profile_id("anthropic-hosted")
     monkeypatch.setattr(connections, "get_model_connection", lambda *_a: {"endpoint": "http://127.0.0.1:9/v1"})
     assert placement_is_local(store, account[0], anthropic) is False
+
+
+def test_a_scheduled_run_outside_the_active_profile_does_not_start(
+    workspace: Path, account: tuple[str, str], chain: list[tuple[str, bool]], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """BUG-356 — a scheduled task is new work, bounded like a typed turn."""
+    import asyncio
+
+    from raiker.events.writer import EventLogWriter
+    from raiker.tasks.manager import TaskManager
+    from raiker.tasks.scheduler import TaskScheduler
+
+    client, h = _client(workspace, account)
+    _profile(client, h, "private_local")
+    store = SQLiteStore(workspace)
+    session_id = f"sess_inbox_{account[0]}"
+    if store.load_session(session_id) is None:
+        store.create_session(session_id, str(workspace))
+    task = TaskManager(store, EventLogWriter(store)).create_task(
+        session_id=session_id, title="Morning brief", objective="Summarise my day",
+        scheduled_at="2020-01-01T09:00:00Z",
+    )
+
+    async def never(*_args: Any, **_kwargs: Any) -> None:
+        raise AssertionError("a run the profile refuses must not reach a model")
+
+    monkeypatch.setattr("raiker.tasks.scheduler.AgentGateway.submit_prompt_async", never)
+    assert asyncio.run(TaskScheduler(workspace).run_due()) == 1
+    saved = store.load_task(task.task_id)
+    assert saved is not None and saved.status == "cancelled"
+    summary = str(saved.summary or "")
+    assert summary.startswith("Not run:") and "Private local" in summary and "Anthropic (hosted)" in summary
+
+    # With the chain allowed, the same kind of run starts.
+    chain[:] = [("ollama", True)]
+    TaskManager(store, EventLogWriter(store)).create_task(
+        session_id=session_id, title="Evening brief", objective="Summarise tomorrow",
+        scheduled_at="2020-01-01T09:00:00Z",
+    )
+    started: list[bool] = []
+
+    async def completed(*_args: Any, **_kwargs: Any) -> Any:
+        from types import SimpleNamespace
+
+        started.append(True)
+        return SimpleNamespace(status="completed", message="Done.")
+
+    monkeypatch.setattr("raiker.tasks.scheduler.AgentGateway.submit_prompt_async", completed)
+    asyncio.run(TaskScheduler(workspace).run_due())
+    assert started == [True]
+
+
+# --- BUG-355: a Build step's verified outcome is independent evidence ---------
+
+
+def _build_goal(client: TestClient, h: dict[str, str], *, surface: str = "build") -> dict[str, Any]:
+    project = client.post("/api/projects", json={"name": "Site"}, headers=h)
+    assert project.status_code == 200, project.text
+    plan = {
+        **PLAN,
+        "project_id": project.json()["project_id"],
+        "criteria": [{"text": "The tests pass", "mandatory": True, "validator": "build_verified"}],
+        "steps": [{"title": "Fix it", "instruction": "Fix the failing test.", "surface": surface, "criteria": [0]}],
+    }
+    return _goal(client, h, plan)
+
+
+def test_a_build_verified_criterion_needs_build_steps(
+    workspace: Path, account: tuple[str, str], chain: list[tuple[str, bool]]
+) -> None:
+    client, h = _client(workspace, account)
+    _profile(client, h)
+    goal = _build_goal(client, h, surface="chat")
+    refused = _act(client, h, goal, "accept")
+    assert refused.status_code == 422 and "goal_build_criterion_needs_build_steps" in refused.text
+
+
+@pytest.mark.parametrize(("outcome", "met"), [("completed_verified", True), ("completed_unverified", False)])
+def test_a_build_verified_criterion_is_met_only_by_a_verified_turn(
+    workspace: Path,
+    account: tuple[str, str],
+    chain: list[tuple[str, bool]],
+    monkeypatch: pytest.MonkeyPatch,
+    outcome: str,
+    met: bool,
+) -> None:
+    from raiker.control.dashboard import DashboardService
+
+    client, h = _client(workspace, account)
+    _profile(client, h)
+    goal = _act(client, h, _build_goal(client, h), "accept").json()
+    started = _act(client, h, goal, "start").json()
+    task_id = started["steps"][0]["task_id"]
+    store = SQLiteStore(workspace)
+    task = store.load_task(task_id)
+    assert task is not None
+    seen: list[str] = []
+
+    def judged(_self: Any, session_id: str, turn_id: str, **_kwargs: Any) -> dict[str, Any]:
+        seen.append(turn_id)
+        return {"outcome": outcome}
+
+    monkeypatch.setattr(DashboardService, "build_turn_outcome", judged)
+    monkeypatch.setattr(
+        SQLiteStore, "list_turns", lambda _self, session_id, limit=50: [{"turn_id": "turn_build_1", "session_id": session_id}]
+    )
+    _settle_task(workspace, task_id, "completed")
+    view = _read(client, h, goal["goal_id"])
+    assert seen and seen[-1] == "turn_build_1"
+    if met:
+        assert view["status"] == "completed"
+        assert view["criteria"][0]["evidence_kind"] == "build_verified"
+        assert view["criteria"][0]["evidence_ref"] == "turn_build_1"
+    else:
+        assert view["status"] == "failed"
+        assert view["criteria"][0]["evidence_kind"] is None

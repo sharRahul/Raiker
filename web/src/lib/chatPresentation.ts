@@ -299,3 +299,39 @@ export function turnOutcome(status: string | null | undefined, rows: readonly To
   }
   return { label: "Completed", detail: steps, tone: "done" };
 }
+
+/**
+ * A turn Raiker refused before sending it, and where the owner changes that.
+ *
+ * An execution profile that does not allow the model (BUG-356), or a project
+ * whose RAIKER.md needs review, ends the stream with its own final event. Such
+ * a turn was never sent, so it is drawn the way a goal step's refusal is: the
+ * reason in words and one link to the setting, never *Not done — The turn
+ * failed before it finished*.
+ */
+export interface TurnRefusal {
+  label: string;
+  message: string;
+  href: string;
+  action: string;
+}
+
+const REFUSAL_ACTIONS: Record<string, { action: string; fallback: string }> = {
+  execution_profile_refused: { action: "Open Settings", fallback: "#/settings?tab=execution-profiles" },
+  instruction_files_need_review: { action: "Review RAIKER.md", fallback: "#/projects" },
+};
+
+export function refusalFromFinal(event: {
+  event_type?: string | null;
+  payload?: unknown;
+  response?: { message?: string | null } | null;
+}): TurnRefusal | null {
+  const known = event.event_type ? REFUSAL_ACTIONS[event.event_type] : undefined;
+  if (!known) return null;
+  const payload = (event.payload ?? {}) as Record<string, unknown>;
+  const route = typeof payload.settings_route === "string" && payload.settings_route.startsWith("#/") ? payload.settings_route : known.fallback;
+  const message =
+    (typeof payload.message === "string" && payload.message) || event.response?.message || "Raiker did not send this turn.";
+  // The label already says it; "Not sent · Not sent: …" read twice (RT-1116-01).
+  return { label: "Not sent", message: message.replace(/^Not sent:\s*/i, ""), href: route, action: known.action };
+}

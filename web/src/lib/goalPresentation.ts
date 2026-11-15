@@ -68,10 +68,14 @@ export const STEP_REASONS: Record<string, string> = {
 export const VALIDATOR_LABELS: Record<string, string> = {
   steps_finish: "Met when its steps finish",
   owner_confirms: "You confirm it",
+  // BUG-355 — independent evidence: Raiker's own record that every check the
+  // project declared ran after the last change and passed.
+  build_verified: "Met when Build's checks pass",
 };
 
 export function evidenceLabel(kind: string | null | undefined): string | null {
   if (kind === "steps_finished") return "Its steps finished";
+  if (kind === "build_verified") return "Build ran your checks after the last change, and they passed";
   if (kind === "owner_confirmed") return "Confirmed by you";
   return null;
 }
@@ -163,6 +167,7 @@ const REFUSALS: Record<string, string> = {
   goal_model_not_configured: "The model this goal names is no longer set up. Edit the plan and choose another.",
   goal_model_pair_required: "Choose both a provider and a model.",
   goal_criterion_has_no_step: "A criterion that is met when its steps finish needs at least one step counting toward it",
+  goal_build_criterion_needs_build_steps: "A criterion met by Build's checks can only count Build steps toward it",
   goal_build_step_requires_project: "A Build step needs the goal to be filed in a project",
   goal_step_dependency_invalid: "A step can only run after steps listed before it",
   execution_profile_version_stale: "This profile changed since you opened it. It has been reloaded.",

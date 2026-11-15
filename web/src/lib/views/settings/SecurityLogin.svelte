@@ -182,7 +182,7 @@
       notice = { kind: "ok", text: "Standing grant created." };
       await loadGrants();
     } catch (e) {
-      notice = { kind: "error", text: message(e, "Could not create the grant.") };
+      notice = { kind: "error", text: message(e, "The grant was not created; nothing new was allowed. Check the details, then create it again.") };
     }
   }
 
@@ -192,7 +192,7 @@
       announcePermissionsChanged("rules");
       await loadGrants();
     } catch (e) {
-      notice = { kind: "error", text: message(e, "Could not revoke the grant.") };
+      notice = { kind: "error", text: message(e, "The grant was not revoked and still applies. Reload this page and choose Revoke again.") };
     }
   }
 
@@ -207,7 +207,7 @@
       );
       approvalTimeout = approvalTimeoutMinutes(s.settings as Record<string, unknown>);
     } catch {
-      notice = { kind: "error", text: "Could not load security settings." };
+      notice = { kind: "error", text: "Security settings could not be read. What is shown may not be what is saved. Reload this page before changing anything." };
     }
     await loadSessions();
     await loadGrants();
@@ -274,7 +274,7 @@
       await auth.revokeDeviceSession(id);
       await loadSessions();
     } catch (e) {
-      notice = { kind: "error", text: message(e, "Could not revoke the session.") };
+      notice = { kind: "error", text: message(e, "That session was not signed out and can still use Raiker. Reload this page and choose Sign out again.") };
     }
   }
 
@@ -390,7 +390,7 @@
       elevatePassword = "";
       notice = { kind: "ok", text: "Vault key cleared. Connectors now fail closed." };
     } catch (e) {
-      notice = { kind: "error", text: message(e, "Could not clear the vault key.") };
+      notice = { kind: "error", text: message(e, "The vault key was not cleared and is still stored. Reload this page and choose Clear again.") };
     } finally {
       setToken(control);
       busy = false;

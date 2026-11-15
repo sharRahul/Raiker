@@ -81,6 +81,7 @@ human authorizer, runtime authority, or other literal actor.
 | `skill_deleted` | A skill's stored document was removed from the workspace |
 | `skill_command_changed` | The owner added, changed, or removed a slash handle for an installed skill; the handle carries no authority |
 | `skills_indexed` | A turn advertised the owner's active skills to the model (count and names only — bodies are loaded on demand by `skill_load`) |
+| `instruction_files_loaded` | A Build turn carried the reviewed RAIKER.md files it follows (scopes, states, character counts and digest prefixes only — never the text or a path) |
 | `channel_routing_changed` | The owner replaced a pairing's stored inbound route, target, owner identity, or relay choice |
 | `channel_paused` | The owner paused a channel (DEC-14 step 10): messages are still received and recorded, no work starts, nothing is delivered or relayed |
 | `channel_resumed` | The owner resumed a paused channel |

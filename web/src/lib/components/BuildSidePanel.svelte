@@ -133,7 +133,7 @@
       notice =
         error instanceof ApiError
           ? `Could not schedule the agent (${error.reasonCode ?? error.status}).`
-          : "Could not schedule the agent.";
+          : "The agent was not scheduled; nothing will run. Check the time and the task, then schedule it again.";
     } finally {
       creating = false;
     }

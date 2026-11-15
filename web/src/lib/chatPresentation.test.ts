@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { StreamEvent } from "./apiTypes";
 import {
+  refusalFromFinal,
   collectReasoning,
   familyIcon,
   hasRunningTool,
@@ -298,5 +299,33 @@ describe("a stopped turn says it was stopped once", () => {
 
   it("leaves every other turn's answer alone", () => {
     expect(stoppedAnswer("completed", "Stopped by user at a safe boundary.")).toBe("Stopped by user at a safe boundary.");
+  });
+});
+
+describe("refusalFromFinal", () => {
+  it("draws an execution-profile refusal as Not sent with its Settings route", () => {
+    const refusal = refusalFromFinal({
+      event_type: "execution_profile_refused",
+      payload: { message: "Not sent: your active execution profile, Private local, does not allow Anthropic (hosted).", settings_route: "#/settings?tab=execution-profiles" },
+      response: { message: "ignored" },
+    });
+    expect(refusal).toEqual({
+      label: "Not sent",
+      message: "your active execution profile, Private local, does not allow Anthropic (hosted).",
+      href: "#/settings?tab=execution-profiles",
+      action: "Open Settings",
+    });
+  });
+
+  it("sends a RAIKER.md review to the project and refuses a foreign route", () => {
+    const refusal = refusalFromFinal({ event_type: "instruction_files_need_review", payload: { settings_route: "https://evil.example" }, response: { message: "Not sent: review it." } });
+    expect(refusal?.href).toBe("#/projects");
+    expect(refusal?.action).toBe("Review RAIKER.md");
+    expect(refusal?.message).toBe("review it.");
+  });
+
+  it("leaves an ordinary final event alone", () => {
+    expect(refusalFromFinal({ event_type: "model_not_ready", payload: {} })).toBeNull();
+    expect(refusalFromFinal({})).toBeNull();
   });
 });

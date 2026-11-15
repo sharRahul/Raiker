@@ -114,7 +114,7 @@ test("RT-GOAL-03 — Private local is made in Settings and refuses the hosted mo
   await detail.getByRole("button", { name: "Accept plan" }).click();
   await expect(detail.getByText("Ready to start")).toBeVisible();
   await detail.getByRole("button", { name: "Start" }).click();
-  await expect(detail.getByRole("alert")).toContainText("anthropic (hosted)");
+  await expect(detail.getByRole("alert")).toContainText("Anthropic (hosted)");
   await capture(page, `${SHOTS}/03-private-local-refuses-hosted.png`, detail);
 });
 

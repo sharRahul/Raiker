@@ -616,7 +616,7 @@
     try { await api.addBrainSource(reviewed); sourcePath = ""; sourceReview = null; sourceOpen = false; await load(); }
     catch {
       if (seq !== sourceSeq) return;
-      sourceError = "Could not add this reviewed source.";
+      sourceError = "This source was not added. Nothing from it will be indexed. Check that the folder still exists, then add it again.";
     }
     finally { if (seq === sourceSeq) sourceBusy = false; }
   }
@@ -657,7 +657,7 @@
     }
     catch {
       if (seq !== sourceSeq) return;
-      sourceError = "Could not revoke that folder.";
+      sourceError = "That folder's access was not revoked, so Raiker can still read it. Reload this page and choose Revoke again.";
     }
     finally { if (seq === sourceSeq) sourceBusy = false; }
   }
@@ -689,7 +689,7 @@
           : "Could not store that file.";
     } finally { sourceBusy = false; }
   }
-  async function removeSource(path: string) { try { await api.removeBrainSource(path); await load(); } catch { sourceError = "Could not remove this source."; } }
+  async function removeSource(path: string) { try { await api.removeBrainSource(path); await load(); } catch { sourceError = "This source was not removed and is still indexed. Reload this page and choose Remove again."; } }
   function addGroup() { if (!groupName.trim() || !groupQuery.trim()) return; groups = [...groups, { name: groupName.trim(), query: groupQuery.trim(), color: groupColor }]; groupName = ""; groupQuery = ""; newGroupOpen = false; }
   function statusLabel(status: string): string { return status.replaceAll("_", " ").replace(/^./, (value) => value.toUpperCase()); }
   const selected = $derived(renderedNodes.find((node) => node.node_id === selectedIds[0]) ?? null);

@@ -16,6 +16,49 @@ PR #106: the **user-owned fallback sequence** and **prompt caching + normalised
 cache-hit metrics**.
 
 
+## Result — 2026-11-16 (RAIKER.md, refusals and the leave guard)
+
+A Linux workspace served by `raiker-web --port 8765` on a fresh workspace
+(`scripts/reset_live_workspace.py`), built from this round's SPA and backend.
+Anthropic was connected through **Add model** with an identity-linked key and
+its workspace ID typed into the UI from the round's environment (RT-1114-01,
+passed on its second attempt; see *Found*). This session's environment was
+moved to one that allows `api.openai.com` and `openrouter.ai`, and **RT-1115-08
+now passes**: OpenAI and OpenRouter keys typed into **Add model** connect and
+pass **Test** (blocked by the network last round). No key, token or workspace
+ID appears in a spec, log or capture. Spec:
+`web/e2e/fixed-1472-raiker-md-round-live.spec.ts`. Result: **5 of 5 passed**
+(RT-1116-01 and RT-1116-03 re-run after the polish below).
+
+| # | Scenario | Verification | Result |
+|---|---|---|---|
+| RT-1116-01 | A project's RAIKER.md: **Use RAIKER.md in Build** approves nothing; a nested `docs/RAIKER.md` is never shown; **Review and use** → *In use*; a real Haiku 4.5 Build turn ends with the file's marker word; the file changes on disk and the next Build turn reads **Not sent** with **Review RAIKER.md**, the context inspector names the changed file, and **Approve this revision** returns it to *In use* | FIXED-1472, FIXED-1474, FIXED-1475 | Passed |
+| RT-1116-02 | Settings › Personalisation › Global RAIKER.md: **Create starter file** shows the account's path, then **Review and use** → *In use* | FIXED-1473 | Passed |
+| RT-1116-03 | With *Private local* active, a Haiku 4.5 Chat turn reads **Not sent** · *…does not allow Anthropic (hosted)…* with **Open Settings**, and no *The turn failed before it finished* | FIXED-1475, FIXED-1476 | Passed |
+| RT-1116-04 | An unsaved Settings edit: leaving asks **Leave Settings without saving?** in Raiker's dialog; Cancel stays, **Leave without saving** goes; no native dialog fires | FIXED-1479 | Passed |
+| RT-1116-05 | A project's overview counts settle; none is left on *Loading … count…* | FIXED-1478 | Passed |
+| RT-1115-08 | OpenAI and OpenRouter connect through **Add model** and are ready | — | Passed (was blocked by the network) |
+
+**Found during the run, fixed.** The first RT-1116-01 run ended its Build turn
+with *The connection to Raiker ended before this turn produced anything*: the new
+`instruction_files_loaded` event was not in the event catalogue, so the stream
+raised (now catalogued, with a regression test). The captures then showed
+**Not sent** · *Not sent: …* written twice and a **Show text** toggle beside
+text already shown; both were removed before the final runs.
+
+**Found, not fixed.** The first Chat turn straight after connecting Anthropic
+read *This model connection must be checked again* (a readiness row invalidated
+by the connection save was read before the check that followed it landed); the
+same turn sent again answered. In a container whose command sandbox cannot be
+confirmed, Build's **Run** is disabled and the spec switches to **Plan**. See
+[TO_BE_FIXED](../plans/TO_BE_FIXED.md#2026-11-16-round--found-not-fixed).
+
+**Captures.** `output/playwright/2026-11-16-round/` — `01-raiker-md-needs-review`,
+`01b-raiker-md-in-use`, `01c-build-followed-raiker-md`, `01d-changed-file-not-sent`,
+`02-global-raiker-md-starter`, `02b-global-raiker-md-in-use`,
+`03-chat-refusal-not-sent`, `04-leave-settings-dialog`,
+`05-project-counts-settled`. Inspected at original resolution; no key, token or
+workspace ID is visible.
 ## Result — 2026-11-15 (Desktop window: first-run Model step and Design composer)
 
 The Linux desktop shell (`desktop/`, Electron 44 under `xvfb-run`) against a

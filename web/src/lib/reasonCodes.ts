@@ -129,6 +129,30 @@ const REASON_CODES: Record<string, ReasonCopy> = {
     plain: "Your execution profile does not allow this model.",
     remediation: "Choose a model it allows, or change the profile in Settings › Execution profiles.",
   },
+  goal_build_criterion_needs_build_steps: {
+    plain: "A criterion met by Build's checks is linked to a step that is not a Build step.",
+    remediation: "Link it only to Build steps, or choose another way it is met.",
+  },
+  instruction_files_need_review: {
+    plain: "This project uses file instructions, and a RAIKER.md needs your review first.",
+    remediation: "Open the project's settings to review it, or turn file instructions off.",
+  },
+  instruction_file_changed_since_preview: {
+    plain: "The RAIKER.md changed after you opened it, so the revision you saw was not approved.",
+    remediation: "Read the new revision, then review it.",
+  },
+  instruction_file_root_unavailable: {
+    plain: "The project's folder is not available, so its RAIKER.md cannot be read.",
+    remediation: "Reattach the folder in the project's settings.",
+  },
+  instruction_file_user_unknown: {
+    plain: "Raiker could not tell which account this RAIKER.md belongs to.",
+    remediation: "Sign out and sign in again, then open it again.",
+  },
+  instruction_file_not_created: {
+    plain: "Raiker could not create your global RAIKER.md.",
+    remediation: "Check that the data folder is writable, then try again.",
+  },
   project_delete_confirmation_required: {
     plain: "The delete was not confirmed.",
     remediation: "Type the project's name to confirm.",

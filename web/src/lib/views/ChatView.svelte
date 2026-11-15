@@ -116,7 +116,7 @@
   import { rememberSessionInRoute } from "../sessionRoute";
   import { evidenceLink, forgetTurnInRoute, revealTurn } from "../turnAnchor";
   import { hasSteps, planFromEvent } from "../agentPlan";
-  import { collectReasoning, hasRunningTool, stoppedAnswer, toolActivity, turnOutcome, workingLine, type ToolCallRow } from "../chatPresentation";
+  import { collectReasoning, hasRunningTool, stoppedAnswer, toolActivity, turnOutcome, workingLine, type ToolCallRow, refusalFromFinal, type TurnRefusal } from "../chatPresentation";
   import { turnFailureMessage } from "../turnFailure";
   import { retryConfirmation, retryConsequence } from "../conversationCommands";
   import {
@@ -175,6 +175,9 @@
     reasoningChars?: number;
     // DEC-22 step 3 — the earlier turn this one asked again, when it was a Retry.
     retryOf?: string | null;
+    // A turn Raiker refused before sending (an execution profile, a RAIKER.md
+    // that needs review): drawn as a refusal with its setting, not a failure.
+    refusal?: TurnRefusal | null;
   }
 
 
@@ -1339,6 +1342,7 @@
         (event) => {
           if (event.kind === "final" && event.response !== null) {
             turn.response = event.response;
+            turn.refusal = refusalFromFinal(event);
             sessionId = event.response.session_id;
             void applyPendingProject();
             // A file written by this turn is stored as a session-authorized
@@ -2399,7 +2403,7 @@
     {/if}
     {#each shownTurns as turn, shownIndex (turn.id)}
       {@const turnIndex = firstShown + shownIndex}
-      {@const answer = stoppedAnswer(turn.response?.status, answerText(turn))}
+      {@const answer = turn.refusal ? "" : stoppedAnswer(turn.response?.status, answerText(turn))}
       {@const toolRows = toolActivity(turn.events)}
       <!-- BUG-215 — the stream first, because a turn that is running has the
            freshest working; the stored text when there is no stream to read,
@@ -2506,7 +2510,12 @@
           <!-- B17/C13 — a turn the owner stopped says so. Without this the
                transcript just ends early and the owner is left wondering whether
                Raiker stopped or broke. -->
-          {#if !turn.streaming}
+          {#if !turn.streaming && turn.refusal}
+            <div class="refusal-line" role="status" data-testid="turn-refusal">
+              <p><strong>{turn.refusal.label}</strong> · {turn.refusal.message}</p>
+              <a class="btn btn-sm" href={turn.refusal.href}>{turn.refusal.action}</a>
+            </div>
+          {:else if !turn.streaming}
             {@const outcome = turnOutcome(turn.response?.status, toolRows)}
             {#if outcome !== null}
               <!-- QUI-C03 — how a turn that did something ended, in one line. -->
@@ -2617,7 +2626,7 @@
               {/if}
               </div>
             {/if}
-          {:else if !turn.streaming && turn.error === null && turn.response !== null && turn.response.status !== "needs_approval"}
+          {:else if !turn.streaming && turn.error === null && turn.response !== null && turn.response.status !== "needs_approval" && !turn.refusal}
             <!-- BUG-73 — a turn with no answer has a state, not an answer; a
                  placeholder stored as the answer becomes a durable false claim.
                  BUG-206 — a parked turn says so on the waiting call's own row and
@@ -3634,6 +3643,22 @@
     }
   }
   .continue-row { margin-top: var(--space-1); }
+  .refusal-line {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-3);
+    flex-wrap: wrap;
+    margin: var(--space-2) 0 0;
+    padding: var(--space-2) var(--space-3);
+    border: 1px solid var(--warn-border);
+    border-radius: var(--r-md);
+    background: var(--warn-soft);
+    color: var(--text-1);
+    font-size: var(--text-sm);
+  }
+  .refusal-line p { margin: 0; flex: 1 1 20rem; }
+  .refusal-line strong { font-weight: 650; }
   .outcome-line { margin: var(--space-1) 0 0; font-size: var(--text-xs); color: var(--text-3); }
   .outcome-line strong { font-weight: 650; color: var(--text-2); }
   .outcome-partial strong, .outcome-unknown strong { color: var(--warn-text); }

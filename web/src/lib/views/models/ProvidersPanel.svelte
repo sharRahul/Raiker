@@ -83,7 +83,7 @@
         })();
       });
     } catch {
-      error = "Could not open the reviewed vendor download.";
+      error = "The vendor's download page did not open. Nothing was installed. Allow pop-ups for Raiker, then choose the download again.";
     } finally {
       busy = null;
     }

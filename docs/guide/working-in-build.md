@@ -666,6 +666,34 @@ under is a fact rather than an inference. **It grants nothing**: every gate,
 decision mode, approval and tool is identical on both surfaces. The full protocol
 is [`RAIKER_BUILD_PROCESS.md`](../architecture/RAIKER_BUILD_PROCESS.md).
 
+## RAIKER.md: instructions Build follows
+
+You can keep standing notes for Build in two plain files: a **global**
+`RAIKER.md` for every project, and a `RAIKER.md` at a **project's root**. They
+are guidance — "use pnpm", "end each answer with a summary" — never
+permissions: nothing in them can turn on a tool, reach a folder, open the
+network or count a check as passed.
+
+1. On the project's overview, **File instructions › Use RAIKER.md in Build**.
+   Turning it on approves nothing.
+2. Each file is shown exactly as Build would see it (secrets masked), with its
+   revision. **Review and use** approves that revision.
+3. From then on every Build turn in the project follows the reviewed files —
+   the global one first, then the project's, which wins where they disagree.
+
+If a file changes on disk, the next Build turn is **Not sent** with **Review
+RAIKER.md**; the composer's context line says *RAIKER.md needs review*.
+**Approve this revision** or **Turn off** and continue. **Turn off** clears the
+approval, so putting the same text back later asks again.
+
+The global file is in Settings › Personalisation › **Global RAIKER.md**, which
+shows its path in your data folder and can create a short starter file. Only
+those two files are read: a `RAIKER.md` in a subfolder, `AGENTS.md` or
+`CLAUDE.md` are not. A file must be plain UTF-8 text of at most 8,192 bytes and
+4,000 characters, and must not be a link; anything else is shown as *Not read*
+with the reason. The design is in
+[RAIKER.md instructions](../architecture/RAIKER_MD_INSTRUCTIONS.md).
+
 ## Background work and scheduled agents
 
 A Build turn can be handed to the background queue, and a task can be given a
@@ -673,6 +701,10 @@ cadence — `continuous` (20 minutes), `hourly`, `daily` or `weekly`. Each cycle
 **one governed turn**: it passes policy, gates and approvals exactly like a typed
 prompt, and a cycle that parks on a decision reads as **blocked** with the reason,
 not as failed.
+
+Your active execution profile bounds a scheduled cycle exactly as it bounds a
+typed turn: a cycle whose model the profile does not allow is not run, and the
+task says *Not run* and why.
 
 Two honest limits: a schedule only fires while Raiker is running, so a closed
 laptop is a missed cadence (recorded as skipped rather than owed); and a cycle
@@ -691,6 +723,11 @@ holds it. The usual four, in the order they are checked:
 4. **Approval** — Approvals. Your decision on this specific action.
 
 A turn posture is a fifth, above all of them, and can only tighten.
+
+A turn Raiker refuses before sending — an execution profile that does not allow
+the model, or a `RAIKER.md` that needs your review — reads **Not sent** with the
+reason and one link to the setting (**Open Settings** or **Review RAIKER.md**),
+not as a failure.
 
 Reason codes and their fixes are in [Troubleshooting](troubleshooting.md).
 

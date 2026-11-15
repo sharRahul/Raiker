@@ -23,7 +23,7 @@
  */
 import { expect, test, type Page } from "@playwright/test";
 import { capture } from "./capture";
-import { chooseModelForTurn, signInAsOwner } from "./hosted-provider";
+import { chooseModelForTurn, openPermission as openSharedPermission, signInAsOwner } from "./hosted-provider";
 import { LIVE_BASE as BASE, ANTHROPIC_KEY as KEY, useAnthropic } from "./live";
 import { HOME_GREETING } from "./home";
 
@@ -41,14 +41,9 @@ function watchConsole(page: Page): string[] {
   return errors;
 }
 
+/** QUI-L06 — the category rail and detail pane, through the shared helper. */
 async function openPermission(page: Page, label: RegExp): Promise<void> {
-  await page.goto(`${BASE}/#/capabilities`);
-  const search = page.getByLabel("Search capabilities", { exact: true });
-  await expect(search).toBeVisible({ timeout: 60_000 });
-  await search.fill(label.source.replace(/[\\^$]/g, ""));
-  const row = page.getByRole("button", { name: label }).first();
-  await expect(row).toBeVisible({ timeout: 30_000 });
-  if ((await row.getAttribute("aria-expanded")) !== "true") await row.click();
+  await openSharedPermission(page, BASE, label);
 }
 
 test("Permissions says what a capability would cost, and what stands in the way", async ({

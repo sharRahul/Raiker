@@ -25,7 +25,7 @@
   // mounted across route visits to keep their transcripts alive.
   import LazyRoute from "./lib/components/LazyRoute.svelte";
   import { prefetchRoutes } from "./lib/routeComponents";
-  import { mayLeave } from "./lib/leaveGuard";
+  import { allowLeaveOnce, consumeAllowedLeave, mayLeave } from "./lib/leaveGuard";
   import { DESKTOP_COMMAND_EVENT, desktopBridge, inDesktopShell } from "./lib/desktopShell";
   import { startReadinessRevalidation } from "./lib/modelReadiness.svelte";
   import ApprovalPrompt from "./lib/components/ApprovalPrompt.svelte";
@@ -215,9 +215,21 @@
         window.location.replace(moved);
         return;
       }
-      if (window.location.hash !== shownHash && !mayLeave(window.location.hash)) {
-        history.replaceState(history.state, "", shownHash || "#/");
-        return;
+      if (window.location.hash !== shownHash && !consumeAllowedLeave(window.location.hash)) {
+        const verdict = mayLeave(window.location.hash);
+        if (verdict !== true) {
+          // Stay on the page while the owner answers; a yes follows the link.
+          const next = window.location.hash;
+          history.replaceState(history.state, "", shownHash || "#/");
+          if (verdict !== false) {
+            void verdict.then((go) => {
+              if (!go) return;
+              allowLeaveOnce(next);
+              window.location.hash = next;
+            });
+          }
+          return;
+        }
       }
       shownHash = window.location.hash;
       navigationDrawerOpen = false;

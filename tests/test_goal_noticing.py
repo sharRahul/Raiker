@@ -117,3 +117,47 @@ def test_the_same_aim_matches_across_word_forms() -> None:
     assert keywords("invoicing customers") == keywords("invoice customer")
     # Folding never merges two different words.
     assert not same_aim(keywords("Lisbon flights hotels"), keywords("Berlin marathon training"))
+
+
+def test_the_same_aim_in_other_words_is_noticed_by_meaning(client: TestClient) -> None:
+    """2026-11-15 — synonyms share no words, so only the embedding finds them."""
+    h = _headers(client)
+    _chat(client, h, "sess_trip", "Plan our holiday to Kyoto next spring with temples")
+    _chat(client, h, "sess_japan", "Organise the Japan vacation itinerary around shrines")
+    store = _store(client)
+    principal = client.get("/api/auth/whoami", headers=h).json()["principal_id"]
+    user_id = store.principal_user_id(principal)
+    # Without an embedder (no model may run) the words alone decide: no match.
+    assert noticing.suggestion_for(store, owner_principal_id=principal, user_id=user_id, session_id="sess_japan") is None
+
+    def embed(text: str) -> list[float] | None:
+        travel = any(word in text.lower() for word in ("kyoto", "japan", "holiday", "vacation"))
+        return [1.0, 0.05] if travel else [0.0, 1.0]
+
+    offered = noticing.suggestion_for(
+        store, owner_principal_id=principal, user_id=user_id, session_id="sess_japan", embed=embed
+    )
+    assert offered is not None and offered.session_ids == ("sess_trip",)
+
+    # A failing embedder is a quiet no, never an error.
+    def broken(_text: str) -> list[float] | None:
+        raise RuntimeError("model went away")
+
+    assert noticing.suggestion_for(
+        store, owner_principal_id=principal, user_id=user_id, session_id="sess_japan", embed=broken
+    ) is None
+
+
+def test_meaning_does_not_join_unrelated_requests(client: TestClient) -> None:
+    h = _headers(client)
+    _chat(client, h, "sess_tax", "Prepare my quarterly sales tax filing figures")
+    _chat(client, h, "sess_run", "Build a running plan for my first half marathon")
+    store = _store(client)
+    principal = client.get("/api/auth/whoami", headers=h).json()["principal_id"]
+
+    def embed(text: str) -> list[float] | None:
+        return [1.0, 0.0] if "tax" in text.lower() else [0.0, 1.0]
+
+    assert noticing.suggestion_for(
+        store, owner_principal_id=principal, user_id=store.principal_user_id(principal), session_id="sess_run", embed=embed
+    ) is None

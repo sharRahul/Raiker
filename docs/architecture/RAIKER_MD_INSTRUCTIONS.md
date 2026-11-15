@@ -1,8 +1,38 @@
-# RAIKER.md global and project instructions: design for owner review
+# RAIKER.md global and project instructions
 
-**Status:** approved design; implementation not started.
-**Date:** 2026-11-10. The owner approved global plus project-root scope with the
-reviewed-revision design below, then removed nested (subdirectory) files.
+**Status:** implemented 2026-11-16
+([FIXED-1472](../plans/FIXED_ITEMS.md#fixed-1472--build-could-not-follow-a-reviewed-raikermd-raiker_md)
+to [FIXED-1474](../plans/FIXED_ITEMS.md#fixed-1474--builds-context-inspector-did-not-say-which-instruction-files-a-turn-follows)).
+**Design date:** 2026-11-10. The owner approved global plus project-root scope with the
+reviewed-revision design below, then removed nested (subdirectory) files. This
+document began as `docs/plans/RAIKER_PROJECT_INSTRUCTIONS_DESIGN.md` and moved
+here once every step of its plan shipped.
+
+## As built
+
+| Part | Where |
+|---|---|
+| Pinned read, limits, digest, redacted projection, states, review, prompt block | `raiker/context/raiker_md.py` |
+| Review records and per-project opt-in | migration `RAIKER-2133-instruction-files` (`instruction_file_settings`, `instruction_file_reviews`) |
+| Owner routes (human-only changes; reads need no provider call) | `raiker/api/routes_instruction_files.py`: `GET/PUT /api/projects/{id}/instruction-files`, `POST …/review`, `POST …/disable`, `GET /api/instruction-files/global`, `POST …/global/starter`, `…/global/review`, `…/global/disable` |
+| Build turn refused while a file needs review | `_instruction_files_refusal` in `raiker/api/routes_prompts.py`; final stream event `instruction_files_need_review` |
+| Reviewed text in a Build turn | `_instruction_files_prompt` in `raiker/runtime/orchestrator.py`: its own system message, re-read every turn, outside the context budget and history (so compaction never summarises it); event `instruction_files_loaded` carries scopes, states and digests only |
+| Project card | `web/src/lib/components/InstructionFiles.svelte` (project overview, beside Limits) |
+| Global card | `web/src/lib/views/settings/GlobalInstructionFile.svelte` (Settings › Personalisation) |
+| Build visibility | *Instruction files* fact in Build's context inspector; *RAIKER.md needs review* on the summary line |
+| Regressions | `tests/test_raiker_md.py` |
+
+Decisions taken while building, within the approved design:
+
+* **Projection version** `raiker-md-1` is part of every review; changing what
+  the model is shown for the same bytes asks for a new review.
+* **Root identity** is `kind:root_id:project_id`, so a moved or reattached
+  folder, a copied project or another account inherits no approval.
+* **Total budget** is 16,000 characters across both files; a file that does not
+  fit is left out whole and the block names it, never truncated.
+* **Disable** keeps a row with no digest; restoring the same bytes later reads
+  as *Off*, not *In use*.
+* **Live walk-through:** [RT-1116-01 and RT-1116-02](WEB_APP_LIVE_TEST.md#result--2026-11-16-raikermd-refusals-and-the-leave-guard).
 
 ## Recommended behavior and alternatives
 
@@ -157,5 +187,5 @@ matches every loading algorithm or permission behavior of another product.
 
 The owner requested the expanded scope and on 2026-11-10 approved the
 reviewed-revision policy, account-scoped global location and project-root
-activation above; nested files were then removed from scope. No
-implementation is claimed yet; work follows the plan above.
+activation above; nested files were then removed from scope. Every step of
+the plan above shipped on 2026-11-16; see *As built*.

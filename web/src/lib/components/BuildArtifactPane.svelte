@@ -123,7 +123,7 @@
         // read is not evidence the working tree is clean, and "no changes" is
         // the one thing this pane must never say without having looked.
         changesError =
-          error instanceof ApiError ? error.message : "Couldn't read the working tree.";
+          error instanceof ApiError ? error.message : "The working tree could not be read, so the change list may be out of date. Choose Refresh to read it again.";
       })
       .finally(() => {
         if (!cancelled) changesLoading = false;
@@ -151,7 +151,7 @@
       .catch((error) => {
         if (cancelled) return;
         file = null;
-        fileError = error instanceof ApiError ? error.message : "Couldn't read that file.";
+        fileError = error instanceof ApiError ? error.message : "That file could not be read; nothing was changed. Choose it again, or refresh the file list.";
       })
       .finally(() => {
         if (!cancelled) fileLoading = false;

@@ -17,7 +17,7 @@ import { expect, test, type Page } from "@playwright/test";
 import { capture } from "./capture";
 import { horizontalBleed, settled } from "./destinations";
 import { chooseModelForTurn, enableCapability, signInAsOwner } from "./hosted-provider";
-import { ANTHROPIC_MODEL, LIVE_BASE, sendTurn, useAnthropic, armConfirm } from "./live";
+import { ANTHROPIC_MODEL, LIVE_BASE, sendTurn, useAnthropic } from "./live";
 
 const BASE = LIVE_BASE;
 const SHOTS = join(import.meta.dirname, "..", "..", "output", "playwright", "2026-10-05-readiness-decisions-round");
@@ -123,17 +123,21 @@ test("the time zone says its UTC offset, and leaving Settings with an unsaved ed
   await expect(page.getByTestId("timezone-resolved")).toContainText("America/New_York");
   await capture(page, join(SHOTS, "04-settings-time-zone-offset.png"), page.getByTestId("timezone-resolved"));
 
-  // The edit is unsaved. Leaving asks; staying keeps the page and the edit.
-  const prompts: string[] = [];
-  page.once("dialog", async (dialog) => {
-    prompts.push(dialog.message());
-    await dialog.dismiss();
+  // The edit is unsaved. Leaving asks in Raiker's own dialog (2026-11-15, no
+  // native confirm); staying keeps the page and the edit.
+  const nativePrompts: string[] = [];
+  page.on("dialog", (dialog) => {
+    nativePrompts.push(dialog.message());
+    void dialog.dismiss();
   });
   await page.evaluate(() => {
     window.location.hash = "#/tasks";
   });
-  await expect.poll(() => prompts.length).toBe(1);
-  expect(prompts[0]).toMatch(/not saved/);
+  const leave = page.getByRole("dialog", { name: "Leave Settings without saving?" });
+  await expect(leave).toBeVisible();
+  await expect(leave).toContainText(/not saved/);
+  await leave.getByRole("button", { name: "Cancel" }).click();
+  await expect(leave).toBeHidden();
   await expect(page).toHaveURL(/#\/settings/);
   await expect(page.getByText(/you have unsaved changes/i)).toBeVisible();
   await expect(page.getByLabel("Time zone")).toHaveValue("America/New_York");
@@ -143,14 +147,15 @@ test("the time zone says its UTC offset, and leaving Settings with an unsaved ed
   await page.getByRole("navigation", { name: "Settings sections" })
     .getByRole("button", { name: "Notifications" }).click();
   await expect(page).toHaveURL(/tab=notification/);
-  expect(prompts.length).toBe(1);
+  await expect(leave).toBeHidden();
 
   // Leaving and agreeing goes.
-  armConfirm(page);
   await page.evaluate(() => {
     window.location.hash = "#/tasks";
   });
+  await leave.getByRole("button", { name: "Leave without saving" }).click();
   await expect(page).toHaveURL(/#\/tasks/);
+  expect(nativePrompts).toEqual([]);
   expect(seen.failures).toEqual([]);
   expect(seen.consoleErrors).toEqual([]);
 });

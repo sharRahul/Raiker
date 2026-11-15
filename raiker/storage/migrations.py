@@ -5128,6 +5128,35 @@ CREATE TABLE IF NOT EXISTS connector_policies (
 );
 """
 
+# RAIKER.md — reviewed global and project-root instruction files
+# (docs/architecture/RAIKER_MD_INSTRUCTIONS.md). A project uses its files only
+# after the owner turns them on (``instruction_file_settings``); a review binds
+# the owner, the scope, the project, its root identity, the file's SHA-256 and
+# the projection version. Disable keeps a row with ``disabled = 1`` and no
+# digest, so restoring the same bytes later does not reactivate them.
+INSTRUCTION_FILES_MIGRATION_ID = "RAIKER-2133-instruction-files"
+INSTRUCTION_FILES_SQL = """
+CREATE TABLE IF NOT EXISTS instruction_file_settings (
+  user_id TEXT NOT NULL,
+  project_id TEXT NOT NULL,
+  enabled INTEGER NOT NULL DEFAULT 0,
+  updated_at TEXT NOT NULL,
+  PRIMARY KEY (user_id, project_id)
+);
+CREATE TABLE IF NOT EXISTS instruction_file_reviews (
+  user_id TEXT NOT NULL,
+  scope TEXT NOT NULL CHECK (scope IN ('global', 'project')),
+  project_id TEXT NOT NULL,
+  root_id TEXT NOT NULL,
+  relative_path TEXT NOT NULL,
+  digest TEXT NOT NULL,
+  projection_version TEXT NOT NULL,
+  disabled INTEGER NOT NULL DEFAULT 0,
+  reviewed_at TEXT NOT NULL,
+  PRIMARY KEY (user_id, scope, project_id)
+);
+"""
+
 LLAMA_RUNTIME_MIGRATION_ID = "RAIKER-2130-llama-runtime"
 LLAMA_RUNTIME_SQL = """
 CREATE TABLE IF NOT EXISTS local_model_runtime_settings (
@@ -5391,6 +5420,7 @@ MIGRATIONS: tuple[MigrationStep, ...] = (
     Migration(LLAMA_RUNTIME_MIGRATION_ID, LLAMA_RUNTIME_SQL),
     Migration(GRANT_LIMITS_MIGRATION_ID, GRANT_LIMITS_SQL),
     Migration(CONNECTOR_POLICIES_MIGRATION_ID, CONNECTOR_POLICIES_SQL),
+    Migration(INSTRUCTION_FILES_MIGRATION_ID, INSTRUCTION_FILES_SQL),
 )
 
 #: DEC-17 step 8 — how far along the registry this build is, as one number.

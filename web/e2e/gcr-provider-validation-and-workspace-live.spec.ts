@@ -28,6 +28,7 @@ import { capture } from "./capture";
 import {
   hostedProviderCard,
   openModelDialog,
+  openPermission,
   signInAsOwner,
 } from "./hosted-provider";
 import { LIVE_BASE as BASE, ANTHROPIC_KEY as KEY } from "./live";
@@ -122,9 +123,8 @@ test("the hosted gate the validation consults is the one Permissions reports", a
   // GCR-01's other half. The provider validation and the turn now go through
   // one factory, so the gate that refuses a hosted provider is a single fact —
   // and Permissions must state the same one (FIXED-322).
-  await page.goto(`${BASE}/#/capabilities`);
-  await page.getByRole("navigation", { name: "Permission categories" }).waitFor({ timeout: 60_000 });
-  const hosted = page.locator(".cap.card").filter({ hasText: /Hosted models/ }).first();
+  // QUI-L06 — the permission opens in the detail pane beside its category.
+  const hosted = await openPermission(page, BASE, /Hosted models/);
   await expect(hosted).toBeVisible({ timeout: 60_000 });
   await capture(
     page,

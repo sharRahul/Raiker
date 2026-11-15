@@ -7,7 +7,7 @@
  */
 import { expect, test } from "@playwright/test";
 import { capture } from "./capture";
-import { signInAsOwner } from "./hosted-provider";
+import { setPermission, signInAsOwner } from "./hosted-provider";
 
 import { roundName } from "./naming";
 import { LIVE_BASE as BASE } from "./live";
@@ -56,21 +56,9 @@ test("a collector receives governed events, metadata only (backlog #18)", async 
   // code afterwards, which is the half this asserts first.
   const closed = page.getByText(/Telemetry export is/);
   if (await closed.count()) {
-    await page.goto(`${BASE}/#/capabilities`);
-    const capability = page.locator(".cap.card").filter({ hasText: "Telemetry export" });
-    await capability.locator("button.cap-toggle").click();
-    const turnOn = capability.getByRole("button", { name: "Turn on" });
-    if (await turnOn.isVisible()) {
-      await turnOn.click();
-      const dialog = page.getByRole("dialog");
-      await dialog.getByLabel("Reason (required)").fill("Live validation of the governed OTLP export");
-      const token = dialog.getByLabel(/Confirmation token/);
-      if (await token.isVisible()) await token.fill("OTLP LIVE CONFIRM");
-      const acknowledgement = dialog.getByLabel(/reviewed the threat model/);
-      if (await acknowledgement.isVisible()) await acknowledgement.check();
-      await dialog.getByRole("button", { name: "Confirm change" }).click();
-      await expect(dialog).toBeHidden({ timeout: 30_000 });
-    }
+    // QUI-L06 — the permission opens beside its category; the shared helper
+    // confirms the owner's dialog (reason, token, threat-model acknowledgement).
+    await setPermission(page, BASE, "Telemetry export", "Turn on", "Live validation of the governed OTLP export");
     await page.goto(`${BASE}/#/observe?tab=overview`);
     await page.waitForLoadState("networkidle");
   }
@@ -106,22 +94,7 @@ test("a connected MCP server says what each of its tools takes (backlog #16, MCP
   // Building and connecting are two capabilities, both Tier 4, both off on a
   // fresh instance. Turn each on the way an owner would.
   for (const label of ["MCP builder", "MCP connector"]) {
-    await page.goto(`${BASE}/#/capabilities`);
-    await page.waitForLoadState("networkidle");
-    const capability = page.locator(".cap.card").filter({ hasText: label }).first();
-    await capability.locator("button.cap-toggle").click();
-    const turnOn = capability.getByRole("button", { name: "Turn on" });
-    if (await turnOn.isVisible()) {
-      await turnOn.click();
-      const dialog = page.getByRole("dialog");
-      await dialog.getByLabel("Reason (required)").fill("Live validation of declared MCP tool schemas");
-      const token = dialog.getByLabel(/Confirmation token/);
-      if (await token.isVisible()) await token.fill("MCP LIVE CONFIRM");
-      const acknowledgement = dialog.getByLabel(/reviewed the threat model/);
-      if (await acknowledgement.isVisible()) await acknowledgement.check();
-      await dialog.getByRole("button", { name: "Confirm change" }).click();
-      await expect(dialog).toBeHidden({ timeout: 30_000 });
-    }
+    await setPermission(page, BASE, label, "Turn on", "Live validation of declared MCP tool schemas");
   }
 
   await page.goto(`${BASE}/#/extensions?tab=mcp`);

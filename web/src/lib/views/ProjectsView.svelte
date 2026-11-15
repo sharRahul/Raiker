@@ -2,6 +2,7 @@
   import { askText } from "../confirm.svelte";
   import LibraryView from "./LibraryView.svelte";
   import ProjectLimits from "../components/ProjectLimits.svelte";
+  import InstructionFiles from "../components/InstructionFiles.svelte";
   import ShowMore from "../components/ShowMore.svelte";
   import { PAGE_SIZE, page } from "../pagination";
   import WorkMeta from "../components/WorkMeta.svelte";
@@ -331,6 +332,9 @@
   let tasksError = $state<string | null>(null);
   let imagesError = $state<string | null>(null);
   let contextLoading = $state(false);
+  let filesLoading = $state(false);
+  let tasksLoading = $state(false);
+  let imagesLoading = $state(false);
 
   const detailProjectId = $derived(detail?.project.project_id ?? "");
   const detailRootKind = $derived(detail?.project.root_kind ?? "managed");
@@ -373,6 +377,7 @@
 
   async function loadProjectContext(projectId: string, seq: number) {
     contextLoading = true;
+    filesLoading = tasksLoading = imagesLoading = true;
     filesError = null;
     tasksError = null;
     imagesError = null;
@@ -380,42 +385,53 @@
     selectedFile = null;
     projectTasks = [];
     projectImages = [];
-    try {
-      const loaded = await api.projectFiles(projectId);
-      if (seq !== selectionSeq) return;
-      files = loaded;
-    } catch (e) {
-      if (seq !== selectionSeq) return;
-      filesError = failure("Project file history could not be read", "File counts and change history are unavailable; the file explorer loads separately.", "Choose Retry project content to read them again.", e);
-    }
-    try {
-      const loaded = await api.tasks({ project_id: projectId });
-      if (seq !== selectionSeq) return;
-      projectTasks = loaded;
-    } catch (e) {
-      if (seq !== selectionSeq) return;
-      tasksError = failure("Project tasks could not be read", "The task count and list are unavailable.", "Choose Retry project content to read them again.", e);
-    }
-    try {
-      // The gallery read is owner-scoped and returns metadata only, so this is
-      // one request rather than a per-picture one; the bytes stay behind the
-      // separate route each thumbnail names.
-      const gallery = await api.images();
-      if (seq !== selectionSeq) return;
-      projectImages = gallery.generations
-        .filter(
-          (generation) =>
-            generation.project_id === projectId &&
-            generation.status === "ok" &&
-            generation.has_image,
-        )
-        .sort((left, right) => right.created_at.localeCompare(left.created_at));
-    } catch (e) {
-      if (seq !== selectionSeq) return;
-      imagesError = failure("Project images could not be read", "The image count and gallery are unavailable.", "Choose Retry project content to read them again.", e);
-    } finally {
-      if (seq === selectionSeq) contextLoading = false;
-    }
+    // The three reads are independent, so they run together and each count
+    // settles the moment its own read lands. Read one after another, a slow
+    // gallery kept *Loading file count…* on screen long after the files had
+    // arrived (2026-11-15 round, RT-1115-05).
+    const filesRead = (async () => {
+      try {
+        const loaded = await api.projectFiles(projectId);
+        if (seq === selectionSeq) files = loaded;
+      } catch (e) {
+        if (seq === selectionSeq) filesError = failure("Project file history could not be read", "File counts and change history are unavailable; the file explorer loads separately.", "Choose Retry project content to read them again.", e);
+      } finally {
+        if (seq === selectionSeq) filesLoading = false;
+      }
+    })();
+    const tasksRead = (async () => {
+      try {
+        const loaded = await api.tasks({ project_id: projectId });
+        if (seq === selectionSeq) projectTasks = loaded;
+      } catch (e) {
+        if (seq === selectionSeq) tasksError = failure("Project tasks could not be read", "The task count and list are unavailable.", "Choose Retry project content to read them again.", e);
+      } finally {
+        if (seq === selectionSeq) tasksLoading = false;
+      }
+    })();
+    const imagesRead = (async () => {
+      try {
+        // The gallery read is owner-scoped and returns metadata only, so this is
+        // one request rather than a per-picture one; the bytes stay behind the
+        // separate route each thumbnail names.
+        const gallery = await api.images();
+        if (seq !== selectionSeq) return;
+        projectImages = gallery.generations
+          .filter(
+            (generation) =>
+              generation.project_id === projectId &&
+              generation.status === "ok" &&
+              generation.has_image,
+          )
+          .sort((left, right) => right.created_at.localeCompare(left.created_at));
+      } catch (e) {
+        if (seq === selectionSeq) imagesError = failure("Project images could not be read", "The image count and gallery are unavailable.", "Choose Retry project content to read them again.", e);
+      } finally {
+        if (seq === selectionSeq) imagesLoading = false;
+      }
+    })();
+    await Promise.allSettled([filesRead, tasksRead, imagesRead]);
+    if (seq === selectionSeq) contextLoading = false;
   }
 
   /**
@@ -427,6 +443,9 @@
    */
   function closeDetail() {
     selectionSeq += 1;
+    // A read still out belongs to the project that just closed; its loading
+    // flags would otherwise stay up until the next project's reads land.
+    contextLoading = filesLoading = tasksLoading = imagesLoading = false;
     detail = null;
     detailSection = "overview";
     contextBaseline = "";
@@ -982,11 +1001,13 @@
              than to find out whether it holds anything. -->
         <!-- QUI-F21 — what work filed here may reach. -->
         <ProjectLimits projectId={detailProjectId} />
+        <!-- RAIKER.md — reviewed global and project-root instruction files. -->
+        <InstructionFiles projectId={detailProjectId} />
         <dl class="section-counts">
-          <div><dt>Files</dt><dd>{contextLoading ? "Loading file count…" : filesError ? "Unavailable" : files?.files.length ?? 0}{files?.truncated ? "+" : ""}</dd></div>
+          <div><dt>Files</dt><dd>{filesLoading ? "Loading file count…" : filesError ? "Unavailable" : files?.files.length ?? 0}{files?.truncated ? "+" : ""}</dd></div>
           <div><dt>Chats</dt><dd>{detail.sessions.length}</dd></div>
-          <div><dt>Tasks</dt><dd>{contextLoading ? "Loading task count…" : tasksError ? "Unavailable" : projectTasks.length}</dd></div>
-          <div><dt>Images</dt><dd>{contextLoading ? "Loading image count…" : imagesError ? "Unavailable" : projectImages.length}</dd></div>
+          <div><dt>Tasks</dt><dd>{tasksLoading ? "Loading task count…" : tasksError ? "Unavailable" : projectTasks.length}</dd></div>
+          <div><dt>Images</dt><dd>{imagesLoading ? "Loading image count…" : imagesError ? "Unavailable" : projectImages.length}</dd></div>
           <div><dt>Checkpoints</dt><dd>{detail.checkpoints.length}</dd></div>
         </dl>
         {:else if detailSection === "files"}
@@ -1025,7 +1046,7 @@
           </ul>
         {/if}
         <h3 class="kicker">Work under this project</h3>
-        {#if contextLoading}
+        {#if tasksLoading}
           <p class="sub" role="status">Loading project tasks…</p>
         {:else if tasksError}
           <p class="error" role="alert">{tasksError}</p>
@@ -1052,7 +1073,7 @@
              own; REM-PROJ-02 gives them the Assets section beside Files. -->
         {:else if detailSection === "assets"}
         <h3 class="kicker">Images</h3>
-        {#if contextLoading}
+        {#if imagesLoading}
           <p class="sub" role="status">Loading project images…</p>
         {:else if imagesError}
           <p class="error" role="alert">{imagesError}</p>

@@ -14964,6 +14964,19 @@
         "title": "GithubRepoConnected",
         "type": "object"
       },
+      "GlobalInstructionFileView": {
+        "description": "The signed-in account's global RAIKER.md.",
+        "properties": {
+          "source": {
+            "$ref": "#/components/schemas/InstructionFileSource"
+          }
+        },
+        "required": [
+          "source"
+        ],
+        "title": "GlobalInstructionFileView",
+        "type": "object"
+      },
       "GoalActionRequest": {
         "additionalProperties": false,
         "description": "An owner action on a goal, named against the revision the owner saw.",
@@ -18345,6 +18358,144 @@
           "url"
         ],
         "title": "InstanceCreated",
+        "type": "object"
+      },
+      "InstructionFileDisableRequest": {
+        "additionalProperties": false,
+        "description": "RAIKER.md — stop using a file; restoring the same bytes later does not reactivate it.",
+        "properties": {
+          "scope": {
+            "default": "project",
+            "enum": [
+              "global",
+              "project"
+            ],
+            "title": "Scope",
+            "type": "string"
+          }
+        },
+        "title": "InstructionFileDisableRequest",
+        "type": "object"
+      },
+      "InstructionFileReviewRequest": {
+        "additionalProperties": false,
+        "description": "RAIKER.md — approve the exact revision on the owner's screen, by its digest.",
+        "properties": {
+          "digest": {
+            "maxLength": 64,
+            "minLength": 64,
+            "pattern": "^[0-9a-f]{64}$",
+            "title": "Digest",
+            "type": "string"
+          },
+          "scope": {
+            "default": "project",
+            "enum": [
+              "global",
+              "project"
+            ],
+            "title": "Scope",
+            "type": "string"
+          }
+        },
+        "required": [
+          "digest"
+        ],
+        "title": "InstructionFileReviewRequest",
+        "type": "object"
+      },
+      "InstructionFileSource": {
+        "description": "One RAIKER.md: its scope, state in words, digest and the redacted preview.",
+        "properties": {
+          "bytes": {
+            "title": "Bytes",
+            "type": "integer"
+          },
+          "chars": {
+            "title": "Chars",
+            "type": "integer"
+          },
+          "digest": {
+            "title": "Digest",
+            "type": "string"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "path": {
+            "title": "Path",
+            "type": "string"
+          },
+          "preview": {
+            "title": "Preview",
+            "type": "string"
+          },
+          "reason": {
+            "title": "Reason",
+            "type": "string"
+          },
+          "reviewed_at": {
+            "title": "Reviewed At",
+            "type": "string"
+          },
+          "reviewed_digest": {
+            "title": "Reviewed Digest",
+            "type": "string"
+          },
+          "scope": {
+            "enum": [
+              "global",
+              "project"
+            ],
+            "title": "Scope",
+            "type": "string"
+          },
+          "state": {
+            "enum": [
+              "absent",
+              "empty",
+              "disabled",
+              "unreviewed",
+              "approved",
+              "changed",
+              "unsafe",
+              "unreadable",
+              "invalid",
+              "oversized",
+              "root_unavailable"
+            ],
+            "title": "State",
+            "type": "string"
+          }
+        },
+        "required": [
+          "scope",
+          "label",
+          "state",
+          "reason",
+          "digest",
+          "chars",
+          "bytes",
+          "reviewed_digest",
+          "reviewed_at"
+        ],
+        "title": "InstructionFileSource",
+        "type": "object"
+      },
+      "InstructionFilesEnabledRequest": {
+        "additionalProperties": false,
+        "description": "RAIKER.md — turn a project's file instructions on or off.",
+        "properties": {
+          "enabled": {
+            "title": "Enabled",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "enabled"
+        ],
+        "title": "InstructionFilesEnabledRequest",
         "type": "object"
       },
       "InterruptCategory": {
@@ -27361,6 +27512,38 @@
           "project_id"
         ],
         "title": "ProjectFolderDetached",
+        "type": "object"
+      },
+      "ProjectInstructionFilesView": {
+        "description": "Whether a project uses file instructions, and the state of both files.",
+        "properties": {
+          "enabled": {
+            "title": "Enabled",
+            "type": "boolean"
+          },
+          "needs_review": {
+            "title": "Needs Review",
+            "type": "boolean"
+          },
+          "project_id": {
+            "title": "Project Id",
+            "type": "string"
+          },
+          "sources": {
+            "items": {
+              "$ref": "#/components/schemas/InstructionFileSource"
+            },
+            "title": "Sources",
+            "type": "array"
+          }
+        },
+        "required": [
+          "project_id",
+          "enabled",
+          "needs_review",
+          "sources"
+        ],
+        "title": "ProjectInstructionFilesView",
         "type": "object"
       },
       "ProjectLimitsBody": {
@@ -48620,6 +48803,102 @@
         "summary": "Create Instance"
       }
     },
+    "/api/instruction-files/global": {
+      "get": {
+        "description": "The signed-in account's global RAIKER.md, with its path so the owner can edit it.",
+        "operationId": "get_global_instruction_file_api_instruction_files_global_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GlobalInstructionFileView"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Get Global Instruction File"
+      }
+    },
+    "/api/instruction-files/global/disable": {
+      "post": {
+        "description": "Stop using the global file in every project.",
+        "operationId": "disable_global_instruction_file_api_instruction_files_global_disable_post",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GlobalInstructionFileView"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Disable Global Instruction File"
+      }
+    },
+    "/api/instruction-files/global/review": {
+      "post": {
+        "description": "Approve the global file's revision the owner saw.",
+        "operationId": "review_global_instruction_file_api_instruction_files_global_review_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InstructionFileReviewRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GlobalInstructionFileView"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Review Global Instruction File"
+      }
+    },
+    "/api/instruction-files/global/starter": {
+      "post": {
+        "description": "Create a short starter file if none exists. It is not approved by being created.",
+        "operationId": "create_global_instruction_file_api_instruction_files_global_starter_post",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GlobalInstructionFileView"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Create Global Instruction File"
+      }
+    },
     "/api/interrupts": {
       "post": {
         "operationId": "interrupts_api_interrupts_post",
@@ -54161,6 +54440,194 @@
           }
         },
         "summary": "Get Project Files"
+      }
+    },
+    "/api/projects/{project_id}/instruction-files": {
+      "get": {
+        "description": "Whether this project uses RAIKER.md, and the state of the global and project files.",
+        "operationId": "get_project_instruction_files_api_projects__project_id__instruction_files_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "title": "Project Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProjectInstructionFilesView"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Project Instruction Files"
+      },
+      "put": {
+        "description": "Turn file instructions on or off for this project. Turning on approves nothing.",
+        "operationId": "set_project_instruction_files_api_projects__project_id__instruction_files_put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "title": "Project Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InstructionFilesEnabledRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProjectInstructionFilesView"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Set Project Instruction Files"
+      }
+    },
+    "/api/projects/{project_id}/instruction-files/disable": {
+      "post": {
+        "description": "Stop using one file. Its review is cleared, so new bytes or old ones need a review again.",
+        "operationId": "disable_project_instruction_file_api_projects__project_id__instruction_files_disable_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "title": "Project Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InstructionFileDisableRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProjectInstructionFilesView"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Disable Project Instruction File"
+      }
+    },
+    "/api/projects/{project_id}/instruction-files/review": {
+      "post": {
+        "description": "Approve the revision the owner saw; a file that changed since then conflicts.",
+        "operationId": "review_project_instruction_file_api_projects__project_id__instruction_files_review_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "title": "Project Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InstructionFileReviewRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProjectInstructionFilesView"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Review Project Instruction File"
       }
     },
     "/api/projects/{project_id}/limits": {

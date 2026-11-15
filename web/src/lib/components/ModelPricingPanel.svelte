@@ -61,7 +61,7 @@
         can_override: raw?.can_override === true,
       };
     } catch {
-      loadError = "Could not read the price registry.";
+      loadError = "The price registry could not be read. Cost estimates here are unconfirmed until it loads. Reopen this panel to read it again.";
     } finally {
       loading = false;
     }

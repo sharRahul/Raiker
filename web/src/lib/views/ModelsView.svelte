@@ -293,7 +293,7 @@
       await load();
       onchanged?.();
     } catch {
-      catalogueNotice = "Could not refresh connected provider catalogues.";
+      catalogueNotice = "Connected providers' model lists were not refreshed. The models shown may be out of date. Check your connection, then choose Refresh again.";
     } finally {
       catalogueRefreshing = false;
     }

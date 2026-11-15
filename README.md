@@ -383,6 +383,8 @@ source](docs/guide/getting-started.md#run-from-source),
   contracts, governance, and design specifications.
 - **[Desktop distribution decision](docs/adr/ADR-0003-desktop-distribution.md)**
   and the [release acceptance matrix](docs/plans/RELEASE_ACCEPTANCE_MATRIX.md).
+- **[RAIKER.md instructions](docs/architecture/RAIKER_MD_INSTRUCTIONS.md)** —
+  reviewed global and project-root instruction files for Build.
 - **[Known limits](docs/architecture/KNOWN_LIMITS.md)** — important boundaries
   and unavailable features.
 - **[Troubleshooting](docs/guide/troubleshooting.md)** — reason codes and fixes.

@@ -70,7 +70,11 @@ STEP_SETTLED = frozenset({"done", "failed", "stopped", "blocked"})
 #: Criterion validators. ``steps_finish`` is deterministic — every step linked to
 #: the criterion finished — and is named as that, not as a judgement that the
 #: result is good. ``owner_confirms`` is the owner's own check of the result.
-VALIDATORS = ("steps_finish", "owner_confirms")
+#: ``build_verified`` (BUG-355) is independent evidence: every linked Build
+#: step's turn was classified ``completed_verified`` — each check the project
+#: declared ran, exactly as written, after the last change, and passed — by
+#: Raiker's own records, not by the model's claim.
+VALIDATORS = ("steps_finish", "owner_confirms", "build_verified")
 
 #: Task status → the step state it means, and the waiting reason if it waits.
 TASK_TO_STEP: dict[str, tuple[str, str]] = {

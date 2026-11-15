@@ -156,8 +156,22 @@ jobs:
                     if conclusion == "success"}
           missing = sorted(required - passed)
           if missing:
+              # Say which are still running: a release started before CI ends
+              # (run 43640908209) is refused the same way, but the remedy is to
+              # wait and start it again, not to look for a failure.
+              running = [n for n in missing if n in latest and latest[n][1] is None]
+              failed = [n for n in missing if n in latest and latest[n][1] is not None]
+              absent = [n for n in missing if n not in latest]
+              parts = []
+              if running:
+                  parts.append("still running (start the release again once they pass): " + ", ".join(running))
+              if failed:
+                  parts.append("did not pass: " + ", ".join(
+                      f"{n} ({latest[n][1]})" for n in failed))
+              if absent:
+                  parts.append("never ran on this commit: " + ", ".join(absent))
               sys.exit("refused: required release verification has not passed on this "
-                       "commit: " + ", ".join(missing))
+                       "commit; " + "; ".join(parts))
           print("all required release verification passed on this commit")
           PY
 

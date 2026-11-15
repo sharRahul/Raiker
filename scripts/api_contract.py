@@ -75,6 +75,15 @@ INVENTORY_MD = REPO_ROOT / "docs" / "architecture" / "API_CONTRACT_INVENTORY.md"
 VERIFIED: frozenset[tuple[str, str]] = frozenset(
     {
         ("DELETE", "/api/account"),
+        # RAIKER.md — reviewed instruction files.
+        ("GET", "/api/projects/{project_id}/instruction-files"),
+        ("PUT", "/api/projects/{project_id}/instruction-files"),
+        ("POST", "/api/projects/{project_id}/instruction-files/review"),
+        ("POST", "/api/projects/{project_id}/instruction-files/disable"),
+        ("GET", "/api/instruction-files/global"),
+        ("POST", "/api/instruction-files/global/starter"),
+        ("POST", "/api/instruction-files/global/review"),
+        ("POST", "/api/instruction-files/global/disable"),
         ("GET", "/api/local-runtime/llama-cpp"),
         ("POST", "/api/local-runtime/llama-cpp/install"),
         ("POST", "/api/local-runtime/llama-cpp/update-check"),

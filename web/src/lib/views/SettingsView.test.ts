@@ -573,11 +573,11 @@ describe("unsaved changes when leaving Settings", () => {
 
     expect(mayLeave("#/settings?tab=general")).toBe(true);
     expect(confirmSpy).not.toHaveBeenCalled();
-    expect(mayLeave("#/chat")).toBe(false);
+    expect(await mayLeave("#/chat")).toBe(false);
     expect(confirmSpy).toHaveBeenCalledWith(expect.stringMatching(/not saved/));
 
     confirmSpy.mockReturnValue(true);
-    expect(mayLeave("#/chat")).toBe(true);
+    expect(await mayLeave("#/chat")).toBe(true);
   });
 
   it("lets the owner leave while a save that carries every edit is out (TO_BE_FIXED race)", async () => {
@@ -593,7 +593,7 @@ describe("unsaved changes when leaving Settings", () => {
     await waitFor(() => expect(putBodies.length).toBe(1));
 
     // The answer has not been read yet; the request already holds the edit.
-    expect(mayLeave("#/chat")).toBe(true);
+    expect(await mayLeave("#/chat")).toBe(true);
     expect(confirmSpy).not.toHaveBeenCalled();
     release();
     await waitFor(() => expect(screen.getByText(/all changes saved/i)).toBeInTheDocument());
@@ -612,7 +612,7 @@ describe("unsaved changes when leaving Settings", () => {
     await waitFor(() => expect(putBodies.length).toBe(1));
     await fireEvent.click(screen.getByLabelText(/unread notices inside Raiker/i));
 
-    expect(mayLeave("#/chat")).toBe(false);
+    expect(await mayLeave("#/chat")).toBe(false);
     expect(confirmSpy).toHaveBeenCalled();
     release();
   });
@@ -625,7 +625,7 @@ describe("unsaved changes when leaving Settings", () => {
     render(SettingsView, { props: { principal: "alice" } });
     await editSomething();
     await fireEvent.click(screen.getByRole("button", { name: /discard/i }));
-    expect(mayLeave("#/chat")).toBe(true);
+    expect(await mayLeave("#/chat")).toBe(true);
     expect(confirmSpy).not.toHaveBeenCalled();
   });
 
@@ -648,7 +648,7 @@ describe("unsaved changes when leaving Settings", () => {
     const view = render(SettingsView, { props: { principal: "alice" } });
     await editSomething();
     view.unmount();
-    expect(mayLeave("#/chat")).toBe(true);
+    expect(await mayLeave("#/chat")).toBe(true);
   });
 });
 

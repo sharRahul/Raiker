@@ -149,7 +149,7 @@
     try {
       view = await api.reviewCodeRepoPatch(repoId);
     } catch (caught) {
-      error = caught instanceof ApiError ? caught.message : "Couldn't review this patch.";
+      error = caught instanceof ApiError ? caught.message : "This patch was not reviewed, so it has no findings yet. Choose Review again; the change itself is untouched.";
     } finally {
       busy = false;
     }

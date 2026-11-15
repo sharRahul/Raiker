@@ -262,10 +262,26 @@ def _git_output(proc: subprocess.CompletedProcess[str]) -> str:
 def _repository(repo_root: str | Path) -> tuple[Path, dict[str, Any] | None]:
     """Resolve the selected repository, or the refusal that explains why not."""
     root = resolve_workspace_path(repo_root, ".")
-    proc = _git(root, ["rev-parse", "--is-inside-work-tree"], timeout=10)
-    if proc.returncode != 0 or proc.stdout.strip() != "true":
+    proc = _git(root, ["rev-parse", "--is-inside-work-tree", "--show-toplevel"], timeout=10)
+    lines = proc.stdout.strip().splitlines()
+    if proc.returncode != 0 or not lines or lines[0].strip() != "true":
+        return root, _failed("not_a_git_repository", path=str(root))
+    # Git discovers a repository by walking up, so a plain folder inside some
+    # other repository read as one (2026-10-19 Windows run: a temp folder under
+    # a checked-out home). A commit, branch or push there would act on a
+    # repository the owner never selected; only the selected folder's own
+    # repository counts.
+    toplevel = lines[1].strip() if len(lines) > 1 else ""
+    if not toplevel or not _same_folder(Path(toplevel), root):
         return root, _failed("not_a_git_repository", path=str(root))
     return root, None
+
+
+def _same_folder(left: Path, right: Path) -> bool:
+    try:
+        return left.resolve() == right.resolve() or os.path.samefile(left, right)
+    except OSError:
+        return False
 
 
 def _busy_reason(root: Path) -> str | None:

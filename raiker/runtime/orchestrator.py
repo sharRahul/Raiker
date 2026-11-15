@@ -1607,6 +1607,42 @@ class RuntimeOrchestrator:
             "instructions, not untrusted workspace data:\n" + "\n".join(lines)
         ), [name for name, _ in entries]
 
+    def _instruction_files_prompt(
+        self, envelope: PromptEnvelope
+    ) -> tuple[str, dict[str, Any]] | None:
+        """RAIKER.md — the reviewed global and project-root files for a Build turn.
+
+        Read again at every turn and sent as their own labelled system message,
+        outside the context budget and the conversation history, so compaction
+        never summarises them away and a changed file never rides on a stale
+        copy. Only approved revisions contribute text; the route refuses a turn
+        whose project still needs a review before this is reached. The event
+        carries scopes, states and digests, never the text or a path.
+        """
+        if str(envelope.prompt.metadata.get("surface", "chat")) != "build":
+            return None
+        project_id = str(envelope.prompt.metadata.get("project_id") or "").strip()
+        store = getattr(self.tool_broker, "store", None)
+        owner = envelope.user.id
+        if store is None or not project_id or not owner:
+            return None
+        try:
+            from raiker.context import raiker_md
+
+            user_id = store.principal_user_id(owner)
+            project = store.load_project(project_id, user_id=user_id) if user_id else None
+            if not user_id or project is None or not raiker_md.project_enabled(store, user_id, project_id):
+                return None
+            state = raiker_md.status_for_project(store, self.workspace_root, user_id, owner, project)
+            block = raiker_md.render_block(state)
+        except Exception:
+            # The route already refused a turn whose files cannot be read; a
+            # failure here adds no rules rather than inventing them.
+            return None
+        if not block:
+            return None
+        return block, state.metadata()
+
     def _plan_prompt(self, envelope: PromptEnvelope) -> str | None:
         """This conversation's standing plan as one system message (B6).
 
@@ -2811,6 +2847,11 @@ class RuntimeOrchestrator:
                 "skills_indexed",
                 {"active_skills": len(skill_names), "names": skill_names},
             )
+        instruction_files = self._instruction_files_prompt(envelope)
+        if instruction_files is not None:
+            text, metadata = instruction_files
+            messages.append(ModelMessage(role="system", content=text))
+            self._event(envelope, "instruction_files_loaded", metadata)
         if envelope.prompt.metadata.get("input_mode") == "spoken":
             messages.append(ModelMessage(role="system", content=SPOKEN_STYLE_PROMPT))
             self._event(envelope, "spoken_style_applied", {"hint_chars": len(SPOKEN_STYLE_PROMPT)})

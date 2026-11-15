@@ -594,7 +594,10 @@ a lost notice does not mean the task failed or should be repeated.
 2. **Success criteria.** Each says how it is met: **Met when its steps finish**
    (Raiker records that the steps counting toward it finished — a fact about
    the steps, not a judgement that the result is good) or **You confirm it**
-   (you check the result and press **Confirm met**, with an optional note).
+   (you check the result and press **Confirm met**, with an optional note), or
+   **Met when Build's checks pass** (every step counting toward it is a Build
+   step, and Raiker's own record shows each check the project declares ran
+   after the last change and passed — the model's word is not enough).
    Mark a criterion required or optional.
 3. **Steps.** Each runs as an ordinary task in **Chat** or **Build** (a Build
    step needs the goal filed in a project), may **run after** earlier steps,
@@ -632,10 +635,12 @@ recently. From Chat, **Make this a goal** under an answer opens this form
 filled in from your request, and when the same aim comes up in another
 conversation Raiker offers *This looks like an ongoing goal. Track it?*, once;
 **Not now** means it is not offered again. Both only fill the form: nothing is
-saved until you save it. A goal is matched by the words of your requests, not by
-a model, so the same aim put in different words may not be noticed. A criterion
-cannot yet use a Build step's verified outcome as its evidence
-([BUG-355](../plans/TO_BE_FIXED.md#bug-355--goals-ship-without-intake-from-chat-validator-backed-criteria-or-a-restart-scenario)).
+saved until you save it. A goal is matched by the words of your requests and,
+where your embedding model may run on this computer, by meaning too — so *plan
+our Kyoto holiday* and *organise the Japan vacation* are one aim; without that
+model, the same aim in different words may not be noticed. What goals still
+cannot do is listed under
+[BUG-355](../plans/TO_BE_FIXED.md#bug-355--goals-ship-without-intake-from-chat-validator-backed-criteria-or-a-restart-scenario).
 
 ### Where a goal's work may run: execution profiles
 

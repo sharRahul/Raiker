@@ -7,6 +7,7 @@
   import { applyAppearance, applyUiPrefs } from "../prefs.svelte";
   import { announceDeliveryChanged } from "../deliveryPolicy.svelte";
   import { guardUnload, registerLeaveGuard } from "../leaveGuard";
+  import { askConfirm } from "../confirm.svelte";
   import General from "./settings/General.svelte";
   import Notification from "./settings/Notification.svelte";
   import Personalisation from "./settings/Personalisation.svelte";
@@ -341,8 +342,12 @@
    * so only a route away from Settings is a question; a reload or a closed tab
    * gets the browser's own prompt.
    */
-  const UNSAVED_PROMPT =
-    "You have changes in Settings that are not saved. Leave without saving them?";
+  const UNSAVED_QUESTION = {
+    title: "Leave Settings without saving?",
+    body: "You have changes in Settings that are not saved. Leaving discards them.",
+    confirmLabel: "Leave without saving",
+    danger: true,
+  } as const;
 
   function leavingSettings(nextHash: string): boolean {
     return !/^#\/settings(?:[?/]|$)/.test(nextHash);
@@ -352,7 +357,8 @@
     void load();
     const unguard = registerLeaveGuard((nextHash) => {
       if (!unsaved || !leavingSettings(nextHash) || coveredBySave()) return true;
-      return window.confirm(UNSAVED_PROMPT);
+      // Asked in Raiker's own dialog; the shell waits on the answer.
+      return askConfirm({ ...UNSAVED_QUESTION });
     });
     // A closed tab can cancel the request, so the browser still asks then.
     const unguardUnload = guardUnload(() => unsaved);

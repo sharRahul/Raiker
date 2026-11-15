@@ -197,6 +197,15 @@ class TestProposalFailsClosed:
         result = proposed_push_snapshot(tmp_path)
         assert result["error"]["type"] == "not_a_git_repository"
 
+    def test_a_plain_folder_inside_another_repository_is_not_one(self, repo: Path, allowed: None) -> None:
+        # 2026-10-19 Windows run: the test's temp folder sat under a checked-out
+        # home, git walked up to it, and the push was judged against a
+        # repository nobody selected (push_egress_denied, not this refusal).
+        inner = repo / "notes"
+        inner.mkdir()
+        result = proposed_push_snapshot(inner)
+        assert result["error"]["type"] == "not_a_git_repository"
+
     def test_no_remote(self, repo: Path, allowed: None) -> None:
         _git(repo, "remote", "remove", "origin")
         assert _snapshot(repo)["error"]["type"] == "no_remote_configured"

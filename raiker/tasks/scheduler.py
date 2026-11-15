@@ -654,6 +654,23 @@ class TaskScheduler:
             )
             TaskManager(self.store, EventLogWriter(self.store)).cancel_task(task.task_id, message)
             return
+        # BUG-356 — a scheduled run is new work too, so the active execution
+        # profile bounds it exactly as it bounds a typed Chat or Build turn.
+        # Goal steps were judged above against their goal's pinned profile.
+        if not GoalCoordinator(self.workspace_root).is_goal_step(task):
+            from raiker.goals import profiles as profile_store
+
+            blocked = profile_store.turn_refusal(
+                self.store, principal_id, task.project_id, task.model_profile or None, task.model or None
+            )
+            if blocked is not None:
+                TaskManager(self.store, EventLogWriter(self.store)).cancel_task(
+                    task.task_id,
+                    "Not run: "
+                    + str(blocked["message"]).removeprefix("Not sent: ")
+                    .replace("Choose a model it allows", "Choose a model for this task that it allows"),
+                )
+                return
         prompt = task.objective or task.title
         turn_id = new_id("turn_")
         # C11 — the cycle runs in the task's own conversation, so the

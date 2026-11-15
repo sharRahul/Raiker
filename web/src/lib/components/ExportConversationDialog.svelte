@@ -72,7 +72,7 @@
       loadError =
         error instanceof ApiError && error.status === 404
           ? "This conversation is no longer available to export."
-          : "Could not read what this conversation contains.";
+          : "What this conversation contains could not be read, so nothing was exported. Close this dialog and choose Export again.";
     } finally {
       loading = false;
     }

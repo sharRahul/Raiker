@@ -920,7 +920,7 @@
     }
   }
 
-  const FORMAT_LABEL: Record<string, string> = { png: "PNG", pdf: "PDF (raster)", vector_pdf: "PDF (vector)", svg: "SVG", json: "JSON" };
+  const FORMAT_LABEL: Record<string, string> = { png: "PNG", pdf: "PDF (raster)", vector_pdf: "PDF (vector)", svg: "SVG", json: "JSON", pptx: "Slides (PowerPoint)" };
 
   async function download(item: DesignExportView) {
     const blob = await api.designExportBlob(item.export_id);
@@ -1793,7 +1793,7 @@
             <div class="grid4">
               <label>Format
                 <select bind:value={exportFormat}>
-                  <option value="png">PNG</option><option value="vector_pdf">PDF (vector, selectable text)</option><option value="pdf">PDF (one raster page)</option><option value="svg">SVG (editable)</option><option value="json">JSON (structured)</option>
+                  <option value="png">PNG</option><option value="vector_pdf">PDF (vector, selectable text)</option><option value="pdf">PDF (one raster page)</option><option value="svg">SVG (editable)</option><option value="json">JSON (structured)</option><option value="pptx">Slides — every frame (PowerPoint)</option>
                 </select>
               </label>
               {#if exportFormat === "png" || exportFormat === "pdf"}

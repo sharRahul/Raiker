@@ -12,8 +12,11 @@
  * which a page registers alongside this through {@link guardUnload}.
  */
 
-/** Returns `true` to let the navigation to `nextHash` go ahead. */
-export type LeaveGuard = (nextHash: string) => boolean;
+/**
+ * Returns `true` to let the navigation to `nextHash` go ahead, `false` to stay,
+ * or a promise of either when the page asks the owner in Raiker's own dialog.
+ */
+export type LeaveGuard = (nextHash: string) => boolean | Promise<boolean>;
 
 const guards = new Set<LeaveGuard>();
 
@@ -25,12 +28,39 @@ export function registerLeaveGuard(guard: LeaveGuard): () => void {
   };
 }
 
-/** Whether every registered guard lets the navigation to `nextHash` go ahead. */
-export function mayLeave(nextHash: string): boolean {
+/**
+ * Whether every registered guard lets the navigation to `nextHash` go ahead.
+ *
+ * Synchronous while every guard answers at once. A guard that asks the owner
+ * (2026-11-15: Settings asks in `ConfirmDialog`, not the browser's confirm)
+ * makes the answer a promise; the shell stays where it is while it waits and
+ * follows the link once the answer is yes.
+ */
+export function mayLeave(nextHash: string): boolean | Promise<boolean> {
+  const asking: Promise<boolean>[] = [];
   for (const guard of guards) {
-    if (!guard(nextHash)) return false;
+    const answer = guard(nextHash);
+    if (answer === false) return false;
+    if (answer !== true) asking.push(answer);
   }
-  return true;
+  if (asking.length === 0) return true;
+  return Promise.all(asking).then((answers) => answers.every(Boolean));
+}
+
+let allowed: string | null = null;
+
+/** The owner said yes: the next route change to `hash` is not asked again. */
+export function allowLeaveOnce(hash: string): void {
+  allowed = hash;
+}
+
+/** True once for the hash `allowLeaveOnce` named; it is then spent. */
+export function consumeAllowedLeave(hash: string): boolean {
+  if (allowed !== null && allowed === hash) {
+    allowed = null;
+    return true;
+  }
+  return false;
 }
 
 /**

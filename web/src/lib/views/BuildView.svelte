@@ -1,4 +1,6 @@
 <script lang="ts">
+  import type { ProjectInstructionFilesView } from "../generated/apiContract";
+  import { contract } from "../generated/apiContract";
   import { onPermissionsChanged } from "../permissionSync";
   import { isSendKeystroke, runningSendHint, sendHint } from "../sendKey";
   import { uiPrefs } from "../prefs.svelte";
@@ -161,7 +163,7 @@
   import { composerMenu } from "../composerCapabilities";
   import { readReadiness, refreshReadCapabilities } from "../readCapabilities.svelte";
   import { collectText, groupPhases, summarizeEvent } from "../turnPhases";
-  import { collectReasoning, hasRunningTool, stoppedAnswer, toolActivity, workingLine, type ToolCallRow } from "../chatPresentation";
+  import { collectReasoning, hasRunningTool, stoppedAnswer, toolActivity, workingLine, type ToolCallRow, refusalFromFinal, type TurnRefusal } from "../chatPresentation";
   import { reportForegroundWork } from "../liveWork.svelte";
   import { announceResponseReady } from "../desktopNotice";
   import { delivery } from "../deliveryPolicy.svelte";
@@ -266,6 +268,8 @@
     reasoningChars?: number;
     // DEC-22 step 3 — the earlier turn this one asked again, when it was a Retry.
     retryOf?: string | null;
+    // Refused before sending (an execution profile, a RAIKER.md to review).
+    refusal?: TurnRefusal | null;
   }
 
   // BUG-35 — Build carries files too. Same store, same limits, same governed
@@ -941,6 +945,51 @@
 
   // UX-BUILD-02 — `$derived.by`, because the model fact reads the composer's
   // model state, which is declared further down this script.
+  /*
+   * RAIKER.md — which instruction files this project's Build turns follow, read
+   * whenever the project changes and after each turn (a file can change on
+   * disk between turns). Shown only when the project uses file instructions;
+   * a file that needs review also reaches the one-line summary, because the
+   * next turn will wait for it.
+   */
+  let instructionFiles = $state<ProjectInstructionFilesView | null>(null);
+  let instructionSeq = 0;
+  async function loadInstructionFiles(projectId: string | null | undefined) {
+    const seq = ++instructionSeq;
+    if (!projectId) {
+      instructionFiles = null;
+      return;
+    }
+    try {
+      const view = await contract.getProjectInstructionFiles(projectId);
+      if (seq === instructionSeq) instructionFiles = view;
+    } catch {
+      if (seq === instructionSeq) instructionFiles = null;
+    }
+  }
+  $effect(() => {
+    void loadInstructionFiles(boundary?.project_id);
+  });
+  const instructionFact = $derived.by(() => {
+    const view = instructionFiles;
+    if (!view || !view.enabled || view.project_id !== boundary?.project_id) return [];
+    const loaded = view.sources.filter((source) => source.state === "approved").map((source) => source.label);
+    const waiting = view.sources.filter((source) => !["approved", "absent", "empty", "disabled"].includes(source.state));
+    const value = [
+      loaded.length > 0 ? `In use: ${loaded.join(", ")}` : "None in use",
+      ...waiting.map((source) => `${source.label}: ${source.reason}`),
+    ].join(" · ");
+    return [
+      {
+        label: "Instruction files",
+        value,
+        ...(waiting.length > 0 ? { short: "RAIKER.md needs review" } : {}),
+        href: `#/projects?project=${encodeURIComponent(view.project_id)}`,
+        action: waiting.length > 0 ? "Review" : "Open project",
+      },
+    ];
+  });
+
   const contextFacts = $derived.by(() => [
     ...(boundary?.project_id && boundary.project_name
       ? [
@@ -1039,6 +1088,7 @@
           },
         ]
       : []),
+    ...instructionFact,
   ]);
   let pendingProjectId: string | null = null;
   let projectNotice = $state<string | null>(null);
@@ -1634,6 +1684,7 @@
         (event) => {
           if (event.kind === "final" && event.response !== null) {
             turn.response = event.response;
+            turn.refusal = refusalFromFinal(event);
             sessionId = event.response.session_id;
             // C6 — the citation markers this answer just wrote need the ledger
             // they resolve against, so it is refreshed with the turn.
@@ -1643,6 +1694,7 @@
             window.dispatchEvent(new Event("raiker:chats-changed"));
             void applyPendingProject();
             void review.load();
+            void loadInstructionFiles(boundary?.project_id);
           } else {
             turn.events = [...turn.events, event];
             const streamed = planFromEvent(event);
@@ -1866,7 +1918,7 @@
       projectNotice =
         error instanceof ApiError
           ? `Could not read this conversation's checkpoints (${error.reasonCode ?? error.status}).`
-          : "Could not read this conversation's checkpoints.";
+          : "This conversation's checkpoints could not be read, so Rewind is unavailable for now. Reopen the conversation to read them again.";
     } finally {
       rewindingTurn = null;
     }
@@ -2248,7 +2300,7 @@
       {/if}
 
       {#each turns as turn (turn.id)}
-        {@const answer = stoppedAnswer(turn.response?.status, answerText(turn))}
+        {@const answer = turn.refusal ? "" : stoppedAnswer(turn.response?.status, answerText(turn))}
         {@const toolRows = toolActivity(turn.events)}
         {@const reasoning = collectReasoning(turn.events) || (turn.retainedReasoning ?? "")}
         {@const turnSourceList = sourcesForTurn(sources.turnSources, turn.response?.turn_id)}
@@ -2362,6 +2414,12 @@
               </p>
             {/if}
 
+            {#if !turn.streaming && turn.refusal}
+              <div class="refusal-line" role="status" data-testid="turn-refusal">
+                <p><strong>{turn.refusal.label}</strong> · {turn.refusal.message}</p>
+                <a class="btn btn-sm" href={turn.refusal.href}>{turn.refusal.action}</a>
+              </div>
+            {/if}
             {#if answer !== ""}
               <div class="answer">
                 <!-- C6 — `[s1]` becomes a chip only when this turn's ledger has
@@ -2408,7 +2466,7 @@
                 {/if}
                 </div>
               {/if}
-            {:else if !turn.streaming && turn.error === null && turn.response !== null && turn.response.status !== "needs_approval"}
+            {:else if !turn.streaming && turn.error === null && turn.response !== null && turn.response.status !== "needs_approval" && !turn.refusal}
               <!-- BUG-73 / BUG-206 — see ChatView: a turn with no answer reports
                    its state, never a claim about whether anything ran, and the
                    parked case is left to the row and the card that state it. -->
@@ -3504,4 +3562,20 @@
   @media (hover: none) {
     .turn-meta { opacity: 1 !important; }
   }
+  .refusal-line {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-3);
+    flex-wrap: wrap;
+    margin: var(--space-2) 0 0;
+    padding: var(--space-2) var(--space-3);
+    border: 1px solid var(--warn-border);
+    border-radius: var(--r-md);
+    background: var(--warn-soft);
+    color: var(--text-1);
+    font-size: var(--text-sm);
+  }
+  .refusal-line p { margin: 0; flex: 1 1 20rem; }
+  .refusal-line strong { font-weight: 650; }
 </style>

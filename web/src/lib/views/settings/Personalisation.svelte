@@ -1,4 +1,5 @@
 <script lang="ts">
+  import GlobalInstructionFile from "./GlobalInstructionFile.svelte";
   import Icon from "../../components/Icon.svelte";
   import { WEATHER_LOCATION_KEY } from "../../environment";
   import type { ThemeChoice } from "../../theme";
@@ -204,6 +205,9 @@
   </label>
   </details>
 </section>
+
+<!-- RAIKER.md — the account's own global instruction file. -->
+<GlobalInstructionFile />
 
 <style>
   .section-heading { margin-bottom:var(--space-4); }

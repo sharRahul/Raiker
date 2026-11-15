@@ -449,7 +449,7 @@
         `Opened the official ${row.label} download. Come back and press Detect once it is installed.`,
       );
     } catch {
-      failure = set(failure, row.profileId, "Could not open the reviewed vendor download.");
+      failure = set(failure, row.profileId, "The vendor's download page did not open. Nothing was installed. Allow pop-ups for Raiker, then choose the download again.");
     } finally {
       busy = drop(busy, row.profileId);
     }

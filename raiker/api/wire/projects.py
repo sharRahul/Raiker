@@ -227,3 +227,51 @@ class RoutineDeliveries(TypedDict):
 class RoutineDeliveryStopped(TypedDict):
     ok: bool
     task_id: str
+
+
+InstructionFileState = Literal[
+    "absent",
+    "empty",
+    "disabled",
+    "unreviewed",
+    "approved",
+    "changed",
+    "unsafe",
+    "unreadable",
+    "invalid",
+    "oversized",
+    "root_unavailable",
+]
+
+
+class InstructionFileSource(TypedDict):
+    """One RAIKER.md: its scope, state in words, digest and the redacted preview."""
+
+    scope: Literal["global", "project"]
+    label: str
+    state: InstructionFileState
+    reason: str
+    digest: str
+    chars: int
+    bytes: int
+    reviewed_digest: str
+    reviewed_at: str
+    preview: NotRequired[str]
+    #: Only on the owner's own global file, so they can open it to edit.
+    path: NotRequired[str]
+
+
+class ProjectInstructionFilesView(TypedDict):
+    """Whether a project uses file instructions, and the state of both files."""
+
+    project_id: str
+    enabled: bool
+    #: True when a Build turn on this project would not start until a review.
+    needs_review: bool
+    sources: list[InstructionFileSource]
+
+
+class GlobalInstructionFileView(TypedDict):
+    """The signed-in account's global RAIKER.md."""
+
+    source: InstructionFileSource

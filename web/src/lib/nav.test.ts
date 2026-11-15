@@ -86,7 +86,6 @@ describe("nav model", () => {
     expect(NAV_GROUPS[2].items.map((i) => i.id)).toEqual(["observe"]);
     expect(HUB_TABS.observe).toEqual([
       "overview",
-      "sessions",
       "activity",
       "checkpoints",
       "work",
@@ -163,8 +162,11 @@ describe("nav model", () => {
     // The route still resolves rather than falling through to the Workbench.
     expect(routeFromHash("#/diagnostics?session=sess_1")).toBe("observe");
     expect(tabFromHash("#/diagnostics?session=sess_1")).toBe("overview");
-    expect(routeFromHash("#/sessions?session=sess_1")).toBe("observe");
-    expect(tabFromHash("#/sessions?session=sess_1")).toBe("sessions");
+    // QUI-L11 — a conversation's record lives in Work › Threads now.
+    expect(routeFromHash("#/sessions?session=sess_1")).toBe("work");
+    expect(tabFromHash("#/sessions?session=sess_1")).toBe("threads");
+    expect(routeFromHash("#/observe?tab=sessions&session=sess_1")).toBe("work");
+    expect(tabFromHash("#/observe?tab=sessions&session=sess_1")).toBe("threads");
     expect(routeFromHash("#/mcp")).toBe("connections");
     expect(tabFromHash("#/mcp")).toBe("advanced");
     expect(routeFromHash("#/connections")).toBe("connections");

@@ -237,6 +237,49 @@ def matching_tools(
     return tuple(name for _score, name in scored[:limit])
 
 
+#: How many deferred tools a request may pre-reveal, and the score each needs.
+PRESELECT_LIMIT = 2
+PRESELECT_MIN_SCORE = 3
+#: Name words shared by several tools, which say nothing about which one is meant.
+_GENERIC_NAME_WORDS = frozenset({
+    "git", "github", "read", "write", "get", "list", "files", "file", "session",
+    "code", "memory", "run", "execute", "find", "search",
+})
+
+
+def preselect_for_prompt(prompt: str) -> tuple[str, ...]:
+    """Deferred tools the owner's request plainly asks for, revealed up front.
+
+    The embedding follow-up of FIXED-1425 ("rank deferred tool schemas by the
+    turn") done lexically, so it costs no model call and no data leaves the
+    host: a deferred tool is carried from the first request only when the
+    request names it: a distinctive word of the tool's *name* (``commit`` in
+    ``git_commit``, never the shared ``git`` or ``read``), scored as
+    :func:`matching_tools` scores. "Commit my changes" reveals ``git_commit``;
+    "what's the weather" reveals nothing.
+
+    At most :data:`PRESELECT_LIMIT`, so a long request cannot put the deferred
+    catalogue back into every call. Revealing grants nothing: the gate, the
+    decision mode and approvals are unchanged, exactly as for `tool_search`.
+    """
+    terms = [word for word in _WORD.findall(prompt.lower()) if word not in _STOPWORDS]
+    if not terms:
+        return ()
+    scored: list[tuple[int, str]] = []
+    for name in deferred_tool_names():
+        named = set(_WORD.findall(name.lower())) - _GENERIC_NAME_WORDS
+        described = set(_WORD.findall(f"{name} {TOOL_DESCRIPTIONS.get(name, '')}".lower()))
+        unique = set(terms)
+        name_hits = sum(1 for term in unique if term in named)
+        if not name_hits:
+            continue
+        score = 2 * name_hits + sum(1 for term in unique if term in described)
+        if score >= PRESELECT_MIN_SCORE:
+            scored.append((score, name))
+    scored.sort(key=lambda item: (-item[0], item[1]))
+    return tuple(name for _score, name in scored[:PRESELECT_LIMIT])
+
+
 def project_specs(
     all_specs: list[ToolSpec],
     *,

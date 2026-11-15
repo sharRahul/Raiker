@@ -19,7 +19,8 @@ this account's or unattributed, the same rule the conversation list applies.
 
 from __future__ import annotations
 
-from typing import Any, Literal
+from collections.abc import Callable
+from typing import Any, Literal, NotRequired
 
 from typing_extensions import TypedDict
 
@@ -72,6 +73,9 @@ class LibraryItem(TypedDict):
     #: A pinned block's validated data, so the page can draw it; empty otherwise.
     block: dict[str, Any] | None
     pin_id: str | None
+    #: Present only on a searched read: ``words`` when the item's own words
+    #: matched, ``meaning`` when it was found by what it is about.
+    match_kind: NotRequired[Literal["words", "meaning"]]
 
 
 def block_title(part_type: str, data: dict[str, Any]) -> str:
@@ -310,3 +314,45 @@ def _sessions(store: SQLiteStore, user_id: str | None) -> dict[str, dict[str, An
         }
         for row in rows
     }
+
+
+def _searchable(item: LibraryItem) -> str:
+    return " ".join(
+        str(part) for part in (item["title"], item["detail"], item.get("session_title"), item.get("project_name")) if part
+    )
+
+
+def search_library(
+    items: list[LibraryItem],
+    query: str,
+    *,
+    embed: Callable[[str], list[float] | None] | None = None,
+) -> list[LibraryItem]:
+    """Items whose words match ``query``, then — where the owner's embedding
+    model may run (``embed``) — items about it in other words.
+
+    Words first, every word of the query required (case-insensitive); meaning
+    only adds, compares the newest :data:`~raiker.context.meaning_search.CANDIDATES`
+    items not already found, and is skipped once five word matches exist.
+    """
+    words = [word for word in query.lower().split() if word]
+    if not words:
+        return items
+    found: list[LibraryItem] = []
+    rest: list[LibraryItem] = []
+    for item in items:
+        text = _searchable(item).lower()
+        if all(word in text for word in words):
+            found.append({**item, "match_kind": "words"})
+        else:
+            rest.append(item)
+    if embed is not None and len(found) < 5 and rest:
+        import contextlib
+
+        from raiker.context.meaning_search import rank_by_meaning
+
+        by_id = {item["item_id"]: item for item in rest}
+        with contextlib.suppress(Exception):
+            for key in rank_by_meaning(query, ((item["item_id"], _searchable(item)) for item in rest), embed):
+                found.append({**by_id[key], "match_kind": "meaning"})
+    return found

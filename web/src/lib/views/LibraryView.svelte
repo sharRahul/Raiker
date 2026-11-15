@@ -68,9 +68,49 @@
   let notice = $state("");
   /** QUI-G06 — a failed action stays until the next one; it is not a 3-second toast. */
   let actionError = $state<string | null>(null);
+  /** What the owner typed in Search, and the server's answer for it. */
+  let query = $state("");
+  let searched = $state<LibraryItem[] | null>(null);
+  let searching = $state(false);
+  let searchError = $state<string | null>(null);
+  let searchTimer: ReturnType<typeof setTimeout> | undefined;
+  let searchRequest = 0;
+
+  /**
+   * Search by words, then by meaning where the owner's embedding model may
+   * run (the server decides; Threads search uses the same rule). Debounced so
+   * typing a word is one request, and an older answer never replaces a newer.
+   */
+  function onSearch(value: string) {
+    query = value;
+    shown = PAGE_SIZE;
+    clearTimeout(searchTimer);
+    if (!value.trim()) {
+      searched = null;
+      searchError = null;
+      searching = false;
+      return;
+    }
+    searching = true;
+    searchTimer = setTimeout(async () => {
+      const id = ++searchRequest;
+      try {
+        const answer = await contract.getLibrary({ ...(projectId ? { project_id: projectId } : {}), q: value.trim() });
+        if (id !== searchRequest) return;
+        searched = answer.items.filter((item) => !exclude.includes(item.kind));
+        searchError = null;
+      } catch (error) {
+        if (id !== searchRequest) return;
+        searched = null;
+        searchError = failure("The search did not finish", "Nothing in the Library was changed.", "Search again in a moment.", error);
+      } finally {
+        if (id === searchRequest) searching = false;
+      }
+    }, 300);
+  }
 
   const scoped = $derived(
-    (items ?? []).filter(
+    (query.trim() && searched !== null ? searched : (items ?? [])).filter(
       (item) =>
         (kind === "all" || item.kind === kind) &&
         (projectId !== null || projectFilter === "" || item.project_id === projectFilter),
@@ -219,6 +259,17 @@
     </div>
   {:else}
     <div class="filters">
+      <label class="search">
+        <span class="sr-only">Search the Library</span>
+        <Icon name="search" size="sm" />
+        <input
+          type="search"
+          placeholder="Search the Library"
+          aria-label="Search the Library"
+          value={query}
+          oninput={(event) => onSearch((event.currentTarget as HTMLInputElement).value)}
+        />
+      </label>
       <div class="chip-row" role="group" aria-label="Show">
         {#each KINDS as option (option.id)}
           <button
@@ -247,8 +298,10 @@
       <span class="notice" role="status">{notice}</span>
     </div>
 
-    {#if scoped.length === 0}
-      <p class="none">Nothing here matches these filters.</p>
+    {#if searchError}
+      <p class="none" role="alert">{searchError}</p>
+    {:else if scoped.length === 0}
+      <p class="none">{query.trim() ? (searching ? "Searching…" : `Nothing in the Library matches “${query.trim()}”.`) : "Nothing here matches these filters."}</p>
     {:else}
       <ul class="rows">
         {#each page(scoped, shown) as item (item.item_id)}
@@ -274,7 +327,7 @@
                   rel={item.external ? "noopener noreferrer" : undefined}>{item.title}</a
                 >
               {/if}
-              <span class="meta">{context(item)}</span>
+              <span class="meta">{context(item)}{item.match_kind === "meaning" ? " · Related by meaning" : ""}</span>
             </div>
             <div class="actions">
               {#if item.kind === "block"}
@@ -337,6 +390,31 @@
     align-items: center;
     flex-wrap: wrap;
     gap: var(--space-2) var(--space-3);
+  }
+  .search {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-1);
+    flex: 1 1 14rem;
+    max-width: 22rem;
+    min-width: 0;
+    padding: 0 0.5rem;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--r-sm);
+    color: var(--text-3);
+  }
+  .search:focus-within { border-color: var(--accent); }
+  .search input {
+    flex: 1;
+    min-width: 0;
+    border: 0;
+    background: transparent;
+    font: inherit;
+    font-size: var(--text-sm);
+    color: var(--text-1);
+    padding: 0.3rem 0;
+    outline: none;
   }
   .project-filter select,
   .move {

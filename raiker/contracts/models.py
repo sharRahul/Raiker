@@ -166,6 +166,9 @@ EVENT_TYPES = {
     # passages the inspector opens are content and stay in the encrypted store,
     # served only over the session-authorized read route.
     "turn_sources_recorded",
+    # Deferred tools this turn's request named, carried from its first model
+    # call (`tool_projection.preselect_for_prompt`). Tool names only.
+    "tools_preselected",
     "action_proposed",
     "action_validated",
     "policy_decision",

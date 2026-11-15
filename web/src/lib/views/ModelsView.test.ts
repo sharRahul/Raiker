@@ -374,7 +374,7 @@ describe("BUG-270 — a card never claims a runtime that is not here", () => {
 
     await fireEvent.click(await screen.findByRole("button", { name: "Set up Ollama" }));
 
-    expect(await screen.findByText(/Could not open the Ollama download/)).toBeTruthy();
+    expect(await screen.findByText(/The Ollama download did not open/)).toBeTruthy();
     expect(open).not.toHaveBeenCalled();
   });
 
@@ -892,7 +892,7 @@ describe("ModelsView state grammar", () => {
     render(ModelsView, { tab: "add", source: "account" });
     const alert = await screen.findByRole("alert");
     expect(alert).toHaveTextContent(/couldn't load models/i);
-    expect(alert).toHaveTextContent(/unavailable \(404\)/i);
+    expect(alert).toHaveTextContent(/Models could not be read \(HTTP 404/i);
   });
 
   it("does not describe an API-key provider as having no API cost", async () => {

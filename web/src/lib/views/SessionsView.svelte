@@ -389,7 +389,7 @@
       {:else if detail !== null}
         <section class="card" aria-labelledby="session-detail-h">
           <h2 id="session-detail-h">{detail.session.title ?? shortId(detail.session.session_id)}</h2>
-          <p class="sub">Created {relativeTime(detail.session.created_at)} · {detail.turns.length} turns</p>
+          <p class="sub">Created {relativeTime(detail.session.created_at)} · {detail.turns.length} {detail.turns.length === 1 ? "turn" : "turns"}</p>
           <p class="session-links">
             <!-- REM-SESSIONS / REM-THREAD-03 — one way back, to the surface
                  this conversation was done on, decided by its recorded origin:

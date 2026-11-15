@@ -35,6 +35,7 @@ from raiker.api.dependencies import workspace_root as _ws
 from raiker.api.schemas import (
     CreateDesignDocumentRequest,
     DesignBaseVersionRequest,
+    DesignBrandGuideRequest,
     DesignExportRequest,
     DesignHandoffRequest,
     DesignImportAssetRequest,
@@ -636,6 +637,44 @@ async def read_design_tokens(body: DesignTokenImportRequest, request: Request) -
     return serialize_dto(answer)
 
 
+@router.post("/api/design/systems/brand-guide")
+async def read_design_brand_guide(body: DesignBrandGuideRequest, request: Request) -> dict[str, Any]:
+    """BUG-348 DW-06 — the colours and fonts a brand guide PDF states. Writes nothing.
+
+    The PDF is validated and its text extracted here, by the same local reader
+    Chat attachments use; nothing is stored and no model or provider is called.
+    What comes back fills the New design system form, as a tokens file does.
+    """
+    import base64
+    import binascii
+
+    from raiker.design.imports import parse_brand_guide  # noqa: PLC0415
+    from raiker.runtime.attachments import (  # noqa: PLC0415
+        PDF_MEDIA_TYPE,
+        AttachmentValidationError,
+        extract_document_text,
+        validate_document,
+    )
+
+    _principal(request)
+    try:
+        data = base64.b64decode(body.data_base64, validate=True)
+    except (binascii.Error, ValueError):
+        raise refusal(status.HTTP_422_UNPROCESSABLE_CONTENT, "design_brand_guide_unreadable") from None
+    try:
+        validate_document(PDF_MEDIA_TYPE, data)
+        text = await asyncio.to_thread(extract_document_text, PDF_MEDIA_TYPE, data)
+    except AttachmentValidationError:
+        raise refusal(status.HTTP_422_UNPROCESSABLE_CONTENT, "design_brand_guide_unreadable") from None
+    parsed = parse_brand_guide(body.filename, text)
+    answer: DesignTokenImport = {
+        "format": parsed["format"], "filename": body.filename.strip()[:200],
+        "sha256": hashlib.sha256(data).hexdigest(), "found": parsed["found"],
+        "variables": parsed["variables"], "skipped": parsed["skipped"],
+    }
+    return serialize_dto(answer)
+
+
 # ── Validation and export ────────────────────────────────────────────────
 
 
@@ -674,7 +713,13 @@ def _render(row: dict[str, Any], frame_id: str, fmt: str, scale: float, load: An
         title = str(document.get("title") or row.get("title") or "Raiker design")
         if fmt == "docx":
             return build_docx(ordered, slide, title=title), {"pages": min(len(ordered), 60)}
-        data = build_pptx(ordered, slide, title=title)
+        def bare_slide(fid: str) -> tuple[bytes, int, int]:
+            # BUG-348 DW-11 — the words go in as editable text boxes, so the
+            # picture under them is drawn without them.
+            image = render_raster(document, fid, load, scale=scale, skip_text=True)
+            return encode_raster(image, "png"), image.width, image.height
+
+        data = build_pptx(ordered, bare_slide, title=title, editable_text=True)
         return data, {"slides": min(len(ordered), 60)}
     if fmt == "json":
         frame = find_frame(document, frame_id)

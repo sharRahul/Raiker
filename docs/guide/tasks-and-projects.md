@@ -384,11 +384,23 @@ there are more.
 **Work › Library** is everything Raiker has made for you in one list, newest
 first: generated documents (with their download), images and documents from
 Design, answer blocks you pinned from Chat, and pull requests Raiker opened.
-Filter by type or project; each item opens the conversation, turn or Design
+Filter by type or project, or type in **Search the Library**: every word must
+appear in the item's title, kind, conversation or project, and — where your
+embedding model may run — items about the same thing in other words are added
+and marked *Related by meaning*. Each item opens the conversation, turn or Design
 document it came from. A pinned block can be moved to another project or
 unpinned from here. Each project's **Project library** is the same list for
 that project. The Library only reads what already exists; nothing is copied
 into it except a block you pin.
+
+## A conversation's record and a project's activity
+
+A conversation's record — its turns, the events of each and their evidence —
+opens in **Work › Threads** (links that used to open Diagnostics › Sessions land
+there, with **← All threads** to go back). A project's **Evidence** section
+lists its checkpoints with **Open Recovery for this project**, and its
+**Activity**: what happened in the project's chats, newest first, from the same
+record as Diagnostics › Audit log.
 
 ## The work board
 

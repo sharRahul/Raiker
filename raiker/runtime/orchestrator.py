@@ -592,6 +592,8 @@ class RuntimeOrchestrator:
         # and the fail-safe direction: the catalogue is rebuilt, never inherited
         # across a boundary the owner just stood at.)
         self._revealed_tools: set[str] = set()
+        # The turns whose request was already read for tools it names.
+        self._preselected_turns: set[str] = set()
 
     def _turn_tool_specs(self, provider: str | None = None, model: str | None = None) -> list[ToolSpec]:
         """The tools this turn may call: the built-ins plus projected MCP tools.
@@ -619,6 +621,19 @@ class RuntimeOrchestrator:
             mcp_specs=mcp_tool_specs(self.workspace_root, store, self.tool_broker.principal_id),
             compact=compact_for(window),
         )
+
+    def _preselect_turn_tools(self, envelope: PromptEnvelope) -> None:
+        """Carry the deferred tools this turn's request names (once per turn)."""
+        turn_id = str(envelope.turn_id or "")
+        if turn_id in self._preselected_turns:
+            return
+        self._preselected_turns.add(turn_id)
+        from raiker.models.tool_projection import preselect_for_prompt
+
+        picked = preselect_for_prompt(str(envelope.prompt.text or "")[:4000])
+        if picked:
+            self._revealed_tools.update(picked)
+            self._event(envelope, "tools_preselected", {"tools": list(picked)})
 
     def _reveal_searched_tools(self, action: ToolAction, result: ToolResult) -> None:
         """Keep what a `tool_search` returned callable for the rest of the turn.
@@ -2248,6 +2263,7 @@ class RuntimeOrchestrator:
     async def _acall_model(
         self, envelope: PromptEnvelope, messages: list[ModelMessage]
     ) -> ModelResponse:
+        self._preselect_turn_tools(envelope)
         # The last provider's own reason code, so a turn that runs out of
         # providers reports why rather than a generic "connection failed".
         last_error_code = UNCLASSIFIED_PROVIDER_ERROR
@@ -2450,6 +2466,7 @@ class RuntimeOrchestrator:
         client, a later stream failure ends the turn honestly instead of mixing
         another provider's response into the same transcript.
         """
+        self._preselect_turn_tools(envelope)
         last_error_code = UNCLASSIFIED_PROVIDER_ERROR
         # DEC-08 step 6 — the candidate that failed last and its own reason,
         # for the fallback event that follows it.

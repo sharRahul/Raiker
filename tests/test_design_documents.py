@@ -476,6 +476,27 @@ def test_a_document_exports_as_slides_one_per_frame(api: Any) -> None:
         assert 'cx="10287000" cy="10287000"' in presentation
 
 
+def test_a_slides_words_are_an_editable_text_box_over_a_picture_without_them(api: Any) -> None:
+    """BUG-348 / DW-11 — slides as editable shapes: text boxes, not painted words."""
+    import xml.dom.minidom
+    import zipfile
+
+    client, h, _ws = api
+    doc = _new(client, h)
+    _ops(client, h, doc, 1, [_text("t", color="#112233")])
+    made = client.post(f"/api/design/documents/{doc['document_id']}/exports",
+                       json={"frame_id": "frame-1", "format": "pptx"}, headers=h).json()
+    download = client.get(f"/api/design/exports/{made['export_id']}/bytes", headers=h)
+    with zipfile.ZipFile(io.BytesIO(download.content)) as deck:
+        slide = deck.read("ppt/slides/slide1.xml").decode()
+        xml.dom.minidom.parseString(slide)  # well-formed
+        assert 'txBox="1"' in slide and "<a:t>Hello" in slide
+        assert '<a:srgbClr val="112233">' in slide
+        picture = Image.open(io.BytesIO(deck.read("ppt/media/frame1.png"))).convert("RGB")
+        # No text was painted into the picture: no pixel is the text's colour.
+        assert (0x11, 0x22, 0x33) not in {picture.getpixel((x, y)) for x in range(picture.width) for y in range(picture.height)}
+
+
 def test_a_document_exports_as_a_word_document_with_editable_text(api: Any) -> None:
     """BUG-348 / DW-11 — the document format: each frame a heading, its picture and its words as paragraphs."""
     import xml.dom.minidom

@@ -37,6 +37,8 @@
   import { projectFromHash } from "../nav";
   import { explainReasonCode } from "../reasonCodes";
   import { failure } from "../errorCopy";
+  import { digestEvents } from "../auditDigest";
+  import type { EventView } from "../generated/apiContract";
   import { fileKind, formatBytes } from "../projectLifecycle";
   import { conversationLink, workModeRoute } from "../turnAnchor";
 
@@ -67,6 +69,28 @@
 
 
   let detail = $state<ProjectDetail | null>(null);
+  /** QUI-L11 — this project's recent activity, read when Evidence opens. */
+  let projectActivity = $state<EventView[] | null>(null);
+  let activityError = $state<string | null>(null);
+  let activityFor = "";
+
+  $effect(() => {
+    const id = detail?.project.project_id;
+    if (!id || detailSection !== "evidence" || activityFor === id) return;
+    activityFor = id;
+    projectActivity = null;
+    activityError = null;
+    api.events({ project_id: id, limit: 60 }).then(
+      (events) => {
+        if (activityFor === id) projectActivity = digestEvents(events, 12);
+      },
+      (error: unknown) => {
+        if (activityFor !== id) return;
+        activityFor = "";
+        activityError = failure("This project's activity could not be read", "The project is unchanged.", "Open Evidence again to retry.", error);
+      },
+    );
+  });
   /**
    * REM-PROJ-02 — the project's own sections, rather than one long column.
    *
@@ -1134,7 +1158,25 @@
               </li>
             {/each}
           </ul>
-          <a class="cross-link" href="#/checkpoints">Open the checkpoint timeline</a>
+          <a class="cross-link" href={`#/checkpoints?project=${encodeURIComponent(detail.project.project_id)}`}>Open Recovery for this project</a>
+        {/if}
+        <!-- QUI-L11 — what happened in this project, newest first, from the
+             same audit record Diagnostics › Audit log reads. -->
+        <h3 class="kicker">Activity</h3>
+        {#if projectActivity === null}
+          <p class="sub">{activityError ?? "Loading activity…"}</p>
+        {:else if projectActivity.length === 0}
+          <p class="sub">Nothing has happened in this project's chats yet.</p>
+        {:else}
+          <ul class="plain-list activity-list">
+            {#each projectActivity as event (event.event_id)}
+              <li>
+                <span>{humanize(event.event_type)}{event.summary ? ` — ${event.summary}` : ""}</span>
+                <span class="sub" title={event.timestamp}>{relativeTime(event.timestamp)}</span>
+              </li>
+            {/each}
+          </ul>
+          <a class="cross-link" href="#/observe?tab=activity">Open the audit log</a>
         {/if}
         {/if}
         </div>

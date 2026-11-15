@@ -16,6 +16,44 @@ PR #106: the **user-owned fallback sequence** and **prompt caching + normalised
 cache-hit metrics**.
 
 
+## Result — 2026-11-18 (Library search, editable slides and brand guides)
+
+A Linux workspace served by `raiker-web --port 8765` (`scripts/reset_live_workspace.py`
+at the start of the round), built from this round's SPA and backend, driven by
+Playwright on Chromium at 1440×1000. Anthropic was connected through **Add
+model** with an identity-linked key and its workspace ID typed into the UI;
+OpenAI and OpenRouter keys were typed into **Add model** in RT-1118-09. Keys were
+read from the round's environment and never written to a spec, log or capture.
+Ollama was not tested: this sandbox's network refuses `ollama.com`, so no
+embedding model was reachable and search by meaning was not qualified live.
+Spec: `web/e2e/fixed-1503-round-live.spec.ts`. Result: **9 of 9 passed**
+(RT-1118-01 to -06 on the first full run; RT-1118-07's two spec selectors were
+corrected and RT-1118-07 to -09 re-run; RT-1118-06 re-run after FIXED-1514).
+
+| # | Scenario | Verification | Result |
+|---|---|---|---|
+| RT-1118-01 | Anthropic connects with its workspace through **Add model**; a Haiku 4.5 Chat turn answers *ROUND_1118_OK* on its first attempt | — | Passed |
+| RT-1118-02 | Design › Documents, a design with a text layer, **Export** chosen: all six inspector tabs are visible inside the inspector | FIXED-1505 | Passed |
+| RT-1118-03 | **Export › Slides (PowerPoint), all frames** lists the export and the download is a `presentationml` file; a generated deck opened in LibreOffice shows its words as text boxes over the picture | FIXED-1511 | Passed |
+| RT-1118-04 | **System › Import from a tokens file or a brand guide** with a PDF: *Read 3 values*, `ocean-blue=#1144aa`, `sunset=#ff7043`, `heading=Playfair Display` | FIXED-1512 | Passed |
+| RT-1118-05 | **Search the Library** finds the design by a word of its title; *zebra quantum* reads *Nothing in the Library matches “zebra quantum”.* | FIXED-1507 | Passed |
+| RT-1118-06 | `#/sessions?session=…` opens the record in Work › Threads with **← All threads**; Diagnostics has no Sessions tab; `#/observe?tab=sessions` lands on Threads | FIXED-1509, FIXED-1514 | Passed |
+| RT-1118-07 | A project with a conversation: **Evidence** lists its **Activity** | FIXED-1510 | Passed |
+| RT-1118-08 | A real turn whose request names *diff files* records `tools_preselected` | FIXED-1508 | Passed |
+| RT-1118-09 | OpenAI and OpenRouter connect through **Add model**; a GPT-4o mini turn answers | — | Passed |
+
+**Found during the run, fixed.** The record in Threads drew a second copy of
+the conversation list above it and read *1 turns* (FIXED-1514).
+
+**Found, not fixed.** None in the scenarios above; the open items are in
+[TO_BE_FIXED](../plans/TO_BE_FIXED.md#2026-11-18-round--found-not-fixed).
+
+**Captures.** `output/playwright/2026-11-18-round/` — `01-anthropic-connected`,
+`01b-chat-answers`, `02-design-inspector-tabs`, `03-design-deck-export`,
+`03b-deck-in-libreoffice`, `04-brand-guide-import`, `05-library-search`,
+`05b-library-search-none`, `06-session-record-in-threads`, `07-project-activity`,
+`08-preselected-turn`, `09-providers`, `09b-openai-answers`.
+
 ## Result — 2026-11-17 (First turn, memories in Context and Word export)
 
 A Linux workspace served by `raiker-web --port 8765` (`scripts/reset_live_workspace.py`

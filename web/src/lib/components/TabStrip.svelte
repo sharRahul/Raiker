@@ -14,11 +14,19 @@
     selected,
     onselect,
     label,
+    wrap = false,
   }: {
     tabs: Tab[];
     selected: string;
     onselect: (id: string) => void;
     label: string;
+    /**
+     * Lay the tabs out in rows of equal width instead of one scrolling row.
+     * For a narrow column (Design's inspector) whose six tabs never fit:
+     * scrolling there hid the first tab behind the selected last one, so
+     * *Inspect* read *ct* with Export chosen (2026-11-17 round).
+     */
+    wrap?: boolean;
   } = $props();
 
   let strip = $state<HTMLDivElement>();
@@ -98,6 +106,7 @@
 
 <div
   class="tab-strip"
+  class:wrap
   class:fade-start={overflowStart}
   class:fade-end={overflowEnd}
   role="tablist"
@@ -140,6 +149,13 @@
     scrollbar-width: none;
   }
   .tab-strip::-webkit-scrollbar { display: none; }
+  .tab-strip.wrap {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(5.25rem, 1fr));
+    overflow: visible;
+    mask-image: none;
+  }
+  .tab-strip.wrap button { justify-content: center; padding-inline: 0.5rem; }
   /* The fade is a mask rather than a gradient overlay so it works on the strip's
      own sunken background in either theme, and so it cannot sit above a tab and
      swallow its click. */

@@ -173,3 +173,82 @@ def extract_palette(data: bytes, size: int = PALETTE_SIZE) -> list[dict[str, Any
 
 
 __all__ = ["extract_palette", "parse_tokens"]
+
+
+# ── Brand guides (BUG-348 DW-06) ──────────────────────────────────────────
+
+#: A brand guide's text read here; the rest of a long guide adds nothing.
+MAX_BRAND_GUIDE_CHARS = 120_000
+_GUIDE_HEX = re.compile(r"#([0-9a-fA-F]{6}|[0-9a-fA-F]{3})\b")
+_GUIDE_RGB = re.compile(r"\bRGB\s*[:(]?\s*(\d{1,3})\s*[, ]\s*(\d{1,3})\s*[, ]\s*(\d{1,3})", re.IGNORECASE)
+_GUIDE_FONT = re.compile(
+    r"\b(?P<role>heading|headline|display|title|body|text|primary|secondary|brand)?\s*"
+    r"(?:typeface|font(?:\s+family)?)\s*[:\-–—]\s*(?P<family>[A-Z][A-Za-z0-9 ]{1,40}?)\s*(?:$|[,.;(|/])",
+    re.IGNORECASE,
+)
+_LABEL_NOISE = re.compile(r"\b(?:hex|rgb|cmyk|pantone|colou?r|code|value)\b\s*[:#]?", re.IGNORECASE)
+
+
+def _guide_label(text: str) -> str | None:
+    """The words naming a colour on its line: "Ocean blue HEX" → ``ocean-blue``."""
+    label = _LABEL_NOISE.sub(" ", text)
+    label = re.sub(r"[^A-Za-z0-9 _-]+", " ", label).strip()
+    words = label.split()
+    if not words or len(words) > 5 or not any(word[0].isalpha() for word in words):
+        return None
+    return _name(" ".join(words))
+
+
+def parse_brand_guide(filename: str, text: str) -> dict[str, Any]:
+    """Colours and fonts a brand guide states, in the shape :func:`parse_tokens` returns.
+
+    Read from the guide's own words, never guessed from its pictures: a colour
+    is a ``#hex`` or an ``RGB r, g, b`` written in the text, named by the words
+    before it on its line (or the line above, a swatch's caption); a font is a
+    labelled ``Typeface:`` / ``Heading font:`` line. A colour stated twice is
+    kept once, under its first name. Everything else is left out, and a guide
+    with nothing to read says so in ``skipped``.
+    """
+    text = text[:MAX_BRAND_GUIDE_CHARS]
+    variables: dict[str, dict[str, Any]] = {"colors": {}, "fonts": {}, "spacing": {}}
+    skipped: list[dict[str, str]] = []
+    seen: set[str] = set()
+    previous = ""
+    for raw_line in text.splitlines():
+        line = " ".join(raw_line.split())
+        if not line:
+            continue
+        found: list[tuple[int, str]] = [
+            (match.start(), f"#{match.group(1)}") for match in _GUIDE_HEX.finditer(line)
+        ]
+        for match in _GUIDE_RGB.finditer(line):
+            parts = [int(value) for value in match.groups()]
+            if all(0 <= part <= 255 for part in parts):
+                found.append((match.start(), "#" + "".join(f"{part:02x}" for part in parts)))
+        found.sort()
+        for start, value in found:
+            color = _hex(value)
+            if color is None or color in seen:
+                continue
+            seen.add(color)
+            label = _guide_label(line[:start]) or _guide_label(previous)
+            name = label if label and label not in variables["colors"] else f"brand-{len(variables['colors']) + 1}"
+            if len(variables["colors"]) >= MAX_VARIABLES_PER_GROUP:
+                skipped.append({"name": name, "reason": f"more than {MAX_VARIABLES_PER_GROUP} colors"})
+                continue
+            variables["colors"][name] = color
+        for match in _GUIDE_FONT.finditer(line):
+            family = _font(match.group("family"))
+            if family is None:
+                continue
+            role = (match.group("role") or "").lower()
+            name = {"headline": "heading", "display": "heading", "title": "heading", "text": "body"}.get(role, role) or "brand"
+            if name in variables["fonts"]:
+                name = f"{name}-{len(variables['fonts']) + 1}"
+            if len(variables["fonts"]) < MAX_VARIABLES_PER_GROUP and family not in variables["fonts"].values():
+                variables["fonts"][name] = family
+        previous = line
+    found_count = sum(len(group) for group in variables.values())
+    if found_count == 0:
+        skipped.append({"name": filename[:80], "reason": "no #hex or RGB colours or labelled fonts in its text"})
+    return {"format": "pdf", "variables": variables, "skipped": skipped[:MAX_SKIPPED], "found": found_count}

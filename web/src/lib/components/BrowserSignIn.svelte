@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { failure } from "../errorCopy";
   /**
    * Connect a mail or calendar account by signing in at the provider, in the
    * owner's own browser. Raiker never sees the password; the provider sends the
@@ -77,7 +78,7 @@
       } else if (err instanceof ApiError && err.reasonCode === "connector_sign_in_needs_loopback") {
         error = "Sign-in works only when Raiker is opened on this computer (127.0.0.1).";
       } else {
-        error = `Could not start the ${label} sign-in. Try again.`;
+        error = failure(`The ${label} sign-in did not start`, "Nothing was connected.", "Try again.", err);
       }
     } finally {
       busy = false;

@@ -12,7 +12,7 @@ operation answers with, and whether OpenAPI describes it (OPT-01/OPT-02 —
 * **deferred** — the body has no declared type; a test fails while any is.
 * **special** — a stream, a file or another non-JSON transport; hand-written.
 
-**541 operations: 525 verified, 0 eligible, 0 deferred, 16 special.**
+**542 operations: 526 verified, 0 eligible, 0 deferred, 16 special.**
 
 | Method | Path | Request | Response | Status | Why |
 |---|---|---|---|---|---|
@@ -185,6 +185,7 @@ operation answers with, and whether OpenAPI describes it (OPT-01/OPT-02 —
 | POST | `/api/design/proposals/{proposal_id}/decision` | DesignProposalDecisionRequest | DesignProposalDecision | verified | declared DesignProposalDecision |
 | GET | `/api/design/systems` |  | DesignSystemList | verified | declared DesignSystemList |
 | POST | `/api/design/systems` | DesignSystemRequest | DesignSystemView | verified | _save_system |
+| POST | `/api/design/systems/brand-guide` | DesignBrandGuideRequest | DesignTokenImport | verified | declared DesignTokenImport |
 | POST | `/api/design/systems/tokens` | DesignTokenImportRequest | DesignTokenImport | verified | declared DesignTokenImport |
 | PUT | `/api/design/systems/{system_id}` | DesignSystemRequest | DesignSystemView | verified | _save_system |
 | GET | `/api/diagnostics` |  | DiagnosticsView | verified | DashboardService.get_diagnostics |

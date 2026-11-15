@@ -2006,6 +2006,12 @@ export type DesignBaseVersionRequest = {
   base_version: number;
 };
 
+/** BUG-348 DW-06 — a brand guide PDF, base64, read on this machine. */
+export type DesignBrandGuideRequest = {
+  filename: string;
+  data_base64: string;
+};
+
 /** DW-08 — a change written as a new version. */
 export type DesignChangeView = {
   ok: boolean;
@@ -3780,6 +3786,7 @@ export type LibraryItem = {
   download_url: string | null;
   block: Record<string, unknown> | null;
   pin_id: string | null;
+  match_kind?: "words" | "meaning";
 };
 
 /** QUI-F15 — file a pin in another project, or in none. */
@@ -7790,6 +7797,8 @@ export const contract = {
     request<DesignSystemList>("/api/design/systems"),
   createDesignSystem: (body: DesignSystemRequest) =>
     call<DesignSystemView>("POST", "/api/design/systems", { body }),
+  readDesignBrandGuide: (body: DesignBrandGuideRequest) =>
+    call<DesignTokenImport>("POST", "/api/design/systems/brand-guide", { body }),
   readDesignTokens: (body: DesignTokenImportRequest) =>
     call<DesignTokenImport>("POST", "/api/design/systems/tokens", { body }),
   updateDesignSystem: (systemId: string, body: DesignSystemRequest) =>
@@ -7802,7 +7811,7 @@ export const contract = {
     request<RecoveryMatrixView>("/api/diagnostics/recovery"),
   getEnvironment: () =>
     request<EnvironmentContextView>("/api/environment"),
-  listEvents: (query: { session_id?: string; turn_id?: string; event_type?: string; limit?: number } = {}) =>
+  listEvents: (query: { session_id?: string; turn_id?: string; event_type?: string; limit?: number; project_id?: string } = {}) =>
     request<EventView[]>(withQuery("/api/events", query)),
   getExecutionEnvironments: () =>
     request<ExecutionEnvironmentsView>("/api/execution-environments"),
@@ -7968,7 +7977,7 @@ export const contract = {
     request<KnowledgeSources>("/api/knowledge-sources"),
   checkLanguage: (body: LanguageCheckRequest) =>
     call<LanguageCheck>("POST", "/api/language/check", { body }),
-  getLibrary: (query: { project_id?: string; kind?: string } = {}) =>
+  getLibrary: (query: { project_id?: string; kind?: string; q?: string } = {}) =>
     request<LibraryView>(withQuery("/api/library", query)),
   listSessionPins: (query: { session_id: string }) =>
     request<SessionPins>(withQuery("/api/library/pins", query)),

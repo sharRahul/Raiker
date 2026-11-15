@@ -797,7 +797,12 @@
     if (!file) return;
     notice = null;
     try {
-      const read = await contract.readDesignTokens({ filename: file.name, text: await file.text() });
+      // BUG-348 DW-06 — a brand guide PDF is read for the colours and fonts
+      // its text states; a tokens file for its variables. Neither saves.
+      const isPdf = file.type === "application/pdf" || /\.pdf$/i.test(file.name);
+      const read = isPdf
+        ? await contract.readDesignBrandGuide({ filename: file.name, data_base64: await fileBase64(file) })
+        : await contract.readDesignTokens({ filename: file.name, text: await file.text() });
       const variables = read.variables as Record<string, Record<string, string | number>>;
       const lines = (group: string) => Object.entries(variables[group] ?? {}).map(([key, value]) => `${key}=${value}`).join("\n");
       systemColors = lines("colors");
@@ -1456,7 +1461,7 @@
       </section>
 
       <aside class="right" aria-label="Inspector and design work">
-        <TabStrip tabs={RAIL_TABS} selected={rail} onselect={(id: string) => (rail = id as RailTab)} label="Design panels" />
+        <TabStrip tabs={RAIL_TABS} selected={rail} onselect={(id: string) => (rail = id as RailTab)} label="Design panels" wrap />
 
         <div id={`panel-${rail}`} role="tabpanel" aria-labelledby={`tab-${rail}`}>
         {#if rail === "inspect"}
@@ -1727,8 +1732,8 @@
           </section>
           <section class="panel" aria-label="New design system">
             <h3>New design system</h3>
-            <label>Import from a tokens file (CSS variables or JSON)
-              <input type="file" accept=".css,.json,.txt,text/css,application/json,text/plain" onchange={(event) => void importTokens(event)} />
+            <label>Import from a tokens file or a brand guide (CSS, JSON or PDF)
+              <input type="file" accept=".css,.json,.txt,.pdf,text/css,application/json,text/plain,application/pdf" onchange={(event) => void importTokens(event)} />
             </label>
             {#if tokenReport}
               <div class="preview" role="status">

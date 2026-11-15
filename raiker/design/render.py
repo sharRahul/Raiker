@@ -216,13 +216,17 @@ def _fit_image(source: Image.Image, node: Mapping[str, Any], size: tuple[int, in
     return canvas
 
 
-def _draw_node(base: Image.Image, node: Mapping[str, Any], load: AssetLoader, scale: float) -> None:
+def _draw_node(
+    base: Image.Image, node: Mapping[str, Any], load: AssetLoader, scale: float, skip_text: bool = False
+) -> None:
     kind = node["type"]
     if kind in CONTAINER_TYPES:
         if kind == "stack" and (node.get("fill") or node.get("stroke")):
             _draw_node(base, {**node, "type": "rect"}, load, scale)
         for child in _visible(node.get("children") or []):
-            _draw_node(base, child, load, scale)
+            _draw_node(base, child, load, scale, skip_text)
+        return
+    if kind == "text" and skip_text:
         return
     layer = Image.new("RGBA", base.size, (0, 0, 0, 0))
     draw = ImageDraw.Draw(layer)
@@ -264,14 +268,18 @@ def _draw_node(base: Image.Image, node: Mapping[str, Any], load: AssetLoader, sc
     base.alpha_composite(layer)
 
 
-def render_raster(document: Mapping[str, Any], frame_id: str, load: AssetLoader, *, scale: float = 1.0) -> Image.Image:
+def render_raster(
+    document: Mapping[str, Any], frame_id: str, load: AssetLoader, *, scale: float = 1.0, skip_text: bool = False
+) -> Image.Image:
+    """The frame as pixels. ``skip_text`` leaves text layers out, for a deck
+    that carries them as editable text boxes over the picture instead."""
     frame = find_frame(document, frame_id)
     width, height = math.ceil(frame["width"] * scale), math.ceil(frame["height"] * scale)
     if width * height > MAX_RASTER_PIXELS:
         raise ValueError("export_too_large")
     base = Image.new("RGBA", (width, height), _rgba(frame.get("background") or "#ffffff") or (255, 255, 255, 255))
     for node in _visible(frame["nodes"]):
-        _draw_node(base, node, load, scale)
+        _draw_node(base, node, load, scale, skip_text)
     return base
 
 

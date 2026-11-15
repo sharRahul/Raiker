@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { failure as describeFailure } from "../errorCopy";
   /**
    * The decision, where the owner is standing.
    *
@@ -22,7 +23,7 @@
    *   out of the way while the owner is on it.
    */
   import { onDestroy } from "svelte";
-  import { api, ApiError, hasToken } from "../api";
+  import { api, hasToken } from "../api";
   import { publishApprovalResolved, subscribeApprovalResolved } from "../approvalResume";
   import type { ApprovalView } from "../apiTypes";
   import { capabilityLabel } from "../capabilityModel";
@@ -170,10 +171,7 @@
       pending = pending.filter((item) => item.approval_id !== approvalId);
       await poll();
     } catch (error) {
-      failure =
-        error instanceof ApiError && error.reasonCode
-          ? `That decision was not accepted (${error.reasonCode}).`
-          : "That decision was not accepted.";
+      failure = describeFailure("That decision was not recorded", "The request is still waiting for you.", "Choose again.", error);
     } finally {
       busy = false;
     }

@@ -1491,17 +1491,23 @@ async def list_events(
     turn_id: str | None = None,
     event_type: str | None = None,
     limit: int = 100,
+    project_id: str | None = None,
     auth_data: tuple[ApiSession, Principal] = Depends(_auth),
 ) -> list[dict[str, Any]]:
     service = _service(request)
     user_id = auth_data[1].delegated_by_user_id
+    if project_id is not None and SQLiteStore(request.app.state.workspace_root).load_project(
+        project_id, user_id=user_id
+    ) is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Unknown project")
     if session_id is not None and service.get_session(session_id, user_id=user_id) is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Unknown session")
     if turn_id is not None and service.get_turn(turn_id, user_id=user_id) is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Unknown turn")
     return serialize_dto(
         service.list_events(
-            session_id=session_id, turn_id=turn_id, event_type=event_type, limit=limit, user_id=user_id
+            session_id=session_id, turn_id=turn_id, event_type=event_type, limit=limit, user_id=user_id,
+            project_id=project_id,
         )
     )
 

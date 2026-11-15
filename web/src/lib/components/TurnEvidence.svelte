@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { failure } from "../errorCopy";
   import { localTime } from "../format";
   /**
    * REM-CHAT-01 — one turn's own evidence, under the turn.
@@ -20,7 +21,7 @@
    * audit writer; this component never renders a raw argument, and the
    * full record, with its filters and its export, stays one link away.
    */
-  import { api, ApiError } from "../api";
+  import { api } from "../api";
   import type { EventEntry } from "../apiTypes";
   import type { ToolCallRow } from "../chatPresentation";
 
@@ -85,10 +86,7 @@
     } catch (error) {
       // Said, not swallowed. An inspector that shows an empty list when the
       // record could not be read is claiming the turn did nothing.
-      loadError =
-        error instanceof ApiError
-          ? `The record for this turn could not be read (${error.status}).`
-          : "The record for this turn could not be read.";
+      loadError = failure("The record for this turn could not be read", "What the turn used and changed is not shown here.", "Close and reopen it to read it again.", error);
     } finally {
       loading = false;
     }

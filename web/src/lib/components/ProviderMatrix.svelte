@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { failure as describeFailure } from "../errorCopy";
   import { askConfirm } from "../confirm.svelte";
   /**
    * One row per model provider — the whole model-connection question on a single
@@ -26,7 +27,7 @@
    * back — the row can only report that one is stored.
    */
   import { onDestroy } from "svelte";
-  import { api, ApiError } from "../api";
+  import { api } from "../api";
   import type { ModelProfile, ProviderModelList } from "../apiTypes";
   import { providerName } from "../format";
   import { modelName } from "../modelPresentation";
@@ -613,9 +614,7 @@
       failure = set(
         failure,
         row.profileId,
-        error instanceof ApiError && error.reasonCode
-          ? `That model could not be selected (${error.reasonCode}).`
-          : "That model could not be selected.",
+        describeFailure("That model was not chosen", "Turns keep the previous model.", "Try again.", error),
       );
     } finally {
       busy = drop(busy, row.profileId);

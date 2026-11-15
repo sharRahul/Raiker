@@ -3,12 +3,14 @@ validation, exports, proposals and handoffs."""
 
 from __future__ import annotations
 
+import base64
 from pathlib import Path
 from typing import Any
 
 from fastapi.testclient import TestClient
 
 from tests.contract_cases.base import Call, Cases, Seed, patched, plain
+from tests.minimal_pdf import minimal_pdf
 
 _TEXT = {"op": "add_node", "frame_id": "frame-1",
          "node": {"id": "title", "type": "text", "x": 40, "y": 40, "w": 600, "h": 80, "text": "Launch"}}
@@ -153,6 +155,10 @@ CASES: Cases = {
     ("GET", "/api/design/assets/{asset_id}/palette"): _imported,
     ("POST", "/api/design/systems/tokens"): plain(
         "/api/design/systems/tokens", {"filename": "tokens.css", "text": ":root { --brand: #1144aa; --gap: 8px; }"}
+    ),
+    ("POST", "/api/design/systems/brand-guide"): plain(
+        "/api/design/systems/brand-guide",
+        {"filename": "brand.pdf", "data_base64": base64.b64encode(minimal_pdf(["Ocean blue #1144aa"])).decode()},
     ),
     ("GET", "/api/design/documents/{document_id}/validation"): _listing("validation"),
     ("POST", "/api/design/documents/{document_id}/exports"): _on_doc(

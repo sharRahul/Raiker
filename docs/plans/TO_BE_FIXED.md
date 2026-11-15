@@ -826,8 +826,8 @@ receipts, and passed 7/7 live. What is still a gap against
 
 | Requirement | What exists | What is missing |
 |---|---|---|
-| DW-06 system sources and components | Tokens files (CSS, JSON), a picture's colours, typed values; components kept in their document | Importing from a brand-guide document (PDF); components shared through a design system across documents |
-| DW-11 formats | PNG, raster PDF, vector PDF, SVG, JSON, a PowerPoint deck of every frame (2026-11-16, [FIXED-1486](FIXED_ITEMS.md#fixed-1486--a-design-could-not-be-shown-as-a-presentation-bug-348-dw-11)) and a Word document with each frame's text as editable paragraphs (2026-11-17, [FIXED-1493](FIXED_ITEMS.md#fixed-1493--a-design-could-not-be-handed-over-as-a-document-bug-348-dw-11)) | Slides as editable shapes rather than pictures; vector PDF text beyond Windows-1252 (counted and written as `?`) |
+| DW-06 system sources and components | Tokens files (CSS, JSON), a picture's colours, typed values, a brand guide PDF's stated colours and fonts (2026-11-18, [FIXED-1512](FIXED_ITEMS.md#fixed-1512--a-brand-guide-could-not-fill-a-design-system-bug-348-dw-06)); components kept in their document | Components shared through a design system across documents; colours a guide shows only as swatches |
+| DW-11 formats | PNG, raster PDF, vector PDF, SVG, JSON, a PowerPoint deck of every frame (2026-11-16, [FIXED-1486](FIXED_ITEMS.md#fixed-1486--a-design-could-not-be-shown-as-a-presentation-bug-348-dw-11)) and a Word document with each frame's text as editable paragraphs (2026-11-17, [FIXED-1493](FIXED_ITEMS.md#fixed-1493--a-design-could-not-be-handed-over-as-a-document-bug-348-dw-11)) | Shapes and images as editable slide shapes (text is editable since 2026-11-18, [FIXED-1511](FIXED_ITEMS.md#fixed-1511--a-decks-words-were-painted-into-its-slides-bug-348-dw-11)); vector PDF text beyond Windows-1252 (counted and written as `?`) |
 
 The canvas also draws text in the browser's font while PNG and both PDFs use the
 host's raster font (recorded with each export), so a line can break in a
@@ -985,8 +985,12 @@ These parts of the same items are not done:
   [FIXED-1171](FIXED_ITEMS.md#fixed-1171--restoring-a-checkpoint-was-the-dominant-button-and-named-little-qui-l11)).
   Recovery reached from the affected task shipped 2026-11-17
   ([FIXED-1498](FIXED_ITEMS.md#fixed-1498--recovery-could-not-be-reached-from-the-task-that-changed-files-qui-l11)).
-  Sessions as Work › Threads and activity inside each task and project are not
-  built; Diagnostics keeps its six tabs until they are.
+  Sessions moved to Work › Threads and each project's Evidence lists its
+  activity and opens its own Recovery on 2026-11-18
+  ([FIXED-1509](FIXED_ITEMS.md#fixed-1509--sessions-lived-in-diagnostics-instead-of-work--threads-qui-l11),
+  [FIXED-1510](FIXED_ITEMS.md#fixed-1510--a-project-had-no-activity-of-its-own-and-its-recovery-link-opened-everything-qui-l11));
+  a task's activity is its **History** (BUG-299). Still open: live work on Home
+  only (Diagnostics › Work in action remains).
 * **Older live specs still drive the pages the layout round replaced.** About
   70 specs under `web/e2e/*-live.spec.ts` (written before 2026-10-21) open
   Models by its old tabs, Extensions tabs, Permissions rows that opened in
@@ -1794,11 +1798,11 @@ embedding space and keeps it current in the background. Still open:
 
 ## 2026-11-17 round — found, not fixed
 
-* **Design's inspector tabs scroll out of sight.** With the Export tab chosen
-  at 1,440 px, the inspector's tab strip is scrolled so *Inspect* reads *ct*;
-  the strip has six tabs in a column narrower than they need. A two-row or
-  icon-labelled strip would fix it; it needs its own layout check.
-* **Thread search by meaning is not qualified live.** No Ollama host is
+* ~~**Design's inspector tabs scroll out of sight.**~~ Closed 2026-11-18
+  ([FIXED-1505](FIXED_ITEMS.md#fixed-1505--designs-inspector-tabs-scrolled-out-of-sight)).
+* **Thread and Library search by meaning are not qualified live.** (Library
+  search shipped 2026-11-18, [FIXED-1507](FIXED_ITEMS.md#fixed-1507--the-library-could-not-be-searched);
+  its words half passed RT-1118-05.) No Ollama host is
   reachable from this sandbox (`ollama.com` is refused by its network policy),
   so FIXED-1494 is covered by tests with a stand-in embedder only. Re-run with
   the built-in embedding model: search *the Japan holiday* with a chat about
@@ -1817,4 +1821,28 @@ embedding space and keeps it current in the background. Still open:
   Raiker?* in Settings; `round-2026-09-15` for Personalisation's old
   *Interface text and formatting only…* line. Each needs a case-by-case rewrite
   like FIXED-1489; none is a product failure.
+
+## 2026-11-18 round — found, not fixed
+
+* **A goal's pause does not yet reach a running step's next safe boundary**
+  (BUG-355's last row). Looked at this round: a step's turn honours *Stop* at
+  the boundary before each model call (`turn_controls`), but there is no
+  *paused* turn state to park it in and continue it from on Resume — the turn
+  would have to end like an approval continuation and be re-entered. That is a
+  runtime change of its own, so it was not started; Pause still files nothing
+  new and lets a running turn finish.
+* **Ollama was not reachable** (`ollama.com` refused by this sandbox's network
+  policy), so the owner's "any available cloud model" through Ollama and every
+  search-by-meaning path (Threads, Library, goal noticing) are still covered by
+  stand-in embedders only.
+* **Older live specs from the FIXED-1482 re-run** (`b9`, `gcr` pinning,
+  `memory-restart-provider-composer`, `round-2026-09-04`, `round-2026-09-15`)
+  were not rewritten this round; the 2026-11-17 notes above still describe them.
+* **Merging adjacent key-figure blocks** (the *three-block limit is guidance*
+  note above) was considered and not done: Library pins name a block by its
+  index in the stored answer, so merging blocks at render time would move
+  existing pins. It needs a pin migration first.
+* **Tool preselection is lexical.** FIXED-1508 reveals a deferred tool the
+  request names; ranking deferred schemas by meaning (to defer more of the core)
+  still waits on a reachable embedding model.
 

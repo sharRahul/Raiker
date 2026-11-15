@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { failure } from "../../errorCopy";
   /**
    * Side-task models: a separate model for each side task, with
    * its own fallback. Summarising (conversation compaction) tries this chain,
@@ -61,7 +62,7 @@
       note = { ...note, [task]: chain.length ? "Saved." : "Cleared — the turn's own model is used." };
     } catch (e) {
       const code = e instanceof ApiError ? (e.reasonCode ?? "") : "";
-      note = { ...note, [task]: REFUSALS[code] ?? `Could not save${code ? ` (${code})` : ""}.` };
+      note = { ...note, [task]: REFUSALS[code] ?? failure("This choice was not saved", "The previous model for it is kept.", "Try again.", e) };
     } finally {
       busy = null;
     }

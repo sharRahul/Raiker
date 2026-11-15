@@ -10,6 +10,9 @@ work (Design), and an extensible, owner-governed runtime. **Goals** carry an
 outcome across sessions as a plan of governed steps, under an execution profile
 you set in Settings; further goal-level capabilities are planned and staged in the
 [personal-agent architecture](docs/plans/PERSONAL_AUTONOMOUS_AGENT_SPEC.md).
+Everything Raiker makes is in **Work › Library**, searchable by words and, where
+your embedding model may run, by meaning; Design exports decks whose words stay
+editable and reads a brand guide PDF into a design system.
 
 Raiker runs as a desktop application on Windows, macOS and Linux. Its desktop
 window, web dashboard and terminal client are available for local, single-owner

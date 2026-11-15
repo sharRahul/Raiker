@@ -28,7 +28,7 @@
 
 import { api, ApiError } from "./api";
 
-import { NOT_ANSWERING } from "./errorCopy";
+import { failure, NOT_ANSWERING } from "./errorCopy";
 import type { PromptAttachment } from "./apiTypes";
 
 /** One attachment the composer is carrying, or that a turn carried. */
@@ -229,7 +229,7 @@ export function createAttachmentStore(): AttachmentStore {
           ? // DEC-25 — other uploads are still being read; nothing was stored.
             "Other uploads are still in progress. Add this file again in a moment."
           : e instanceof ApiError
-            ? `Upload rejected (${e.reasonCode ?? e.status}).`
+            ? failure("The file was not attached", "Your message is kept.", "Check its size and type, then add it again.", e)
             : `The file was not attached. ${NOT_ANSWERING}`;
     } finally {
       uploading = false;

@@ -21,7 +21,7 @@
   import EmptyState from "./EmptyState.svelte";
   import Icon from "./Icon.svelte";
   import PageState from "./PageState.svelte";
-  import { api, ApiError } from "../api";
+  import { api } from "../api";
   import { stopRun } from "../taskLifecycle";
   import { haltAction, taskActionLabel } from "../taskPhase";
   // BUG-299 — the panel could stop a run and report `outcome_unknown`, and had
@@ -130,10 +130,7 @@
       tab = "running";
       await load();
     } catch (error) {
-      notice =
-        error instanceof ApiError
-          ? `Could not schedule the agent (${error.reasonCode ?? error.status}).`
-          : "The agent was not scheduled; nothing will run. Check the time and the task, then schedule it again.";
+      notice = failure("The agent was not scheduled", "Nothing will run.", "Check the time and the task, then schedule it again.", error);
     } finally {
       creating = false;
     }

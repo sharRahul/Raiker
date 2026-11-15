@@ -163,6 +163,7 @@ VERIFIED: frozenset[tuple[str, str]] = frozenset(
         ("POST", "/api/design/assets/import"),
         ("GET", "/api/design/assets/{asset_id}/palette"),
         ("POST", "/api/design/systems/tokens"),
+        ("POST", "/api/design/systems/brand-guide"),
         ("GET", "/api/design/documents/{document_id}/validation"),
         ("POST", "/api/design/documents/{document_id}/exports"),
         ("GET", "/api/design/documents/{document_id}/exports"),

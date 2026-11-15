@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { failure } from "../errorCopy";
   import { MODEL_ADD_SOURCES } from "../modelNavigation";
   import { askConfirm } from "../confirm.svelte";
   import { onDestroy, onMount } from "svelte";
@@ -273,9 +274,7 @@
       loadError =
         e instanceof ApiError && e.status === 429
           ? "Too many requests in the last minute. Raiker throttled this read; wait a moment and press Refresh."
-          : e instanceof ApiError
-            ? `Unavailable (${e.status})`
-            : "Unavailable";
+          : failure("Models could not be read", "Your saved models and connections are unchanged.", "Press Refresh to read them again.", e);
     }
   }
 
@@ -633,7 +632,7 @@
       installNotice = `Opened the official ${providerName(provider)} download. Install it and come back — Raiker will look again.`;
       armReturnDetect(providerName(provider));
     } catch {
-      installNotice = `Could not open the ${providerName(provider)} download.`;
+      installNotice = `The ${providerName(provider)} download did not open. Nothing was installed. Open ${providerName(provider)}'s website in your browser instead.`;
     } finally {
       installing = null;
     }
@@ -823,9 +822,7 @@
       await load();
     } catch (e) {
       routingNote =
-        e instanceof ApiError
-          ? `Could not save routing (${e.status}${e.reasonCode ? `: ${e.reasonCode}` : ""})`
-          : "Could not save routing";
+        failure("Routing was not saved", "Turns keep the previous routing.", "Try again.", e);
     } finally {
       routingBusy = false;
     }
@@ -841,9 +838,7 @@
       onchanged?.();
     } catch (e) {
       selectError =
-        e instanceof ApiError
-          ? `Could not select (${e.status}${e.reasonCode ? `: ${e.reasonCode}` : ""})`
-          : "Could not select";
+        failure("That model was not chosen", "Turns keep the previous default model.", "Try again.", e);
     } finally {
       selecting = false;
     }

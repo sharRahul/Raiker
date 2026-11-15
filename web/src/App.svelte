@@ -9,6 +9,7 @@
   import {
     DEFAULT_ROUTE,
     navItem,
+    projectFromHash,
     routeFromHash,
     tabFromHash,
   } from "./lib/nav";
@@ -509,6 +510,8 @@
               props={{
                 tab: currentTab ?? "overview",
                 sessionId: continuedSessionId,
+                // QUI-L11 — Recovery opened from a project lists its checkpoints.
+                projectId: projectFromHash(window.location.hash),
               }}
             />
             <!-- Settings is the fallback route, so every guard that renders

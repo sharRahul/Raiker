@@ -88,3 +88,38 @@ def meaning_matches(
             scored.append((score, record))
     scored.sort(key=lambda pair: pair[0], reverse=True)
     return [record for _score, record in scored[:MAX_RESULTS]]
+
+
+def rank_by_meaning(
+    query: str,
+    candidates: Iterable[tuple[str, str]],
+    embed: Embed,
+    *,
+    threshold: float = THRESHOLD,
+    limit: int = MAX_RESULTS,
+    bound: int = CANDIDATES,
+) -> list[str]:
+    """The keys of ``candidates`` (``(key, text)`` pairs) about ``query``, best first.
+
+    The same bounds as conversation search: at most ``bound`` candidates are
+    embedded per call, a short text is never compared, and nothing is returned
+    when the query itself cannot be embedded.
+    """
+    vector = embed(query.strip())
+    if not vector:
+        return []
+    scored: list[tuple[float, str]] = []
+    for index, (key, text) in enumerate(candidates):
+        if index >= bound:
+            break
+        cleaned = " ".join(text.split())
+        if len(cleaned) < 8:
+            continue
+        other = embed(cleaned[:2000])
+        if not other:
+            continue
+        score = _cosine(vector, other)
+        if score >= threshold:
+            scored.append((score, key))
+    scored.sort(key=lambda pair: pair[0], reverse=True)
+    return [key for _score, key in scored[:limit]]

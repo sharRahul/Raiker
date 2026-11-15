@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { failure } from "../../errorCopy";
   /**
    * UX-MODEL-01 — Advanced routing, out of the Models page into the one
    * component that owns its two state machines: the fallback sequence being
@@ -105,10 +106,7 @@
       // model now selected rather than the one it replaced.
       await onreload();
     } catch (e) {
-      advisorError =
-        e instanceof ApiError
-          ? `Could not save (${e.status}${e.reasonCode ? `: ${e.reasonCode}` : ""})`
-          : "Could not save";
+      advisorError = failure("The advisor was not saved", "Turns keep the previous advisor.", "Try again.", e);
     } finally {
       advisorSaving = false;
     }
@@ -158,10 +156,7 @@
       confirmedSequence = [...result.fallback_sequence];
       saved = true;
     } catch (e) {
-      saveError =
-        e instanceof ApiError
-          ? `Could not save (${e.status}${e.reasonCode ? `: ${e.reasonCode}` : ""})`
-          : "Could not save";
+      saveError = failure("Routing was not saved", "Turns keep the previous routing.", "Try again.", e);
     } finally {
       saving = false;
     }

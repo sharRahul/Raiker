@@ -28,6 +28,8 @@ MAX_RESULTS = 25
 #: bounded, and the short snippet separately as the reason it matched.
 TEXT_CHARS = 1200
 MATCH_CHARS = 400
+#: TOOL-119 — how much of a conversation's opening request names what it was about.
+ABOUT_CHARS = 200
 
 
 def _text(row: dict[str, Any]) -> str:
@@ -62,6 +64,45 @@ def _result(row: dict[str, Any]) -> dict[str, Any]:
         "matched": matched,
         "redacted": text_redacted or match_redacted,
     }
+
+
+def _conversations(store: Any, session_ids: list[str]) -> dict[str, dict[str, Any]]:
+    """TOOL-119 — one line per conversation a hit came from: what it was about.
+
+    A hit is one exchange; the model asked *which conversation* it is in, and
+    an exchange from the middle of a long chat ("yes, the second one") says
+    nothing about that. So each result names its conversation's opening
+    request, how many exchanges it has and when it started — read from the
+    transcript, redacted like the hit, with no model call.
+    """
+    from raiker.context.redaction import redact_text
+
+    unique = sorted({sid for sid in session_ids if sid})
+    if not unique:
+        return {}
+    rows: list[Any] = []
+    try:
+        for session_id in unique:  # at most MAX_RESULTS conversations
+            rows.extend(store._rows(  # noqa: SLF001 - one bounded read beside the store's own search
+                "SELECT t.session_id AS session_id, COUNT(*) AS turns, MIN(t.created_at) AS started_at, "
+                "(SELECT f.prompt_text FROM turns f WHERE f.session_id = t.session_id "
+                "AND f.prompt_text IS NOT NULL ORDER BY f.created_at ASC LIMIT 1) AS first_prompt "
+                "FROM turns t WHERE t.session_id = ? GROUP BY t.session_id",
+                (session_id,),
+            ))
+    except Exception:  # noqa: BLE001 - the hits still answer without the summary
+        return {}
+    found: dict[str, dict[str, Any]] = {}
+    for row in rows:
+        about = " ".join(str(row["first_prompt"] or "").split())
+        about = about[:ABOUT_CHARS] + ("…" if len(about) > ABOUT_CHARS else "")
+        cleaned, _redacted = redact_text(about)
+        found[str(row["session_id"])] = {
+            "about": cleaned,
+            "turns": int(row["turns"] or 0),
+            "started_at": str(row["started_at"] or ""),
+        }
+    return found
 
 
 def conversation_search(
@@ -117,9 +158,15 @@ def conversation_search(
         after=after,
         before=before,
     )
+    results = [_result(row) for row in rows]
+    conversations = _conversations(resolved, [result["session_id"] for result in results])
+    for result in results:
+        summary = conversations.get(result["session_id"])
+        if summary is not None:
+            result["conversation"] = summary
     return {
         "status": "success",
         "count": len(rows),
         "trust_label": "untrusted_conversation_data",
-        "results": [_result(row) for row in rows],
+        "results": results,
     }

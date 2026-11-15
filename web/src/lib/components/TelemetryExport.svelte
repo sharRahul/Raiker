@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { failure } from "../errorCopy";
   import { askConfirm } from "../confirm.svelte";
   /**
    * Backlog #18 — the governed record, on a wire.
@@ -14,7 +15,7 @@
    */
   import { onMount } from "svelte";
   import Icon from "./Icon.svelte";
-  import { api, ApiError } from "../api";
+  import { api } from "../api";
   import { runtimeBlock } from "../capabilityModel";
   import { relativeFuture, relativeTime } from "../format";
   import type { CapabilityGate, TelemetryDestination } from "../apiTypes";
@@ -44,8 +45,7 @@
   let includeContent = $state(false);
 
   function reason(e: unknown): string {
-    if (e instanceof ApiError) return e.reasonCode ?? `Request failed (${e.status})`;
-    return "Request failed";
+    return failure("The telemetry export was not changed", "The saved export settings are as they were.", "Check the endpoint and try again.", e);
   }
 
   async function load() {

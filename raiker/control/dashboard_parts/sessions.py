@@ -573,7 +573,24 @@ class SessionService:
         event_type: str | None = None,
         limit: int = 100,
         user_id: str | None = None,
+        project_id: str | None = None,
     ) -> list[EventView]:
+        if project_id is not None and session_id is None and turn_id is None:
+            # QUI-L11 — a project's activity: the events of its own
+            # conversations, newest first. Read wider and filtered, so a busy
+            # conversation elsewhere cannot crowd the project's out entirely.
+            project_sessions = {
+                str(row["session_id"])
+                for row in self.store.list_sessions(
+                    limit=500, project_id=project_id, user_id=user_id, include_archived=True
+                )
+            }
+            if not project_sessions:
+                return []
+            wide = self.store.list_event_index(event_type=event_type, limit=min(max(limit, 1) * 20, 5000))
+            return [
+                self._event_view(row) for row in wide if str(row.get("session_id")) in project_sessions
+            ][:limit]
         rows = self.store.list_event_index(
             session_id=session_id, turn_id=turn_id, event_type=event_type, limit=limit
         )

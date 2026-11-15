@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { failure } from "../errorCopy";
   /**
    * B13 — the repository, on screen, in Build.
    *
@@ -102,10 +103,7 @@
       // A folder that cannot be read is worth saying and must not blank the
       // panel: the rest of the repository stays browsable.
       if (path === "") {
-        error =
-          e instanceof ApiError
-            ? `This repository could not be read (${e.status}).`
-            : "This repository could not be read.";
+        error = failure("This repository could not be read", "Its files are not listed.", "Check that the folder still exists, then reopen the panel.", e);
       }
     } finally {
       const rest = { ...loadingPaths };

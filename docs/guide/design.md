@@ -305,10 +305,13 @@ fonts (`body=sans-serif`), spacing, usage rules, the variables a finished design
 must use, and a note on where they came from. Saving a system again makes a new
 version; designs using the earlier one are not changed.
 
-Instead of typing the values, **Import from a tokens file** reads CSS variables
-(`--brand-primary: #1144aa;`) or a JSON tokens file on this machine and fills
-the form with the colours, fonts and px/rem sizes it found, listing anything it
-skipped and why; **Or colours from a picture** reads the main colours of a logo
+Instead of typing the values, **Import from a tokens file or a brand guide**
+reads CSS variables (`--brand-primary: #1144aa;`) or a JSON tokens file on this
+machine and fills the form with the colours, fonts and px/rem sizes it found,
+listing anything it skipped and why. A brand guide **PDF** is read for what its
+text states: each `#hex` or `RGB r, g, b` colour, named by the words beside it
+(*Ocean blue #1A73E8* → `ocean-blue`), and labelled fonts (*Heading font:
+Playfair Display*); colours shown only as swatches are not read; **Or colours from a picture** reads the main colours of a logo
 or screenshot you have. The source note names the file and its hash. Nothing is
 saved until **Save system**.
 
@@ -373,8 +376,9 @@ shapes as paths, text as real text, an A4 frame as an A4 page — **PDF (one
 raster page)**, **SVG** (text stays text, so it remains editable in a vector
 tool), **JSON** (the frame's structure) or **Slides (PowerPoint), all
 frames**: a `.pptx` deck with one slide per frame, the chosen frame
-first, each slide the frame as a picture with its words as alternative text
-(the design stays the editable source), or **Document (Word), all
+first, each slide the frame's shapes and pictures as one picture with every
+text layer over it as a real, editable text box at its place, size, colour and
+weight (the design stays the full editable source), or **Document (Word), all
 frames**: a `.docx` with one page per frame, the frame's name as a heading,
 the frame as a picture and then each of its text layers as an ordinary,
 editable paragraph. The vector PDF writes text in the

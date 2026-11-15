@@ -1,3 +1,4 @@
+import { failure } from "../../errorCopy";
 /**
  * UX-BUILD-01 — Build's approval review, out of BuildView.
  *
@@ -151,9 +152,7 @@ export class ApprovalReview {
       await this.load();
     } catch (error) {
       this.notice =
-        error instanceof ApiError && error.reasonCode
-          ? `That version was not accepted (${error.reasonCode}).`
-          : "That version was not accepted.";
+        failure("That version was not recorded", "The change is still waiting for your review.", "Refresh the review and choose again.", error);
     } finally {
       this.busy = null;
     }
@@ -234,9 +233,7 @@ export class ApprovalReview {
         this.checkNow();
       } else {
         this.notice =
-          error instanceof ApiError
-            ? `The decision was not accepted (${error.reasonCode ?? error.status}).`
-            : "The decision could not be recorded.";
+          failure("The decision was not recorded", "The request is still waiting for you.", "Open it again and decide.", error);
       }
     } finally {
       this.busy = null;

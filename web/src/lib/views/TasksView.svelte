@@ -438,9 +438,7 @@
       detailError =
         error instanceof ApiError && error.status === 404
           ? "That task is not on this account's board."
-          : error instanceof ApiError
-            ? `Unavailable (${error.status})`
-            : "Unavailable";
+          : failure("This task could not be read", "The task itself is unchanged.", "Choose it again to reopen it.", error);
     } finally {
       if (generation === detailGeneration) detailLoading = false;
     }

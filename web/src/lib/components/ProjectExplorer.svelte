@@ -20,7 +20,7 @@
    * disk.
    */
   import { untrack } from "svelte";
-  import { api, ApiError } from "../api";
+  import { api } from "../api";
   import type {
     ProjectBrowseEntry,
     ProjectBrowseView,
@@ -81,10 +81,7 @@
       // A folder that cannot be read is worth saying and must not blank the
       // page: the project's other sections stay usable.
       if (path === "") {
-        error =
-          e instanceof ApiError
-            ? `The project folder could not be read (${e.status}).`
-            : "The project folder could not be read.";
+        error = failure("The project folder could not be read", "Its files are not listed; the project's other sections still work.", "Reopen the project to read it again.", e);
       }
     } finally {
       const rest = { ...loadingPaths };

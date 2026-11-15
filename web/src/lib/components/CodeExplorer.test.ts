@@ -296,6 +296,6 @@ describe("CodeExplorer", () => {
     });
     render(CodeExplorer, { props });
 
-    expect(await screen.findByText(/could not be read \(500\)/)).toBeVisible();
+    expect(await screen.findByText(/could not be read \(HTTP 500/)).toBeVisible();
   });
 });

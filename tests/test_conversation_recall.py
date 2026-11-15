@@ -509,3 +509,17 @@ def test_known_session_edges_reach_memory_created_only_after_copying(
     recalled = ContextGatherer()._recalled_sessions(store, "trial tea", "current", None, owner_principal_id="principal_owner")
     assert {row["session_id"] for row in recalled} == {"unrelated_late"}
     assert store.search_conversation_turns("jasmine")
+
+
+def test_a_hit_names_what_its_conversation_was_about(tmp_path: Path) -> None:
+    """TOOL-119 — a hit from the middle of a chat still says which chat it is."""
+    store = SQLiteStore(tmp_path)
+    store.create_session("sess_trip", "/w", title="Planning")
+    _exchange(store, "sess_trip", "turn_1", "Help me plan a week in Kyoto in April.", "Here is a plan.")
+    _exchange(store, "sess_trip", "turn_2", "Yes, the second hotel please.", "Booked as a draft.")
+    hit = next(
+        row for row in conversation_search(tmp_path, "hotel", store=store)["results"] if row["turn_id"] == "turn_2"
+    )
+    assert hit["conversation"]["about"] == "Help me plan a week in Kyoto in April."
+    assert hit["conversation"]["turns"] == 2
+    assert hit["conversation"]["started_at"]

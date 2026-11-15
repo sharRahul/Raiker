@@ -29,7 +29,7 @@ from raiker.api.wire.library import (
     LibraryView,
     SessionPins,
 )
-from raiker.control.library import LIBRARY_KINDS, block_title, library_items
+from raiker.control.library import LIBRARY_KINDS, block_title, library_items, search_library
 from raiker.runtime.typed_parts import BLOCK_TYPES, content_parts
 from raiker.storage.sqlite import SQLiteStore
 
@@ -54,18 +54,28 @@ def _visible_session(store: SQLiteStore, session_id: str, user_id: str | None) -
 
 @router.get("/api/library")
 async def get_library(
-    request: Request, project_id: str | None = None, kind: str | None = None
+    request: Request, project_id: str | None = None, kind: str | None = None, q: str | None = None
 ) -> dict[str, Any]:
-    """Documents, images, designs, pinned blocks and pull requests, newest first."""
+    """Documents, images, designs, pinned blocks and pull requests, newest first.
+
+    With ``q``, only the items that match it: by their words, then by meaning
+    where the owner's embedding model may run (the same governed embedder
+    Threads search uses), each marked with how it matched.
+    """
     store, owner, user_id = _context(request)
     if kind is not None and kind not in LIBRARY_KINDS:
         raise refusal(status.HTTP_422_UNPROCESSABLE_CONTENT, "library_kind_unknown")
     if project_id and store.load_project(project_id, user_id=user_id) is None:
         raise refusal(status.HTTP_404_NOT_FOUND, "unknown_project")
+    items = library_items(
+        store, owner_principal_id=owner, user_id=user_id, project_id=project_id or None, kind=kind
+    )
+    if q and q.strip():
+        from raiker.api.routes_goals import _meaning_embedder
+
+        items = search_library(items, q[:200], embed=_meaning_embedder(store, owner, purpose="library-search"))
     answer: LibraryView = {
-        "items": library_items(
-            store, owner_principal_id=owner, user_id=user_id, project_id=project_id or None, kind=kind
-        ),
+        "items": items,
         "kinds": list(LIBRARY_KINDS),
     }
     return serialize_dto(answer)

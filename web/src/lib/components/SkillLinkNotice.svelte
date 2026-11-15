@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { failure } from "../errorCopy";
   /**
    * A skill link pasted into the Chat or Build composer.
    *
@@ -49,9 +50,9 @@
       if (code === "skill_missing_description" || code === "skill_invalid_name")
         return "That document isn't a valid skill.";
       if (code.startsWith("skill_fetch_failed")) return "That link couldn't be read.";
-      return code || `Request failed (${e.status})`;
+      return failure("The skill was not imported", "Nothing was installed.", "Check the link and try again.", e);
     }
-    return "Request failed";
+    return failure("The skill was not imported", "Nothing was installed.", "Try again.", e);
   }
 
   async function verify() {

@@ -9,8 +9,13 @@ sized to the first frame's aspect.
 The file is plain Office Open XML written here, with no new dependency: a
 presentation part, one slide master and layout, a theme, and per slide one
 picture. Every frame's text is also kept as the slide's alternative text, so a
-screen reader and a search over the deck still find the words. Pictures are not
-editable shapes; the stored document stays the editable source, as with PNG.
+screen reader and a search over the deck still find the words.
+
+Since 2026-11-18 (BUG-348 DW-11, "slides as editable shapes") each visible text
+layer is a real text box over the picture, at its place, size, colour, weight,
+alignment and line height, and the picture is drawn without the text, so the
+words are edited in PowerPoint rather than painted into the slide. Shapes and
+images stay in the picture; the stored document stays the full editable source.
 """
 
 from __future__ import annotations
@@ -74,7 +79,90 @@ def _fit(image_w: int, image_h: int, slide_w: int, slide_h: int) -> tuple[int, i
     return (slide_w - w) // 2, (slide_h - h) // 2, w, h
 
 
-def _slide_xml(index: int, name: str, alt: str, box: tuple[int, int, int, int]) -> str:
+#: EMU per typographic point.
+EMU_PER_PT = 12700
+
+
+def text_layers(frame: Mapping[str, Any]) -> list[Mapping[str, Any]]:
+    """Every visible text layer with words, in layer (drawing) order."""
+    found: list[Mapping[str, Any]] = []
+
+    def walk(nodes: Sequence[Mapping[str, Any]]) -> None:
+        for node in nodes:
+            if node.get("hidden"):
+                continue
+            if node.get("type") == "text" and str(node.get("text") or "").strip():
+                found.append(node)
+            children = node.get("children")
+            if isinstance(children, list):
+                walk(children)
+
+    nodes = frame.get("nodes")
+    walk(nodes if isinstance(nodes, list) else [])
+    return found
+
+
+def _hex(color: Any) -> str:
+    value = str(color or "").strip().lstrip("#")
+    if len(value) == 3 and all(c in "0123456789abcdefABCDEF" for c in value):
+        value = "".join(c * 2 for c in value)
+    if len(value) == 8:
+        value = value[:6]
+    return value.upper() if len(value) == 6 and all(c in "0123456789abcdefABCDEF" for c in value) else "000000"
+
+
+def _clean_text(text: str) -> str:
+    # XML 1.0 forbids most control characters; a tab or newline is kept.
+    return escape("".join(ch for ch in text if ch in "\t\n" or ord(ch) >= 32))
+
+
+def _text_box(shape_id: int, node: Mapping[str, Any], origin: tuple[int, int], emu_per_px: float) -> str:
+    """One text layer as an editable PowerPoint text box over the picture."""
+    ox, oy = origin
+    x = ox + round(float(node.get("x") or 0) * emu_per_px)
+    y = oy + round(float(node.get("y") or 0) * emu_per_px)
+    w = max(1, round(float(node.get("w") or 1) * emu_per_px))
+    h = max(1, round(float(node.get("h") or 1) * emu_per_px))
+    rot = round(float(node.get("rotation") or 0) * 60000)
+    size = max(100, min(400000, round(float(node.get("font_size") or 16) * emu_per_px / EMU_PER_PT * 100)))
+    bold = ' b="1"' if int(node.get("font_weight") or 400) >= 600 else ""
+    align = {"left": "l", "center": "ctr", "right": "r"}.get(str(node.get("align") or "left"), "l")
+    spacing = max(50000, min(300000, round(float(node.get("line_height") or 1.2) * 100000)))
+    opacity = float(node.get("opacity", 1) or 0)
+    alpha = f'<a:alpha val="{max(0, min(100000, round(opacity * 100000)))}"/>' if opacity < 1 else ""
+    run_props = (
+        f'<a:rPr lang="en-US" sz="{size}"{bold} dirty="0">'
+        f'<a:solidFill><a:srgbClr val="{_hex(node.get("color"))}">{alpha}</a:srgbClr></a:solidFill>'
+        '<a:latin typeface="Inter"/></a:rPr>'
+    )
+    paragraphs = "".join(
+        f'<a:p><a:pPr algn="{align}"><a:lnSpc><a:spcPct val="{spacing}"/></a:lnSpc></a:pPr>'
+        + (f"<a:r>{run_props}<a:t>{_clean_text(line)}</a:t></a:r>" if line else "")
+        + f'<a:endParaRPr lang="en-US" sz="{size}" dirty="0"/></a:p>'
+        for line in str(node.get("text") or "").split("\n")
+    )
+    name = escape(str(node.get("name") or "Text"), {chr(34): "&quot;"})
+    return (
+        f'<p:sp><p:nvSpPr><p:cNvPr id="{shape_id}" name="{name}"/><p:cNvSpPr txBox="1"/><p:nvPr/></p:nvSpPr>'
+        f'<p:spPr><a:xfrm{f" rot={chr(34)}{rot}{chr(34)}" if rot else ""}><a:off x="{x}" y="{y}"/>'
+        f'<a:ext cx="{w}" cy="{h}"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom><a:noFill/></p:spPr>'
+        '<p:txBody><a:bodyPr wrap="square" lIns="0" tIns="0" rIns="0" bIns="0" rtlCol="0"><a:noAutofit/></a:bodyPr>'
+        f"<a:lstStyle/>{paragraphs}</p:txBody></p:sp>"
+    )
+
+
+def _slide_texts(frame: Mapping[str, Any], box: tuple[int, int, int, int]) -> str:
+    """The frame's text layers as text boxes, placed over the fitted picture."""
+    x, y, w, _h = box
+    emu_per_px = w / max(1.0, float(frame.get("width") or 1))
+    return "".join(
+        _text_box(shape_id, node, (x, y), emu_per_px) for shape_id, node in enumerate(text_layers(frame), start=3)
+    )
+
+
+def _slide_xml(
+    index: int, name: str, alt: str, box: tuple[int, int, int, int], texts: str = ""
+) -> str:
     x, y, w, h = box
     return (
         '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
@@ -89,7 +177,7 @@ def _slide_xml(index: int, name: str, alt: str, box: tuple[int, int, int, int]) 
         f'<p:blipFill><a:blip r:embed="rId2"/><a:stretch><a:fillRect/></a:stretch></p:blipFill>'
         f'<p:spPr><a:xfrm><a:off x="{x}" y="{y}"/><a:ext cx="{w}" cy="{h}"/></a:xfrm>'
         '<a:prstGeom prst="rect"><a:avLst/></a:prstGeom></p:spPr></p:pic>'
-        "</p:spTree></p:cSld><p:clrMapOvr><a:masterClrMapping/></p:clrMapOvr></p:sld>"
+        f"{texts}</p:spTree></p:cSld><p:clrMapOvr><a:masterClrMapping/></p:clrMapOvr></p:sld>"
     )
 
 
@@ -158,8 +246,13 @@ def build_pptx(
     render_png: Callable[[str], tuple[bytes, int, int]],
     *,
     title: str = "Raiker design",
+    editable_text: bool = False,
 ) -> bytes:
-    """One slide per frame. ``render_png(frame_id)`` returns ``(png, width, height)``."""
+    """One slide per frame. ``render_png(frame_id)`` returns ``(png, width, height)``.
+
+    With ``editable_text`` the caller's pictures are drawn without text, and
+    each frame's text layers are added as text boxes over them.
+    """
     chosen = [frame for frame in frames if frame.get("id")][:MAX_SLIDES]
     if not chosen:
         raise ValueError("design_deck_has_no_frames")
@@ -257,11 +350,12 @@ def build_pptx(
             "</Relationships>",
         )
         for index, (frame, png, width, height) in enumerate(rendered, start=1):
+            box = _fit(width, height, slide_w, slide_h)
             name = str(frame.get("name") or f"Frame {index}")[:120]
             package.writestr(f"ppt/media/frame{index}.png", png)
             package.writestr(
                 f"ppt/slides/slide{index}.xml",
-                _slide_xml(index, name, frame_text(frame) or name, _fit(width, height, slide_w, slide_h)),
+                _slide_xml(index, name, frame_text(frame) or name, box, _slide_texts(frame, box) if editable_text else ""),
             )
             package.writestr(f"ppt/slides/_rels/slide{index}.xml.rels", _slide_rels(index))
     return buffer.getvalue()

@@ -233,7 +233,7 @@ describe("supported-preferences settings", () => {
     await fireEvent.click(screen.getByRole("button", { name: /save changes/i }));
 
     // The failed write surfaces a page-level error and the control reverts.
-    await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent(/couldn't save/i));
+    await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent(/settings were not saved/i));
     await waitFor(() => expect((screen.getByLabelText(/unread notices inside Raiker/i) as HTMLInputElement).checked).toBe(true));
   });
 
@@ -464,7 +464,7 @@ describe("saving while the owner is still editing", () => {
     const group = await editDensity(/Compact/);
     put.refuse();
 
-    await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent(/couldn't save/i));
+    await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent(/settings were not saved/i));
     // The refused change is rolled back … (the rail item now carries an unsaved
     // mark, which is part of its accessible name, so it is matched loosely.)
     await fireEvent.click(screen.getByRole("button", { name: /^Notifications/ }));

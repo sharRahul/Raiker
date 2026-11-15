@@ -1,3 +1,4 @@
+import { failure } from "../../errorCopy";
 /**
  * UX-CHAT-01 — the Continuity actions, out of ChatView.
  *
@@ -16,7 +17,7 @@
  * Moved, not changed: every message and refusal is the one the view printed.
  */
 import { compressNotice } from "../../threadInsights";
-import { api, ApiError } from "../../api";
+import { api } from "../../api";
 import type { ConversationBranchOrigin } from "../../apiTypes";
 
 export class TurnContinuity {
@@ -71,9 +72,7 @@ export class TurnContinuity {
       window.location.hash = `#/new-chat?session=${encodeURIComponent(branch.session_id)}`;
     } catch (error) {
       this.notify(
-        error instanceof ApiError
-          ? `That conversation could not be branched (${error.reasonCode ?? error.status}).`
-          : "That conversation could not be branched.",
+        failure("That conversation was not branched", "This conversation is unchanged.", "Try again.", error),
       );
     } finally {
       this.branchingTurn = null;
@@ -96,9 +95,7 @@ export class TurnContinuity {
       this.rewindCheckpointId = point.checkpoint_id;
     } catch (error) {
       this.notify(
-        error instanceof ApiError
-          ? `Could not read this conversation's checkpoints (${error.reasonCode ?? error.status}).`
-          : "Could not read this conversation's checkpoints.",
+        failure("This conversation's checkpoints could not be read", "Rewind is unavailable for now.", "Reopen the conversation to read them again.", error),
       );
     } finally {
       this.rewindingTurn = null;
@@ -115,9 +112,7 @@ export class TurnContinuity {
       this.notify(compressNotice(result));
     } catch (error) {
       this.notify(
-        error instanceof ApiError
-          ? `That range could not be summarised (${error.reasonCode ?? error.status}).`
-          : "That range could not be summarised.",
+        failure("That range was not summarised", "The conversation is unchanged.", "Try again.", error),
       );
     } finally {
       this.compactingTurn = null;

@@ -10014,6 +10014,30 @@
         "title": "DesignBaseVersionRequest",
         "type": "object"
       },
+      "DesignBrandGuideRequest": {
+        "additionalProperties": false,
+        "description": "BUG-348 DW-06 — a brand guide PDF, base64, read on this machine.",
+        "properties": {
+          "data_base64": {
+            "maxLength": 14000000,
+            "minLength": 8,
+            "title": "Data Base64",
+            "type": "string"
+          },
+          "filename": {
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Filename",
+            "type": "string"
+          }
+        },
+        "required": [
+          "filename",
+          "data_base64"
+        ],
+        "title": "DesignBrandGuideRequest",
+        "type": "object"
+      },
       "DesignChangeView": {
         "description": "DW-08 — a change written as a new version.\n\n``rebased`` is true when the change was made against an older version and\ntouched nothing changed since, so it was applied on top rather than refused.",
         "properties": {
@@ -19309,6 +19333,14 @@
               "pull_request"
             ],
             "title": "Kind",
+            "type": "string"
+          },
+          "match_kind": {
+            "enum": [
+              "words",
+              "meaning"
+            ],
+            "title": "Match Kind",
             "type": "string"
           },
           "pin_id": {
@@ -45691,6 +45723,45 @@
         "summary": "Create Design System"
       }
     },
+    "/api/design/systems/brand-guide": {
+      "post": {
+        "description": "BUG-348 DW-06 — the colours and fonts a brand guide PDF states. Writes nothing.\n\nThe PDF is validated and its text extracted here, by the same local reader\nChat attachments use; nothing is stored and no model or provider is called.\nWhat comes back fills the New design system form, as a tokens file does.",
+        "operationId": "read_design_brand_guide_api_design_systems_brand_guide_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DesignBrandGuideRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DesignTokenImport"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Read Design Brand Guide"
+      }
+    },
     "/api/design/systems/tokens": {
       "post": {
         "description": "DW-06 — the colours, fonts and spacing in a tokens file, and what was skipped. Writes nothing.",
@@ -45915,6 +45986,22 @@
               "default": 100,
               "title": "Limit",
               "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "project_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Project Id"
             }
           }
         ],
@@ -49049,7 +49136,7 @@
     },
     "/api/library": {
       "get": {
-        "description": "Documents, images, designs, pinned blocks and pull requests, newest first.",
+        "description": "Documents, images, designs, pinned blocks and pull requests, newest first.\n\nWith ``q``, only the items that match it: by their words, then by meaning\nwhere the owner's embedding model may run (the same governed embedder\nThreads search uses), each marked with how it matched.",
         "operationId": "get_library_api_library_get",
         "parameters": [
           {
@@ -49082,6 +49169,22 @@
                 }
               ],
               "title": "Kind"
+            }
+          },
+          {
+            "in": "query",
+            "name": "q",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Q"
             }
           }
         ],

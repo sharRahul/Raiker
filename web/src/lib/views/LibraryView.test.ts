@@ -117,4 +117,19 @@ describe("QUI-F15 Library", () => {
     expect(screen.queryByRole("combobox", { name: "Filter by project" })).not.toBeInTheDocument();
     expect(fetchMock.mock.calls.some(([url]) => String(url).includes("project_id=proj_1"))).toBe(true);
   });
+
+  it("searches by words and says when an item was found by meaning", async () => {
+    stubFetch({
+      "GET /api/library": { items: [DOCUMENT, BLOCK], kinds: [] },
+      "GET /api/library?q=japan+holiday": { items: [{ ...DOCUMENT, match_kind: "meaning" }], kinds: [] },
+      "GET /api/projects": PROJECTS,
+    });
+    render(LibraryView);
+    await screen.findByRole("link", { name: "summary.md" });
+    await fireEvent.input(screen.getByRole("searchbox", { name: "Search the Library" }), {
+      target: { value: "japan holiday" },
+    });
+    await waitFor(() => expect(screen.getByText(/Related by meaning/)).toBeInTheDocument(), { timeout: 2000 });
+    expect(screen.queryByRole("button", { name: "Quarter in numbers" })).toBeNull();
+  });
 });

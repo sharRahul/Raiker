@@ -15,6 +15,7 @@
   import LibraryView from "./LibraryView.svelte";
   import ProjectsView from "./ProjectsView.svelte";
   import SearchChatView from "./SearchChatView.svelte";
+  import SessionsView from "./SessionsView.svelte";
   import TasksView from "./TasksView.svelte";
 
   let {
@@ -49,7 +50,25 @@
     <ProjectsView {onchanged} />
   {:else if tab === "library"}
     <LibraryView />
+  {:else if sessionId}
+    <!-- QUI-L11 — a conversation's record (its turns, events and evidence),
+         moved here from Diagnostics › Sessions; Threads is one link away. -->
+    <p class="back"><a href="#/work?tab=threads">← All threads</a></p>
+    <div class="record-only">
+      <SessionsView {sessionId} />
+    </div>
   {:else}
     <SearchChatView />
   {/if}
 </div>
+
+<style>
+  .back { margin: 0 0 var(--space-3); font-size: var(--text-sm); }
+  .back a { color: var(--text-2); text-decoration: none; }
+  .back a:hover { color: var(--text-1); }
+  /* Threads is the list here; only the conversation's record is drawn. */
+  .record-only :global(.head-row),
+  .record-only :global(.bulk-bar),
+  .record-only :global(.list-card) { display: none; }
+  .record-only :global(.layout) { display: block; }
+</style>

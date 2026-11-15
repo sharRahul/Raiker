@@ -1499,10 +1499,7 @@
     try {
       projectNotice = compressNotice(await api.compactConversation(sessionId, through));
     } catch (error) {
-      projectNotice =
-        error instanceof ApiError
-          ? `That range could not be summarised (${error.reasonCode ?? error.status}).`
-          : "That range could not be summarised.";
+      projectNotice = failure("That range was not summarised", "The conversation is unchanged.", "Try again.", error);
     }
   }
 
@@ -1915,10 +1912,7 @@
       }
       rewindCheckpointId = point.checkpoint_id;
     } catch (error) {
-      projectNotice =
-        error instanceof ApiError
-          ? `Could not read this conversation's checkpoints (${error.reasonCode ?? error.status}).`
-          : "This conversation's checkpoints could not be read, so Rewind is unavailable for now. Reopen the conversation to read them again.";
+      projectNotice = failure("This conversation's checkpoints could not be read", "Rewind is unavailable for now.", "Reopen the conversation to read them again.", error);
     } finally {
       rewindingTurn = null;
     }

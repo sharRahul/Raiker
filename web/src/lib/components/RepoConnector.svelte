@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { failure } from "../errorCopy";
   /**
    * Connect the Build workspace to a repository: a folder already inside this
    * Raiker workspace, or a GitHub `owner/repo` coordinate.
@@ -174,7 +175,7 @@
       case "invalid_github_branch":
         return "That branch name has characters GitHub does not allow.";
       default:
-        return `Could not connect the repository (${e.reasonCode ?? e.status}).`;
+        return failure("The repository was not connected", "Build keeps its current repository.", "Check the coordinate and try again.", e);
     }
   }
 
@@ -227,7 +228,7 @@
       case "not_a_task_worktree":
         return "That repository is not a task worktree.";
       default:
-        return `The worktree could not be changed (${e.reasonCode ?? e.status}).`;
+        return failure("The worktree was not changed", "Its files are as they were.", "Refresh the list and try again.", e);
     }
   }
 

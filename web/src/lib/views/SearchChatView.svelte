@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { failure } from "../errorCopy";
   import { askConfirm } from "../confirm.svelte";
   import WorkMeta from "../components/WorkMeta.svelte";
   /**
@@ -133,7 +134,7 @@
       if (id !== requestId) return;
       page = null;
       threads = [];
-      loadError = error instanceof ApiError ? `Unavailable (${error.status})` : "Unavailable";
+      loadError = failure("Threads could not be read", "No conversation was changed.", "Search again in a moment.", error);
     } finally {
       if (id === requestId) {
         searching = false;
@@ -285,7 +286,7 @@
       sessions = [...result].sort((a, b) => b.updated_at.localeCompare(a.updated_at));
     } catch (error) {
       sessions = null;
-      loadError = error instanceof ApiError ? `Unavailable (${error.status})` : "Unavailable";
+      loadError = failure("The search did not finish", "No conversation was changed.", "Search again in a moment.", error);
     } finally {
       searching = false;
     }

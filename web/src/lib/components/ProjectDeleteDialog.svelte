@@ -127,7 +127,7 @@
             ? "That password or code was not accepted. Nothing was deleted."
             : explained
               ? `${explained.plain} ${explained.remediation ?? ""}`.trim()
-              : `Could not delete (${e.status}). Nothing was deleted.`;
+              : failure("The project was not deleted", "Nothing was deleted.", "Try again.", e);
         return;
       }
       // A request that never came back is not a request that failed: ask

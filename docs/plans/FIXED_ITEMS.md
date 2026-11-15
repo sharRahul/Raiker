@@ -1,5 +1,117 @@
 # Fixed items
 
+## FIXED-1514 — A conversation's record in Threads stayed under a second copy of the list
+
+**Severity: Low. Area: Work / Threads. Status: Fixed 2026-11-18 (found this round).**
+
+**Observed.** RT-1118-06's capture of `#/sessions?session=…` in Work › Threads drew the old Sessions table (tag filter, archive toggle, every row) above the record, a second list under a tab that is already the list; the record also read *1 turns*.
+
+**Fixed.** In Threads only the record is drawn, under **← All threads**; the count reads *1 turn*.
+
+**Evidence.** Capture `06-session-record-in-threads` in the [run record](../architecture/WEB_APP_LIVE_TEST.md#result--2026-11-18-library-search-editable-slides-and-brand-guides); `SessionsView.test.ts`.
+
+## FIXED-1513 — A conversation search hit did not say what its conversation was about (TOOL-119)
+
+**Severity: Low. Area: Recall / tools. Status: Fixed 2026-11-18.**
+
+**Observed.** `conversation_search` returns single exchanges. A hit from the middle of a chat (*"Yes, the second hotel please."*) told the model nothing about which conversation it came from, so it searched again or guessed.
+
+**Fixed.** Each result carries `conversation`: the conversation's opening request (200 characters, redacted like the hit), its number of exchanges and when it started — read from the transcript, with no model call. Incognito still withholds everything.
+
+**Evidence.** `tests/test_conversation_recall.py::test_a_hit_names_what_its_conversation_was_about`.
+
+## FIXED-1512 — A brand guide could not fill a design system (BUG-348 DW-06)
+
+**Severity: Medium. Area: Design / systems. Status: Fixed 2026-11-18.**
+
+**Observed.** A design system could be read from a tokens file or a picture's colours, not from the brand-guide PDF most brands actually hand over.
+
+**Fixed.** **Import from a tokens file or a brand guide** takes a PDF. `POST /api/design/systems/brand-guide` validates it and extracts its text with the local reader Chat attachments use (`raiker/runtime/attachments.py`), and `parse_brand_guide` (`raiker/design/imports.py`) reads every `#hex` and `RGB r, g, b` colour, named by the words beside it or the caption line above, and labelled fonts (*Heading font: …*). A colour stated twice is kept once; a guide with nothing to read says so. Nothing is stored and no model is called; the form is filled and saving stays the owner's.
+
+**Evidence.** `tests/test_design_brand_guide.py`; contract case in `tests/contract_cases/design.py`; RT-1118-04 (capture `04-brand-guide-import`).
+
+## FIXED-1511 — A deck's words were painted into its slides (BUG-348 DW-11)
+
+**Severity: Medium. Area: Design / export. Status: Fixed 2026-11-18.**
+
+**Observed.** **Slides (PowerPoint), all frames** made each slide one picture; changing a word meant going back to Raiker.
+
+**Fixed.** The picture is drawn without its text layers (`render_raster(skip_text=True)`), and each visible text layer is a PowerPoint text box over it at its place, size, rotation, colour, opacity, weight, alignment and line height (`raiker/design/deck.py`). Shapes and images stay in the picture.
+
+**Evidence.** `tests/test_design_documents.py::test_a_slides_words_are_an_editable_text_box_over_a_picture_without_them`; RT-1118-03; a generated deck opened in LibreOffice (capture `03b-deck-in-libreoffice`).
+
+## FIXED-1510 — A project had no activity of its own, and its Recovery link opened everything (QUI-L11)
+
+**Severity: Low. Area: Work / projects. Status: Fixed 2026-11-18.**
+
+**Observed.** QUI-L11 puts activity inside each project and Recovery reached from it. A project's Evidence listed checkpoints with *Open the checkpoint timeline*, which opened every conversation's.
+
+**Fixed.** `GET /api/events?project_id=` returns the events of the project's own conversations (404 for a project that is not the account's). Evidence lists the latest twelve under **Activity** with **Open the audit log**, and the link reads **Open Recovery for this project**, which opens Recovery filtered to it.
+
+**Evidence.** `tests/test_project_activity.py`; RT-1118-07 (capture `07-project-activity`).
+
+## FIXED-1509 — Sessions lived in Diagnostics instead of Work › Threads (QUI-L11)
+
+**Severity: Low. Area: Navigation. Status: Fixed 2026-11-18.**
+
+**Observed.** A conversation's record (turns, events, evidence) was Diagnostics › Sessions, a second list of the conversations Threads already lists.
+
+**Fixed.** `#/sessions?session=…` and `#/observe?tab=sessions` open the record in Work › Threads; Diagnostics has five tabs. Every link that pointed at a session's record keeps working.
+
+**Evidence.** `nav.test.ts`; `e2e/composer.spec.ts`; RT-1118-06.
+
+## FIXED-1508 — A request that named a deferred tool waited a round trip for it
+
+**Severity: Low. Area: Runtime / tools. Status: Fixed 2026-11-18.**
+
+**Observed.** "Commit my changes" carried `git_commit` only after the model called `tool_search` for it: one more model call, every time, for a tool the owner had named.
+
+**Fixed.** `preselect_for_prompt` (`raiker/models/tool_projection.py`) reveals up to two deferred tools whose distinctive name word the request contains (`commit` in `git_commit`, never the shared `git` or `read`). It is lexical, so no data leaves the host; the turn records `tools_preselected`. Revealing grants nothing: the gate, decision mode and approvals are unchanged.
+
+**Evidence.** `tests/test_tool_preselection.py`; RT-1118-08 (a real Haiku 4.5 turn records the event).
+
+## FIXED-1507 — The Library could not be searched
+
+**Severity: Low. Area: Work / Library. Status: Fixed 2026-11-18.**
+
+**Observed.** Work › Library filtered by kind and project only; finding one document among hundreds meant scrolling. FIXED-1425 also listed Library search by meaning as not built.
+
+**Fixed.** **Search the Library**: every word must appear in an item's title, kind, conversation or project; where the owner's embedding model may run (the governed embedder Threads search uses), items about the query in other words are added and marked *Related by meaning*. A search with nothing found says so; a failed search says what to do.
+
+**Evidence.** `tests/test_library_search.py`; `LibraryView.test.ts`; RT-1118-05 (captures `05-library-search`, `05b-library-search-none`). Meaning is covered with a stand-in embedder; no embedding model was reachable live.
+
+## FIXED-1506 — Twenty-nine more error messages gave a status code and no next step (QUI-G06)
+
+**Severity: Low. Area: Errors. Status: Fixed 2026-11-18.**
+
+**Observed.** *Unavailable (404)*, *Could not save (500: …)*, *Request failed (500)*, *Upload rejected (…)* and similar on Models, routing, side-task models, Threads search, Tasks, the project and repository explorers, turn evidence, branching, compaction, checkpoints, approvals, the repository connector, skill links, telemetry export, uploads, Settings saves and sign-in.
+
+**Fixed.** Each goes through `failure()`: what failed, what that affected, one next step; the status rides in brackets.
+
+**Evidence.** Unit tests updated for the new wording (`CodeExplorer`, `ModelsView`, `SearchChatView`, `SettingsView`).
+
+## FIXED-1505 — Design's inspector tabs scrolled out of sight
+
+**Severity: Low. Area: Design / layout. Status: Fixed 2026-11-18 (found 2026-11-17).**
+
+**Observed.** With Export chosen at 1,440 px, the inspector's six tabs scrolled so *Inspect* read *ct*.
+
+**Fixed.** `TabStrip` takes `wrap`: equal-width rows instead of one scrolling row. Design's inspector uses it (two rows of three).
+
+**Evidence.** RT-1118-02 checks every tab sits inside the inspector (capture `02-design-inspector-tabs`).
+
+## FIXED-1504 — Live round, 2026-11-18
+
+**Severity: —. Area: Live evidence. Status: Recorded 2026-11-18.**
+
+Anthropic (with its workspace ID), OpenAI and OpenRouter were connected through **Add model** on a fresh host and answered real turns; nine scenarios passed. See the [run record](../architecture/WEB_APP_LIVE_TEST.md#result--2026-11-18-library-search-editable-slides-and-brand-guides).
+
+## FIXED-1503 — No plan document or workflow was finished or stale (audit)
+
+**Severity: —. Area: Documentation / CI. Status: Checked 2026-11-18.**
+
+Every document in `docs/plans/` still has open rows, so none was deleted; the six GitHub workflows (CI, data safety, desktop package, llama.cpp, personal Windows voice, release) all still run on `main` and none is stale.
+
 ## FIXED-1502 — The Context panel named a memory's scope by its stored value
 
 **Severity: Low. Area: Chat / context panel. Status: Fixed 2026-11-17 (found this round).**
@@ -3198,6 +3310,18 @@ file you can open. The two capture sets that remain — `screenshots/pages/` and
 | [FIXED-1382](#fixed-1382--linux-filesystem-flags-broke-windows-type-checking) | Low | Platform portability | Fixed 2026-11-09 |
 | [FIXED-1383](#fixed-1383--keyboard-start-evidence-depended-on-retired-receipt-wording) | Low | Beta live tests | Fixed 2026-11-09 |
 | [FIXED-1384](#fixed-1384--model-downloads-checked-redirect-hosts-after-contacting-them) | High | Model and speech downloads | Fixed 2026-11-09 |
+| [FIXED-1514](#fixed-1514--a-conversations-record-in-threads-stayed-under-a-second-copy-of-the-list) | Low | Work / Threads | Fixed 2026-11-18 |
+| [FIXED-1513](#fixed-1513--a-conversation-search-hit-did-not-say-what-its-conversation-was-about-tool-119) | Low | Recall / tools | Fixed 2026-11-18 |
+| [FIXED-1512](#fixed-1512--a-brand-guide-could-not-fill-a-design-system-bug-348-dw-06) | Medium | Design / systems | Fixed 2026-11-18 |
+| [FIXED-1511](#fixed-1511--a-decks-words-were-painted-into-its-slides-bug-348-dw-11) | Medium | Design / export | Fixed 2026-11-18 |
+| [FIXED-1510](#fixed-1510--a-project-had-no-activity-of-its-own-and-its-recovery-link-opened-everything-qui-l11) | Low | Work / projects | Fixed 2026-11-18 |
+| [FIXED-1509](#fixed-1509--sessions-lived-in-diagnostics-instead-of-work--threads-qui-l11) | Low | Navigation | Fixed 2026-11-18 |
+| [FIXED-1508](#fixed-1508--a-request-that-named-a-deferred-tool-waited-a-round-trip-for-it) | Low | Runtime / tools | Fixed 2026-11-18 |
+| [FIXED-1507](#fixed-1507--the-library-could-not-be-searched) | Low | Work / Library | Fixed 2026-11-18 |
+| [FIXED-1506](#fixed-1506--twenty-nine-more-error-messages-gave-a-status-code-and-no-next-step-qui-g06) | Low | Errors | Fixed 2026-11-18 |
+| [FIXED-1505](#fixed-1505--designs-inspector-tabs-scrolled-out-of-sight) | Low | Design / layout | Fixed 2026-11-18 |
+| [FIXED-1504](#fixed-1504--live-round-2026-11-18) | — | Live evidence | Recorded 2026-11-18 |
+| [FIXED-1503](#fixed-1503--no-plan-document-or-workflow-was-finished-or-stale-audit) | — | Documentation / CI | Checked 2026-11-18 |
 | [FIXED-1502](#fixed-1502--the-context-panel-named-a-memorys-scope-by-its-stored-value) | Low | Chat / context panel | Fixed 2026-11-17 |
 | [FIXED-1501](#fixed-1501--designs-export-formats-were-cut-off-in-the-picker) | Low | Design / export | Fixed 2026-11-17 |
 | [FIXED-1500](#fixed-1500--a-failed-designs-read-left-create-enabled-with-no-size-to-start-from) | Low | Design / errors | Fixed 2026-11-17 |

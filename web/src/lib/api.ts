@@ -699,7 +699,7 @@ export const api = {
   // comes back as a named status rather than an error.
   memorySource: (memoryId: string) => contract.getMemorySource(memoryId),
   events: (
-    params: { session_id?: string; turn_id?: string; event_type?: string; limit?: number } = {},
+    params: { session_id?: string; turn_id?: string; event_type?: string; limit?: number; project_id?: string } = {},
   ) => contract.listEvents(params),
   brain: () => contract.getBrain(),
   /**

@@ -252,6 +252,7 @@ export function designReason(code: string | null | undefined): string {
     unknown_node: "That layer no longer exists.",
     unknown_frame: "That frame no longer exists.",
     invalid_color: "Colours are written as #rrggbb.",
+    design_brand_guide_unreadable: "That PDF could not be read: it may be damaged, encrypted or not a PDF. Nothing was imported.",
     field_out_of_range: "That value is outside what a layer can hold.",
     too_many_nodes: "This design has reached its layer limit.",
     too_many_frames: "This design has reached its frame limit.",

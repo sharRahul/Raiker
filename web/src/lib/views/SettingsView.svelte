@@ -300,7 +300,7 @@
       const kept = Object.keys(madeDuringSave).length > 0;
       const worded = e instanceof ApiError && e.reasonCode ? SAVE_REFUSALS[e.reasonCode] : undefined;
       saveDetail =
-        (worded ?? (e instanceof ApiError ? `Couldn't save (${e.status}).` : "Couldn't save.")) +
+        (worded ?? failure("Settings were not saved", "Your saved settings are as they were.", "Try again.", e)) +
         (kept
           ? " The rejected changes were rolled back; what you changed while it was saving is still unsaved."
           : " Your change was rolled back.");

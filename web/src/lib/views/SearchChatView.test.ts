@@ -338,7 +338,7 @@ describe("SearchChatView", () => {
     render(SearchChatView);
     const alert = await screen.findByRole("alert");
     expect(alert).toHaveTextContent(/couldn't load your threads/i);
-    expect(alert).toHaveTextContent(/unavailable \(404\)/i);
+    expect(alert).toHaveTextContent(/Threads could not be read \(HTTP 404/i);
   });
 });
 

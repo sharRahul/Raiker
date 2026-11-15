@@ -1235,6 +1235,14 @@ class DesignTokenImportRequest(StrictRequest):
     text: str = Field(min_length=1, max_length=200_000)
 
 
+class DesignBrandGuideRequest(StrictRequest):
+    """BUG-348 DW-06 — a brand guide PDF, base64, read on this machine."""
+
+    filename: str = Field(min_length=1, max_length=200)
+    # 10 MB of PDF, as base64.
+    data_base64: str = Field(min_length=8, max_length=14_000_000)
+
+
 class DesignHandoffRequest(StrictRequest):
     frame_ids: list[str] = Field(min_length=1, max_length=40)
     target: str = Field(default="", max_length=300)

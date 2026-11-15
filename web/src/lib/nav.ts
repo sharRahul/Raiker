@@ -211,7 +211,9 @@ export const HUB_TABS: Record<string, string[]> = {
   // technical as one segmented list. Overview is gone: with the catalogue in the
   // Add connection dialog, Services is short enough to be the overview.
   connections: ["services", "channels", "advanced"],
-  observe: ["overview", "sessions", "activity", "checkpoints", "work", "notifications"],
+  // QUI-L11 — Sessions moved to Work › Threads (`#/sessions?session=…` opens a
+  // conversation's record there); `#/observe?tab=sessions` forwards with it.
+  observe: ["overview", "activity", "checkpoints", "work", "notifications"],
   // Memory carried approved records, proposals, observations, a document
   // library, two recall controls and an import/export drawer at one visual
   // level, so the page asked an owner to tell administration from content by
@@ -258,7 +260,7 @@ const ROUTE_ALIASES: Record<string, { route: string; tab: string }> = {
   checkpoints: { route: "observe", tab: "checkpoints" },
   diagnostics: { route: "observe", tab: "overview" },
   notifications: { route: "observe", tab: "notifications" },
-  sessions: { route: "observe", tab: "sessions" },
+  sessions: { route: "work", tab: "threads" },
   // Quiet UI — pages folded into a hub keep their addresses.
   "search-chat": { route: "work", tab: "threads" },
   threads: { route: "work", tab: "threads" },
@@ -336,6 +338,9 @@ export function routeFromHash(hash: string): string {
   if (raw === "quick-entry") return raw;
   // QUI-G03 — the state gallery exists in development builds only.
   if (raw === "state-gallery" && import.meta.env.DEV) return raw;
+  if (raw === "observe" && new URLSearchParams(hash.split("?", 2)[1] ?? "").get("tab") === "sessions") {
+    return "work";
+  }
   if (NAV_ITEMS.some((item) => item.id === raw)) return raw;
   return ROUTE_ALIASES[raw]?.route ?? DEFAULT_ROUTE;
 }
@@ -403,6 +408,7 @@ export function tabFromHash(hash: string): string | null {
   if (supersededBy !== undefined && tabs.includes(supersededBy)) return supersededBy;
   const aliased = ROUTE_ALIASES[raw];
   if (aliased !== undefined && aliased.route === route) return aliased.tab;
+  if (raw === "observe" && route === "work") return "threads";
   return tabs[0];
 }
 

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { failure } from "../errorCopy";
   /**
    * QUI-L07 — Connections: what Raiker is connected to.
    *
@@ -15,7 +16,7 @@
   import TabStrip from "../components/TabStrip.svelte";
   import GuideLink from "../components/GuideLink.svelte";
   import LazyRoute from "../components/LazyRoute.svelte";
-  import { api, ApiError } from "../api";
+  import { api } from "../api";
   import type { HooksView, PluginContributions, PluginsView } from "../apiTypes";
   import { relativeTime } from "../format";
   import { ADVANCED_KINDS, HUB_TABS, advancedKindFromHash, type AdvancedKind } from "../nav";
@@ -42,7 +43,7 @@
       hooksError = null;
     } catch (error) {
       hooks = null;
-      hooksError = error instanceof ApiError ? error.message : "Hook configuration is unavailable.";
+      hooksError = failure("Hook rules could not be read", "None were changed.", "Reopen Extensions to read them again.", error);
     }
   }
 
@@ -66,7 +67,7 @@
       hooksError = null;
     } catch (error) {
       hooksError =
-        error instanceof ApiError ? error.message : "That setting could not be saved.";
+        failure("The hooks switch was not saved", "Hooks keep their previous setting.", "Try again.", error);
     } finally {
       hooksBusy = false;
     }
@@ -79,7 +80,7 @@
     } catch (error) {
       plugins = null;
       pluginsError =
-        error instanceof ApiError ? error.message : "Plugin records are unavailable.";
+        failure("Plugin records could not be read", "No plugin was changed.", "Reopen Extensions to read them again.", error);
     }
   }
   // `.raiker/plugins/<id>/hooks.json` → `<id>`. Two plugins load at the same

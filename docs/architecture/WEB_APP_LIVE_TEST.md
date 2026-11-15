@@ -16,6 +16,52 @@ PR #106: the **user-owned fallback sequence** and **prompt caching + normalised
 cache-hit metrics**.
 
 
+## Result — 2026-11-17 (First turn, memories in Context and Word export)
+
+A Linux workspace served by `raiker-web --port 8765` (`scripts/reset_live_workspace.py`
+at the start of the round), built from this round's SPA and backend. Anthropic
+was connected through **Add model** with an identity-linked key and its
+workspace ID typed into the UI (RT-1114-01, **passed on its first attempt**);
+OpenAI and OpenRouter keys were typed into **Add model** in RT-1117-07. Keys
+were read from the round's environment and never written to a spec, log or
+capture. Ollama was not tested: this sandbox's network refuses `ollama.com`.
+Spec: `web/e2e/fixed-1487-round-live.spec.ts`. Result: **7 of 7 passed** (one
+full run; RT-1117-02, -03 and -04 re-run after the polish below).
+
+| # | Scenario | Verification | Result |
+|---|---|---|---|
+| RT-1117-01 | Choosing Haiku 4.5 (which invalidates readiness) and sending at once: the turn answers *FIRST_TRY_OK*, never *must be checked again* | FIXED-1487 | Passed |
+| RT-1117-02 | A memory imported through Memory; a real Haiku 4.5 turn answers from it; **Context › Memories** lists it once with **Open Memory** | FIXED-1491, FIXED-1502 | Passed |
+| RT-1117-03 | A design with a text layer; **Export › Document (Word), all frames** lists the export and the download is a `wordprocessingml` file | FIXED-1493, FIXED-1501 | Passed |
+| RT-1117-04 | Designs list answers HTTP 500: the message says what failed, what it affected and **Try again**; **Create** waits; Try again clears it | FIXED-1490, FIXED-1500 | Passed |
+| RT-1117-05 | Settings › Account: **Display name** says *Shown as … until you choose one* | FIXED-1499 | Passed |
+| RT-1117-06 | Work › Threads finds a chat by words; a task run in the background from Chat finishes and offers **Recovery** for its own conversation, which opens Recovery filtered | FIXED-1494 (words half), FIXED-1498 | Passed |
+| RT-1117-07 | OpenAI and OpenRouter connect through **Add model**, are ready, and a GPT-4o mini Chat turn answers | — | Passed |
+
+Also run live this round: `release-readiness-2026-09-13` and
+`removal-review-permissions-2026-09-14`, rewritten for the rail (FIXED-1489),
+**10 of 10 passed**. The five specs FIXED-1482 moved to the rail helpers were
+re-run for the first time: 8 passed, 7 failed, 10 did not run — every
+Permissions step passed; the failures are older layout and fixture drift listed
+in [TO_BE_FIXED](../plans/TO_BE_FIXED.md#2026-11-17-round--found-not-fixed).
+
+**Found during the run, fixed.** The Context panel named a memory's scope
+*account* (FIXED-1502); the export format picker cut off *(Word)* (FIXED-1501);
+a failed Designs read left an empty size picker and **Create** enabled
+(FIXED-1500); the Display name field gave no hint of the name in use
+(FIXED-1499).
+
+**Found, not fixed.** Design's inspector tab strip scrolls *Inspect* out of
+sight when Export is chosen; thread search by meaning could not be qualified
+without a reachable embedding model. See
+[TO_BE_FIXED](../plans/TO_BE_FIXED.md#2026-11-17-round--found-not-fixed).
+
+**Captures.** `output/playwright/2026-11-17-round/` — `01-first-turn-answers`,
+`02-context-memories`, `03-design-word-export`, `04-designs-read-failed`,
+`05-account-display-name`, `06-threads-search`, `06b-task-recovery-link`,
+`07-openai-answers`. Inspected at original resolution; no key, token or
+workspace ID is visible.
+
 ## Result — 2026-11-16 (RAIKER.md, refusals and the leave guard)
 
 A Linux workspace served by `raiker-web --port 8765` on a fresh workspace

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { failure } from "../../errorCopy";
   import { localDateTime, localTime, relativeTime } from "../../format";
   /**
    * REM-SET-GIT — scope before secret.
@@ -40,7 +41,7 @@
       loadError = null;
       status = await api.gitCredential();
     } catch (error) {
-      loadError = error instanceof ApiError ? error.message : String(error);
+      loadError = failure("The Git token's status could not be read", "Nothing was stored or removed.", "Reopen this section to read it again.", error);
     }
   }
 
@@ -57,7 +58,7 @@
       message = "Token stored. Git commands still need your approval each time.";
       onchanged?.();
     } catch (error) {
-      message = error instanceof ApiError ? "That does not look like a GitHub token." : String(error);
+      message = error instanceof ApiError ? "That does not look like a GitHub token. Nothing was stored. Paste a token that starts with ghp_ or github_pat_." : failure("The token was not stored", "Nothing was changed.", "Try again.", error);
     } finally {
       busy = false;
     }
@@ -71,7 +72,7 @@
       message = null;
       onchanged?.();
     } catch (error) {
-      message = error instanceof ApiError ? error.message : String(error);
+      message = failure("Access was not granted", "The token's access is unchanged.", "Try again, or reopen this section to check it.", error);
     } finally {
       busy = false;
     }

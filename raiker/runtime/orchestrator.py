@@ -729,7 +729,7 @@ class RuntimeOrchestrator:
             for (item_id, _draft), source in zip(accepted, recorded, strict=False)
         }
 
-    def _identity_prompt(self, envelope: PromptEnvelope) -> str:
+    def _identity_prompt(self, envelope: PromptEnvelope, *, compact: bool = False) -> str:
         """Who the turn is talking to, resolved server-side.
 
         RR-IDENTITY-01. The envelope now carries a display name at every entry
@@ -746,7 +746,7 @@ class RuntimeOrchestrator:
         carried = sanitize_display_name(envelope.user.display_name)
         if identity.display_name is None and carried is not None:
             identity = replace(identity, display_name=carried)
-        return user_identity_prompt(identity)
+        return user_identity_prompt(identity, compact=compact)
 
     @staticmethod
     def _citation_prompt() -> str:
@@ -2801,12 +2801,12 @@ class RuntimeOrchestrator:
             # block for the same reason the clock is: this is server-resolved
             # runtime fact, not material the turn read, and the one sentence
             # that matters here is that an internal id is not a name.
-            ModelMessage(role="system", content=self._identity_prompt(envelope)),
+            ModelMessage(role="system", content=self._identity_prompt(envelope, compact=small_window)),
             # The clock rides ahead of the workspace block on purpose. What
             # follows that heading is data the turn must not obey; this is
             # runtime metadata the turn must not doubt, and putting the two
             # under one heading would blur exactly the boundary both depend on.
-            ModelMessage(role="system", content=environment.prompt_block()),
+            ModelMessage(role="system", content=environment.prompt_block(compact=small_window)),
             ModelMessage(
                 role="system",
                 content=(

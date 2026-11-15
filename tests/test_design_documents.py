@@ -474,3 +474,49 @@ def test_a_document_exports_as_slides_one_per_frame(api: Any) -> None:
         assert picture.size == (1080, 1080)
         presentation = deck.read("ppt/presentation.xml").decode()
         assert 'cx="10287000" cy="10287000"' in presentation
+
+
+def test_a_document_exports_as_a_word_document_with_editable_text(api: Any) -> None:
+    """BUG-348 / DW-11 — the document format: each frame a heading, its picture and its words as paragraphs."""
+    import xml.dom.minidom
+    import zipfile
+
+    client, h, _ws = api
+    doc = _new(client, h)
+    _ops(client, h, doc, 1, [_text("t", color="#000000")])
+    response = client.post(f"/api/design/documents/{doc['document_id']}/exports",
+                           json={"frame_id": "frame-1", "format": "docx"}, headers=h)
+    assert response.status_code == 200, response.text
+    made = response.json()
+    assert made["format"] == "docx" and made["settings"]["pages"] >= 1
+    download = client.get(f"/api/design/exports/{made['export_id']}/bytes", headers=h)
+    assert download.headers["content-type"].startswith(
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+    )
+    assert download.headers["content-disposition"].endswith('.docx"')
+    with zipfile.ZipFile(io.BytesIO(download.content)) as package:
+        names = set(package.namelist())
+        assert {"[Content_Types].xml", "word/document.xml", "word/styles.xml", "word/media/frame1.png"} <= names
+        body = package.read("word/document.xml").decode()
+        xml.dom.minidom.parseString(body)  # well-formed
+        # The frame's words are a real paragraph, not only alternative text.
+        assert '<w:t xml:space="preserve">Hello' in body
+        assert 'w:pStyle w:val="Heading1"' in body
+        picture = Image.open(io.BytesIO(package.read("word/media/frame1.png")))
+        assert picture.size == (1080, 1080)
+
+
+def test_docx_text_never_breaks_the_file() -> None:
+    import xml.dom.minidom
+    import zipfile
+
+    from raiker.design.document_export import build_docx
+
+    frame = {"id": "f", "name": "A <b> & \x01", "nodes": [{"type": "text", "text": "x\x02 < y & z"},
+                                                          {"type": "text", "text": "hidden", "hidden": True}]}
+    data = build_docx([frame], lambda _fid: (b"\x89PNG", 10, 10), title="T & <x>")
+    with zipfile.ZipFile(io.BytesIO(data)) as package:
+        body = package.read("word/document.xml").decode()
+    xml.dom.minidom.parseString(body)
+    assert "hidden" not in body
+    assert "x &lt; y &amp; z" in body

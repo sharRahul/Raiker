@@ -15,7 +15,7 @@
    * Nothing is duplicated — this page and that sentence read the same settings.
    */
   import { onMount } from "svelte";
-  import { api, ApiError } from "../../api";
+  import { api } from "../../api";
   import { providerName } from "../../format";
   import type { MemorySettingsView } from "../../apiTypes";
   import PageState from "../../components/PageState.svelte";
@@ -40,7 +40,7 @@
       settings = await api.memorySettings();
     } catch (error) {
       settings = null;
-      loadError = error instanceof ApiError ? error.message : "Memory settings are unavailable.";
+      loadError = failure("Memory settings could not be read", "Nothing was changed.", "Reopen this section to read them again.", error);
     }
   }
 

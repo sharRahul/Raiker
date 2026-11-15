@@ -193,6 +193,10 @@ parent shows a bar and *N of M delegated tasks settled · Show*, and **Show**
 lists all of it — a settled child included, under its parent rather than again
 under Finished work.
 
+**Recovery** sits on every task that has ended. It opens Recovery filtered to
+the conversation the task ran in, so the checkpoints of the files that task
+changed are the ones listed, and each restore first says what it will undo.
+
 **Whether you were told is its own fact.** Background work that ends sends you a
 notice, and if that notice could not be written — or the desktop notification
 command you configured failed — the task still reads as what it was, *completed*

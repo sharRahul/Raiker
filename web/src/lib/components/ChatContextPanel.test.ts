@@ -43,4 +43,16 @@ describe("ChatContextPanel (QUI-C07)", () => {
     render(ChatContextPanel, { props: { files: [], plan: null, sources: [], activity: [], onclose: () => {} } });
     expect(screen.getByText(/Nothing in use yet/)).toBeInTheDocument();
   });
+
+  it("lists the memories the turns were given, each once, with a way to Memory", async () => {
+    const memory = { memory_id: "m1", turn_id: "t1", text: "Prefers metric units", scope: "user", pinned: true };
+    render(ChatContextPanel, {
+      props: { files: [FILE], memories: [memory], plan: null, sources: [], activity: [], onclose: () => {} },
+    });
+    expect(screen.getAllByRole("tab").map((tab) => tab.textContent)).toEqual(["Context", "Memories"]);
+    await fireEvent.click(screen.getByRole("tab", { name: "Memories" }));
+    expect(screen.getByText("Prefers metric units")).toBeInTheDocument();
+    expect(screen.getByText("Pinned · About you")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Open Memory" })).toHaveAttribute("href", "#/memory");
+  });
 });

@@ -5,7 +5,7 @@
  * the page said something the runtime did not — so a unit test can show the
  * rule and only a live round can show the page. What is asserted:
  *
- *   NEW-PERM-01   Common permissions and Needs your attention reach the control.
+ *   NEW-PERM-01   Overview's sentences reach the control (QUI-L06 layout).
  *   NEW-PERM-02   Every summary moves together when one mode is confirmed.
  *   NEW-PERM-03   An unavailable automatic gate is not described as running.
  *   RR-PROJECT-01 "New chat" on a project card starts the chat in that project.
@@ -18,8 +18,8 @@
 import { expect, test } from "@playwright/test";
 import { capture, captureElement } from "./capture";
 import { signInAsOwner } from "./hosted-provider";
+import { LIVE_BASE as BASE } from "./live";
 
-const BASE = process.env.RAIKER_LIVE_BASE ?? "http://127.0.0.1:8768";
 const SHOTS = "../../output/playwright/2026-09-13-release-readiness";
 const PROJECT = "Release readiness";
 
@@ -29,66 +29,74 @@ test.beforeEach(async ({ page }) => {
   await signInAsOwner(page, BASE);
 });
 
+// QUI-L06 (2026-10-21) replaced *Common permissions* and the inline registry
+// with Overview's *What Raiker can do for you*, a category rail and one detail
+// pane. The three checks below assert the same three defects on that layout.
+
+const WEB_SENTENCE = /^Change: Can(not)? read web pages/;
+
 test("Permissions offers a way to change what it puts at the top", async ({ page }) => {
   test.setTimeout(180_000);
   await page.goto(`${BASE}/#/capabilities`);
   await page.getByRole("navigation", { name: "Permission categories" }).waitFor({ timeout: 60_000 });
 
-  const common = page.getByRole("region", { name: "Common permissions" });
-  await expect(common).toBeVisible({ timeout: 30_000 });
-  await capture(page, `${SHOTS}/permissions-top-sections.png`, common);
+  const overview = page.getByRole("region", { name: "What Raiker can do for you" });
+  await expect(overview).toBeVisible({ timeout: 30_000 });
+  await capture(page, `${SHOTS}/permissions-top-sections.png`, overview);
 
-  // NEW-PERM-01 — the owner-reported symptom. Every entry offers an action, and
-  // the action reaches the one control in the registry below.
-  const manage = common.getByRole("button", { name: /^Manage / }).first();
-  await expect(manage).toBeVisible();
-  const managed = (await manage.textContent())?.replace("Manage", "").trim() ?? "";
-  await manage.click();
-
-  const registry = page.getByRole("region", { name: "All permissions" });
-  const row = registry.getByRole("button", { name: new RegExp(`^${managed}`) }).first();
-  await expect(row).toHaveAttribute("aria-expanded", "true", { timeout: 30_000 });
-  // The keyboard goes with the scroll, or the shortcut only helped a mouse.
-  await expect(row).toBeFocused();
-  await capture(page, `${SHOTS}/permissions-shortcut-opened-the-row.png`, row);
+  // NEW-PERM-01 — the owner-reported symptom. Every sentence offers an action,
+  // and the action reaches the one control that decides it.
+  const sentences = overview.getByRole("listitem");
+  const count = await sentences.count();
+  expect(count).toBeGreaterThan(0);
+  for (let index = 0; index < count; index += 1) {
+    await expect(sentences.nth(index).getByRole("button", { name: /^Change: / })).toBeVisible();
+  }
+  await overview.getByRole("button", { name: WEB_SENTENCE }).click();
+  const detail = page.getByRole("region", { name: "Selected item" });
+  await expect(detail.getByRole("article")).toBeVisible({ timeout: 30_000 });
+  await expect(detail.getByRole("group", { name: /^When Raiker wants to use / })).toBeVisible();
+  await capture(page, `${SHOTS}/permissions-shortcut-opened-the-row.png`, detail);
 });
 
 test("every Permissions summary moves when one decision is confirmed", async ({ page }) => {
   test.setTimeout(180_000);
   await page.goto(`${BASE}/#/capabilities`);
-  await page.getByRole("navigation", { name: "Permission categories" }).waitFor({ timeout: 60_000 });
+  const rail = page.getByRole("navigation", { name: "Permission categories" });
+  await rail.waitFor({ timeout: 60_000 });
 
-  const common = page.getByRole("region", { name: "Common permissions" });
-  const entry = common.getByRole("listitem").filter({ hasText: "Web fetch" }).first();
-  await expect(entry).toBeVisible({ timeout: 30_000 });
-
-  const registry = page.getByRole("region", { name: "All permissions" });
-  const card = registry.locator(".cap.card").filter({ hasText: "Web fetch" }).first();
-  await card.scrollIntoViewIfNeeded();
+  await rail.getByRole("button", { name: /^Web and research/ }).click();
+  const row = page.getByRole("option", { name: /^Web fetch / }).first();
+  await row.click();
+  const card = page.getByRole("article", { name: "Web fetch" });
+  await expect(card).toBeVisible({ timeout: 30_000 });
   // A governed mutation through the product's own control, not through the API.
   await card.getByRole("button", { name: "Never", exact: true }).click();
 
-  // NEW-PERM-02 — the summary above the registry used to go on saying the old
-  // mode until a refresh nobody was told to make.
-  await expect(entry).toContainText("Never", { timeout: 60_000 });
-  await expect(card).toContainText("Never");
-  await capture(page, `${SHOTS}/permissions-summary-agrees.png`, common);
+  // NEW-PERM-02 — every summary of the same decision moves with it, rather
+  // than saying the old mode until a refresh nobody was told to make.
+  await expect(row).toContainText("Never", { timeout: 60_000 });
+  await expect(card.getByRole("button", { name: "Never", exact: true })).toHaveAttribute("aria-pressed", "true");
+  await capture(page, `${SHOTS}/permissions-summary-agrees.png`, card);
 
   // And it survives the read, rather than being an optimistic label the next
   // refresh replaces with what the server held a moment ago.
   await page.getByRole("button", { name: /Refresh capabilities/i }).click();
-  await expect(entry).toContainText("Never", { timeout: 60_000 });
+  await expect(page.getByRole("option", { name: /^Web fetch / }).first()).toContainText("Never", { timeout: 60_000 });
 
   // Put it back, so the round leaves the workspace as it found it.
-  await card.getByRole("button", { name: "Ask me", exact: true }).click();
-  await expect(entry).toContainText("Ask me", { timeout: 60_000 });
+  await page.getByRole("article", { name: "Web fetch" }).getByRole("button", { name: "Ask me", exact: true }).click();
+  await expect(page.getByRole("option", { name: /^Web fetch / }).first()).toContainText("Ask me", { timeout: 60_000 });
 });
 
 test("the authority summary says what it is a summary of", async ({ page }) => {
   test.setTimeout(120_000);
   await page.goto(`${BASE}/#/capabilities`);
-  await page.getByRole("navigation", { name: "Permission categories" }).waitFor({ timeout: 60_000 });
+  const rail = page.getByRole("navigation", { name: "Permission categories" });
+  await rail.waitFor({ timeout: 60_000 });
+  await rail.getByRole("button", { name: /^Advanced/ }).click();
 
+  await page.getByText("How your permissions apply", { exact: true }).click();
   const table = page.locator(".authority-matrix");
   await expect(table).toBeVisible({ timeout: 30_000 });
   // NEW-PERM-03 — it reads account configuration, and says so, rather than
@@ -98,9 +106,7 @@ test("the authority summary says what it is a summary of", async ({ page }) => {
   // Nothing in it may read "Direct": that word was one verdict for Allow,
   // Automatic, and any mode this build does not recognise.
   await expect(table.getByText("Direct", { exact: true })).toHaveCount(0);
-  // The element, not the page. A full-page capture here came out byte-identical
-  // to the one the test above takes — two files filed as evidence of two
-  // different things while being one picture, which is BUG-241's shape.
+  // The element, not the page (BUG-241: two captures of one picture).
   await captureElement(table, `${SHOTS}/authority-summary-read-only.png`);
 });
 
@@ -141,6 +147,8 @@ test("a new chat started from a project is filed in that project", async ({ page
 test("Settings acknowledges the revision it saved", async ({ page }) => {
   test.setTimeout(180_000);
   await page.goto(`${BASE}/#/settings?tab=personalisation`);
+  // Density moved into the *Layout & type* disclosure (QUI-L03).
+  await page.getByText("Layout & type", { exact: true }).click({ timeout: 60_000 });
 
   const density = page.getByRole("radiogroup", { name: "Density" });
   await expect(density).toBeVisible({ timeout: 60_000 });
@@ -172,11 +180,14 @@ test("Raiker addresses the owner by name, not by their principal id", async ({ p
   // wrong thing to read the current value from.
   const stored = await page.evaluate(async () => {
     const response = await fetch("/api/settings", { credentials: "same-origin" });
-    const body = (await response.json()) as { status?: { display_name?: string } };
-    return body.status?.display_name ?? "";
+    const body = (await response.json()) as { status?: { display_name?: string; username?: string } };
+    return { name: body.status?.display_name ?? "", username: body.status?.username ?? "" };
   });
-  if (stored !== "Rahul S") {
-    await expect(name).toHaveValue(stored === "Owner" ? "" : stored, { timeout: 30_000 });
+  if (stored.name !== "Rahul S") {
+    // With no chosen name the server falls back to the sign-in handle, and the
+    // field stays empty with that handle in its placeholder.
+    const chosen = stored.name === "Owner" || stored.name === stored.username ? "" : stored.name;
+    await expect(name).toHaveValue(chosen, { timeout: 30_000 });
     await name.fill("Rahul S");
     await name.blur();
     await page.getByRole("button", { name: /save changes/i }).click();

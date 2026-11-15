@@ -371,10 +371,13 @@ Check never judges how good the design looks.
 **Export** writes the frame as **PNG**, **PDF (vector, selectable text)** —
 shapes as paths, text as real text, an A4 frame as an A4 page — **PDF (one
 raster page)**, **SVG** (text stays text, so it remains editable in a vector
-tool), **JSON** (the frame's structure) or **Slides — every frame
-(PowerPoint)**: a `.pptx` deck with one slide per frame, the chosen frame
+tool), **JSON** (the frame's structure) or **Slides (PowerPoint), all
+frames**: a `.pptx` deck with one slide per frame, the chosen frame
 first, each slide the frame as a picture with its words as alternative text
-(the design stays the editable source). The vector PDF writes text in the
+(the design stays the editable source), or **Document (Word), all
+frames**: a `.docx` with one page per frame, the frame's name as a heading,
+the frame as a picture and then each of its text layers as an ordinary,
+editable paragraph. The vector PDF writes text in the
 Western European character set; any other character becomes `?`, and the export
 records how many. Each export is listed with its version, the result of Check
 at that moment, and the file's SHA-256, and downloads from there. PNG and PDF are

@@ -42,7 +42,7 @@ Two identities belong to your account and they are not interchangeable.
 | | What it is | Where it appears |
 |---|---|---|
 | **Username** | The sign-in handle. Fixed. | The sign-in form, and **Settings → General** (Account). |
-| **Display name** | What Raiker calls you. Change it at any time. | Greetings, the account surfaces, and the turn's own identity block. |
+| **Display name** | What Raiker calls you. Change it at any time; until you do, Raiker uses your sign-in name, and the empty field says so. | Greetings, the account surfaces, and the turn's own identity block. |
 | **Principal ID** | The internal authorisation key (`principal_user_…`). | Audit records and diagnostics only. |
 
 The principal ID is what ownership, policy and audit are keyed on, and changing

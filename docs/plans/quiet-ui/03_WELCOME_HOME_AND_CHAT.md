@@ -22,10 +22,10 @@ live cases RT-QUI-10 to RT-QUI-13 and RT-QUI-16). Both in
 | QUI-C01 | **Done**: editable title, project chip, search in conversation, Context toggle. |
 | QUI-C02 | Already true before this round; unchanged. |
 | QUI-C03 | **Done**: the status line, follow-ups queued from the prompt and Stop safely in Send's place (2026-11-07, [execution states](#2026-11-07--composer-execution-states)), the outcome line, and the task receipt at the end of each turn (2026-10-24, [QUI-F16, FIXED-1153](../FIXED_ITEMS.md#fixed-1153--a-tasks-end-did-not-say-what-it-used-read-changed-or-sent-qui-f16); per task in Tasks, [FIXED-1261](../FIXED_ITEMS.md#fixed-1261--a-background-task-had-no-receipt-qui-f16-found-this-round)). |
-| QUI-C04 | **Partly done.** Done: the placeholder, the data label and the profile chip (QUI-P02, 2026-10-22); answer style is in Settings › General until *More* exists (04, closed; [FIXED-1145](../FIXED_ITEMS.md#fixed-1145--there-was-no-way-to-ask-for-fewer-or-more-visuals-04-answer-style), 2026-10-23). Open: *More* (schedule, research depth). |
+| QUI-C04 | **Partly done.** Done: the placeholder, the data label and the profile chip (QUI-P02, 2026-10-22); answer style is in Settings › General until *More* exists (04, closed; [FIXED-1145](../FIXED_ITEMS.md#fixed-1145--there-was-no-way-to-ask-for-fewer-or-more-visuals-04-answer-style), 2026-10-23). *More* decided 2026-11-17: the composer's **Tools** menu is *More* (Schedule it and Run in background are there); research depth waits for a research mode with depths. |
 | QUI-C05 | **Done.** |
 | QUI-C06 | **Done.** |
-| QUI-C07 | **Done.** Tabs: Context (files in use), Plan, Sources, Activity. Memories in use are not listed yet: a turn's recall reports a count, not the records. |
+| QUI-C07 | **Done.** Tabs: Context (files in use), Memories (2026-11-17, [FIXED-1491](../FIXED_ITEMS.md#fixed-1491--chats-context-panel-did-not-list-the-memories-a-turn-was-given-qui-c07)), Plan, Sources, Activity. |
 | QUI-C08 | **Done.** |
 | QUI-C09 | Already true before this round: Edit and Retry make a new turn and keep the earlier one. |
 | QUI-C10 | **Done**, without the companion. |

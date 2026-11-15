@@ -176,7 +176,7 @@
       aria-label="Display name"
       value={displayName}
       onchange={(e) => save({ "account.display_name": e.currentTarget.value })}
-      placeholder="How you want to be shown"
+      placeholder={status.username ? `Shown as ${status.username} until you choose one` : "How you want to be shown"}
     />
   </label>
   <details class="support" data-testid="account-support-details">

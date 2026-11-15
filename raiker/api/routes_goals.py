@@ -122,7 +122,7 @@ def _plan(body: CreateGoalRequest | UpdateGoalPlanRequest, has_project: bool) ->
 # ── Goals ────────────────────────────────────────────────────────────────
 
 
-def _meaning_embedder(store: SQLiteStore, owner: str) -> Any:
+def _meaning_embedder(store: SQLiteStore, owner: str, *, purpose: str = "goal-noticing") -> Any:
     """The governed embedding function, or ``None`` where no real model may run.
 
     The same path memory recall and the near-duplicate check use: it embeds
@@ -136,7 +136,7 @@ def _meaning_embedder(store: SQLiteStore, owner: str) -> Any:
         backend = resolve_embedding_backend(store, owner_principal_id=owner)
         if not query_embedding_available(store, owner, backend):
             return None
-        embedder = GovernedQueryEmbedder(store, owner, session_id="goal-noticing")
+        embedder = GovernedQueryEmbedder(store, owner, session_id=purpose)
     except Exception:  # noqa: BLE001 - noticing falls back to words
         return None
     return lambda text: embedder(backend, text)

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { failure } from "../../errorCopy";
   import { onMount } from "svelte";
   import { api, ApiError } from "../../api";
   import PageState from "../../components/PageState.svelte";
@@ -80,7 +81,7 @@
       // The feeds are their own card: one that cannot load never hides the page.
       feeds = await api.threatFeeds().catch(() => null);
     } catch (error) {
-      loadError = error instanceof ApiError ? error.message : String(error);
+      loadError = failure("Web access rules could not be read", "The rules on screen may be out of date; nothing was changed.", "Reopen this section to read them again.", error);
     }
   }
 
@@ -95,7 +96,7 @@
       note = "";
       await load();
     } catch (error) {
-      addError = error instanceof ApiError ? ruleError(error.reasonCode ?? "") : String(error);
+      addError = error instanceof ApiError ? ruleError(error.reasonCode ?? "") : failure("The rule was not added", "Your entry is kept here.", "Try again.", error);
     } finally {
       busy = false;
     }
@@ -143,7 +144,7 @@
       probeResult = await api.testWebBlocklist(probe.trim());
     } catch (error) {
       probeResult = null;
-      loadError = error instanceof ApiError ? error.message : String(error);
+      loadError = failure("The address could not be checked", "No rule was changed.", "Check the address, then test it again.", error);
     } finally {
       probing = false;
     }

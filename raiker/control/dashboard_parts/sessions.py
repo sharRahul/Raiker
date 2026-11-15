@@ -13,6 +13,7 @@ from __future__ import annotations
 import contextlib
 import json
 import re
+from collections.abc import Callable
 from typing import TYPE_CHECKING, Any
 
 from raiker.contracts.ids import new_id, utc_now
@@ -242,10 +243,26 @@ class SessionService:
                 )
             )
 
-    def search_sessions(self: DashboardService, query: str, user_id: str | None = None) -> list[SessionView]:
-        return [
-            self._session_view(row) for row in self.store.search_sessions(query.strip(), user_id)
-        ]
+    def search_sessions(
+        self: DashboardService,
+        query: str,
+        user_id: str | None = None,
+        *,
+        embed: Callable[[str], list[float] | None] | None = None,
+    ) -> list[SessionView]:
+        """Conversations matching ``query`` by words, then — where the owner's
+        embedding model may run (``embed``) — by meaning."""
+        rows = [{**row, "match_kind": "words"} for row in self.store.search_sessions(query.strip(), user_id)]
+        if embed is not None and query.strip() and len(rows) < 5:
+            from raiker.context.meaning_search import meaning_matches
+
+            # Meaning is an addition; when it fails the words still answer.
+            with contextlib.suppress(Exception):
+                rows.extend(meaning_matches(
+                    self.store, query, embed, user_id=user_id,
+                    exclude=[str(row.get("session_id")) for row in rows],
+                ))
+        return [self._session_view(row) for row in rows]
 
     def get_turn(self: DashboardService, turn_id: str, user_id: str | None = None) -> TurnDetailView | None:
         row = self.store.load_turn(turn_id)
@@ -915,6 +932,7 @@ class SessionService:
             ),
             match_snippet=str(row.get("match_snippet") or ""),
             match_turn_id=str(row.get("match_turn_id") or ""),
+            match_kind=str(row.get("match_kind") or ""),
         )
 
     def _turn_view(self: DashboardService, row: dict[str, Any]) -> TurnView:

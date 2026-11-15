@@ -385,6 +385,8 @@ source](docs/guide/getting-started.md#run-from-source),
   and the [release acceptance matrix](docs/plans/RELEASE_ACCEPTANCE_MATRIX.md).
 - **[RAIKER.md instructions](docs/architecture/RAIKER_MD_INSTRUCTIONS.md)** —
   reviewed global and project-root instruction files for Build.
+- **[Composer personas (ADR-0005)](docs/adr/ADR-0005-composer-personas.md)** —
+  the accepted design for `@` specialists that can only narrow a turn.
 - **[Known limits](docs/architecture/KNOWN_LIMITS.md)** — important boundaries
   and unavailable features.
 - **[Troubleshooting](docs/guide/troubleshooting.md)** — reason codes and fixes.

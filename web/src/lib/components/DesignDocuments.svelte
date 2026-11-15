@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { failure } from "../errorCopy";
   /**
    * Design → Documents: the structured canvas (DW-01 to DW-12).
    *
@@ -134,7 +135,7 @@
       list = await contract.listDesignDocuments();
       listError = null;
     } catch (error) {
-      listError = error instanceof ApiError ? error.message : "Designs are unavailable.";
+      listError = failure("Designs could not be read", "The list may be out of date; nothing was changed.", "Choose Try again to read it again.", error);
     }
   }
 
@@ -920,7 +921,7 @@
     }
   }
 
-  const FORMAT_LABEL: Record<string, string> = { png: "PNG", pdf: "PDF (raster)", vector_pdf: "PDF (vector)", svg: "SVG", json: "JSON", pptx: "Slides (PowerPoint)" };
+  const FORMAT_LABEL: Record<string, string> = { png: "PNG", pdf: "PDF (raster)", vector_pdf: "PDF (vector)", svg: "SVG", json: "JSON", pptx: "Slides (PowerPoint)", docx: "Document (Word)" };
 
   async function download(item: DesignExportView) {
     const blob = await api.designExportBlob(item.export_id);
@@ -1182,16 +1183,18 @@
         </label>
         <label>
           <span>Starts as</span>
-          <select bind:value={newPreset} aria-label="Frame size">
+          <select bind:value={newPreset} aria-label="Frame size" disabled={list === null}>
             {#each list?.presets ?? [] as preset (preset.preset)}
               <option value={preset.preset}>{preset.label} · {preset.width}×{preset.height}</option>
             {/each}
           </select>
         </label>
-        <button type="submit" class="btn btn-primary" disabled={busy}><Icon name="plus" size="sm" />Create</button>
+        <!-- The sizes come with the list: until it has been read there is no
+             size to start from, so Create waits for it (found 2026-11-17). -->
+        <button type="submit" class="btn btn-primary" disabled={busy || list === null}><Icon name="plus" size="sm" />Create</button>
       </form>
       {#if listError}
-        <p class="error" role="alert">{listError}</p>
+        <p class="error" role="alert">{listError} <button type="button" class="btn btn-ghost btn-sm" onclick={() => void loadList()}>Try again</button></p>
       {:else if list === null}
         <p class="muted">Loading designs…</p>
       {:else if list.documents.length === 0}
@@ -1793,7 +1796,7 @@
             <div class="grid4">
               <label>Format
                 <select bind:value={exportFormat}>
-                  <option value="png">PNG</option><option value="vector_pdf">PDF (vector, selectable text)</option><option value="pdf">PDF (one raster page)</option><option value="svg">SVG (editable)</option><option value="json">JSON (structured)</option><option value="pptx">Slides — every frame (PowerPoint)</option>
+                  <option value="png">PNG</option><option value="vector_pdf">PDF (vector, selectable text)</option><option value="pdf">PDF (one raster page)</option><option value="svg">SVG (editable)</option><option value="json">JSON (structured)</option><option value="pptx">Slides (PowerPoint), all frames</option><option value="docx">Document (Word), all frames</option>
                 </select>
               </label>
               {#if exportFormat === "png" || exportFormat === "pdf"}

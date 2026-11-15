@@ -525,8 +525,10 @@ finds things across all of them.
 
 **Context** opens a panel of what this conversation is working with, closed
 until you open it. Its tabs appear only when they have something in them:
-**Context** (files used in this conversation), **Plan**, **Sources** and
-**Activity** (each step, with its state in words). On a laptop screen it opens
+**Context** (files used in this conversation), **Memories** (each memory the
+turns were given, once, with **Open Memory**; a memory you forget disappears
+from here too — it lists what a turn was given, not what the answer relied on),
+**Plan**, **Sources** and **Activity** (each step, with its state in words). On a laptop screen it opens
 over the transcript and stops above the composer; on a screen 1,920 pixels wide
 or more it sits beside the transcript.
 
@@ -545,6 +547,14 @@ collapsed to icons.
 newest — the conversations you started **and** the threads your routines are
 advancing on their own. Each row names the project it sits in and says what it
 is blocked on; a routine's row says how often it runs.
+
+**Searching Threads** finds a conversation by the words in its title or its
+messages, with the exchange that matched. Where your embedding model may run
+(Settings › Memory), a search that finds few chats by words also looks for
+recent conversations that are *about* the same thing in other words — searching
+*the Japan holiday* can find a chat about *Kyoto flights* — and marks them
+**Related by meaning**. It compares your forty most recent conversations and
+never reaches a hosted model you have not allowed for recall.
 
 **A row opens where the work was done.** A conversation started in Chat opens in
 Chat, one started in Build opens in Build, one started in Design opens in

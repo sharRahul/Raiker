@@ -123,8 +123,18 @@ def test_run_command_validates_against_its_own_cwd(tmp_path: Path) -> None:
         )
 
 
-def test_no_workspace_still_means_the_process_directory(tmp_path: Path) -> None:
-    """`None` keeps its old meaning, now as a stated choice rather than a default."""
+def test_no_workspace_still_means_the_process_directory(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """`None` keeps its old meaning, now as a stated choice rather than a default.
+
+    The process directory is pinned to a folder beside the file: a run started
+    from a folder that contains the temporary directory (a Windows home, which
+    holds ``AppData\\Local\\Temp``) saw the file as inside it (2026-10-19).
+    """
+    process_dir = tmp_path / "process"
+    process_dir.mkdir()
+    monkeypatch.chdir(process_dir)
     with pytest.raises(SandboxError):
         check_command_allowlist(
             ["cat", str(tmp_path / "elsewhere.txt")],

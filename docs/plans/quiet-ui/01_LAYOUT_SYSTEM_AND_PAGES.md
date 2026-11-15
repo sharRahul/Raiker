@@ -27,11 +27,11 @@ live cases RT-QUI-61 to RT-QUI-63 and RT-QUI-67).
 | QUI-L08 | **Done.** Deviation: the global spending limit lives in **Settings → Advanced → Usage and spending**, beside spend across providers, rather than on Models. |
 | QUI-L09 | **Done.** Deviation: Account is part of **General** rather than its own section. |
 | QUI-L10 | **Done.** The Guide page is gone; `#/guide…` opens the panel. |
-| QUI-L11 | **Partly done.** Overview is *What needs attention* with one card per issue and healthy systems folded (FIXED-1170); Checkpoints is **Recovery**, and a restore first says what will be undone and what stays, with Restore never the dominant button (FIXED-1171). Open: Sessions into Work › Threads, activity inside each task and project, Recovery reached from the affected task, live work on Home only. |
+| QUI-L11 | **Partly done.** Overview is *What needs attention* with one card per issue and healthy systems folded (FIXED-1170); Checkpoints is **Recovery**, and a restore first says what will be undone and what stays, with Restore never the dominant button (FIXED-1171). Recovery from the affected task shipped 2026-11-17 ([FIXED-1498](../FIXED_ITEMS.md#fixed-1498--recovery-could-not-be-reached-from-the-task-that-changed-files-qui-l11)). Open: Sessions into Work › Threads, activity inside each task and project, Recovery reached from the affected task, live work on Home only. |
 | QUI-L12 | **Done**, except Projects, which stays a card grid. Work pages after 50 rows with 64 px thread and goal rows (FIXED-1172); Memory's map opens from Memories and Recall folds into Controls (FIXED-1173); Approvals' evidence is closed below 1,600 px (since 2026-10-22); Connections › Advanced is one segmented list. |
 | QUI-L13 | **Done.** Design's revision strip of three 56 px thumbnails; Build's postures are Plan · Suggest changes · Run within limits (FIXED-1175). Build's rail and side panel were already closed by default, and Design's export already existed only once a picture did. |
 | QUI-L14 | **Done.** 1,024–1,279 px shows the icon rail. |
-| Acceptance | **Partly met.** No destination shows a catalogue; old addresses forward. Size: Memory › Controls (929 px) and Memory › Map (922 px) are still just over budget at 1440×900; every other destination fits (TO_BE_FIXED, QUI-G01 follow-up). |
+| Acceptance | **Partly met.** No destination shows a catalogue; old addresses forward. Size: every destination fits its budget at 1440×900, and the budgets are a failing check since 2026-11-15 ([FIXED-1460](../FIXED_ITEMS.md#fixed-1460--tasks-ran-9-px-past-one-screen-and-the-size-budgets-were-only-a-report-qui-g01)). |
 
 ## The problem, measured
 

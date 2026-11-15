@@ -69,6 +69,7 @@ Canonical technical references:
   Raiker: the remote listener, mandatory two-step sign-in, sessions, and the
   configuration lifecycle.
 - [Model destination authorization](adr/ADR-0004-connection-bound-model-authorization.md)
+- [Composer personas narrow a turn](adr/ADR-0005-composer-personas.md)
   — why a saved model connection, not an environment allowlist, decides where a
   model request may go.
 - [OWASP GenAI mapping](architecture/OWASP_GENAI_SECURITY_MAPPING.md) and

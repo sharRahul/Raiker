@@ -36,6 +36,9 @@ class SessionView(View):
     # difference between finding a chat from years ago and recognising it.
     match_snippet: str = ""
     match_turn_id: str = ""
+    # "words" when the search's words matched, "meaning" when the owner's
+    # embedding model found it by what it was about; empty on a plain listing.
+    match_kind: str = ""
     # Soft-archive state (Control Deck task 3). Archiving is a reversible
     # organizing action — it moves a chat out of the default active list but
     # never deletes transcripts, events, checkpoints, or permissions.

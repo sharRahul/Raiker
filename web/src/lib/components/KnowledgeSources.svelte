@@ -18,7 +18,7 @@
    * granted is left exactly where it is.
    */
   import { onMount } from "svelte";
-  import { api, ApiError } from "../api";
+  import { api } from "../api";
   import type { KnowledgeSource, KnowledgeSourcesView } from "../apiTypes";
   import PageState from "./PageState.svelte";
   import Icon from "./Icon.svelte";
@@ -42,7 +42,7 @@
       view = await api.knowledgeSources();
     } catch (error) {
       view = null;
-      loadError = error instanceof ApiError ? error.message : "Sources are unavailable.";
+      loadError = failure("Sources could not be read", "Nothing was added or removed.", "Reopen this panel to read them again.", error);
     }
   }
 

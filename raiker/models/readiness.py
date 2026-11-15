@@ -173,6 +173,26 @@ def _managed_slot_reloaded(readiness: ModelReadiness, managed: frozenset[str]) -
     )
 
 
+#: The owner saved (or re-saved) this provider's connection, or chose a model on
+#: it. The composer's
+#: background check re-checks such an observation on its own within a tick, so
+#: a send that lands before that check refused a turn the next tick would have
+#: admitted (2026-11-16 round: the first Chat turn after connecting read *This
+#: model connection must be checked again*). The check runs against the
+#: connection the owner just saved, so it reaches nothing they did not
+#: configure; a rejected key still refuses, with the fresh answer.
+_CONNECTION_SAVED_REASONS = frozenset({"connection_changed", "model_selection_changed"})
+
+
+def _connection_just_saved(readiness: ModelReadiness, connected: frozenset[str]) -> bool:
+    """True when the owner's own connection save or model choice is all that invalidated this."""
+    return (
+        readiness.state is ModelReadinessState.STALE
+        and readiness.reason_code in _CONNECTION_SAVED_REASONS
+        and readiness.key.profile_id in connected
+    )
+
+
 def _managed_slots_served(store: Any, owner_principal_id: str) -> frozenset[str]:
     """Raiker-managed local slot profiles the owner served a model into."""
     try:
@@ -1082,6 +1102,7 @@ class ModelReadinessService:
                 _has_merely_expired(readiness)
                 or _nothing_has_been_measured(readiness, connected)
                 or _managed_slot_reloaded(readiness, managed)
+                or _connection_just_saved(readiness, connected)
             ):
                 continue
             try:

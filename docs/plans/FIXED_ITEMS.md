@@ -1,5 +1,165 @@
 # Fixed items
 
+## FIXED-1502 — The Context panel named a memory's scope by its stored value
+
+**Severity: Low. Area: Chat / context panel. Status: Fixed 2026-11-17 (found this round).**
+
+**Observed.** RT-1117-02's capture showed a remembered sentence labelled *account* — the stored scope — under the new Memories tab.
+
+**Fixed.** `ChatContextPanel.svelte` says *About you* for an account or user memory, *Project memory* for a project one and *Saved memory* otherwise.
+
+**Evidence.** `web/src/lib/components/ChatContextPanel.test.ts`; capture `02-context-memories` in the [run record](../architecture/WEB_APP_LIVE_TEST.md#result--2026-11-17-first-turn-memories-in-context-and-word-export).
+
+## FIXED-1501 — Design's export formats were cut off in the picker
+
+**Severity: Low. Area: Design / export. Status: Fixed 2026-11-17 (found this round).**
+
+**Observed.** The Export tab's format picker read *Document — every frame, editable text (W*: the Office labels were longer than the inspector is wide.
+
+**Fixed.** The options read **Slides (PowerPoint), all frames** and **Document (Word), all frames**; the guide uses the same names.
+
+**Evidence.** Capture `03-design-word-export` before the change; RT-1117-03 passes after it.
+
+## FIXED-1500 — A failed Designs read left Create enabled with no size to start from
+
+**Severity: Low. Area: Design / errors. Status: Fixed 2026-11-17 (found this round).**
+
+**Observed.** With the Designs list unreadable (RT-1117-04 injects HTTP 500), *Starts as* was an empty picker and **Create** stayed enabled: the frame sizes arrive with the list, so there was nothing to start from, and the message asked the owner to reopen the page.
+
+**Fixed.** The size picker and **Create** wait for the list, and the error carries **Try again**, which re-reads it; the message says *Choose Try again to read it again.*
+
+**Evidence.** RT-1117-04: the message, **Create** disabled, **Try again**, then after the read succeeds the message is gone and **Create** is enabled.
+
+## FIXED-1499 — Account's display name field was empty with no hint of the name in use
+
+**Severity: Low. Area: Settings / Account. Status: Fixed 2026-11-17 (found this round).**
+
+**Observed.** With no display name chosen, Raiker greets the owner by their sign-in name, but **Display name** read empty with *How you want to be shown*, so the page did not say which name was in use. `release-readiness-2026-09-13` also assumed the fallback was *Owner* and failed.
+
+**Fixed.** The field's placeholder reads *Shown as ‹username› until you choose one*; the spec now reads the fallback from the server.
+
+**Evidence.** RT-1117-05; `release-readiness-2026-09-13-live` passes.
+
+## FIXED-1498 — Recovery could not be reached from the task that changed files (QUI-L11)
+
+**Severity: Low. Area: Work › Tasks / Recovery. Status: Fixed 2026-11-17.**
+
+**Observed.** QUI-L11 asks for Recovery from the affected task. A task's checkpoints were reachable only through Diagnostics › Recovery and a session id typed into its filter.
+
+**Fixed.** A task that has ended — in its card and in *Finished work* — offers **Recovery**, which opens Recovery filtered to the conversation the task ran in (`#/checkpoints?session=…`). A task still running offers none.
+
+**Evidence.** RT-1117-06: a task run in the background from Chat finishes, **Recovery** links to its session and opens with the filter filled.
+
+## FIXED-1497 — A command-policy test depended on where the suite was started (2026-10-19 Windows failures)
+
+**Severity: Low. Area: Tests. Status: Fixed 2026-11-17.**
+
+**Observed.** `test_no_workspace_still_means_the_process_directory` expects a file in the temporary folder to be outside the process directory. Started from a Windows home, the temporary folder (`AppData\Local\Temp`) is inside it, so the expected refusal did not happen. The policy itself is portable.
+
+**Fixed.** The test pins its own process directory beside the file.
+
+**Evidence.** `tests/test_command_workspace_is_not_global.py` passes.
+
+## FIXED-1496 — A notification test used a command Windows does not have (2026-10-19 Windows failures)
+
+**Severity: Low. Area: Tests. Status: Fixed 2026-11-17.**
+
+**Observed.** `test_the_os_command_obeys_the_stored_desktop_decision` configured `true` as the notifier; Windows has no `true`, so the run reported `failed` instead of `sent`.
+
+**Fixed.** The notifier is the running Python (`-c pass`), quoted so a Windows path keeps its backslashes through `shlex`.
+
+**Evidence.** `tests/test_notification_quiet_hours.py` passes.
+
+## FIXED-1495 — A small-window model still received the full identity and clock blocks
+
+**Severity: Low. Area: Runtime / prompt size. Status: Fixed 2026-11-17.**
+
+**Observed.** FIXED-1436 and FIXED-1464 shortened the tool schemas, standing instructions and Memory Brief for a model whose window is 16,384 tokens or less; the identity and clock blocks were left at full size.
+
+**Fixed.** On such a window `user_identity_prompt(compact=True)` and `EnvironmentContext.prompt_block(compact=True)` carry the same facts and rules — the name as data, the identifier rule, date, day, local time, zone, offset, answer language and *never infer the date elsewhere* — in fewer words: clock 133 → 49 tokens, identity 117 → 57.
+
+**Evidence.** `tests/test_small_window_prompt.py::test_identity_and_clock_have_a_short_form_that_keeps_their_facts`.
+
+## FIXED-1494 — Chat search found only conversations that used the same words
+
+**Severity: Low. Area: Work › Threads / embeddings. Status: Fixed 2026-11-17.**
+
+**Observed.** FIXED-1425 left *thread search by meaning* open: searching *the Japan holiday* did not find a chat about *Kyoto flights*.
+
+**Fixed.** Where the owner's embedding model may run, a search the words answer with fewer than five chats also compares the forty most recent conversations by meaning (title and first request, cosine ≥ 0.6) through the governed embedder goal noticing uses (`raiker/context/meaning_search.py`). Meaning results are added after the word results, never repeat them, stay within the owner's own chats and read *Related by meaning*; `SessionView.match_kind` says which kind matched. With no model allowed nothing changes.
+
+**Evidence.** `tests/test_chat_search_by_meaning.py` (3 passed). Not qualified live: no Ollama host is reachable from this sandbox; RT-1117-06 checks that search by words still answers.
+
+## FIXED-1493 — A design could not be handed over as a document (BUG-348, DW-11)
+
+**Severity: Medium. Area: Design / export. Status: Fixed 2026-11-17.**
+
+**Observed.** After the slide deck (FIXED-1486), BUG-348 still listed document formats (DOCX) as missing, and no export carried a frame's words as text someone could edit.
+
+**Fixed.** **Export › Document (Word), all frames** writes a `.docx` (`raiker/design/document_export.py`): the design's title, then per frame its name as a heading, the frame drawn by the renderer PNG, PDF and the deck use, a caption with its size, and every visible text layer as an ordinary, editable paragraph in layer order. Plain Office Open XML with no new dependency; characters XML cannot carry are dropped rather than breaking the file; the export records its page count with its version and hash.
+
+**Evidence.** `tests/test_design_documents.py::test_a_document_exports_as_a_word_document_with_editable_text` and `test_docx_text_never_breaks_the_file`; RT-1117-03 exports through the Export tab and downloads a `wordprocessingml` file.
+
+## FIXED-1492 — BUG-360 stayed open after its legacy barrier shipped
+
+**Severity: High (documentation). Area: Memory privacy. Status: Fixed 2026-11-17 (reconciled).**
+
+**Observed.** BUG-360 (answers that copied a forgotten fact through untracked history) was still listed as an open beta blocker, but commit `c2e7871` (2026-11-10) had added the provenance graph and the conservative barrier it asked for, with tests, and no document said so.
+
+**Fixed.** Recorded here. Ambient recall walks each candidate conversation's `context_gathered` provenance (bounded and integrity-checked; damaged or oversized provenance fails closed). Once any memory has been forgotten, archived, expired, corrected or purged, a conversation whose memory context predates complete provenance — the legacy case — is withheld from ambient recall (`history_withheld_reason: untraceable_legacy_memory_purge`), while conversations with no memory context, or with complete provenance, stay available. Transcripts are never erased and stay reachable through explicit, governed search; another account's history is never narrowed.
+
+**Evidence.** `tests/test_conversation_recall.py` — `test_legacy_unknown_memory_context_is_withheld_but_clean_history_survives` (forgotten, corrected, purged, archived, expired), `test_legacy_unknown_provenance_survives_copying_before_forget`, `test_ambient_history_tracks_memory_across_two_indirect_copies`, `test_indeterminate_context_provenance_fails_closed` (59 passed). The owner's retained Windows reproducer (`output/beta-memory-final`) has not been re-run against it; that run stays in [TO_BE_FIXED](TO_BE_FIXED.md#bug-360--legacy-answers-copied-from-stale-history-have-no-memory-provenance).
+
+## FIXED-1491 — Chat's Context panel did not list the memories a turn was given (QUI-C07)
+
+**Severity: Low. Area: Chat / context panel. Status: Fixed 2026-11-17.**
+
+**Observed.** QUI-C07: *Memories in use are not listed yet: a turn's recall reports a count, not the records.*
+
+**Fixed.** The Context panel has a **Memories** tab, drawn only when the conversation's turns were given memories: each memory once, with whether it is pinned and what it is about, and **Open Memory**. It reads the recall ledger (C17), which is read live from Memory, so a forgotten memory is already absent. It records inclusion, not reliance.
+
+**Evidence.** `web/src/lib/contextPanel.test.ts`, `ChatContextPanel.test.ts`; RT-1117-02 imports a memory, a real Haiku 4.5 turn answers from it and the tab lists it.
+
+## FIXED-1490 — Sixteen more error messages showed the server's raw text (QUI-G06)
+
+**Severity: Low. Area: Quiet UI / errors. Status: Fixed 2026-11-17.**
+
+**Observed.** Sixteen catch blocks showed `error.message` or `String(error)` — *Request failed (HTTP 500)* and the like — with nothing about what was affected or what to do.
+
+**Fixed.** They use `failure()` (`web/src/lib/errorCopy.ts`): the Designs list, knowledge sources, Build's working tree and file preview, a Design research turn, web access rules (read, add, test), the Git token (status, store, grant), Extensions' hooks (read, switch) and plugins, and Memory settings. A malformed GitHub token now says which prefixes it expects.
+
+**Evidence.** svelte-check and ESLint clean; web unit suite 2,915 passed; RT-1117-04 reads the Designs message live.
+
+## FIXED-1489 — Two live specs still asserted the Permissions and Settings layouts QUI-L06 replaced
+
+**Severity: Low. Area: Live test harness. Status: Fixed 2026-11-17.**
+
+**Observed.** `release-readiness-2026-09-13` looked for *Common permissions* and inline mode buttons; `removal-review-permissions-2026-09-14` for a closed-row summary, a *GIT* list and status filter chips. Both also opened Settings controls that QUI-L03 moved into disclosures (Density, the backup note).
+
+**Fixed.** Both assert the same rules on the current layout: Overview's sentences each offer **Change** and reach the decision pane; a confirmed mode moves the row and survives a refresh; the authority table under *Advanced › How your permissions apply* says it is read-only; a closed option names availability and mode; Git, Git push and GitHub sit together under *Files and code*; search filters; no sideways scroll at 390 px. Density and the backup note are opened from their disclosures.
+
+**Evidence.** Both specs pass live, 10 of 10.
+
+## FIXED-1488 — A refused first turn still tried to save its conversation profile
+
+**Severity: Low. Area: Chat. Status: Fixed 2026-11-17.**
+
+**Observed.** A new conversation whose first turn was refused before it was stored still sent `PUT /api/sessions/{id}/profile`, answered 403 `unknown_session:…` (2026-11-16 round).
+
+**Fixed.** Chat saves a new conversation's profile when its first turn ends, and only if that turn was not refused. The status stays 403: every session write answers 403 for both a missing and another account's session (`tests/test_session_organisation.py`, `test_session_lifecycle.py`), so the status never says whose sessions exist; this is recorded as the decision.
+
+**Evidence.** RT-1116-03's refused turn path; svelte-check clean.
+
+## FIXED-1487 — The first turn after connecting a provider or choosing a model was refused
+
+**Severity: Medium. Area: Models / readiness. Status: Fixed 2026-11-17.**
+
+**Observed.** RT-1114-01 failed on its first attempt in the 2026-11-15 and 2026-11-16 rounds and again at the start of this one: *This model connection must be checked again*. Saving a connection (`connection_changed`) and choosing a model (`model_selection_changed`) mark readiness stale; the composer's own background check re-checks a stale model within a tick, but a send that landed first was refused.
+
+**Fixed.** `require_ready_async` re-checks an observation invalidated by those two owner actions — only on a provider the owner has a saved connection for — exactly as it already re-checks an expired one; a key the provider rejects still refuses, with the fresh answer. A key or endpoint changed any other way, and a profile with no saved connection, still ask the owner.
+
+**Evidence.** `tests/test_model_readiness_rate_limit.py` (three new cases, including no saved connection still refusing); RT-1114-01 and RT-1117-01 pass on their first attempt against Anthropic.
+
 ## FIXED-1486 — A design could not be shown as a presentation (BUG-348, DW-11)
 
 **Severity: Medium. Area: Design / export. Status: Fixed 2026-11-16.**
@@ -3038,6 +3198,22 @@ file you can open. The two capture sets that remain — `screenshots/pages/` and
 | [FIXED-1382](#fixed-1382--linux-filesystem-flags-broke-windows-type-checking) | Low | Platform portability | Fixed 2026-11-09 |
 | [FIXED-1383](#fixed-1383--keyboard-start-evidence-depended-on-retired-receipt-wording) | Low | Beta live tests | Fixed 2026-11-09 |
 | [FIXED-1384](#fixed-1384--model-downloads-checked-redirect-hosts-after-contacting-them) | High | Model and speech downloads | Fixed 2026-11-09 |
+| [FIXED-1502](#fixed-1502--the-context-panel-named-a-memorys-scope-by-its-stored-value) | Low | Chat / context panel | Fixed 2026-11-17 |
+| [FIXED-1501](#fixed-1501--designs-export-formats-were-cut-off-in-the-picker) | Low | Design / export | Fixed 2026-11-17 |
+| [FIXED-1500](#fixed-1500--a-failed-designs-read-left-create-enabled-with-no-size-to-start-from) | Low | Design / errors | Fixed 2026-11-17 |
+| [FIXED-1499](#fixed-1499--accounts-display-name-field-was-empty-with-no-hint-of-the-name-in-use) | Low | Settings / Account | Fixed 2026-11-17 |
+| [FIXED-1498](#fixed-1498--recovery-could-not-be-reached-from-the-task-that-changed-files-qui-l11) | Low | Work › Tasks / Recovery | Fixed 2026-11-17 |
+| [FIXED-1497](#fixed-1497--a-command-policy-test-depended-on-where-the-suite-was-started-2026-10-19-windows-failures) | Low | Tests | Fixed 2026-11-17 |
+| [FIXED-1496](#fixed-1496--a-notification-test-used-a-command-windows-does-not-have-2026-10-19-windows-failures) | Low | Tests | Fixed 2026-11-17 |
+| [FIXED-1495](#fixed-1495--a-small-window-model-still-received-the-full-identity-and-clock-blocks) | Low | Runtime / prompt size | Fixed 2026-11-17 |
+| [FIXED-1494](#fixed-1494--chat-search-found-only-conversations-that-used-the-same-words) | Low | Work › Threads / embeddings | Fixed 2026-11-17 |
+| [FIXED-1493](#fixed-1493--a-design-could-not-be-handed-over-as-a-document-bug-348-dw-11) | Medium | Design / export | Fixed 2026-11-17 |
+| [FIXED-1492](#fixed-1492--bug-360-stayed-open-after-its-legacy-barrier-shipped) | High (documentation) | Memory privacy | Fixed 2026-11-17 |
+| [FIXED-1491](#fixed-1491--chats-context-panel-did-not-list-the-memories-a-turn-was-given-qui-c07) | Low | Chat / context panel | Fixed 2026-11-17 |
+| [FIXED-1490](#fixed-1490--sixteen-more-error-messages-showed-the-servers-raw-text-qui-g06) | Low | Quiet UI / errors | Fixed 2026-11-17 |
+| [FIXED-1489](#fixed-1489--two-live-specs-still-asserted-the-permissions-and-settings-layouts-qui-l06-replaced) | Low | Live test harness | Fixed 2026-11-17 |
+| [FIXED-1488](#fixed-1488--a-refused-first-turn-still-tried-to-save-its-conversation-profile) | Low | Chat | Fixed 2026-11-17 |
+| [FIXED-1487](#fixed-1487--the-first-turn-after-connecting-a-provider-or-choosing-a-model-was-refused) | Medium | Models / readiness | Fixed 2026-11-17 |
 | [FIXED-1486](#fixed-1486--a-design-could-not-be-shown-as-a-presentation-bug-348-dw-11) | Medium | Design / export | Fixed 2026-11-16 |
 | [FIXED-1485](#fixed-1485--a-release-started-before-ci-finished-was-refused-as-if-checks-had-failed) | Low | Release workflow | Fixed 2026-11-16 |
 | [FIXED-1484](#fixed-1484--a-folder-inside-another-repository-was-treated-as-a-repository-2026-10-19-windows-failures) | Medium | Git / Build | Fixed 2026-11-16 |

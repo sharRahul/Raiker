@@ -977,6 +977,17 @@
                     <button type="button" class="btn btn-ghost btn-sm" onclick={() => void stopDelivery(task.task_id)}>Stop sending</button>
                   </span>
                 {/if}
+                <!-- QUI-L11 — Recovery reached from the affected task: a run
+                     that ended (failed, stopped or done) opens the checkpoints
+                     its own conversation recorded, rather than Diagnostics'
+                     whole list. A run still going has nothing to restore yet. -->
+                {#if task.session_id && !ACTIVE_TASK_STATES.includes(task.status)}
+                  <a class="btn btn-ghost btn-sm thread-link" href={`#/checkpoints?session=${encodeURIComponent(task.session_id)}`}
+                     title="Restore files this task changed, from its checkpoints">
+                    <Icon name="checkpoints" size="sm" />
+                    Recovery
+                  </a>
+                {/if}
                 <!-- BUG-299 — every run's attempts, the decision each waited on
                      and the continuation that followed, at one address. -->
                 <a class="btn btn-ghost btn-sm thread-link" href={taskDetailHref(task.task_id)}>
@@ -1016,7 +1027,7 @@
         <ShowMore total={rows.length} shown={Math.min(shownRows, rows.length)} noun="tasks" onmore={() => (shownRows += PAGE_SIZE)} />
       </section>
     {/if}
-    {#if history.length > 0}<section class="history"><h3>Finished work</h3>{#each history as task (task.task_id)}<div class="history-row"><div class="history-main"><a class="history-title" href={taskDetailHref(task.task_id)}>{task.title}</a><p class="outcome">{outcome(task)}</p>{#if task.delivery_state === "failed"}<!-- DEC-12 step 5 — the work's outcome, and separately whether the owner was told. --><p class="delivery-failed" role="status" data-testid="task-delivery-failed"><Icon name="warning" size="sm" /> <strong>Delivery failed.</strong> {task.delivery_detail ?? "The notice that this ended did not arrive."}</p>{/if}{#if deliveries.has(task.task_id)}<!-- QUI-F06 --><p class="delivery-line">Also sent to {deliveries.get(task.task_id)?.channel_name}{deliveries.get(task.task_id)?.last_status === "not_delivered" ? " · the last one was not sent" : ""}</p>{/if}{#if (task.thread_turns ?? 0) > 0}<!-- QUI-F16 --><TaskReceipt taskId={task.task_id} />{/if}</div><Badge variant={taskBadge(task.status)} label={stateLabel(task)} /><span class="when">{relativeTime(task.updated_at)}</span>{#if taskActions(task).includes("run_again")}<button type="button" class="btn btn-ghost btn-sm" onclick={() => again(task)} disabled={busyTask === task.task_id}>{busyTask === task.task_id ? "Filing…" : "Run again"}</button>{/if}</div>{/each}</section>{/if}
+    {#if history.length > 0}<section class="history"><h3>Finished work</h3>{#each history as task (task.task_id)}<div class="history-row"><div class="history-main"><a class="history-title" href={taskDetailHref(task.task_id)}>{task.title}</a><p class="outcome">{outcome(task)}</p>{#if task.delivery_state === "failed"}<!-- DEC-12 step 5 — the work's outcome, and separately whether the owner was told. --><p class="delivery-failed" role="status" data-testid="task-delivery-failed"><Icon name="warning" size="sm" /> <strong>Delivery failed.</strong> {task.delivery_detail ?? "The notice that this ended did not arrive."}</p>{/if}{#if deliveries.has(task.task_id)}<!-- QUI-F06 --><p class="delivery-line">Also sent to {deliveries.get(task.task_id)?.channel_name}{deliveries.get(task.task_id)?.last_status === "not_delivered" ? " · the last one was not sent" : ""}</p>{/if}{#if (task.thread_turns ?? 0) > 0}<!-- QUI-F16 --><TaskReceipt taskId={task.task_id} />{/if}</div><Badge variant={taskBadge(task.status)} label={stateLabel(task)} /><span class="when">{relativeTime(task.updated_at)}</span>{#if task.session_id}<!-- QUI-L11 — Recovery from the affected task. --><a class="btn btn-ghost btn-sm" href={`#/checkpoints?session=${encodeURIComponent(task.session_id)}`} title="Restore files this task changed, from its checkpoints">Recovery</a>{/if}{#if taskActions(task).includes("run_again")}<button type="button" class="btn btn-ghost btn-sm" onclick={() => again(task)} disabled={busyTask === task.task_id}>{busyTask === task.task_id ? "Filing…" : "Run again"}</button>{/if}</div>{/each}</section>{/if}
   {/if}
 
   <!-- The composer docks at the bottom of the page, under the work it files,

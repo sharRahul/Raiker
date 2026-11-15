@@ -7,13 +7,14 @@
    * sits: over the transcript below 1,920 px, beside it from 1,920 px up.
    */
   import Icon from "./Icon.svelte";
-  import type { AgentPlan, TurnSourceView } from "../apiTypes";
+  import type { AgentPlan, RecalledMemory, TurnSourceView } from "../apiTypes";
   import type { ToolCallRow } from "../chatPresentation";
   import type { ComposerAttachment } from "../composerAttachments.svelte";
   import { CONTEXT_TAB_LABELS, contextTabs, type ContextTab } from "../contextPanel";
 
   let {
     files,
+    memories = [],
     plan,
     sources,
     activity,
@@ -21,6 +22,7 @@
     onopensource,
   }: {
     files: ComposerAttachment[];
+    memories?: RecalledMemory[];
     plan: AgentPlan | null;
     sources: TurnSourceView[];
     activity: ToolCallRow[];
@@ -28,7 +30,7 @@
     onopensource?: (source: TurnSourceView) => void;
   } = $props();
 
-  const tabs = $derived(contextTabs({ files, plan, sources, activity }));
+  const tabs = $derived(contextTabs({ files, memories, plan, sources, activity }));
   let chosen = $state<ContextTab | null>(null);
   const current = $derived(chosen !== null && tabs.includes(chosen) ? chosen : (tabs[0] ?? null));
 
@@ -91,6 +93,17 @@
             <li><strong>{file.label}</strong><span>{file.detail}</span></li>
           {/each}
         </ul>
+      {:else if current === "memories"}
+        <p class="tab-note">What Raiker was given from Memory for this conversation. Forgotten ones are gone from here too.</p>
+        <ul class="items">
+          {#each memories as memory (memory.memory_id)}
+            <li>
+              <strong>{memory.text}</strong>
+              <span>{memory.pinned ? "Pinned · " : ""}{memory.scope === "user" || memory.scope === "account" ? "About you" : memory.scope === "project" ? "Project memory" : "Saved memory"}</span>
+            </li>
+          {/each}
+        </ul>
+        <a class="link-btn" href="#/memory">Open Memory</a>
       {:else if current === "plan" && plan !== null}
         <ol class="items">
           {#each plan.steps as step, index (index)}
@@ -136,6 +149,7 @@
     background: var(--surface);
     overflow-y: auto;
   }
+  .tab-note { margin: 0; color: var(--text-2); font-size: var(--text-sm); }
   .context-head { display: flex; align-items: center; justify-content: space-between; }
   .context-head h3 { margin: 0; font-size: var(--text-md); }
   .tabs { display: flex; gap: var(--space-1); border-bottom: 1px solid var(--border); }

@@ -129,7 +129,7 @@
   import { catalogueChoices } from "../modelCatalogue";
   import { COMPOSE_EVENT, takeChatHandoff, type ChatHandoff } from "../chatHandoff";
   import { conversationMatches, matchLabel } from "../conversationSearch";
-  import { filesInUse } from "../contextPanel";
+  import { filesInUse, memoriesInUse } from "../contextPanel";
   import ChatContextPanel from "../components/ChatContextPanel.svelte";
   import { STARTERS } from "../starters";
   import { composerDataLabel, inferenceLocation, inferenceSentence } from "../inferenceLocation";
@@ -428,8 +428,20 @@
     const justStarted = profileFor === null && untrack(() => turns.some((turn) => turn.streaming));
     // A conversation that is opened takes its profile from its own record, read
     // with its transcript (`loadHistory`).
-    if (justStarted) saveProfile(id, untrack(() => conversationProfile));
+    // Saved once the first turn ends, and only if it was stored: a turn
+    // refused before sending leaves no conversation to save it on (the
+    // 2026-11-16 round's 404 noise).
+    if (justStarted) pendingProfileSave = id;
     profileFor = id;
+  });
+  let pendingProfileSave = $state<string | null>(null);
+  $effect(() => {
+    const id = pendingProfileSave;
+    if (id === null || turns.some((turn) => turn.streaming)) return;
+    pendingProfileSave = null;
+    const last = untrack(() => turns[turns.length - 1]);
+    if (id !== sessionId || last?.refusal) return;
+    saveProfile(id, untrack(() => conversationProfile));
   });
   /**
    * The override to send with the next prompt, or null when Careful is chosen
@@ -3118,6 +3130,7 @@
     <div id="chat-context" class="context-slot">
       <ChatContextPanel
         files={contextFiles}
+        memories={memoriesInUse(recall.memories)}
         {plan}
         sources={inspector.turnSources}
         activity={contextActivity}

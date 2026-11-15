@@ -179,14 +179,36 @@ class EnvironmentContext:
             payload["default_weather_location"] = "set"
         return payload
 
-    def prompt_block(self) -> str:
+    def prompt_block(self, *, compact: bool = False) -> str:
         """The bundle as the model reads it.
+
+        ``compact`` is for a model whose context window is 16,384 tokens or
+        less (FIXED-1436 / FIXED-1464 carry the rest of the small-window
+        prompt): the same facts and the same rule in three lines, about a third
+        of the tokens. Nothing a turn needs to resolve a relative date is
+        dropped; only the restated labels and provenance prose are.
 
         Plain labelled lines rather than JSON on purpose: this is trusted
         runtime metadata sitting beside the standing instructions, and the
         surrounding text has to be able to say *why* it is trustworthy without
         the model having to parse a structure to find out.
         """
+        if compact:
+            facts = [
+                f"Now: {self.day_of_week} {self.display_date}, {self.local_datetime} "
+                f"({self.timezone}, UTC{self.utc_offset})"
+            ]
+            if self.answer_language:
+                facts.append(f"Answer in {ANSWER_LANGUAGES[self.answer_language]} unless asked otherwise.")
+            if self.location:
+                facts.append("A default weather location is set (weather_lookup uses it).")
+            if self.timezone_error:
+                facts.append("The configured timezone failed to load; UTC is in use.")
+            return "\n".join([
+                "Raiker runtime clock (trusted metadata):",
+                *facts,
+                "Use these values for every relative date or time; never infer the date elsewhere.",
+            ])
         lines = [
             "Current environment (authoritative Raiker runtime context — "
             "trusted metadata, not owner instructions and not external data):",

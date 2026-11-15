@@ -151,3 +151,75 @@ def test_a_key_or_endpoint_change_and_a_hosted_profile_still_ask_the_owner(tmp_p
     with _pytest.raises(ModelNotReady):
         _asyncio.run(service.require_ready_async("owner", "anthropic-hosted", "claude"))
     assert calls["n"] == before, "nothing was reached on Raiker's own initiative"
+
+
+def _ready_probe(calls: dict[str, int], *, ready: bool = True) -> object:
+    from raiker.models.readiness import ModelReadiness, ModelReadinessKey, ModelReadinessState
+
+    class Probe:
+        def resolve_key(self, owner: str, profile: str, model: str) -> ModelReadinessKey:
+            return ModelReadinessKey(owner, profile, model, "e")
+
+        async def check(self, key: ModelReadinessKey) -> ModelReadiness:
+            calls["n"] += 1
+            state = ModelReadinessState.READY if ready else ModelReadinessState.AUTHENTICATION_FAILED
+            return ModelReadiness(key=key, state=state, checked_at=None, expires_at=None,
+                                  summary="ok" if ready else "The key was rejected.",
+                                  reason_code="model_ready" if ready else "provider_auth_failed",
+                                  remediation="", evidence={})
+
+    return Probe()
+
+
+def test_the_first_turn_after_saving_a_connection_is_checked_not_refused(tmp_path: Path) -> None:
+    """2026-11-16 round: the send landed before the composer's own re-check."""
+    from raiker.auth.vault_key_file import ensure_vault_key
+    from raiker.models.connections import put_model_connection
+    from raiker.models.readiness import ModelReadinessService
+
+    ensure_vault_key(tmp_path)
+    store = SQLiteStore(tmp_path)
+    store.save_configured_model("owner", "anthropic-hosted", "claude")
+    put_model_connection(store, "owner", "anthropic-hosted", {"api_key": "x"})
+    calls = {"n": 0}
+    service = ModelReadinessService(store, probe=_ready_probe(calls))  # type: ignore[arg-type]
+    asyncio.run(service.check("owner", "anthropic-hosted", "claude", "e"))
+    store.invalidate_model_readiness("owner", "anthropic-hosted", reason_code="connection_changed")
+    ready = asyncio.run(service.require_ready_async("owner", "anthropic-hosted", "claude"))
+    assert ready.ready
+    assert calls["n"] == 2
+
+
+def test_a_connection_change_without_a_saved_connection_still_refuses(tmp_path: Path) -> None:
+    """Clearing a connection also writes `connection_changed`; nothing is reached."""
+    import pytest
+
+    from raiker.models.readiness import ModelNotReady, ModelReadinessService
+
+    store = SQLiteStore(tmp_path)
+    store.save_configured_model("owner", "anthropic-hosted", "claude")
+    calls = {"n": 0}
+    service = ModelReadinessService(store, probe=_ready_probe(calls))  # type: ignore[arg-type]
+    asyncio.run(service.check("owner", "anthropic-hosted", "claude", "e"))
+    store.invalidate_model_readiness("owner", "anthropic-hosted", reason_code="connection_changed")
+    with pytest.raises(ModelNotReady):
+        asyncio.run(service.require_ready_async("owner", "anthropic-hosted", "claude"))
+    assert calls["n"] == 1
+
+
+def test_choosing_a_model_then_sending_is_checked_not_refused(tmp_path: Path) -> None:
+    """RT-1114-01 picks Haiku and sends at once; the choice invalidated readiness."""
+    from raiker.auth.vault_key_file import ensure_vault_key
+    from raiker.models.connections import put_model_connection
+    from raiker.models.readiness import ModelReadinessService
+
+    ensure_vault_key(tmp_path)
+    store = SQLiteStore(tmp_path)
+    store.save_configured_model("owner", "anthropic-hosted", "claude")
+    put_model_connection(store, "owner", "anthropic-hosted", {"api_key": "x"})
+    calls = {"n": 0}
+    service = ModelReadinessService(store, probe=_ready_probe(calls))  # type: ignore[arg-type]
+    asyncio.run(service.check("owner", "anthropic-hosted", "claude", "e"))
+    store.invalidate_model_readiness("owner", "anthropic-hosted", reason_code="model_selection_changed")
+    assert asyncio.run(service.require_ready_async("owner", "anthropic-hosted", "claude")).ready
+    assert calls["n"] == 2

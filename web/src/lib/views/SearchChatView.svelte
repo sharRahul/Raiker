@@ -404,7 +404,7 @@
                   <span class="meta"
                     >{session.turn_count} turn{session.turn_count === 1 ? "" : "s"} · {relativeTime(
                       session.updated_at,
-                    )} · {session.match_turn_id ? "Open the match" : "Open"} →</span
+                    )}{session.match_kind === "meaning" ? " · Related by meaning" : ""} · {session.match_turn_id ? "Open the match" : "Open"} →</span
                   >
                   {#if session.match_snippet}<span class="matched">“{session.match_snippet}”</span
                     >{/if}

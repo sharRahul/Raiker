@@ -6177,6 +6177,7 @@ export type SessionView = {
   project_id: string | null;
   match_snippet: string;
   match_turn_id: string;
+  match_kind: string;
   archived: boolean;
   archived_at: string | null;
   origin: string;

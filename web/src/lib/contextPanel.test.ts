@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { contextTabs, filesInUse } from "./contextPanel";
+import { contextTabs, filesInUse, memoriesInUse } from "./contextPanel";
 import type { ToolCallRow } from "./chatPresentation";
 import type { TurnSourceView } from "./apiTypes";
 
@@ -29,5 +29,14 @@ describe("filesInUse", () => {
   it("lists each file once across turns", () => {
     const image = { kind: "image" as const, label: "chart.png", detail: "PNG", attachmentId: "att_2" };
     expect(filesInUse([[FILE], [FILE, image]])).toEqual([FILE, image]);
+  });
+});
+
+describe("memoriesInUse", () => {
+  it("lists each recalled memory once, in first-recalled order", () => {
+    const a = { memory_id: "a", turn_id: "t1", text: "A", scope: "user", pinned: false };
+    const b = { memory_id: "b", turn_id: "t1", text: "B", scope: "project", pinned: false };
+    expect(memoriesInUse([a, b, { ...a, turn_id: "t2" }]).map((m) => m.memory_id)).toEqual(["a", "b"]);
+    expect(contextTabs({ files: [], memories: [a], plan: null, sources: [], activity: [] })).toEqual(["memories"]);
   });
 });

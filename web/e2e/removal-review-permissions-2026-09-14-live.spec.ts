@@ -30,6 +30,10 @@ import { LIVE_BASE as BASE } from "./live";
 
 const SHOTS = "../../output/playwright/2026-09-14-permissions-overhaul";
 
+// QUI-L06 (2026-10-21) replaced the stacked registry with a category rail, a
+// list per category and one detail pane. The assertions below are the same
+// REM-PERM rules on that layout: closed rows still state availability and
+// behaviour, Git is still one group, the reference gates still decide nothing.
 test("Permissions leads with posture and actions, and keeps the table as evidence", async ({
   page,
 }) => {
@@ -41,80 +45,68 @@ test("Permissions leads with posture and actions, and keeps the table as evidenc
 
   await signInAsOwner(page, BASE);
   await page.goto(`${BASE}/#/capabilities`);
+  const rail = page.getByRole("navigation", { name: "Permission categories" });
+  await expect(rail).toBeVisible({ timeout: 60_000 });
 
-  const registry = page.getByRole("region", { name: "All permissions" });
-  await expect(registry).toBeVisible({ timeout: 60_000 });
-
-  // One page title. This view carried a second `<h1>` reading "Permissions"
-  // directly under the one in the top bar — the only view in the product that
-  // did, and the first thing that made the page look unfinished.
+  // One page title, in the top bar only.
   await expect(page.getByRole("heading", { level: 1, name: "Permissions" })).toHaveCount(1);
 
-  // One posture summary, and the counts under it are the page's one status
-  // filter rather than four page-width tiles plus a select further down.
-  const posture = page.getByRole("region", { name: "Permission posture" });
-  await expect(posture).toBeVisible();
-  await expect(posture.getByText(/permissions are available to Raiker on this account/)).toBeVisible();
-  const status = page.getByRole("group", { name: "Filter permissions by status" });
-  await expect(status.getByRole("button", { name: /All/ })).toBeVisible();
+  // One posture sentence, and the rail's counts are the page's one filter.
+  const main = page.getByRole("main");
+  await expect(main.getByText(/^\d+ of \d+ permissions are available to Raiker on this account/)).toBeVisible();
   await expect(page.getByRole("combobox", { name: "Permission status" })).toHaveCount(0);
+  await expect(rail.getByRole("button", { name: /^Files and code \d+$/ })).toBeVisible();
   await capture(page, `${SHOTS}/permissions-overhauled.png`);
 
-  // REM-PERM-01 — the read-only authority table is evidence, and reads after
-  // the controls it summarises rather than above them.
-  const authority = page.locator("details.authority-disclosure");
-  await expect(authority).toBeVisible();
-  const registryBox = await registry.boundingBox();
-  const authorityBox = await authority.boundingBox();
-  expect(authorityBox!.y).toBeGreaterThan(registryBox!.y);
-  await authority.getByText("How your permissions apply").click();
-  await expect(page.getByRole("heading", { name: /Owner sets the boundary/ })).toBeVisible();
-  await capture(page, `${SHOTS}/permissions-authority-below.png`, authority);
-
-  // REM-PERM-03 — the row answers both questions closed, and explains itself
-  // open, in one shape rather than four stacked paragraphs.
-  const shell = registry.locator(".cap.card").filter({ hasText: "Shell commands" }).first();
-  await expect(shell.locator(".cap-summary")).toHaveText(/^(On|Off) · (Ask me|Allow|Automatic|Never)$/);
-  await shell.locator("button.cap-toggle").click();
-  await expect(shell.getByText("Can Raiker use this?")).toBeVisible();
-  await expect(shell.getByText("When Raiker wants to use it")).toBeVisible();
+  // REM-PERM-03 — a closed row answers both questions; its detail explains
+  // itself in one shape.
+  await rail.getByRole("button", { name: /^Advanced/ }).click();
+  const shellRow = page.getByRole("option", { name: /^Shell commands / }).first();
+  await expect(shellRow).toHaveAccessibleName(/^Shell commands (On|Off) · (Ask me|Allow|Automatic|Never)$/);
+  await shellRow.click();
+  const shell = page.getByRole("article", { name: "Shell commands" });
+  await expect(shell.getByRole("heading", { name: "Can Raiker use this?" })).toBeVisible();
+  await expect(shell.getByRole("heading", { name: "When Raiker wants to use it" })).toBeVisible();
   await expect(shell.getByText(/Raiker (may|cannot) use this on this account/)).toBeVisible();
   await capture(page, `${SHOTS}/permissions-row-detail.png`, shell);
 
-  // Git is one group, not three. A branch, a commit, a push and the account the
-  // push authenticates to were filed under Workspace, Network and Connectors.
-  const git = registry.locator(".cap-list").filter({ hasText: "GIT" }).first();
-  for (const label of ["Git writes", "Git push", "GitHub connector"]) {
-    await expect(git.getByText(label, { exact: true })).toBeVisible();
-  }
-  await capture(page, `${SHOTS}/permissions-git-grouped.png`, git);
+  // REM-PERM-01 — the read-only authority table is evidence, below the list
+  // of controls it summarises.
+  const list = page.getByRole("listbox", { name: "Advanced permissions" });
+  const authority = page.getByText("How your permissions apply", { exact: true });
+  const listBox = await list.boundingBox();
+  const authorityBox = await authority.boundingBox();
+  expect(authorityBox!.y).toBeGreaterThan(listBox!.y);
+  await authority.click();
+  await expect(page.getByRole("heading", { name: /Owner sets the boundary/ })).toBeVisible();
 
-  // And nothing is left in the fallback bucket, whose name means "nobody filed
-  // this": both execution destinations have a real home.
-  await expect(registry.getByText("OTHER TOOLS")).toHaveCount(0);
-
-  // GEP-04's second answer: the gates this page does not decide are read-only
-  // reference, with no mode control and no selection box.
+  // GEP-04 — the gates this page does not decide are read-only reference, with
+  // no mode control and no selection box.
   const reference = page.locator("details.not-decided");
-  await expect(reference).toBeVisible();
-  await reference.getByText("Not decided here").click();
-  await expect(reference.getByText("Container execution", { exact: true })).toBeVisible();
-  await expect(reference.getByText("Processes", { exact: true })).toBeVisible();
+  await reference.locator("summary").click();
   await expect(reference.getByRole("group", { name: /when Raiker wants to use/i })).toHaveCount(0);
   await expect(reference.getByRole("checkbox")).toHaveCount(0);
-  // Every one of them names what really governs it, or why nothing runs.
-  await expect(reference.getByText(/Governed elsewhere/).first()).toBeVisible();
-  await expect(reference.getByText(/No route yet/).first()).toBeVisible();
+  await expect(reference.getByText(/Governed elsewhere|No route yet/).first()).toBeVisible();
   await capture(page, `${SHOTS}/permissions-not-decided-here.png`, reference);
 
-  // The filter chips really filter, and the count line follows them.
-  await status.getByRole("button", { name: /Available/ }).click();
-  await expect(registry.getByText(/^Showing \d+ of \d+ permissions$/)).toBeVisible();
+  // Git is one group, not three: a branch, a commit, a push and the account the
+  // push authenticates to sit together under Files and code.
+  await rail.getByRole("button", { name: /^Files and code/ }).click();
+  const files = page.getByRole("listbox", { name: "Files and code permissions" });
+  for (const label of ["Git writes", "Git push", "GitHub connector"]) {
+    await expect(files.getByRole("option", { name: new RegExp(`^${label} `) })).toBeVisible();
+  }
+  await capture(page, `${SHOTS}/permissions-git-grouped.png`, files);
+  // And nothing is left in a fallback bucket whose name means "nobody filed this".
+  await expect(rail.getByRole("button", { name: /Other/ })).toHaveCount(0);
 
-  // And the phone width keeps the whole page reachable without a sideways
-  // scroll, which is where fifty-one rows of four buttons would show it first.
+  // Search filters the list.
+  await page.getByRole("searchbox", { name: "Search permissions" }).fill("Git push");
+  await expect(files.getByRole("option")).toHaveCount(1);
+
+  // A phone width keeps the page reachable without a sideways scroll.
   await page.setViewportSize({ width: 390, height: 844 });
-  await expect(registry).toBeVisible();
+  await expect(rail).toBeVisible();
   expect(
     await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
   ).toBe(true);
@@ -155,6 +147,8 @@ test("Privacy is an inventory of what is kept and what can leave (REM-SET-PRIVAC
   const kept = page.getByRole("region", { name: "Kept on this machine" });
   await expect(kept).toBeVisible({ timeout: 60_000 });
   await expect(kept.getByRole("link", { name: "Memory" })).toHaveAttribute("href", "#/memory");
+  // The backup caveat sits in the *Forgetting and backups* disclosure (QUI-L03).
+  await kept.getByText("Forgetting and backups", { exact: true }).click();
   await expect(kept.getByText(/not from a backup already written/)).toBeVisible();
 
   const outbound = page.getByRole("region", { name: "What leaves this computer" });
@@ -164,6 +158,6 @@ test("Privacy is an inventory of what is kept and what can leave (REM-SET-PRIVAC
   await expect(
     outbound.getByText(/^(On|Off) · (Ask me|Allow|Automatic|Never)$/).first(),
   ).toBeVisible({ timeout: 30_000 });
-  await expect(outbound.getByText(/as much of the conversation as the turn needs/)).toBeVisible();
+  await expect(outbound.getByText(/as much of the conversation as the turn needs/).first()).toBeVisible();
   await capture(page, `${SHOTS}/privacy-inventory.png`);
 });

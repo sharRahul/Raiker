@@ -31875,6 +31875,11 @@
             "title": "Created At",
             "type": "string"
           },
+          "match_kind": {
+            "default": "",
+            "title": "Match Kind",
+            "type": "string"
+          },
           "match_snippet": {
             "default": "",
             "title": "Match Snippet",

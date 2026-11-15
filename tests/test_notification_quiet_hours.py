@@ -11,6 +11,8 @@ same path.
 
 from __future__ import annotations
 
+import shlex
+import sys
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -247,7 +249,9 @@ def test_the_os_command_obeys_the_stored_desktop_decision(
     headers, owner = _owner(client)
     _save(client, headers, OVERNIGHT)
     store = SQLiteStore(client.app.state.workspace_root)  # type: ignore[attr-defined]
-    monkeypatch.setenv("RAIKER_OS_NOTIFY_CMD", "true")
+    # A notifier every host has: Windows has no `true` (2026-10-19 Windows run).
+    # Single-quoted, so a Windows path keeps its backslashes through shlex.
+    monkeypatch.setenv("RAIKER_OS_NOTIFY_CMD", f"{shlex.quote(sys.executable)} -c pass")
     held = store.insert_notification(
         principal_id=owner, kind="task_paused", title="Paused", body="x", now=_at("2026-10-05T23:30:00+01:00")
     )

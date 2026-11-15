@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { failure } from "../errorCopy";
   /**
    * Build's third pane, as the object of work.
    *
@@ -44,7 +45,7 @@
   import PatchReview from "./PatchReview.svelte";
   import PullRequestReceipts from "./PullRequestReceipts.svelte";
   import RecentCommits from "./RecentCommits.svelte";
-  import { api, ApiError } from "../api";
+  import { api } from "../api";
   import type {
     CodeRepoChangesView,
     CodeRepoFileView,
@@ -123,7 +124,7 @@
         // read is not evidence the working tree is clean, and "no changes" is
         // the one thing this pane must never say without having looked.
         changesError =
-          error instanceof ApiError ? error.message : "The working tree could not be read, so the change list may be out of date. Choose Refresh to read it again.";
+          failure("The working tree could not be read", "The change list may be out of date; nothing was changed.", "Choose Refresh to read it again.", error);
       })
       .finally(() => {
         if (!cancelled) changesLoading = false;
@@ -151,7 +152,7 @@
       .catch((error) => {
         if (cancelled) return;
         file = null;
-        fileError = error instanceof ApiError ? error.message : "That file could not be read; nothing was changed. Choose it again, or refresh the file list.";
+        fileError = failure("That file could not be read", "Nothing was changed.", "Choose it again, or refresh the file list.", error);
       })
       .finally(() => {
         if (!cancelled) fileLoading = false;

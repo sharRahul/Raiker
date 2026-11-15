@@ -1079,7 +1079,15 @@ async def search_chat_history(
     request: Request,
     auth_data: tuple[ApiSession, Principal] = Depends(_auth),
 ) -> list[dict[str, Any]]:
-    return serialize_dto(_service(request).search_sessions(q, auth_data[1].delegated_by_user_id))
+    from raiker.api.routes_goals import _meaning_embedder
+
+    # Meaning is added only where the owner's embedding model may run.
+    embed = _meaning_embedder(
+        SQLiteStore(request.app.state.workspace_root), auth_data[0].principal_id, purpose="chat-search"
+    )
+    return serialize_dto(
+        _service(request).search_sessions(q, auth_data[1].delegated_by_user_id, embed=embed)
+    )
 
 
 @router.get("/api/sessions/{session_id}/turns/{turn_id}/outcome")

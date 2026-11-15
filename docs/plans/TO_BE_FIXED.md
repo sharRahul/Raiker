@@ -238,10 +238,11 @@ LC-03/LC-04 and `web-access-turn-control-live`. **2026-11-15 — reduced again**
 `b9-repository-code-map`, `gcr-provider-validation-and-workspace`,
 `memory-restart-provider-composer`, `round-2026-09-04-priority` and
 `round-2026-09-15-typed-and-authority` use the rail helpers (type-checked, not
-yet re-run live). Two still assert the old layout itself and need a
-case-by-case rewrite: `release-readiness-2026-09-13` (its *Common permissions*
-region and inline mode buttons) and `removal-review-permissions-2026-09-14`
-(its closed-row summary and grouped *GIT* list). LC-03's first check expects *On by connection*,
+yet re-run live). **2026-11-17 — the last two rewritten**
+([FIXED-1489](FIXED_ITEMS.md#fixed-1489--two-live-specs-still-asserted-the-permissions-and-settings-layouts-qui-l06-replaced)):
+`release-readiness-2026-09-13` and `removal-review-permissions-2026-09-14`
+assert the same rules on the rail and pass live (10/10). No live spec asserts
+the old Permissions layout any more. LC-03's first check expects *On by connection*,
 which holds only on a workspace where the gate was never turned on by hand.
 
 ## Windows high-DPI window restoration
@@ -322,12 +323,12 @@ Evidence: `screenshots/not-working/` (defects),
 
 | ID | Severity | Area | Status |
 |---|---|---|---|
-| [BUG-360](#bug-360--legacy-answers-copied-from-stale-history-have-no-memory-provenance) | High | Memory privacy | Open — indirect legacy copies lack provenance; beta blocker |
+| [BUG-360](#bug-360--legacy-answers-copied-from-stale-history-have-no-memory-provenance) | High | Memory privacy | Code closed 2026-11-17 ([FIXED-1492](FIXED_ITEMS.md#fixed-1492--bug-360-stayed-open-after-its-legacy-barrier-shipped)): legacy context is withheld once a memory changes; the owner's retained reproducer still needs one re-run |
 | [BUG-194](#bug-194--the-governed-shell-has-an-os-boundary-but-no-interactive-background-or-remote-execution) | Low | Shell / sandbox / recovery | Open — rechecked 2026-10-19: Docker Desktop and Ollama are reachable on this host, but the mandatory live bypass/revocation/credential proof and production signing anchor remain |
 | [BUG-248](#bug-248--twenty-seven-live-specs-still-sign-in-inside-a-test-body) | Low | Live test harness | Open remainder — reduced again 2026-09-29 by four (`composer-parity-and-turn-honesty`, `fts5-mem03-bug194`, `mem04-bug194-observations`, `bug-37-39-40-41`), each re-run live and brought up to the product; converting them found [FIXED-632](FIXED_ITEMS.md#fixed-632--an-approval-card-covered-settings-save-changes) and [FIXED-633](FIXED_ITEMS.md#fixed-633--choosing-the-default-density-closed-the-panel-it-was-chosen-in). Ten sign in on their own: three must, and seven provider scenarios can now be converted one at a time with reachable providers |
 | [BUG-287](#bug-287--the-image-provider-round-trip-is-unverified-against-a-real-provider) | Medium | Design / image runtime / live evidence | Open remainder — reduced 2026-10-18: real OpenAI generation, edit, four-result variation, lineage, permission-off refusal and empty-allowlist refusal passed; a source-image provider refusal and a live research-reference **Sent with** check remain |
 | [BUG-339](#bug-339--the-issue-to-pull-request-routine-has-a-template-and-no-runner) | Low | Tasks / routines | Open remainder — reduced 2026-10-18 ([FIXED-950](FIXED_ITEMS.md#fixed-950--the-issue-to-pull-request-routine-can-now-be-scheduled-as-a-build-task-bug-339-reduced)): the template schedules a governed Build task from Settings → GitHub; RR-40 live evidence against a consented repository remains; 2026-10-19 the pull request receipt ([FIXED-974](FIXED_ITEMS.md#fixed-974--a-pull-request-raiker-opened-was-known-only-from-the-create-response-br-12)) and the task's repository binding ([FIXED-976](FIXED_ITEMS.md#fixed-976--a-scheduled-build-task-ran-in-whatever-repository-build-was-pointed-at-br-02)) the run will read back are in place |
-| [BUG-348](#bug-348--the-design-canvas-is-edited-by-keyboard-and-inspector-only-and-five-dw-requirements-are-still-partial) | Medium | Design / composition | Open remainder — reduced 2026-10-20 ([FIXED-998](FIXED_ITEMS.md#fixed-998--a-layer-could-only-be-moved-with-the-arrow-keys-dw-02-bug-348) to [FIXED-1010](FIXED_ITEMS.md#fixed-1010--after-a-restart-the-design-agent-said-no-chat-model-was-connected)): pointer editing, imports, components, notes, vector PDF and proposal receipts ship; 2026-11-15 selecting inside a group on the canvas ([FIXED-1457](FIXED_ITEMS.md#fixed-1457--a-layer-inside-a-group-could-not-be-selected-on-the-canvas-bug-348-dw-02)); brand-guide import, system-level components and presentation export remain |
+| [BUG-348](#bug-348--the-design-canvas-is-edited-by-keyboard-and-inspector-only-and-five-dw-requirements-are-still-partial) | Medium | Design / composition | Open remainder — reduced 2026-10-20 ([FIXED-998](FIXED_ITEMS.md#fixed-998--a-layer-could-only-be-moved-with-the-arrow-keys-dw-02-bug-348) to [FIXED-1010](FIXED_ITEMS.md#fixed-1010--after-a-restart-the-design-agent-said-no-chat-model-was-connected)): pointer editing, imports, components, notes, vector PDF and proposal receipts ship; 2026-11-15 selecting inside a group on the canvas ([FIXED-1457](FIXED_ITEMS.md#fixed-1457--a-layer-inside-a-group-could-not-be-selected-on-the-canvas-bug-348-dw-02)); presentation and Word export since 2026-11-17 (FIXED-1486, FIXED-1493); brand-guide import and system-level components remain |
 | [BUG-355](#bug-355--goals-ship-without-intake-from-chat-validator-backed-criteria-or-a-restart-scenario) | Medium | Goals / personal agent | Open remainder of PA-D01 — 2026-11-15 a goal starts from a Build answer ([FIXED-1456](FIXED_ITEMS.md#fixed-1456--a-goal-could-be-started-from-chat-but-not-from-build-bug-355)); the first slice shipped 2026-10-20 ([FIXED-1039](FIXED_ITEMS.md#fixed-1039--an-outcome-could-live-only-in-a-chat-transcript-there-was-no-durable-goal-goal-01-pa-d01) to [FIXED-1048](FIXED_ITEMS.md#fixed-1048--a-goal-had-no-budget-across-its-steps-goal-10-pa-d01)) |
 | [BUG-356](#bug-356--execution-profiles-govern-goal-steps-only-and-cover-one-data-class) | Medium | Execution profiles / models / data handling | Open remainder of PA-D02 — 2026-11-15 Chat and Build are held to the profile and a custom endpoint on this machine is local ([FIXED-1454](FIXED_ITEMS.md#fixed-1454--a-custom-endpoint-on-this-machine-counted-as-hosted-bug-356), [FIXED-1455](FIXED_ITEMS.md#fixed-1455--execution-profiles-bounded-goal-steps-and-nothing-else-bug-356)); the first slice shipped 2026-10-20 ([FIXED-1049](FIXED_ITEMS.md#fixed-1049--there-was-nowhere-to-say-where-a-goals-work-may-run-prof-01-pa-d02) to [FIXED-1051](FIXED_ITEMS.md#fixed-1051--changing-the-boundary-would-have-applied-silently-to-work-in-flight-prof-03-pa-d02)) |
 | [BUG-359](#bug-359--remote-access-is-verified-live-on-linux-only-and-has-five-known-limits) | Low | Host / remote access | Open remainder of BUG-347/BUG-358 — remote access shipped 2026-10-26 ([FIXED-1266](FIXED_ITEMS.md#fixed-1266--a-proxy-that-sent-no-forwarding-header-was-still-read-as-local-bug-347-review) to [FIXED-1273](FIXED_ITEMS.md#fixed-1273--security-settings-showed-their-defaults-as-the-accounts-state-while-loading-found-live)); live runs on Linux only; 2026-11-15 four of the five limits and the cosmetic notes closed ([FIXED-1446](FIXED_ITEMS.md#fixed-1446--the-lock-screen-on-another-device-said-on-this-computer-bug-359) to [FIXED-1451](FIXED_ITEMS.md#fixed-1451--every-request-through-a-reverse-proxy-shared-one-rate-limit-bucket-bug-359)) |
@@ -338,7 +339,17 @@ The open defects below retain their original reproductions and remediation contr
 
 ## BUG-360 — Legacy answers copied from stale history have no memory provenance
 
-**Severity: High. Area: Memory privacy. Status: Open 2026-11-10. Beta blocker.**
+**Severity: High. Area: Memory privacy. Status: Code closed 2026-11-17; one
+owner re-run remains.**
+
+**2026-11-17 — reconciled** ([FIXED-1492](FIXED_ITEMS.md#fixed-1492--bug-360-stayed-open-after-its-legacy-barrier-shipped)).
+The provenance graph and the conservative legacy barrier asked for below
+shipped in `c2e7871` on 2026-11-10 with tests and were never recorded: once any
+memory is forgotten, corrected, archived, expired or purged, a conversation
+whose memory context predates complete provenance is withheld from ambient
+recall, clean history stays available and transcripts are never erased. What
+remains is one run of the retained reproducer (`output/beta-memory-final`, the
+owner's Windows workspace) against this build, read back in a new chat.
 
 FIXED-1387 excludes source conversations and answers linked by `turn_recalls`.
 An older diagnostic workspace still reproduces a third answer that had already
@@ -816,7 +827,7 @@ receipts, and passed 7/7 live. What is still a gap against
 | Requirement | What exists | What is missing |
 |---|---|---|
 | DW-06 system sources and components | Tokens files (CSS, JSON), a picture's colours, typed values; components kept in their document | Importing from a brand-guide document (PDF); components shared through a design system across documents |
-| DW-11 formats | PNG, raster PDF, vector PDF, SVG, JSON, and a PowerPoint deck of every frame (2026-11-16, [FIXED-1486](FIXED_ITEMS.md#fixed-1486--a-design-could-not-be-shown-as-a-presentation-bug-348-dw-11)) | Document formats (DOCX); slides as editable shapes rather than pictures; vector PDF text beyond Windows-1252 (counted and written as `?`) |
+| DW-11 formats | PNG, raster PDF, vector PDF, SVG, JSON, a PowerPoint deck of every frame (2026-11-16, [FIXED-1486](FIXED_ITEMS.md#fixed-1486--a-design-could-not-be-shown-as-a-presentation-bug-348-dw-11)) and a Word document with each frame's text as editable paragraphs (2026-11-17, [FIXED-1493](FIXED_ITEMS.md#fixed-1493--a-design-could-not-be-handed-over-as-a-document-bug-348-dw-11)) | Slides as editable shapes rather than pictures; vector PDF text beyond Windows-1252 (counted and written as `?`) |
 
 The canvas also draws text in the browser's font while PNG and both PDFs use the
 host's raster font (recorded with each export), so a line can break in a
@@ -938,8 +949,8 @@ check that failed.
 
 The focused regression set, documentation contracts, Ruff, mypy, and web checks passed. The complete local Python suite reached 100% but reported five failures on this Windows host:
 
-- `tests/test_bug_308_code_placement.py::TestTheCommandServiceNeverRunsHostCodeUnasked::test_an_ordinary_command_needs_nothing_new` (`pwd` ended in `command_launch_failed`)
-- `tests/test_command_workspace_is_not_global.py::test_no_workspace_still_means_the_process_directory` (expected `SandboxError` was not raised)
+- `tests/test_bug_308_code_placement.py::TestTheCommandServiceNeverRunsHostCodeUnasked::test_an_ordinary_command_needs_nothing_new` (`pwd` ended in `command_launch_failed`) — the test no longer exists under that name; Windows has no `pwd` executable, and a command now needs the enforced native sandbox, so this is an environment case
+- ~~`tests/test_command_workspace_is_not_global.py::test_no_workspace_still_means_the_process_directory`~~ — fixed 2026-11-17 ([FIXED-1497](FIXED_ITEMS.md#fixed-1497--a-command-policy-test-depended-on-where-the-suite-was-started-2026-10-19-windows-failures)): the run was started from a folder containing the temporary directory
 - `tests/test_git_push_path.py::TestProposalFailsClosed::test_not_a_repository` (returned `push_egress_denied` instead of `not_a_git_repository`)
 - `tests/test_git_write_path.py::TestBranchProposal::test_a_non_repository_fails_closed` (returned no `error` object)
 - `tests/test_notification_quiet_hours.py::test_the_os_command_obeys_the_stored_desktop_decision` (configured `true` notifier returned `failed` instead of `sent`)
@@ -948,7 +959,9 @@ The focused regression set, documentation contracts, Ruff, mypy, and web checks 
 folder inside another repository was judged as that repository — fixed in
 [FIXED-1484](FIXED_ITEMS.md#fixed-1484--a-folder-inside-another-repository-was-treated-as-a-repository-2026-10-19-windows-failures).
 The notifier failure is the Windows host having no `true` command (an
-environment assumption in the test). The rest are not closed by this pass. They need follow-up investigation to determine which are Windows-environment assumptions and which are regressions in command, Git proposal, or notification behavior.
+environment assumption in the test), fixed 2026-11-17
+([FIXED-1496](FIXED_ITEMS.md#fixed-1496--a-notification-test-used-a-command-windows-does-not-have-2026-10-19-windows-failures)).
+All five are now explained; a Windows full-suite re-run should confirm. The rest are not closed by this pass. They need follow-up investigation to determine which are Windows-environment assumptions and which are regressions in command, Git proposal, or notification behavior.
 
 ## 2026-10-21 Quiet UI round 2 — what is still open
 
@@ -970,9 +983,10 @@ These parts of the same items are not done:
 * **QUI-L11 — the moves out of Diagnostics.** Overview as issue cards and
   Recovery shipped 2026-10-25 ([FIXED-1170](FIXED_ITEMS.md#fixed-1170--diagnostics-opened-on-seven-tiles-reading-ready-and-0-qui-l11),
   [FIXED-1171](FIXED_ITEMS.md#fixed-1171--restoring-a-checkpoint-was-the-dominant-button-and-named-little-qui-l11)).
-  Sessions as Work › Threads, activity inside each task and project, and
-  Recovery reached from the affected task are not built; Diagnostics keeps its
-  six tabs until they are.
+  Recovery reached from the affected task shipped 2026-11-17
+  ([FIXED-1498](FIXED_ITEMS.md#fixed-1498--recovery-could-not-be-reached-from-the-task-that-changed-files-qui-l11)).
+  Sessions as Work › Threads and activity inside each task and project are not
+  built; Diagnostics keeps its six tabs until they are.
 * **Older live specs still drive the pages the layout round replaced.** About
   70 specs under `web/e2e/*-live.spec.ts` (written before 2026-10-21) open
   Models by its old tabs, Extensions tabs, Permissions rows that opened in
@@ -984,8 +998,11 @@ These parts of the same items are not done:
   they are run again (related to BUG-248).
 * **QUI-W02 and QUI-H02 — the companion.** Its pick in Hello and its picture on
   a first-day Home wait for the companion's art (QUI-V05).
-* **QUI-C04 — *More*** (schedule, research depth, answer style) is not built.
-  **Run in background** sits in Tools until it is. The profile chip on both
+* **QUI-C04 — *More*** — decided 2026-11-17: the composer's **Tools** menu is
+  *More*. **Schedule it** and **Run in background** are already there and answer
+  style is in Settings › General; a second menu would add a control and nothing
+  it could do. Research depth is the one item not built, and it waits for a
+  research mode that has depths to choose between. The profile chip on both
   composers shipped 2026-10-22 ([FIXED-1130](FIXED_ITEMS.md#fixed-1130--a-conversation-could-not-say-how-careful-raiker-should-be-qui-p02)).
 
 ## Quiet UI permissions and approvals — open items (document closed 2026-11-08)
@@ -1401,6 +1418,14 @@ Rewind and the GitHub repository connector).
 
 ## Composer agent personas for `@`
 
+**2026-11-17 — the design is accepted** in
+[ADR-0005](../adr/ADR-0005-composer-personas.md): a persona is owner-authored
+instructions, an optional default model and an optional tool ceiling, applied
+as one more narrowing override (it can never widen a turn); `@` lists personas
+and files in two groups and a chosen persona is a chip, not prompt text; the
+transcript records the persona and a hash of its instructions. Not built; the
+ADR names three build slices.
+
 **Decided 2026-11-07, not built.** The owner chose that `@` in the composer
 routes a prompt to a named specialist agent (for example `@DataAnalyst`,
 `@Copywriter`), as part of the composer control deck in
@@ -1445,9 +1470,11 @@ twelve-tool core, about 2,600 schema tokens instead of 5,500
 2026-11-15: such a window also gets short standing instructions and half the
 Memory Brief (Chat 1,017 → 276 tokens, Build 930 → 257, Design 1,248 → 507;
 [FIXED-1464](FIXED_ITEMS.md#fixed-1464--a-small-window-model-spent-a-sixth-of-its-window-on-raikers-standing-instructions)).
+2026-11-17: the identity and clock blocks have a short form too (clock 133 → 49
+tokens, identity 117 → 57;
+[FIXED-1495](FIXED_ITEMS.md#fixed-1495--a-small-window-model-still-received-the-full-identity-and-clock-blocks)).
 Still open: measure a whole real turn's prompt on a small local model (no
-local model runs in this sandbox), and the identity and clock blocks, which are
-unchanged.
+local model runs in this sandbox).
 
 ## AMD (Vulkan) owner-machine run (MD-2) — moved to beta.2
 
@@ -1706,7 +1733,9 @@ embedding space and keeps it current in the background. Still open:
   schemas by similarity to the turn, which would cut Raiker's ~9,500-token
   prompt; related-file suggestions in Build; near-duplicate memory
   detection by meaning shipped 2026-11-15 ([FIXED-1466](FIXED_ITEMS.md#fixed-1466--a-proposed-memory-that-repeated-an-approved-one-in-other-words-looked-new));
-  thread and Library search by meaning;
+  thread search by meaning shipped 2026-11-17
+  ([FIXED-1494](FIXED_ITEMS.md#fixed-1494--chat-search-found-only-conversations-that-used-the-same-words);
+  not yet qualified with a real embedding model); Library search by meaning;
   routing a task to a project by similarity. Each is a separate change.
 
 ## 2026-11-15 round — found, not fixed
@@ -1736,25 +1765,56 @@ embedding space and keeps it current in the background. Still open:
 
 ## 2026-11-16 round — found, not fixed
 
-* **The first Chat turn after connecting a provider can read *This model
-  connection must be checked again*.** Saving a connection invalidates its
+* ~~**The first Chat turn after connecting a provider can read *This model
+  connection must be checked again*.**~~ Closed 2026-11-17
+  ([FIXED-1487](FIXED_ITEMS.md#fixed-1487--the-first-turn-after-connecting-a-provider-or-choosing-a-model-was-refused));
+  choosing the model was the second invalidation. Saving a connection invalidates its
   readiness; the composer's check that follows can land after the first send,
   which the server then refuses as stale. Sending again answers. Seen on
   RT-1114-01 in both the 2026-11-15 and 2026-11-16 rounds. Fix: have the send
   wait on (or re-run) the readiness check the connection save started, instead
   of reading the invalidated row.
-* **A refused first turn's profile save returns 403.** A new conversation
+* ~~**A refused first turn's profile save returns 403.**~~ Closed 2026-11-17
+  ([FIXED-1488](FIXED_ITEMS.md#fixed-1488--a-refused-first-turn-still-tried-to-save-its-conversation-profile)):
+  the client no longer sends it; 403 is kept for a missing session by the
+  existing convention. A new conversation
   whose first turn is refused before it is stored still tries to save its
   conversation profile, and `PUT /api/sessions/{id}/profile` answers 403
   `unknown_session:…` (an unknown session should be 404, and the client should
   not send it). Harmless — the error is swallowed — but it is noise in the log.
-* **Two live specs still assert the old Permissions layout**
-  (`release-readiness-2026-09-13`, `removal-review-permissions-2026-09-14`); the
-  five moved this round (FIXED-1482) were type-checked, not re-run live.
+* ~~**Two live specs still assert the old Permissions layout**~~ Closed
+  2026-11-17 ([FIXED-1489](FIXED_ITEMS.md#fixed-1489--two-live-specs-still-asserted-the-permissions-and-settings-layouts-qui-l06-replaced)).
 * **This container cannot enforce the native sandbox**, so about forty Python
   tests that run real shell, plugin and MCP stdio processes fail here with
   `native_sandbox_required` and pass on CI's runners (unchanged from the
   2026-11-14 triage above). Build's **Run** is disabled on such a host.
 * **Design slides are pictures.** The Design deck (FIXED-1486) is one
-  picture per slide; editable text and shapes, and DOCX, remain under BUG-348.
+  picture per slide; editable shapes remain under BUG-348. DOCX shipped
+  2026-11-17 with each frame's text as editable paragraphs (FIXED-1493).
+
+## 2026-11-17 round — found, not fixed
+
+* **Design's inspector tabs scroll out of sight.** With the Export tab chosen
+  at 1,440 px, the inspector's tab strip is scrolled so *Inspect* reads *ct*;
+  the strip has six tabs in a column narrower than they need. A two-row or
+  icon-labelled strip would fix it; it needs its own layout check.
+* **Thread search by meaning is not qualified live.** No Ollama host is
+  reachable from this sandbox (`ollama.com` is refused by its network policy),
+  so FIXED-1494 is covered by tests with a stand-in embedder only. Re-run with
+  the built-in embedding model: search *the Japan holiday* with a chat about
+  *Kyoto flights* and see *Related by meaning*.
+* **A goal criterion read back from its destination** (BUG-355's last row) was
+  planned for this round and not started: it needs a sent message or saved
+  event to read back, which needs a connected mail or calendar account.
+* **The five FIXED-1482 specs, re-run live: 8 passed, 7 failed, 10 did not
+  run** (serial files stop at a failure). Their Permissions steps — what
+  FIXED-1482 changed — pass. The failures are other drift in the same files:
+  `b9` needs `RAIKER_LIVE_WORKSPACE` (the host's folder, for a repository it
+  writes); `gcr` *pinning repeatedly* timed out filling the model search;
+  `memory-restart-provider-composer` looks for a *Memory store* card with
+  **Turn off**, a shared Chat/Build draft, and `article.provider-card` (the Models
+  layout of 2026-10); `round-2026-09-04` looks for *Can I see this outside
+  Raiker?* in Settings; `round-2026-09-15` for Personalisation's old
+  *Interface text and formatting only…* line. Each needs a case-by-case rewrite
+  like FIXED-1489; none is a product failure.
 

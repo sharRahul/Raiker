@@ -487,7 +487,7 @@
       researchSources = [];
       closeSource();
       researchError =
-        error instanceof ApiError ? error.message : "That research turn failed.";
+        recoveryFailure("That research turn did not finish", "No sources were added to this design.", "Ask again, or check the model in the composer.", error);
     } finally {
       researching = false;
     }

@@ -277,9 +277,12 @@ describe("the image model picker names only reachable providers", () => {
     );
     render(DesignView);
 
-    const picker = await screen.findByLabelText("Image model");
-    expect(picker).toHaveTextContent("OpenAI · GPT Image 1");
-    expect(picker).not.toHaveTextContent("Gemini");
+    // One reachable image model is named, not offered as a one-item dropdown
+    // (2026-11-15: the native list only repeated it).
+    const only = await screen.findByTestId("image-model-single");
+    expect(only).toHaveTextContent("OpenAI · GPT Image 1");
+    expect(only).not.toHaveTextContent("Gemini");
+    expect(screen.queryByRole("combobox", { name: "Image model" })).toBeNull();
   });
 });
 

@@ -868,3 +868,121 @@ describe("BUG-331 — the model step does not wait on every provider", () => {
   });
 });
 
+
+// 2026-11-15 — owner report: with OpenAI, Anthropic and OpenRouter connected
+// and their models listed, the only action at the foot of the Model step was
+// "Decide later", so nothing said a default still had to be chosen. Provider
+// answers are mocked: no key, no network, no charge.
+describe("the Model step with connected providers", () => {
+  const hosted = (profile_id: string, provider: string) =>
+    profile({
+      profile_id, provider, local_only: false, requires_network: true,
+      endpoint_kind: "remote_hosted", off_machine: true, connection_configured: true, configured: true,
+    });
+  const CONNECTED = [
+    hosted("openai-hosted", "openai"),
+    hosted("anthropic-hosted", "anthropic"),
+    hosted("openrouter-policy-gated", "openrouter"),
+  ];
+  const listed = (profile_id: string, provider: string, models: string[]) => ({
+    profile_id, provider, status: "available", reason_code: null, models,
+  });
+
+  /** The setup route echoes what was saved, as the server does. */
+  function stubSetup(extra: Record<string, unknown> = {}, initial: Record<string, unknown> = required) {
+    const routed = stubFetch({
+      "GET /api/setup": initial,
+      "GET /api/models": { profiles: CONNECTED, chat_profiles: [], current_profile_id: null, current_model: null },
+      "GET /api/model-library": { roots: [], models: [] },
+      "GET /api/models/openai-hosted/provider-models": listed("openai-hosted", "openai", ["gpt-4o-mini", "gpt-4.1"]),
+      "GET /api/models/anthropic-hosted/provider-models": listed("anthropic-hosted", "anthropic", ["claude-haiku-4-5-20251001"]),
+      "GET /api/models/openrouter-policy-gated/provider-models": listed("openrouter-policy-gated", "openrouter", ["openai/gpt-4o-mini"]),
+      "PUT /api/model-selection": { ok: true },
+      "POST /api/model-readiness/check": { state: "ready", ready: true },
+      ...extra,
+    });
+    const saved: Record<string, unknown>[] = [];
+    const mock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
+      if (url.split("?")[0].endsWith("/api/setup") && init?.method === "PUT") {
+        const body = JSON.parse(String(init.body));
+        saved.push(body);
+        return { ok: true, status: 200, json: async () => ({ ...required, ...body }) } as Response;
+      }
+      return (routed as unknown as typeof fetch)(input, init);
+    });
+    vi.stubGlobal("fetch", mock);
+    return saved;
+  }
+
+  it("says a default must be chosen, holds Continue, then saves it and moves to Privacy", async () => {
+    const saved = stubSetup();
+    render(ModelSetupView);
+    await openProviders();
+    for (const name of ["OpenAI", "Anthropic", "OpenRouter"]) {
+      await within(await screen.findByRole("group", { name })).findByRole("button", { name: "Choose a model" });
+    }
+
+    // Before a choice: the way forward is named, Continue is there and waits.
+    expect(await screen.findByText("Choose a default model to continue to Privacy")).toBeInTheDocument();
+    const next = screen.getByRole("button", { name: "Continue" });
+    expect(next).toBeDisabled();
+    expect(screen.queryByRole("button", { name: "Decide later" })).not.toBeInTheDocument();
+
+    // Choose Haiku 4.5 from Anthropic's own list.
+    const anthropic = screen.getByRole("group", { name: "Anthropic" });
+    await fireEvent.click(within(anthropic).getByRole("button", { name: "Choose a model" }));
+    const dialog = await screen.findByRole("dialog", { name: "Anthropic models" });
+    await fireEvent.click(within(dialog).getAllByRole("button", { name: /^Use / })[0]);
+    expect(await screen.findByText(/Haiku 4.5 is selected/)).toBeInTheDocument();
+
+    // After a choice: Continue is enabled, the hint has gone, and pressing it
+    // saves the default and opens Privacy.
+    await waitFor(() => expect(screen.getByRole("button", { name: "Continue" })).toBeEnabled());
+    expect(screen.queryByText("Choose a default model to continue to Privacy")).not.toBeInTheDocument();
+    await fireEvent.click(screen.getByRole("button", { name: "Continue" }));
+    await waitFor(() => expect(saved.at(-1)).toMatchObject({
+      stage: "privacy",
+      selected_profile_id: "anthropic-hosted",
+      selected_model: "claude-haiku-4-5-20251001",
+      model_deferred: false,
+    }));
+    // Privacy is the step on screen now: its "How I'll ask" card replaces the providers.
+    expect(await screen.findByText("How I'll ask")).toBeInTheDocument();
+    expect(screen.queryByRole("group", { name: "Anthropic" })).not.toBeInTheDocument();
+  });
+
+  it("enables Continue at once when a default is already selected", async () => {
+    const saved = stubSetup({}, {
+      ...required,
+      status: "in_progress",
+      selected_profile_id: "openai-hosted",
+      selected_model: "gpt-4o-mini",
+    });
+    render(ModelSetupView);
+    expect(await screen.findByText(/is selected/)).toBeInTheDocument();
+    const next = screen.getByRole("button", { name: "Continue" });
+    expect(next).toBeEnabled();
+    expect(screen.queryByText("Choose a default model to continue to Privacy")).not.toBeInTheDocument();
+    await fireEvent.click(next);
+    await waitFor(() => expect(saved.at(-1)).toMatchObject({
+      stage: "privacy", selected_profile_id: "openai-hosted", selected_model: "gpt-4o-mini", model_deferred: false,
+    }));
+  });
+
+  it("keeps Decide later when no connected provider has a model to choose", async () => {
+    const unavailable = (profile_id: string, provider: string) => ({
+      profile_id, provider, status: "unavailable", reason_code: "provider_unreachable", models: [],
+    });
+    stubSetup({
+      "GET /api/models/openai-hosted/provider-models": unavailable("openai-hosted", "openai"),
+      "GET /api/models/anthropic-hosted/provider-models": unavailable("anthropic-hosted", "anthropic"),
+      "GET /api/models/openrouter-policy-gated/provider-models": unavailable("openrouter-policy-gated", "openrouter"),
+    });
+    render(ModelSetupView);
+    await openProviders();
+    expect(await screen.findByRole("button", { name: "Decide later" })).toBeEnabled();
+    expect(screen.queryByText("Choose a default model to continue to Privacy")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Continue" })).not.toBeInTheDocument();
+  });
+});

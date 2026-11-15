@@ -51,6 +51,7 @@
     onselected,
     onchanged,
     oncatalogue,
+    onselectable,
     openPickerFor = null,
   }: {
     /** Every profile the registry publishes, from `GET /api/models`. */
@@ -73,6 +74,13 @@
      * it cannot call a key that lists nothing "connected".
      */
     oncatalogue?: (profileId: string, reasonCode: string | null) => void;
+    /**
+     * How many models each connected provider offers to choose from right now,
+     * by profile id (a listed catalogue that is available; a provider that was
+     * disconnected or refused drops to nothing). Setup reads it to know whether
+     * there is a default to choose before moving on.
+     */
+    onselectable?: (counts: Record<string, number>) => void;
     /**
      * BUG-344 — open this profile's model picker as soon as its catalogue is
      * listed, so setup's "Choose a model" answers in one press instead of
@@ -181,6 +189,13 @@
   /** Per-row transient state, keyed by profile id. */
   let catalogue = $state<Record<string, ProviderModelList>>({});
   let choice = $state<Record<string, string>>({});
+  $effect(() => {
+    const counts: Record<string, number> = {};
+    for (const [profileId, list] of Object.entries(catalogue)) {
+      counts[profileId] = list.status === "available" ? list.models.length : 0;
+    }
+    onselectable?.(counts);
+  });
   let apiKey = $state<Record<string, string>>({});
   let endpoint = $state<Record<string, string>>({});
   // BUG-274 — an identity-linked key acts inside one workspace. Neither field

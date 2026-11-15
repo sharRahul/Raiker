@@ -1905,6 +1905,12 @@ dialog li { font-size: var(--text-sm); line-height: 1.5; }
   outline-offset: 2px;
 }
 
+/* 2026-11-15 — Design's image-model pill draws one focus ring around the pill
+   (its :focus-within); the select inside it must not draw a second one. */
+:is(.composer-card .composer-bar) .model-scope .bar-select:focus-visible {
+  outline: none;
+}
+
 /* Match the compact composer's intended icon targets even when a lazy-loaded
    picker's own minimum width would otherwise win the cascade. */
 @media (max-width: 63.9rem) {

@@ -16,6 +16,26 @@ PR #106: the **user-owned fallback sequence** and **prompt caching + normalised
 cache-hit metrics**.
 
 
+## Result — 2026-11-15 (Desktop window: first-run Model step and Design composer)
+
+The Linux desktop shell (`desktop/`, Electron 44 under `xvfb-run`) against a
+fresh `raiker-web --port 8765` workspace, built from this change's SPA. The
+OpenAI, Anthropic and OpenRouter connections and model lists, the model
+selection and its readiness check were answered inside the window
+(`page.route`), so no key was used and nothing was charged; first-run setup
+itself was saved by the real host. Spec:
+`desktop/e2e/setup-model-step-live.spec.ts`. Result: **2 of 2 passed**.
+
+| # | Scenario | Verification | Result |
+|---|---|---|---|
+| DESK-1115-01 | Model step with three connected providers: *Choose a default model to continue to Privacy* and a disabled **Continue**, no **Decide later**; after choosing Haiku 4.5, **Continue** is enabled, opens Privacy, and the host's setup reads back `stage: privacy`, `anthropic-hosted`, `claude-haiku-4-5-20251001` | FIXED-1470 | Passed |
+| DESK-1115-02 | Design composer: one image model is plain text (no combobox); with two, the focused select draws no outline and the pill draws one | FIXED-1471 | Passed |
+
+**Captures** (run directory, not committed): `setup-model-1-before-choice`,
+`setup-model-2-after-choice`, `setup-model-3-privacy`,
+`design-composer-1-single-model`, `design-composer-2-one-ring`. Inspected at
+original resolution.
+
 ## Result — 2026-11-15 (Workspace key, execution profiles, remote access and budgets)
 
 A Linux workspace served by `raiker-web --port 8765` on a fresh workspace

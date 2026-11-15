@@ -1,5 +1,25 @@
 # Fixed items
 
+## FIXED-1471 — Design's image-model control drew two focus rings and a one-item list
+
+**Severity: Low. Area: Quiet UI / Design composer. Status: Fixed 2026-11-15.**
+
+**Observed.** Reported by the owner with a screenshot: focusing the image-model control in Design's composer drew a ring around the pill and a second ring around the select inside it, and with one image model connected the browser's native list opened under it holding only the name already shown.
+
+**Fixed.** The pill draws the only focus ring; the shared composer rule no longer rings the select inside it (`app.css`). One reachable image model is named as plain text, not offered as a one-item dropdown (`DesignView.svelte`, `image-model-single`); two or more keep the select.
+
+**Evidence.** `DesignView.test.ts`; desktop window (Linux, Electron under Xvfb, providers answered in the window): `desktop/e2e/setup-model-step-live.spec.ts` *Design's image-model control* — one model reads *OpenAI · GPT Image 1* with no combobox; with two, the focused select's outline is `none` and the pill's is `solid`.
+
+## FIXED-1470 — The first-run Model step offered only *Decide later* with models ready to choose
+
+**Severity: Medium. Area: First-run setup. Status: Fixed 2026-11-15.**
+
+**Observed.** Reported by the owner: with OpenAI, Anthropic and OpenRouter connected and their model lists loaded, the only action at the foot of the Model step was **Decide later**; nothing said a default still had to be chosen before going on.
+
+**Fixed.** `ProviderMatrix` reports how many models each connected provider offers (`onselectable`). While any has a model to choose and none is chosen, the step shows *Choose a default model to continue to Privacy* beside a visible **Continue** that is disabled until a model is picked; a default already chosen enables it at once. **Continue** saves the selection (`selected_profile_id`, `selected_model`, `model_deferred: false`) and opens Privacy. **Decide later** remains when no connected provider has a model to choose.
+
+**Evidence.** `ModelSetupView.test.ts` — three connected providers with mocked catalogues before and after a choice, a default already selected, and no selectable models (no keys, no network). Desktop window: `desktop/e2e/setup-model-step-live.spec.ts` against a fresh `raiker-web`, the three providers answered in the window — the hint and a disabled **Continue** before the choice, **Continue** enabled after choosing Haiku 4.5, Privacy opened, and the host's stored setup read back as `stage: privacy`, `anthropic-hosted`, `claude-haiku-4-5-20251001`.
+
 ## FIXED-1469 — Build's composer put the model, and then Send, on a second row
 
 **Severity: Low. Area: Quiet UI / composer. Status: Fixed 2026-11-15.**
@@ -2869,6 +2889,8 @@ file you can open. The two capture sets that remain — `screenshots/pages/` and
 | [FIXED-1382](#fixed-1382--linux-filesystem-flags-broke-windows-type-checking) | Low | Platform portability | Fixed 2026-11-09 |
 | [FIXED-1383](#fixed-1383--keyboard-start-evidence-depended-on-retired-receipt-wording) | Low | Beta live tests | Fixed 2026-11-09 |
 | [FIXED-1384](#fixed-1384--model-downloads-checked-redirect-hosts-after-contacting-them) | High | Model and speech downloads | Fixed 2026-11-09 |
+| [FIXED-1471](#fixed-1471--designs-image-model-control-drew-two-focus-rings-and-a-one-item-list) | Low | Quiet UI / Design composer | Fixed 2026-11-15 |
+| [FIXED-1470](#fixed-1470--the-first-run-model-step-offered-only-decide-later-with-models-ready-to-choose) | Medium | First-run setup | Fixed 2026-11-15 |
 | [FIXED-1469](#fixed-1469--builds-composer-put-the-model-and-then-send-on-a-second-row) | Low | Quiet UI / composer | Fixed 2026-11-15 |
 | [FIXED-1468](#fixed-1468--the-app-still-asked-for-text-in-the-browsers-own-prompt-box) | Low | Quiet UI / dialogs | Fixed 2026-11-15 |
 | [FIXED-1467](#fixed-1467--three-live-specs-still-drove-the-permissions-page-qui-l06-replaced) | Low | Live test harness | Fixed 2026-11-15 |

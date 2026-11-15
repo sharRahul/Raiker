@@ -200,6 +200,18 @@
     await loadProfiles();
   }
 
+  /** Save the chosen default and go on to Privacy. */
+  async function continueWithModel() {
+    if (picked === null) return;
+    const ref = pickedRef;
+    await save({
+      status: "in_progress",
+      stage: "privacy",
+      ...(ref ? { selected_profile_id: ref.profileId, selected_model: ref.model } : {}),
+      model_deferred: false,
+    });
+  }
+
   async function deferModel() {
     await save({
       status: "in_progress",
@@ -394,6 +406,15 @@
   // QUI-W03 — the providers open from "On this computer", "An account I have"
   // or the recommendation, never by themselves over the three answers.
   const allProvidersOpen = $derived(showAllProviders);
+  /**
+   * 2026-11-15 — what a connected provider offers to choose from, by profile
+   * (ProviderMatrix reports it as catalogues are listed). With models on
+   * offer and none chosen, the step's way forward is choosing one, so it
+   * says so and holds Continue; "Decide later" is for a step with nothing to
+   * choose from.
+   */
+  let selectableCounts = $state<Record<string, number>>({});
+  const hasSelectable = $derived(Object.values(selectableCounts).some((count) => count > 0));
 
   /*
    * DIST-05 — This device. Measured by the host, locally; the answer says what
@@ -680,6 +701,7 @@
           onselected={(profileId, model) => void chooseModel(profileId, model)}
           oncatalogue={(profileId, reasonCode) =>
             (catalogueRefusals = { ...catalogueRefusals, [profileId]: reasonCode })}
+          onselectable={(counts) => (selectableCounts = counts)}
           openPickerFor={pickerRequest}
         />
       {/if}
@@ -693,8 +715,20 @@
              needed to connect a provider and pick a default is on this screen;
              the Models page is where deeper configuration lives. -->
         <a class="quiet" href="#/models">Advanced setup</a>
-        {#if picked !== null || allProvidersOpen}
-          <button class="primary" disabled={busy} onclick={deferModel}>{picked === null ? "Decide later" : "Continue"}</button>
+        {#if picked !== null || (allProvidersOpen && hasSelectable)}
+          <!-- 2026-11-15 — with models on offer the way forward is choosing
+               one: Continue is visible from the start and waits for it. -->
+          {#if picked === null}
+            <span class="continue-hint" id="model-continue-hint" role="status">Choose a default model to continue to Privacy</span>
+          {/if}
+          <button
+            class="primary"
+            disabled={busy || picked === null}
+            aria-describedby={picked === null ? "model-continue-hint" : undefined}
+            onclick={continueWithModel}
+          >Continue</button>
+        {:else if allProvidersOpen}
+          <button class="primary" disabled={busy} onclick={deferModel}>Decide later</button>
         {/if}
       </div>
     {:else if stage === "privacy"}
@@ -889,4 +923,5 @@
   .check-remedy { color: var(--text-1); font-weight: 600; }
   .path { font-family: var(--font-mono); font-size: var(--text-xs); overflow-wrap: anywhere; }
   @media (max-width: 760px) { .think-choices, .starters { grid-template-columns: 1fr; } .stage-rail li strong { display: none; } .stage-rail li.active strong { display: block; } .summary { grid-template-columns: 1fr; } }
+  .continue-hint { margin-left: auto; color: var(--text-2); font-size: var(--text-sm); align-self: center; }
 </style>

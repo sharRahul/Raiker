@@ -1009,7 +1009,13 @@
       <label class="composer-scope model-scope">
         <span class="sr-only">Image model</span>
         <Icon name="models" size="sm" />
-        {#if imageChoices.length > 0}
+        {#if imageChoices.length === 1}
+          <!-- 2026-11-15 — one image model is a fact, not a choice: a select
+               with one option opened a native list that only repeated it. -->
+          <span class="bar-select bar-single" data-testid="image-model-single">
+            {providerName(imageChoices[0].provider)} · {modelName(imageChoices[0].model)}
+          </span>
+        {:else if imageChoices.length > 1}
           <select
             class="bar-select"
             bind:value={choiceKey}
@@ -1375,6 +1381,7 @@
     max-width: min(16rem, 40vw);
   }
   .model-scope select { appearance: none; }
+  .model-scope .bar-single { white-space: nowrap; color: var(--text-1); cursor: default; }
   .model-scope :global(svg) { flex: none; pointer-events: none; }
   .model-scope:focus-within { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
   .model-scope .bar-empty,

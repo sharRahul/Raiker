@@ -20,6 +20,7 @@
     disabled = false,
     onchosen,
     onreset,
+    onpicked,
     open = $bindable(false),
     efforts = [],
     effort = $bindable(""),
@@ -54,6 +55,8 @@
      * the default row while another model is in use.
      */
     onreset?: () => void;
+    /** Every explicit choice, the Default row and the row already shown included. */
+    onpicked?: () => void;
     /**
      * B19 — bindable so `/model` in the composer can open the same menu the
      * trigger opens. The slash command is a shortcut to this control, not a
@@ -148,6 +151,7 @@
     profileId = choice.profile_id;
     model = choice.model;
     open = false;
+    onpicked?.();
     onchosen?.(choice.profile_id, choice.model);
   }
 
@@ -236,6 +240,7 @@
     profileId = selectsDefault ? "" : profile.profile_id;
     model = selectsDefault ? "" : profile.model;
     open = false;
+    onpicked?.();
     if (!selectsDefault) onchosen?.(profile.profile_id, profile.model);
     else if (wasOverridden) onreset?.();
   }

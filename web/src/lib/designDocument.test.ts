@@ -104,3 +104,26 @@ describe("refusals and history read as words", () => {
     expect(versionKind("edit", "owner")).toBe("Edit");
   });
 });
+
+describe("designFailure (QUI-G06)", () => {
+  it("keeps Design's own sentence for a refusal it knows", async () => {
+    const { ApiError } = await import("./api");
+    const { designFailure } = await import("./designDocument");
+    const error = new ApiError(409, "design_version_conflict:title", "conflict");
+    expect(designFailure("That change was not saved", error)).toMatch(/changed since you loaded it/);
+  });
+
+  it("names what failed and what to do when Raiker does not answer", async () => {
+    const { designFailure } = await import("./designDocument");
+    const said = designFailure("The design was not created", new TypeError("Failed to fetch"));
+    expect(said).toMatch(/^The design was not created\. Nothing was changed\. Raiker did not answer/);
+    expect(said).not.toMatch(/That change was refused/);
+  });
+
+  it("never shows a bare reason code", async () => {
+    const { ApiError } = await import("./api");
+    const { designFailure } = await import("./designDocument");
+    const said = designFailure("The export was not made", new ApiError(500, "brand_new_code", "x"), "No file was written.");
+    expect(said).toBe("The export was not made (HTTP 500, brand_new_code). No file was written. Try again.");
+  });
+});

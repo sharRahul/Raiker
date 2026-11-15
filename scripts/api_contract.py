@@ -104,6 +104,11 @@ VERIFIED: frozenset[tuple[str, str]] = frozenset(
         ("GET", "/api/code/repos/{repo_id}/pull-requests"),
         ("GET", "/api/code/repos/{repo_id}/target"),
         ("GET", "/api/library"),
+        # ADR-0005 — composer personas.
+        ("GET", "/api/personas"),
+        ("POST", "/api/personas"),
+        ("PUT", "/api/personas/{persona_id}"),
+        ("DELETE", "/api/personas/{persona_id}"),
         ("GET", "/api/remote-access"),
         ("POST", "/api/remote-access/check"),
         ("POST", "/api/remote-access/apply"),

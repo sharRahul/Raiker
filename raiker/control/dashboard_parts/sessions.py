@@ -967,7 +967,29 @@ class SessionService:
             tool_rows=self._turn_tool_rows(str(row["session_id"]), str(row.get("turn_id") or "")),
             content_parts=_stored_content_parts(row.get("summary")),
             retry_of_turn_id=row.get("retry_of_turn_id"),
+            persona=self._turn_persona(row),
         )
+
+    def _turn_persona(self: DashboardService, row: dict[str, Any]) -> dict[str, Any] | None:
+        persona_id = row.get("persona_id")
+        if not persona_id:
+            return None
+        recorded = str(row.get("persona_instructions_sha256") or "")
+        current = False
+        with contextlib.suppress(Exception):
+            found = self.store._row(  # noqa: SLF001 - one keyed read beside the turn list
+                "SELECT instructions FROM personas WHERE persona_id = ?", (str(persona_id),)
+            )
+            if found is not None:
+                import hashlib
+
+                current = hashlib.sha256(str(found["instructions"]).encode("utf-8")).hexdigest() == recorded
+        return {
+            "persona_id": str(persona_id),
+            "name": str(row.get("persona_name") or ""),
+            "instructions_sha256": recorded,
+            "current": current,
+        }
 
     #: How a stored action's status reads as a transcript row. `proposed` is a
     #: call that never settled - the live view shows the same fact as a row that

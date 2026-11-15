@@ -73,14 +73,24 @@ test("pinning a model repeatedly leaves the host answering", async ({ page, requ
   // The measurement is the host's own open-socket count either side of the
   // whole run — `scripts/live_socket_check.sh 8765 before|after`. This is the
   // load that used to move it by one client per press.
+  //
+  // 2026-11-19: a key that can list its catalogue gets switches, not the
+  // custom-name fallback, so each press keeps the model through whichever the
+  // dialog offers (the 2026-11-17 re-run timed out waiting for the fallback).
   for (let attempt = 0; attempt < 3; attempt += 1) {
     const dialog = await openModelDialog(page, card);
-    await dialog
-      .getByRole("textbox", { name: "Custom model name" })
-      .fill("claude-haiku-4-5-20251001");
-    const use = dialog.getByRole("button", { name: "Use model" });
-    await expect(use).toBeEnabled({ timeout: 30_000 });
-    await use.click();
+    const custom = dialog.getByRole("textbox", { name: "Custom model name" });
+    if (await custom.isVisible().catch(() => false)) {
+      await custom.fill("claude-haiku-4-5-20251001");
+      const use = dialog.getByRole("button", { name: "Use model" });
+      await expect(use).toBeEnabled({ timeout: 30_000 });
+      await use.click();
+    } else {
+      const box = dialog.locator('input[type="checkbox"][value="claude-haiku-4-5-20251001"]');
+      await expect(box).toBeAttached({ timeout: 30_000 });
+      if (!(await box.isChecked())) await box.click();
+      await dialog.getByRole("button", { name: /^(Done|Cancel)$/ }).first().click();
+    }
     await expect(dialog).toBeHidden({ timeout: 60_000 });
   }
 
@@ -105,6 +115,12 @@ test("an identity-linked key is refused in words, not as a network fault", async
   // provider's own refusal — the workspace this key acts inside — rather than
   // as "check your network" (FIXED-388) or a bare status (FIXED-370).
   const dialog = await openModelDialog(page, card);
+  // A connection saved *with* its workspace lists the catalogue instead; the
+  // refusal this test reads cannot arise there (2026-11-19 re-run).
+  if ((await dialog.locator('input[type="checkbox"]').count()) > 0) {
+    await dialog.getByRole("button", { name: /^(Done|Cancel)$/ }).first().click();
+    test.skip(true, "this connection has its workspace, so the provider lists models");
+  }
   await expect(dialog.getByText(/identity-linked|workspace/i)).toBeVisible({
     timeout: 120_000,
   });
@@ -137,6 +153,9 @@ test("the hosted gate the validation consults is the one Permissions reports", a
   // that had just accepted a pin. Connecting a provider is consent to use it, so
   // the enforcing path had said yes. The panel says what it answers now.
   await hostedProviderCard(page, BASE, "Anthropic");
+  // The posture moved into the closed *Permissions and network* fold.
+  const fold = page.locator("details.provider-permissions").first();
+  if ((await fold.getAttribute("open")) === null) await fold.locator("summary").click();
   const posture = page.getByLabel("Off-machine provider posture");
   await expect(posture).toBeVisible({ timeout: 30_000 });
   await expect(posture.getByText("Off", { exact: true })).toHaveCount(0);

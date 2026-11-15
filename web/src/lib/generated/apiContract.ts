@@ -5086,6 +5086,44 @@ export type PendingTool = {
   fingerprint: string;
 };
 
+export type PersonaFamily = {
+  family: string;
+  label: string;
+};
+
+export type PersonaList = {
+  personas: PersonaView[];
+  families: PersonaFamily[];
+};
+
+export type PersonaRemoved = {
+  ok: boolean;
+  persona_id: string;
+};
+
+/** ADR-0005 — a persona as the owner wrote it. Validated in `raiker.personas`. */
+export type PersonaRequest = {
+  name: string;
+  description?: string;
+  instructions: string;
+  model_profile?: string | null;
+  model?: string | null;
+  tool_ceiling?: string[] | null;
+};
+
+export type PersonaView = {
+  persona_id: string;
+  name: string;
+  description: string;
+  instructions: string;
+  model_profile: string | null;
+  model: string | null;
+  tool_ceiling: string[] | null;
+  instructions_sha256: string;
+  created_at: string;
+  updated_at: string;
+};
+
 /** BUG-308 — where this plugin's own code would run on this machine. */
 export type PluginCodeRuntime = {
   where: "not_enabled" | "isolated" | "host_network";
@@ -5433,6 +5471,7 @@ export type PromptRequest = {
   approval_mode?: string | null;
   model_profile?: string | null;
   retry_of_turn_id?: string | null;
+  persona_id?: string | null;
   model?: string | null;
   reasoning_effort?: string | null;
   max_tool_calls?: number | null;
@@ -7091,6 +7130,7 @@ export type TurnView = {
   tool_rows: Record<string, unknown>[];
   content_parts: ContentPartView[];
   retry_of_turn_id: string | null;
+  persona: Record<string, unknown> | null;
 };
 
 /** Something a server offers that Raiker does not use, in one sentence. */
@@ -8245,6 +8285,14 @@ export const contract = {
     call<Ok>("POST", `/api/notifications/${encodeURIComponent(notificationId)}/read`),
   pullOllamaModel: (body: OllamaPullRequestBody) =>
     call<ModelOperationView>("POST", "/api/ollama/pull", { body }),
+  listPersonas: () =>
+    request<PersonaList>("/api/personas"),
+  createPersona: (body: PersonaRequest) =>
+    call<PersonaView>("POST", "/api/personas", { body }),
+  deletePersona: (personaId: string) =>
+    call<PersonaRemoved>("DELETE", `/api/personas/${encodeURIComponent(personaId)}`),
+  updatePersona: (personaId: string, body: PersonaRequest) =>
+    call<PersonaView>("PUT", `/api/personas/${encodeURIComponent(personaId)}`, { body }),
   listPlugins: () =>
     request<PluginsView>("/api/plugins"),
   listProjects: () =>

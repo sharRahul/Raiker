@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import dataclasses
 import json
 import re
 from collections.abc import AsyncIterator
@@ -151,8 +152,26 @@ def _validated_attachments(raw: list[dict[str, Any]] | None) -> list[dict[str, A
     return cleaned
 
 
+def _turn_persona(workspace: str | Path, principal_id: str, body: PromptRequest) -> Any:
+    """ADR-0005 — the owner's persona this turn names, or a 404 for one never issued."""
+    persona_id = (body.persona_id or "").strip()
+    if not persona_id:
+        return None
+    from raiker import personas
+
+    store = SQLiteStore(workspace)
+    user_id = store.principal_user_id(principal_id)
+    persona = personas.get_persona(store, user_id, persona_id) if user_id else None
+    if persona is None:
+        raise refusal(status.HTTP_404_NOT_FOUND, "unknown_persona")
+    return persona
+
+
 def _build_envelope(
-    body: PromptRequest, principal_id: str = "local_user", workspace: str | Path | None = None
+    body: PromptRequest,
+    principal_id: str = "local_user",
+    workspace: str | Path | None = None,
+    persona: Any = None,
 ) -> PromptEnvelope:
     prompt_text = body.text
     command_trigger: str | None = None
@@ -175,7 +194,12 @@ def _build_envelope(
         max_tool_calls=(
             body.max_tool_calls if body.max_tool_calls is not None else DEFAULT_MAX_TOOL_CALLS
         ),
-        capability_modes=body.capability_modes or {},
+        # ADR-0005 — a persona's ceiling only ever adds `deny` entries.
+        capability_modes=(
+            body.capability_modes or {}
+            if persona is None
+            else _persona_capability_modes(persona, body.capability_modes)
+        ),
         answer_style=(
             body.answer_style
             if body.answer_style is not None
@@ -193,6 +217,10 @@ def _build_envelope(
     }
     if command_trigger is not None:
         metadata["skill_command"] = command_trigger
+    if persona is not None:
+        from raiker.personas import turn_record
+
+        metadata["persona"] = turn_record(persona)
     return PromptEnvelope(
         request_id=new_id("req_"),
         session_id=body.session_id or new_id("sess_"),
@@ -211,6 +239,12 @@ def _build_envelope(
         ),
         options=options,
     )
+
+
+def _persona_capability_modes(persona: Any, turn_modes: dict[str, str] | None) -> dict[str, str]:
+    from raiker.personas import ceiling_capability_modes
+
+    return ceiling_capability_modes(persona.tool_ceiling, turn_modes)
 
 
 def _record_attachment_refs(
@@ -496,8 +530,13 @@ async def _prepare_turn(
         if existing is not None and existing.get("user_id") != principal.delegated_by_user_id:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Unknown session")
     turn_project_id = _resolve_turn_project(body, workspace, principal)
+    persona = _turn_persona(workspace, session.principal_id, body)
+    if persona is not None and persona.model_profile and not (body.model_profile or "").strip():
+        # The persona's default model, held to readiness and the execution
+        # profile below exactly like a model chosen in the composer.
+        body = dataclasses.replace(body, model_profile=persona.model_profile, model=persona.model or "")
     try:
-        envelope = _build_envelope(body, session.principal_id, workspace)
+        envelope = _build_envelope(body, session.principal_id, workspace, persona)
     except ContractValidationError as exc:
         return _TurnRefusal(kind="invalid", response=_invalid_response(exc))
     # DEC-22 step 3 — a Retry names the turn it asks again; the source must be
@@ -553,6 +592,11 @@ async def _prepare_turn(
             detail=instruction_refusal,
         )
     _record_attachment_refs(workspace, envelope, session.principal_id)
+    if persona is not None:
+        SQLiteStore(workspace).record_turn_persona(
+            turn_id=envelope.turn_id, session_id=envelope.session_id, persona_id=persona.persona_id,
+            name=persona.name, instructions_sha256=persona.instructions_sha256,
+        )
     if retry_of:
         SQLiteStore(workspace).record_turn_retry(
             turn_id=envelope.turn_id, retry_of_turn_id=retry_of, session_id=envelope.session_id

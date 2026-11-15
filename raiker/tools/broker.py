@@ -180,6 +180,9 @@ class ToolBroker:
         self.workspace_root = Path(workspace_root).resolve()
         self.policy_engine = policy_engine
         self.store = store
+        # ADR-0005 — the tools this turn's persona leaves out; `tool_search`
+        # never offers them. Set by the orchestrator at the start of each turn.
+        self.persona_withheld_tools: frozenset[str] = frozenset()
         self.writer = writer
         self.hook_dispatcher = hook_dispatcher
         self.principal_id = principal_id
@@ -251,6 +254,8 @@ class ToolBroker:
                 # from the same discovery the projection uses so a search can
                 # never return a tool the turn could not have been offered.
                 mcp_specs=mcp_tool_specs(self.workspace_root, self.store, self.principal_id),
+                # ADR-0005 — what this turn's persona leaves out (set by the orchestrator).
+                withheld=self.persona_withheld_tools,
             ),
             # TOOL-72 — a suggestion the conversation draws as a card; it
             # connects nothing.

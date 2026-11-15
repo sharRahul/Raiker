@@ -1080,6 +1080,12 @@ class AgentGateway:
                 text=str(row["prompt_text"]),
                 metadata={
                     "resumed_from_approval": approval_id,
+                    # ADR-0005 — the persona's ceiling holds across the approval.
+                    **(
+                        {"persona": options_raw["persona"]}
+                        if isinstance(options_raw.get("persona"), dict)
+                        else {}
+                    ),
                     # BUG-325 — the run's spend before it paused, so its cost
                     # limit meters the whole run and not each leg afresh.
                     **(

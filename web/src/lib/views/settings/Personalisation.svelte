@@ -1,5 +1,6 @@
 <script lang="ts">
   import GlobalInstructionFile from "./GlobalInstructionFile.svelte";
+  import Personas from "./Personas.svelte";
   import Icon from "../../components/Icon.svelte";
   import { WEATHER_LOCATION_KEY } from "../../environment";
   import type { ThemeChoice } from "../../theme";
@@ -93,7 +94,8 @@
        "personalisation" reads as if it might shape the assistant too. -->
   <p class="note">
     Each choice shows at once and is kept when you save; Discard puts back what you had.
-    These change only how Raiker looks — never its instructions, its personality or what it may do.
+    Appearance changes only how Raiker looks. Personas shape how it answers when you pick one with @;
+    nothing here changes what Raiker may do.
   </p>
 </header>
 
@@ -205,6 +207,9 @@
   </label>
   </details>
 </section>
+
+<!-- ADR-0005 — the owner's `@` personas. -->
+<Personas />
 
 <!-- RAIKER.md — the account's own global instruction file. -->
 <GlobalInstructionFile />

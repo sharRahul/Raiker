@@ -666,7 +666,10 @@ async def read_design_brand_guide(body: DesignBrandGuideRequest, request: Reques
         text = await asyncio.to_thread(extract_document_text, PDF_MEDIA_TYPE, data)
     except AttachmentValidationError:
         raise refusal(status.HTTP_422_UNPROCESSABLE_CONTENT, "design_brand_guide_unreadable") from None
-    parsed = parse_brand_guide(body.filename, text)
+    from raiker.design.imports import pdf_swatches  # noqa: PLC0415
+
+    swatches = await asyncio.to_thread(pdf_swatches, data)
+    parsed = parse_brand_guide(body.filename, text, swatches)
     answer: DesignTokenImport = {
         "format": parsed["format"], "filename": body.filename.strip()[:200],
         "sha256": hashlib.sha256(data).hexdigest(), "found": parsed["found"],
@@ -719,7 +722,13 @@ def _render(row: dict[str, Any], frame_id: str, fmt: str, scale: float, load: An
             image = render_raster(document, fid, load, scale=scale, skip_text=True)
             return encode_raster(image, "png"), image.width, image.height
 
-        data = build_pptx(ordered, bare_slide, title=title, editable_text=True)
+        from raiker.design.render import node_picture_png
+
+        # Every layer a native, editable slide object (BUG-348 DW-11).
+        data = build_pptx(
+            ordered, bare_slide, title=title, editable_text=True,
+            picture=lambda node: node_picture_png(node, load, scale=scale),
+        )
         return data, {"slides": min(len(ordered), 60)}
     if fmt == "json":
         frame = find_frame(document, frame_id)

@@ -489,6 +489,10 @@ class ConversationStore:
             "turn_sources",
             "agent_plans",
             "turn_controls",
+            # DEC-22 step 3 retry links and ADR-0005 persona records name the
+            # conversation's turns; they go with it.
+            "turn_retries",
+            "turn_personas",
         ):
             connection.execute(f"DELETE FROM {table} WHERE session_id = ?", (session_id,))
         connection.execute("DELETE FROM sessions WHERE session_id = ?", (session_id,))
@@ -515,8 +519,11 @@ class ConversationStore:
     def list_turns(self: SQLiteStore, session_id: str, limit: int = 50) -> list[dict[str, Any]]:
         # DEC-22 step 3 — each turn carries the turn it retried, when it was one.
         rows = self._rows(
-            """SELECT t.*, r.retry_of_turn_id AS retry_of_turn_id
+            """SELECT t.*, r.retry_of_turn_id AS retry_of_turn_id,
+                      p.persona_id AS persona_id, p.name AS persona_name,
+                      p.instructions_sha256 AS persona_instructions_sha256
                  FROM turns t LEFT JOIN turn_retries r ON r.turn_id = t.turn_id
+                 LEFT JOIN turn_personas p ON p.turn_id = t.turn_id
                 WHERE t.session_id = ? ORDER BY t.created_at ASC LIMIT ?""",
             (session_id, limit),
         )
@@ -564,6 +571,18 @@ class ConversationStore:
                 connection.rollback()
                 raise
         return verdict
+
+    def record_turn_persona(
+        self: SQLiteStore, *, turn_id: str, session_id: str, persona_id: str, name: str,
+        instructions_sha256: str,
+    ) -> None:
+        """ADR-0005 §5 — which persona a turn ran as, and the hash of what it ran with."""
+        self._execute(
+            """INSERT OR IGNORE INTO turn_personas
+                 (turn_id, session_id, persona_id, name, instructions_sha256, created_at)
+               VALUES (?, ?, ?, ?, ?, ?)""",
+            (turn_id, session_id, persona_id, name, instructions_sha256, utc_now()),
+        )
 
     def record_turn_retry(
         self: SQLiteStore, *, turn_id: str, retry_of_turn_id: str, session_id: str

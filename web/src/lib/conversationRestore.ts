@@ -38,6 +38,8 @@ export interface RestoredTurnCore {
   reasoningChars: number;
   // DEC-22 step 3 — the turn this one asked again, when it was a Retry.
   retryOf: string | null;
+  // ADR-0005 — the persona the turn ran as, and whether it is unchanged since.
+  persona: { name: string; current: boolean } | null;
 }
 
 export function restoredTurnCore(
@@ -102,7 +104,14 @@ export function restoredTurnCore(
     retainedReasoning: turn.reasoning ?? null,
     reasoningChars: turn.reasoning_chars ?? 0,
     retryOf: turn.retry_of_turn_id ?? null,
+    persona: personaOf(turn.persona),
   };
+}
+
+/** ADR-0005 — the persona a stored turn ran as, as the transcript draws it. */
+function personaOf(record: Record<string, unknown> | null | undefined): { name: string; current: boolean } | null {
+  if (!record || typeof record.name !== "string" || record.name === "") return null;
+  return { name: record.name, current: record.current === true };
 }
 
 /** The parked approval for each turn that has one, keyed by turn id. */

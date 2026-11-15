@@ -209,7 +209,12 @@ def test_a_vector_pdf_keeps_text_as_text_and_counts_what_it_could_not_encode(api
     page = reader.pages[0]
     assert [round(float(v)) for v in page.mediabox[2:]] == [596, 842]
     assert "Café —" in page.extract_text() and "Buy" in page.extract_text()
-    assert settings["characters_replaced"] == 1 and settings["text_encoding"] == "windows-1252"
+    if settings["text_encoding"] == "unicode":
+        # A host TrueType font: every character it has a glyph for is written,
+        # and the words read back through the ToUnicode map (BUG-348 DW-11).
+        assert "✓" in page.extract_text() and settings["characters_replaced"] == 0
+    else:
+        assert settings["characters_replaced"] == 1 and settings["text_encoding"] == "windows-1252"
 
     client, h, _ws = api
     made = client.post("/api/design/documents", json={"title": "PDF"}, headers=h).json()
@@ -220,6 +225,30 @@ def test_a_vector_pdf_keeps_text_as_text_and_counts_what_it_could_not_encode(api
     assert exported["media_type"] == "application/pdf" and exported["settings"]["pdf_pages"] == "vector"
     download = client.get(f"/api/design/exports/{exported['export_id']}/bytes", headers=h)
     assert download.content.startswith(b"%PDF-1.4") and ".pdf\"" in download.headers["content-disposition"]
+
+
+def test_a_vector_pdf_writes_scripts_beyond_windows_1252_as_selectable_text() -> None:
+    import pytest as _pytest
+
+    from raiker.design import pdf as design_pdf
+
+    if design_pdf._host_font_file() is None:
+        _pytest.skip("this host has no TrueType font to embed")
+    doc, _t, _s = apply_operations(blank_document("document_a4"), [
+        {"op": "add_node", "frame_id": "frame-1", "node": {"id": "t", "type": "text", "x": 50, "y": 100, "w": 600,
+                                                           "h": 60, "text": "Ζωή Привет Łódź", "font_size": 24}},
+    ], actor="owner")
+    data, settings = render_pdf(doc, "frame-1", lambda _a: None)
+    text = PdfReader(io.BytesIO(data)).pages[0].extract_text()
+    assert settings["text_encoding"] == "unicode" and settings["characters_replaced"] == 0
+    assert "Ζωή" in text and "Привет" in text and "Łódź" in text
+
+
+def test_the_cmap_reader_refuses_what_is_not_a_font() -> None:
+    from raiker.design.pdf import read_cmap
+
+    assert read_cmap(b"not a font") == {}
+    assert read_cmap(b"") == {}
 
 
 # ── Receipts ────────────────────────────────────────────────────────────

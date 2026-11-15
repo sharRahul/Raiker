@@ -60,6 +60,21 @@ const profiles: ModelProfile[] = [
 ];
 
 describe("ModelPicker", () => {
+  it("reports an explicit pick of the default row, which changes nothing else", async () => {
+    // Found live 2026-11-19: picking the Default row fired no callback, so a
+    // composer could not tell it apart from no choice and a late read of the
+    // surface's remembered model replaced it a second later.
+    const onpicked = vi.fn();
+    const onchosen = vi.fn();
+    const onreset = vi.fn();
+    render(ModelPicker, { profiles, selectedProfile: profiles[0], onpicked, onchosen, onreset });
+    await fireEvent.click(screen.getByRole("button", { name: /model for this turn/i }));
+    await fireEvent.click(screen.getAllByRole("menuitemradio")[0]);
+    expect(onpicked).toHaveBeenCalledTimes(1);
+    expect(onchosen).not.toHaveBeenCalled();
+    expect(onreset).not.toHaveBeenCalled();
+  });
+
   it("dismisses with Escape and restores focus to the model trigger", async () => {
     render(ModelPicker, {
       profiles,

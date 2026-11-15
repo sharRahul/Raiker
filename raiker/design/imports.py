@@ -199,7 +199,105 @@ def _guide_label(text: str) -> str | None:
     return _name(" ".join(words))
 
 
-def parse_brand_guide(filename: str, text: str) -> dict[str, Any]:
+#: The smallest side, in points, a filled rectangle needs to count as a swatch:
+#: a rule, a bullet or a text underline is not a brand colour.
+SWATCH_MIN_SIDE = 18.0
+MAX_SWATCH_PAGES = 30
+
+
+def _swatch_color(operator: str, operands: list[Any]) -> str | None:
+    try:
+        values = [float(value) for value in operands]
+    except (TypeError, ValueError):
+        return None
+    if operator == "rg" and len(values) == 3:
+        r, g, b = values
+    elif operator == "g" and len(values) == 1:
+        r = g = b = values[0]
+    elif operator == "k" and len(values) == 4:
+        c, m, y, k = values
+        r, g, b = (1 - c) * (1 - k), (1 - m) * (1 - k), (1 - y) * (1 - k)
+    else:
+        return None
+    return "#" + "".join(f"{round(max(0.0, min(1.0, part)) * 255):02x}" for part in (r, g, b))
+
+
+def pdf_swatches(data: bytes) -> list[tuple[str, str | None]]:
+    """Colours a brand guide only *shows*: filled rectangles of at least
+    :data:`SWATCH_MIN_SIDE` points, in page order, each with the nearest
+    caption below or beside it when one is close.
+
+    Read from the page's own drawing operators with the local PDF reader; white
+    and near-white page backgrounds are skipped, and nothing is rendered.
+    """
+    try:
+        from pypdf import PdfReader
+        from pypdf.generic import ContentStream
+    except ImportError:  # pragma: no cover - pypdf is a runtime dependency
+        return []
+    import io
+
+    found: list[tuple[str, str | None]] = []
+    try:
+        reader = PdfReader(io.BytesIO(data))
+        for page in reader.pages[:MAX_SWATCH_PAGES]:
+            words: list[tuple[float, float, str]] = []
+
+            def visit(
+                text: str, _cm: Any, tm: Any, _font: Any, _size: Any,
+                into: list[tuple[float, float, str]] = words,
+            ) -> None:
+                cleaned = " ".join(text.split())
+                if cleaned:
+                    into.append((float(tm[4]), float(tm[5]), cleaned))
+
+            page.extract_text(visitor_text=visit)
+            contents = page.get_contents()
+            if contents is None:
+                continue
+            stream = ContentStream(contents, reader)
+            fill: str | None = None
+            pending: list[tuple[float, float, float, float]] = []
+            for operands, operator in stream.operations:
+                name = operator.decode("latin-1") if isinstance(operator, bytes) else str(operator)
+                if name in ("rg", "g", "k"):
+                    fill = _swatch_color(name, list(operands))
+                elif name == "re" and len(operands) == 4:
+                    x, y, w, h = (float(value) for value in operands)
+                    pending.append((x, y, abs(w), abs(h)))
+                elif name in ("f", "F", "f*", "B", "B*", "b", "b*"):
+                    for x, y, w, h in pending:
+                        if fill is None or w < SWATCH_MIN_SIDE or h < SWATCH_MIN_SIDE:
+                            continue
+                        if all(int(fill[i:i + 2], 16) >= 0xF5 for i in (1, 3, 5)):
+                            continue
+                        found.append((fill, _nearest_caption(words, x, y, w, h)))
+                    pending = []
+                elif name in ("n", "S", "s", "W", "W*"):
+                    pending = [] if name in ("n", "S", "s") else pending
+    except Exception:  # noqa: BLE001 - a guide whose drawing cannot be read keeps its stated colours
+        return found
+    return found
+
+
+def _nearest_caption(words: list[tuple[float, float, str]], x: float, y: float, w: float, h: float) -> str | None:
+    """The closest text under (within 40 pt) or to the right of (within 60 pt) a swatch."""
+    best: tuple[float, str] | None = None
+    for wx, wy, text in words:
+        if x - 4 <= wx <= x + w + 4 and y - 40 <= wy <= y:
+            distance = y - wy
+        elif x + w <= wx <= x + w + 60 and y - 4 <= wy <= y + h + 4:
+            distance = wx - (x + w)
+        else:
+            continue
+        if best is None or distance < best[0]:
+            best = (distance, text)
+    return _guide_label(best[1]) if best else None
+
+
+def parse_brand_guide(
+    filename: str, text: str, swatches: list[tuple[str, str | None]] | None = None
+) -> dict[str, Any]:
     """Colours and fonts a brand guide states, in the shape :func:`parse_tokens` returns.
 
     Read from the guide's own words, never guessed from its pictures: a colour
@@ -248,7 +346,18 @@ def parse_brand_guide(filename: str, text: str) -> dict[str, Any]:
             if len(variables["fonts"]) < MAX_VARIABLES_PER_GROUP and family not in variables["fonts"].values():
                 variables["fonts"][name] = family
         previous = line
+    # Colours the guide only shows as swatches, after the ones it states.
+    for value, caption in swatches or []:
+        color = _hex(value)
+        if color is None or color in seen:
+            continue
+        seen.add(color)
+        name = caption if caption and caption not in variables["colors"] else f"swatch-{len(variables['colors']) + 1}"
+        if len(variables["colors"]) >= MAX_VARIABLES_PER_GROUP:
+            skipped.append({"name": name, "reason": f"more than {MAX_VARIABLES_PER_GROUP} colors"})
+            continue
+        variables["colors"][name] = color
     found_count = sum(len(group) for group in variables.values())
     if found_count == 0:
-        skipped.append({"name": filename[:80], "reason": "no #hex or RGB colours or labelled fonts in its text"})
+        skipped.append({"name": filename[:80], "reason": "no colours, swatches or labelled fonts to read"})
     return {"format": "pdf", "variables": variables, "skipped": skipped[:MAX_SKIPPED], "found": found_count}

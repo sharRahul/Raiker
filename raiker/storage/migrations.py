@@ -5157,6 +5157,36 @@ CREATE TABLE IF NOT EXISTS instruction_file_reviews (
 );
 """
 
+PERSONAS_MIGRATION_ID = "RAIKER-2134-personas"
+#: ADR-0005 — composer personas. Owner data under the account; the ceiling is
+#: a JSON list of tool families (NULL inherits the turn's tools).
+PERSONAS_SQL = """
+CREATE TABLE IF NOT EXISTS personas (
+  persona_id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL,
+  name TEXT NOT NULL,
+  description TEXT NOT NULL DEFAULT '',
+  instructions TEXT NOT NULL,
+  model_profile TEXT,
+  model TEXT,
+  tool_ceiling_json TEXT,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_personas_user_name ON personas (user_id, lower(name));
+-- What each turn ran as: kept when the persona is edited or removed, so an
+-- older answer can still say *ran with an earlier version*.
+CREATE TABLE IF NOT EXISTS turn_personas (
+  turn_id TEXT PRIMARY KEY,
+  session_id TEXT NOT NULL,
+  persona_id TEXT NOT NULL,
+  name TEXT NOT NULL,
+  instructions_sha256 TEXT NOT NULL,
+  created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_turn_personas_session ON turn_personas (session_id);
+"""
+
 LLAMA_RUNTIME_MIGRATION_ID = "RAIKER-2130-llama-runtime"
 LLAMA_RUNTIME_SQL = """
 CREATE TABLE IF NOT EXISTS local_model_runtime_settings (
@@ -5421,6 +5451,7 @@ MIGRATIONS: tuple[MigrationStep, ...] = (
     Migration(GRANT_LIMITS_MIGRATION_ID, GRANT_LIMITS_SQL),
     Migration(CONNECTOR_POLICIES_MIGRATION_ID, CONNECTOR_POLICIES_SQL),
     Migration(INSTRUCTION_FILES_MIGRATION_ID, INSTRUCTION_FILES_SQL),
+    Migration(PERSONAS_MIGRATION_ID, PERSONAS_SQL),
 )
 
 #: DEC-17 step 8 — how far along the registry this build is, as one number.

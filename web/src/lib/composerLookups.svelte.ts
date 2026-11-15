@@ -15,6 +15,7 @@ import { api } from "./api";
 import { NOT_ANSWERING } from "./errorCopy";
 import type { MenuItem } from "./components/ComposerMenu.svelte";
 import type { SlashCommand } from "./composerCommands";
+import type { PersonaView } from "./generated/apiContract";
 
 export interface MentionNotice {
   text: string;
@@ -27,6 +28,8 @@ export class ComposerLookups {
   mentionNotice = $state<MentionNotice | null>(null);
   /** The owner's active skills that declare a command trigger. */
   slashCommands = $state<SlashCommand[]>([]);
+  /** ADR-0005 — the owner's personas, offered first under `@`. */
+  personas = $state<PersonaView[]>([]);
   private mentionRequest = 0;
 
   constructor(
@@ -47,6 +50,29 @@ export class ComposerLookups {
       this.slashCommands = [];
     }
   };
+
+  loadPersonas = async () => {
+    try {
+      this.personas = (await api.personas()).personas;
+    } catch {
+      // A persona list that cannot be read leaves file mentions working.
+      this.personas = [];
+    }
+  };
+
+  /** Personas whose name starts with what was typed after `@`, as menu rows. */
+  personaItems(fragment: string): MenuItem[] {
+    const wanted = fragment.toLowerCase();
+    return this.personas
+      .filter((persona) => persona.name.toLowerCase().startsWith(wanted))
+      .map((persona) => ({
+        id: persona.persona_id,
+        label: `@${persona.name}`,
+        detail: persona.description || undefined,
+        group: "Personas",
+        kind: "persona" as const,
+      }));
+  }
 
   loadMentions = async (fragment: string) => {
     const request = ++this.mentionRequest;
@@ -71,6 +97,7 @@ export class ComposerLookups {
         id: entry.path,
         label: entry.path,
         detail: entry.language,
+        group: "Files",
       }));
     } catch {
       if (request !== this.mentionRequest) return;

@@ -62,6 +62,7 @@
     type Guide,
     type Handle,
     CHECK_STATUS,
+    designFailure,
     designReason,
     documentBody,
     findNode,
@@ -151,7 +152,7 @@
       await loadList();
       show(made);
     } catch (error) {
-      notice = designReason(error instanceof ApiError ? error.reasonCode : null);
+      notice = designFailure("The design was not created", error);
     } finally {
       busy = false;
     }
@@ -172,7 +173,7 @@
       rail = "inspect";
       void refreshRail();
     } catch (error) {
-      notice = designReason(error instanceof ApiError ? error.reasonCode : null);
+      notice = designFailure("The design could not be opened", error, "It is unchanged.");
     }
   }
 
@@ -197,7 +198,7 @@
       return true;
     } catch (error) {
       const code = error instanceof ApiError ? error.reasonCode : null;
-      notice = designReason(code);
+      notice = designFailure("That change was not saved", error);
       // Reloaded so the next change is made against what is really there; the
       // notice stays, because the owner needs to know why their change did not land.
       if (code?.startsWith("design_version_conflict")) await openDocument(open.document_id, true);
@@ -497,7 +498,7 @@
       gallery = await api.images();
       placeImage(made.generation.generation_id);
     } catch (error) {
-      notice = designReason(error instanceof ApiError ? error.reasonCode : null);
+      notice = designFailure("The picture was not imported", error);
     } finally {
       importing = false;
     }
@@ -521,7 +522,7 @@
       show(change.document);
       if (rail === "history" || rail === "check") void refreshRail();
     } catch (error) {
-      notice = designReason(error instanceof ApiError ? error.reasonCode : null);
+      notice = designFailure("Undo or redo did not finish", error);
     } finally {
       busy = false;
     }
@@ -708,7 +709,7 @@
       show(change.document);
       await refreshRail();
     } catch (error) {
-      notice = designReason(error instanceof ApiError ? error.reasonCode : null);
+      notice = designFailure("That version was not restored", error);
     } finally {
       busy = false;
     }
@@ -747,7 +748,7 @@
       proposals = [made, ...proposals];
       picked = Object.fromEntries(made.operations.filter((op) => op.status === "valid").map((op) => [String(op.index), true]));
     } catch (error) {
-      notice = designReason(error instanceof ApiError ? error.reasonCode : null);
+      notice = designFailure("The design agent did not answer", error);
     } finally {
       proposing = false;
     }
@@ -771,7 +772,7 @@
       }
       proposals = (await contract.listDesignProposals(open.document_id)).proposals;
     } catch (error) {
-      notice = designReason(error instanceof ApiError ? error.reasonCode : null);
+      notice = designFailure("The proposal was not applied or rejected", error);
     } finally {
       busy = false;
     }
@@ -812,7 +813,7 @@
       if (!systemName.trim()) systemName = read.filename.replace(/\.[^.]+$/, "");
       tokenReport = read;
     } catch (error) {
-      notice = designReason(error instanceof ApiError ? error.reasonCode : null);
+      notice = designFailure("The file was not imported", error);
     }
   }
 
@@ -827,7 +828,7 @@
       systemSource = `Colours read from “${asset.prompt}” (${asset.generation_id})`;
       tokenReport = null;
     } catch (error) {
-      notice = designReason(error instanceof ApiError ? error.reasonCode : null);
+      notice = designFailure("The picture's colours could not be read", error);
     }
   }
 
@@ -868,7 +869,7 @@
       systemName = "";
       tokenReport = null;
     } catch (error) {
-      notice = designReason(error instanceof ApiError ? error.reasonCode : null);
+      notice = designFailure("The design system was not saved", error);
     } finally {
       busy = false;
     }
@@ -879,7 +880,7 @@
     try {
       preview = await contract.previewDesignSystem(open.document_id, { system_id: systemChoice || null });
     } catch (error) {
-      notice = designReason(error instanceof ApiError ? error.reasonCode : null);
+      notice = designFailure("The design system could not be previewed", error);
     }
   }
 
@@ -895,7 +896,7 @@
       show(change.document);
       preview = null;
     } catch (error) {
-      notice = designReason(error instanceof ApiError ? error.reasonCode : null);
+      notice = designFailure("The design system was not applied", error);
     } finally {
       busy = false;
     }
@@ -920,7 +921,7 @@
       await contract.exportDesignFrame(open.document_id, { frame_id: frame.id, format: exportFormat, scale: exportScale });
       await refreshRail();
     } catch (error) {
-      notice = designReason(error instanceof ApiError ? error.reasonCode : null);
+      notice = designFailure("The export was not made", error, "No file was written.");
     } finally {
       busy = false;
     }
@@ -959,7 +960,7 @@
       handedOff = made.filename;
       await refreshRail();
     } catch (error) {
-      notice = designReason(error instanceof ApiError ? error.reasonCode : null);
+      notice = designFailure("The design was not handed to Build", error);
     } finally {
       busy = false;
     }
@@ -974,7 +975,7 @@
       show(await contract.updateDesignDocument(open.document_id, { title }));
       await loadList();
     } catch (error) {
-      notice = designReason(error instanceof ApiError ? error.reasonCode : null);
+      notice = designFailure("The design was not renamed", error);
     }
   }
 
@@ -983,7 +984,7 @@
     try {
       show(await contract.updateDesignDocument(open.document_id, { project_id: (event.currentTarget as HTMLSelectElement).value }));
     } catch (error) {
-      notice = designReason(error instanceof ApiError ? error.reasonCode : null);
+      notice = designFailure("The design was not filed in that project", error);
     }
   }
 

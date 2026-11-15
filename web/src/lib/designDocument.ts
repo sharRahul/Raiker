@@ -1,3 +1,5 @@
+import { ApiError } from "./api";
+import { failure } from "./errorCopy";
 /**
  * Raiker Design's structured documents, as the canvas reads them (DW-01 to DW-12).
  *
@@ -290,6 +292,23 @@ export function designReason(code: string | null | undefined): string {
   const said = words[head];
   if (said) return detail && head === "design_proposal_provider_error" ? `${said} (${detail})` : said;
   return code;
+}
+
+/**
+ * QUI-G06 — a failed Design action, said the way every other surface says it.
+ *
+ * A refusal Design has words for keeps them (*That layer is locked*); anything
+ * else — Raiker not answering, a refusal with no sentence here — names what
+ * failed, what it affected and what to do next through `failure()`, instead of
+ * *That change was refused.* or a bare reason code.
+ */
+export function designFailure(what: string, error: unknown, affected = "Nothing was changed."): string {
+  const code = error instanceof ApiError ? error.reasonCode : null;
+  if (code) {
+    const said = designReason(code);
+    if (said !== code) return said;
+  }
+  return failure(what, affected, "Try again.", error);
 }
 
 /* ── Direct manipulation (DW-02) ───────────────────────────────────────── */

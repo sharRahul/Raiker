@@ -139,7 +139,13 @@ def _meaning_embedder(store: SQLiteStore, owner: str, *, purpose: str = "goal-no
         embedder = GovernedQueryEmbedder(store, owner, session_id=purpose)
     except Exception:  # noqa: BLE001 - noticing falls back to words
         return None
-    return lambda text: embedder(backend, text)
+    def embed(text: str) -> list[float] | None:
+        return embedder(backend, text)
+
+    # The space vectors are compared in, so a search can reuse a candidate's
+    # vector from an earlier search (`meaning_search._document_vector`).
+    embed.space = str(backend.model_label)  # type: ignore[attr-defined]
+    return embed
 
 
 @router.get("/api/goals/suggestion")

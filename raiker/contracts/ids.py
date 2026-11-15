@@ -142,6 +142,8 @@ _PREFIXES = {
     "dhand_",
     # QUI-F15 — a block of an answer pinned to the Library.
     "pin_",
+    # ADR-0005 — composer personas.
+    "persona_",
     # QUI-F07 — a further named account on one connector.
     "cacct_",
 }

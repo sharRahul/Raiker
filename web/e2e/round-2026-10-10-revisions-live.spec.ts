@@ -106,7 +106,7 @@ test("appearance previews before it is kept and Discard puts it back", async ({ 
   const seen = watchFailures(page);
   await signInAsOwner(page, BASE);
   await open(page, "#/settings?tab=personalisation");
-  await expect(page.getByText(/never its instructions, its personality or what it may do/)).toBeVisible();
+  await expect(page.getByText(/nothing here changes what Raiker may do/)).toBeVisible();
   await page.getByText("Layout & type").click();
   await page.getByRole("radio", { name: /Compact/ }).click();
   await expect(page.locator("html")).toHaveAttribute("data-spacing", "compact");

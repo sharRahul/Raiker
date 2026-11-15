@@ -175,11 +175,11 @@ test("Settings says what it decides, once, and keeps the tuning one fold away", 
   const errors = watchConsole(page);
   await signInAsOwner(page, BASE);
 
-  // REM-SET-GENERAL — the distinction that changes the answer, said once.
+  // REM-SET-GENERAL — General keeps language and time; FIXED-1391 replaced the
+  // page's caption with the card's own line (*Raiker's own text is in English*).
   await page.goto(`${BASE}/#/settings?tab=general`);
-  await expect(
-    page.getByText("Interface text and formatting only. These do not change what Raiker tells a model."),
-  ).toBeVisible({ timeout: 60_000 });
+  await expect(page.getByRole("heading", { name: "Language and time" })).toBeVisible({ timeout: 60_000 });
+  await expect(page.getByText(/Raiker's own text is in English/)).toBeVisible();
   await expect(page.getByLabel("Default weather location")).toHaveCount(0);
   await capture(page, `${SHOTS}/settings-general-trimmed.png`);
 
@@ -242,9 +242,12 @@ test("Home opens on the next action, with the commentary under it", async ({ pag
   await expect(greeting).toBeVisible({ timeout: 60_000 });
   // QUI-H01 — the primary action is Home's composer.
   const start = page.getByLabel("Ask Raiker");
-  const freshness = page.getByText(/^Updated |^Updating…$/).first();
+  // The freshness line became the Refresh control's title beside *Needs your
+  // attention* (2026-11 Home); it still sits under the composer.
+  const freshness = page.getByRole("button", { name: "Refresh Workbench" });
   await expect(start).toBeVisible();
   await expect(freshness).toBeVisible();
+  await expect(freshness).toHaveAttribute("title", /^Updated |^Updating…$/);
 
   // REM-HOME-03 — the primary action is above the platform-state strip, not
   // below two rows of Raiker describing itself.

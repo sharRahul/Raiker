@@ -5,7 +5,7 @@
  * owner does, on the surface they do it on, and what the screen says afterwards.
  * Each block is written so it can fail for exactly one reason.
  */
-import { expect, test } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
 import { capture } from "./capture";
 import { setPermission, signInAsOwner } from "./hosted-provider";
 
@@ -42,11 +42,18 @@ test("a Build task says so on the board, and a Chat one stays quiet (backlog #23
   await capture(page, "../../docs/plans/screenshots/working/backlog-23-task-surface.png");
 });
 
+/** The collector moved into Diagnostics' closed *Share or export* fold. */
+async function openShareOrExport(page: Page): Promise<void> {
+  const fold = page.locator("details.support");
+  if ((await fold.getAttribute("open")) === null) await fold.locator("summary").click();
+}
+
 test("a collector receives governed events, metadata only (backlog #18)", async ({ page }) => {
   test.setTimeout(180_000);
   await signInAsOwner(page, BASE);
   await page.goto(`${BASE}/#/observe?tab=overview`);
   await page.waitForLoadState("networkidle");
+  await openShareOrExport(page);
 
   await expect(page.getByRole("heading", { name: "Can I see this outside Raiker?" })).toBeVisible();
 
@@ -61,15 +68,16 @@ test("a collector receives governed events, metadata only (backlog #18)", async 
     await setPermission(page, BASE, "Telemetry export", "Turn on", "Live validation of the governed OTLP export");
     await page.goto(`${BASE}/#/observe?tab=overview`);
     await page.waitForLoadState("networkidle");
+    await openShareOrExport(page);
   }
   // The honest empty state: no collector, so nothing can leave.
-  const existing = page.getByText("Local collector");
+  const existing = page.getByText("Local collector", { exact: true });
   if ((await existing.count()) === 0) {
     await page.getByRole("button", { name: /Add collector/ }).click();
     await page.getByLabel("Name").fill("Local collector");
     await page.getByLabel("OTLP endpoint").fill("http://127.0.0.1:4318");
     await page.getByRole("button", { name: /^Add collector$/ }).click();
-    await expect(page.getByText("Local collector")).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByText("Local collector", { exact: true })).toBeVisible({ timeout: 30_000 });
   }
 
   // Metadata only until the owner says otherwise, said on the card.
@@ -128,6 +136,26 @@ test("a connected MCP server says what each of its tools takes (backlog #16, MCP
 
 test("an http hook says which destination the grant covers (BUG-226)", async ({ page }) => {
   test.setTimeout(180_000);
+  // The fixture this test reads: a workspace rule with two http handlers. The
+  // host must run with RAIKER_HOOK_EGRESS_ALLOWLIST=127.0.0.1:* (the grant).
+  // Written here from RAIKER_LIVE_WORKSPACE rather than left to the operator,
+  // which is why the 2026-11-17 re-run found nothing to read.
+  const workspace = process.env.RAIKER_LIVE_WORKSPACE ?? "";
+  test.skip(workspace === "", "set RAIKER_LIVE_WORKSPACE to the host's workspace");
+  const { mkdirSync, writeFileSync } = await import("node:fs");
+  mkdirSync(`${workspace}/config`, { recursive: true });
+  writeFileSync(`${workspace}/config/hooks.json`, JSON.stringify({
+    schema_version: "1.0",
+    hooks: {
+      PreToolUse: [{
+        matcher: "shell",
+        handlers: [
+          { id: "local", type: "http", url: "http://127.0.0.1:9099/hook" },
+          { id: "elsewhere", type: "http", url: "https://hooks.elsewhere.invalid/raiker" },
+        ],
+      }],
+    },
+  }));
   await signInAsOwner(page, BASE);
   await page.goto(`${BASE}/#/extensions?tab=hooks`);
   await page.waitForLoadState("networkidle");

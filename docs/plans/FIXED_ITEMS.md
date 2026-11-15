@@ -1,5 +1,37 @@
 # Fixed items
 
+## FIXED-1522 — Picking the Default model in a new chat was replaced a second later
+
+**Severity: Medium. Area: Chat / Build composer. Status: Fixed 2026-11-19 (found live this round).** Choosing the row already shown (the Default) fired no callback, so the late read of the surface's remembered model replaced it and the turn ran on another provider. `ModelPicker` now reports every explicit pick (`onpicked`); Chat and Build keep it. Evidence: `ModelPicker.test.ts`; RT-1119-02 receipt reads Haiku 4.5.
+
+## FIXED-1521 — Tool search offered tools a persona withholds, and a model looped on it
+
+**Severity: Medium. Area: Personas / tools. Status: Fixed 2026-11-19 (found live).** The search now leaves out withheld tools and says why; the live turn made one lookup and answered. Evidence: `tests/test_personas.py`; RT-1119-02.
+
+## FIXED-1520 — Deleting a conversation left its retry links behind
+
+**Severity: Low. Area: Storage. Status: Fixed 2026-11-19.** `turn_retries` (and the new `turn_personas`) are now in the session-delete cascade.
+
+## FIXED-1519 — Design Documents said *That change was refused.* when Raiker did not answer (QUI-G06)
+
+**Severity: Low. Area: Design. Status: Fixed 2026-11-19.** `designFailure()` keeps Design's known sentences and otherwise uses `failure()` with what failed; research says when its sources could not be listed. Evidence: `designDocument.test.ts`.
+
+## FIXED-1518 — Brand-guide colours shown only as swatches were not read (BUG-348 DW-06)
+
+**Severity: Medium. Area: Design / systems. Status: Fixed 2026-11-19.** `pdf_swatches` reads filled rectangles ≥18 pt with their nearest caption. Evidence: `tests/test_design_brand_guide.py`.
+
+## FIXED-1517 — Vector PDF text beyond Windows-1252 became `?` (BUG-348 DW-11)
+
+**Severity: Medium. Area: Design / export. Status: Fixed 2026-11-19.** A host TrueType font is embedded as Type0/Identity-H with a ToUnicode map. Evidence: `tests/test_design_workspace_round_two.py`.
+
+## FIXED-1516 — Deck shapes and images were a flattened picture (BUG-348 DW-11)
+
+**Severity: Medium. Area: Design / export. Status: Fixed 2026-11-19.** Background, rectangles, rounded rectangles, ellipses, images and text are native slide objects in drawing order. Evidence: `tests/test_design_documents.py`.
+
+## FIXED-1515 — Composer personas (ADR-0005, slices 1–3)
+
+**Severity: Medium. Area: Chat / personas. Status: Fixed 2026-11-19.** Settings › Personalisation › Personas; `@` lists Personas then Files; a chip sends `persona_id`; the ceiling denies left-out capabilities and withholds their tools; the answer reads *Raiker as @Name* and *ran with an earlier version* after an edit. Also: a bounded per-space cache of candidate vectors for search by meaning. Evidence: `tests/test_personas.py`, `Personas.test.ts`; RT-1119-01..03 passed live.
+
 ## FIXED-1514 — A conversation's record in Threads stayed under a second copy of the list
 
 **Severity: Low. Area: Work / Threads. Status: Fixed 2026-11-18 (found this round).**
@@ -3310,6 +3342,14 @@ file you can open. The two capture sets that remain — `screenshots/pages/` and
 | [FIXED-1382](#fixed-1382--linux-filesystem-flags-broke-windows-type-checking) | Low | Platform portability | Fixed 2026-11-09 |
 | [FIXED-1383](#fixed-1383--keyboard-start-evidence-depended-on-retired-receipt-wording) | Low | Beta live tests | Fixed 2026-11-09 |
 | [FIXED-1384](#fixed-1384--model-downloads-checked-redirect-hosts-after-contacting-them) | High | Model and speech downloads | Fixed 2026-11-09 |
+| [FIXED-1522](#fixed-1522--picking-the-default-model-in-a-new-chat-was-replaced-a-second-later) | Medium | Chat / Build composer | Fixed 2026-11-19 |
+| [FIXED-1521](#fixed-1521--tool-search-offered-tools-a-persona-withholds-and-a-model-looped-on-it) | Medium | Personas / tools | Fixed 2026-11-19 |
+| [FIXED-1520](#fixed-1520--deleting-a-conversation-left-its-retry-links-behind) | Low | Storage | Fixed 2026-11-19 |
+| [FIXED-1519](#fixed-1519--design-documents-said-that-change-was-refused-when-raiker-did-not-answer-qui-g06) | Low | Design | Fixed 2026-11-19 |
+| [FIXED-1518](#fixed-1518--brand-guide-colours-shown-only-as-swatches-were-not-read-bug-348-dw-06) | Medium | Design / systems | Fixed 2026-11-19 |
+| [FIXED-1517](#fixed-1517--vector-pdf-text-beyond-windows-1252-became--bug-348-dw-11) | Medium | Design / export | Fixed 2026-11-19 |
+| [FIXED-1516](#fixed-1516--deck-shapes-and-images-were-a-flattened-picture-bug-348-dw-11) | Medium | Design / export | Fixed 2026-11-19 |
+| [FIXED-1515](#fixed-1515--composer-personas-adr-0005-slices-13) | Medium | Chat / personas | Fixed 2026-11-19 |
 | [FIXED-1514](#fixed-1514--a-conversations-record-in-threads-stayed-under-a-second-copy-of-the-list) | Low | Work / Threads | Fixed 2026-11-18 |
 | [FIXED-1513](#fixed-1513--a-conversation-search-hit-did-not-say-what-its-conversation-was-about-tool-119) | Low | Recall / tools | Fixed 2026-11-18 |
 | [FIXED-1512](#fixed-1512--a-brand-guide-could-not-fill-a-design-system-bug-348-dw-06) | Medium | Design / systems | Fixed 2026-11-18 |

@@ -72,7 +72,7 @@ describe("Settings → Personalisation", () => {
 
   it("says that how Raiker looks never changes what it is told or may do", () => {
     render(Personalisation, { settings: {}, save: vi.fn(), theme: "system", chooseTheme: vi.fn() });
-    expect(screen.getByText(/never its instructions, its personality or what it may do/)).toBeInTheDocument();
+    expect(screen.getByText(/nothing here changes what Raiker may do/)).toBeInTheDocument();
   });
 });
 

@@ -14,15 +14,19 @@ zoom and its text can be selected and searched:
 * a placed picture is embedded at twice its box's size after its crop and fit,
   the one part of the page that is pixels because the asset itself is.
 
-Text is encoded as Windows-1252, the encoding a simple embedded font carries.
-A character outside it is written as ``?`` and counted, so the export can say
-so instead of a reader discovering it.
+Since 2026-11-19 (BUG-348 DW-11) text is written in any script the embedded
+font covers: the TrueType file is a composite (``Type0``, ``Identity-H``) font,
+each character is its glyph id read from the file's own ``cmap`` table, and a
+``ToUnicode`` map keeps the words selectable and searchable. A character the
+font has no glyph for is counted, so the export can say so. Only a host with no
+TrueType file falls back to Helvetica and Windows-1252, writing ``?`` for the rest.
 """
 
 from __future__ import annotations
 
 import io
 import math
+import struct
 import zlib
 from collections.abc import Mapping
 from pathlib import Path
@@ -75,6 +79,22 @@ class _Page:
         self.states: dict[float, str] = {}
         self.images: list[tuple[str, Image.Image]] = []
         self.lost = 0
+        #: Code point → glyph id of the embedded font; empty writes Windows-1252.
+        self.cmap: dict[int, int] = {}
+        #: Glyph id → the character it was written for (for ToUnicode and widths).
+        self.used: dict[int, str] = {}
+
+    def glyphs(self, text: str) -> str:
+        """*text* as a hex string of two-byte glyph ids, counting characters with no glyph."""
+        out: list[str] = []
+        for ch in text:
+            gid = self.cmap.get(ord(ch), 0)
+            if gid == 0:
+                self.lost += 1
+            else:
+                self.used.setdefault(gid, ch)
+            out.append(f"{gid:04X}")
+        return "".join(out)
 
     def y(self, value: float) -> float:
         return (self.height - value) * PT
@@ -198,9 +218,13 @@ def _text(page: _Page, node: Mapping[str, Any], x: float, y: float, w: float, op
         # The raster export draws from the line's top; its baseline sits at the
         # font's ascent below that, which this matches.
         baseline = y + index * size * float(node["line_height"]) + _ascent(size)
+        position = f"1 0 0 1 {_num(left * PT)} {_num(page.y(baseline))} Tm "
+        if page.cmap:
+            page.ops.append(position + "<" + page.glyphs(line) + "> Tj")
+            continue
         encoded, lost = _encode(line)
         page.lost += lost
-        page.ops.append(f"1 0 0 1 {_num(left * PT)} {_num(page.y(baseline))} Tm (" + encoded.decode("latin-1") + ") Tj")
+        page.ops.append(position + "(" + encoded.decode("latin-1") + ") Tj")
     page.ops.append("ET")
 
 
@@ -208,6 +232,92 @@ def _ascent(size: float) -> float:
     font = _font(size)
     metrics = getattr(font, "getmetrics", None)
     return float(metrics()[0]) if metrics else size * 0.8
+
+
+def read_cmap(font: bytes) -> dict[int, int]:
+    """Code point → glyph id from a TrueType file's ``cmap`` (formats 12 and 4).
+
+    Read here rather than through a font library: these two formats are what
+    every Unicode TrueType font carries, and anything unexpected reads as an
+    empty map, which only means the page falls back to Windows-1252.
+    """
+    try:
+        count = struct.unpack_from(">H", font, 4)[0]
+        tables = {}
+        for index in range(count):
+            tag, _check, offset, _length = struct.unpack_from(">4sIII", font, 12 + index * 16)
+            tables[tag] = offset
+        base = tables[b"cmap"]
+        subtables = struct.unpack_from(">H", font, base + 2)[0]
+        found: dict[tuple[int, int], int] = {}
+        for index in range(subtables):
+            platform, encoding, offset = struct.unpack_from(">HHI", font, base + 4 + index * 8)
+            found[(platform, encoding)] = base + offset
+        mapping: dict[int, int] = {}
+        for key in ((3, 10), (0, 4), (0, 6)):
+            if key in found and struct.unpack_from(">H", font, found[key])[0] == 12:
+                start = found[key]
+                groups = struct.unpack_from(">I", font, start + 12)[0]
+                for group in range(groups):
+                    first, last, gid = struct.unpack_from(">III", font, start + 16 + group * 12)
+                    for offset_code in range(min(last - first + 1, 0x110000)):
+                        mapping[first + offset_code] = gid + offset_code
+                return mapping
+        for key in ((3, 1), (0, 3), (0, 1), (0, 0)):
+            if key not in found or struct.unpack_from(">H", font, found[key])[0] != 4:
+                continue
+            start = found[key]
+            segments = struct.unpack_from(">H", font, start + 6)[0] // 2
+            ends = struct.unpack_from(f">{segments}H", font, start + 14)
+            starts = struct.unpack_from(f">{segments}H", font, start + 16 + segments * 2)
+            deltas = struct.unpack_from(f">{segments}h", font, start + 16 + segments * 4)
+            range_base = start + 16 + segments * 6
+            offsets = struct.unpack_from(f">{segments}H", font, range_base)
+            for segment in range(segments):
+                for code in range(starts[segment], ends[segment] + 1):
+                    if code == 0xFFFF:
+                        continue
+                    if offsets[segment] == 0:
+                        gid = (code + deltas[segment]) & 0xFFFF
+                    else:
+                        at = range_base + segment * 2 + offsets[segment] + (code - starts[segment]) * 2
+                        gid = struct.unpack_from(">H", font, at)[0]
+                        gid = (gid + deltas[segment]) & 0xFFFF if gid else 0
+                    if gid:
+                        mapping[code] = gid
+            return mapping
+    except (KeyError, struct.error, IndexError):
+        return {}
+    return {}
+
+
+def _to_unicode(used: Mapping[int, str]) -> bytes:
+    """The CMap that maps each written glyph id back to its character."""
+    lines = [
+        "/CIDInit /ProcSet findresource begin 12 dict begin begincmap",
+        "/CIDSystemInfo << /Registry (Adobe) /Ordering (UCS) /Supplement 0 >> def",
+        "/CMapName /Adobe-Identity-UCS def /CMapType 2 def",
+        "1 begincodespacerange <0000> <FFFF> endcodespacerange",
+    ]
+    items = sorted(used.items())
+    for chunk in range(0, len(items), 100):
+        block = items[chunk:chunk + 100]
+        lines.append(f"{len(block)} beginbfchar")
+        for gid, ch in block:
+            utf16 = ch.encode("utf-16-be").hex().upper()
+            lines.append(f"<{gid:04X}> <{utf16}>")
+        lines.append("endbfchar")
+    lines += ["endcmap CMapName currentdict /CMap defineresource pop end end"]
+    return "\n".join(lines).encode("ascii")
+
+
+def _host_font_file() -> bytes | None:
+    name = raster_font_name()
+    if name == "bundled-sans":
+        return None
+    candidate = getattr(ImageFont.truetype(name, 12), "path", None)
+    path = str(candidate) if candidate and Path(str(candidate)).is_file() else None
+    return Path(path).read_bytes() if path else None
 
 
 def _font_objects() -> tuple[dict[str, bytes], bytes | None]:
@@ -234,10 +344,26 @@ def _font_objects() -> tuple[dict[str, bytes], bytes | None]:
     return font, Path(path).read_bytes() if path else None
 
 
+def _simple_font(add: Any, stream: Any) -> tuple[int, bytes | None]:
+    """The Windows-1252 font: the host's TrueType file when it has one, else Helvetica."""
+    font, font_file = _font_objects()
+    font_ref = ""
+    if font_file is not None:
+        file_ref = stream(f"/Length1 {len(font_file)}", font_file)
+        descriptor = add(
+            f"<< /Type /FontDescriptor /FontName /RaikerSans /Flags 32 /FontBBox [-1021 -463 1793 1232] "
+            f"/ItalicAngle 0 /Ascent 928 /Descent -236 /CapHeight 729 /StemV 80 /FontFile2 {file_ref} 0 R >>".encode()
+        )
+        font_ref = f" /FontDescriptor {descriptor} 0 R"
+    return add(("<< " + " ".join(f"/{k} {v.decode()}" for k, v in font.items()) + font_ref + " >>").encode()), font_file
+
+
 def render_pdf(document: Mapping[str, Any], frame_id: str, load: AssetLoader) -> tuple[bytes, dict[str, Any]]:
     """One frame as a one-page vector PDF, and what the export should record about it."""
     frame = find_frame(document, frame_id)
     page = _Page(float(frame["height"]))
+    host_font = _host_font_file()
+    page.cmap = read_cmap(host_font) if host_font is not None else {}
     width_pt, height_pt = frame["width"] * PT, frame["height"] * PT
     page.ops.append("q")
     page.paint(frame.get("background") or "#ffffff", None, 0, 1)
@@ -256,16 +382,28 @@ def render_pdf(document: Mapping[str, Any], frame_id: str, load: AssetLoader) ->
         return add(f"<< {dictionary} /Filter /FlateDecode /Length {len(packed)} >>\nstream\n".encode()
                    + packed + b"\nendstream")
 
-    font, font_file = _font_objects()
-    font_ref = ""
-    if font_file is not None:
+    font_file: bytes | None
+    if page.cmap and host_font is not None:
+        font_file = host_font
         file_ref = stream(f"/Length1 {len(font_file)}", font_file)
         descriptor = add(
             f"<< /Type /FontDescriptor /FontName /RaikerSans /Flags 32 /FontBBox [-1021 -463 1793 1232] "
             f"/ItalicAngle 0 /Ascent 928 /Descent -236 /CapHeight 729 /StemV 80 /FontFile2 {file_ref} 0 R >>".encode()
         )
-        font_ref = f" /FontDescriptor {descriptor} 0 R"
-    font_id = add(("<< " + " ".join(f"/{k} {v.decode()}" for k, v in font.items()) + font_ref + " >>").encode())
+        measure = _font(1000)
+        widths = " ".join(f"{gid} [{round(measure.getlength(ch))}]" for gid, ch in sorted(page.used.items()))
+        cid_font = add(
+            f"<< /Type /Font /Subtype /CIDFontType2 /BaseFont /RaikerSans "
+            f"/CIDSystemInfo << /Registry (Adobe) /Ordering (Identity) /Supplement 0 >> "
+            f"/FontDescriptor {descriptor} 0 R /DW 500 /W [{widths}] /CIDToGIDMap /Identity >>".encode()
+        )
+        to_unicode = stream("", _to_unicode(page.used))
+        font_id = add(
+            f"<< /Type /Font /Subtype /Type0 /BaseFont /RaikerSans /Encoding /Identity-H "
+            f"/DescendantFonts [{cid_font} 0 R] /ToUnicode {to_unicode} 0 R >>".encode()
+        )
+    else:
+        font_id, font_file = _simple_font(add, stream)
 
     xobjects = []
     for name, picture in page.images:
@@ -317,7 +455,7 @@ def render_pdf(document: Mapping[str, Any], frame_id: str, load: AssetLoader) ->
               f"startxref\n{xref}\n%%EOF\n".encode())
     settings = {
         "font": raster_font_name() if font_file is not None else "Helvetica (not embedded)",
-        "text_encoding": "windows-1252",
+        "text_encoding": "unicode" if page.cmap and font_file is not None else "windows-1252",
         "characters_replaced": page.lost,
     }
     return out.getvalue(), settings

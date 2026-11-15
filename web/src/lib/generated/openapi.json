@@ -26438,6 +26438,209 @@
         "title": "PendingTool",
         "type": "object"
       },
+      "PersonaFamily": {
+        "properties": {
+          "family": {
+            "title": "Family",
+            "type": "string"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          }
+        },
+        "required": [
+          "family",
+          "label"
+        ],
+        "title": "PersonaFamily",
+        "type": "object"
+      },
+      "PersonaList": {
+        "properties": {
+          "families": {
+            "items": {
+              "$ref": "#/components/schemas/PersonaFamily"
+            },
+            "title": "Families",
+            "type": "array"
+          },
+          "personas": {
+            "items": {
+              "$ref": "#/components/schemas/PersonaView"
+            },
+            "title": "Personas",
+            "type": "array"
+          }
+        },
+        "required": [
+          "personas",
+          "families"
+        ],
+        "title": "PersonaList",
+        "type": "object"
+      },
+      "PersonaRemoved": {
+        "properties": {
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          },
+          "persona_id": {
+            "title": "Persona Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "ok",
+          "persona_id"
+        ],
+        "title": "PersonaRemoved",
+        "type": "object"
+      },
+      "PersonaRequest": {
+        "additionalProperties": false,
+        "description": "ADR-0005 — a persona as the owner wrote it. Validated in `raiker.personas`.",
+        "properties": {
+          "description": {
+            "default": "",
+            "title": "Description",
+            "type": "string"
+          },
+          "instructions": {
+            "title": "Instructions",
+            "type": "string"
+          },
+          "model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model"
+          },
+          "model_profile": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model Profile"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "tool_ceiling": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tool Ceiling"
+          }
+        },
+        "required": [
+          "name",
+          "instructions"
+        ],
+        "title": "PersonaRequest",
+        "type": "object"
+      },
+      "PersonaView": {
+        "properties": {
+          "created_at": {
+            "title": "Created At",
+            "type": "string"
+          },
+          "description": {
+            "title": "Description",
+            "type": "string"
+          },
+          "instructions": {
+            "title": "Instructions",
+            "type": "string"
+          },
+          "instructions_sha256": {
+            "title": "Instructions Sha256",
+            "type": "string"
+          },
+          "model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model"
+          },
+          "model_profile": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model Profile"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "persona_id": {
+            "title": "Persona Id",
+            "type": "string"
+          },
+          "tool_ceiling": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tool Ceiling"
+          },
+          "updated_at": {
+            "title": "Updated At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "persona_id",
+          "name",
+          "description",
+          "instructions",
+          "model_profile",
+          "model",
+          "tool_ceiling",
+          "instructions_sha256",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "PersonaView",
+        "type": "object"
+      },
       "PluginCodeRuntime": {
         "description": "BUG-308 — where this plugin's own code would run on this machine.",
         "properties": {
@@ -28183,6 +28386,17 @@
               }
             ],
             "title": "Model Profile"
+          },
+          "persona_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Persona Id"
           },
           "planning_mode": {
             "anyOf": [
@@ -36580,6 +36794,19 @@
           "created_at": {
             "title": "Created At",
             "type": "string"
+          },
+          "persona": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Persona"
           },
           "prompt_text": {
             "anyOf": [
@@ -54066,6 +54293,150 @@
           }
         },
         "summary": "Pull Ollama Model"
+      }
+    },
+    "/api/personas": {
+      "get": {
+        "description": "The owner's personas, by name, and the families a ceiling may keep.",
+        "operationId": "list_personas_api_personas_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PersonaList"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "List Personas"
+      },
+      "post": {
+        "description": "Add a persona. Its name must be free on this account.",
+        "operationId": "create_persona_api_personas_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PersonaRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PersonaView"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Persona"
+      }
+    },
+    "/api/personas/{persona_id}": {
+      "delete": {
+        "description": "Remove a persona. Past turns keep their record of it.",
+        "operationId": "delete_persona_api_personas__persona_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "persona_id",
+            "required": true,
+            "schema": {
+              "title": "Persona Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PersonaRemoved"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Delete Persona"
+      },
+      "put": {
+        "description": "Replace a persona. Turns it already answered keep the instructions' hash they ran with.",
+        "operationId": "update_persona_api_personas__persona_id__put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "persona_id",
+            "required": true,
+            "schema": {
+              "title": "Persona Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PersonaRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PersonaView"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update Persona"
       }
     },
     "/api/plugins": {

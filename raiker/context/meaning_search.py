@@ -18,7 +18,10 @@ terms goal noticing already uses (FIXED-1481):
 
 from __future__ import annotations
 
+import hashlib
 import math
+import threading
+from collections import OrderedDict
 from collections.abc import Callable, Iterable
 from typing import Any
 
@@ -31,6 +34,44 @@ THRESHOLD = 0.6
 MAX_RESULTS = 8
 
 Embed = Callable[[str], list[float] | None]
+
+#: How many candidate vectors are kept between searches, per process. A
+#: conversation's title and first request rarely change, and without this a
+#: second search embedded the same forty texts again — forty governed model
+#: calls for a list that was already ranked once.
+DOCUMENT_CACHE_SIZE = 2048
+_DOCUMENTS: OrderedDict[tuple[str, str], list[float]] = OrderedDict()
+_DOCUMENTS_LOCK = threading.Lock()
+
+
+def _document_vector(embed: Embed, text: str) -> list[float] | None:
+    """``embed(text)``, remembered per embedding space when ``embed`` names one.
+
+    The space is the backend's model label (``embed.space``); an embedder that
+    does not name one is never cached, so vectors from two models are never
+    compared. Only successful vectors are kept, keyed by the text's SHA-256.
+    """
+    space = getattr(embed, "space", None)
+    if not isinstance(space, str) or not space:
+        return embed(text)
+    key = (space, hashlib.sha256(text.encode("utf-8")).hexdigest())
+    with _DOCUMENTS_LOCK:
+        held = _DOCUMENTS.get(key)
+        if held is not None:
+            _DOCUMENTS.move_to_end(key)
+            return held
+    vector = embed(text)
+    if vector:
+        with _DOCUMENTS_LOCK:
+            _DOCUMENTS[key] = vector
+            while len(_DOCUMENTS) > DOCUMENT_CACHE_SIZE:
+                _DOCUMENTS.popitem(last=False)
+    return vector
+
+
+def clear_document_cache() -> None:
+    with _DOCUMENTS_LOCK:
+        _DOCUMENTS.clear()
 
 
 def _cosine(a: list[float], b: list[float]) -> float:
@@ -77,7 +118,7 @@ def meaning_matches(
         text = f"{record.get('title') or ''}. {prompt}".strip(". ")
         if len(text) < 8:
             continue
-        other = embed(text[:2000])
+        other = _document_vector(embed, text[:2000])
         if not other:
             continue
         score = _cosine(vector, other)
@@ -115,7 +156,7 @@ def rank_by_meaning(
         cleaned = " ".join(text.split())
         if len(cleaned) < 8:
             continue
-        other = embed(cleaned[:2000])
+        other = _document_vector(embed, cleaned[:2000])
         if not other:
             continue
         score = _cosine(vector, other)

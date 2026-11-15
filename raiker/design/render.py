@@ -268,6 +268,22 @@ def _draw_node(
     base.alpha_composite(layer)
 
 
+def node_picture_png(node: Mapping[str, Any], load: AssetLoader, *, scale: float = 1.0) -> bytes | None:
+    """One image layer as its own fitted, cropped PNG (a deck's editable picture), or None."""
+    asset = load(str(node["asset_id"])) if node.get("asset_id") else None
+    if asset is None:
+        return None
+    w = max(1, round(float(node.get("w") or 1) * scale))
+    h = max(1, round(float(node.get("h") or 1) * scale))
+    if w * h > MAX_RASTER_PIXELS:
+        return None
+    with Image.open(io.BytesIO(asset[1])) as opened:
+        picture = _fit_image(opened.convert("RGBA"), node, (w, h))
+    buffer = io.BytesIO()
+    picture.save(buffer, format="PNG", optimize=True)
+    return buffer.getvalue()
+
+
 def render_raster(
     document: Mapping[str, Any], frame_id: str, load: AssetLoader, *, scale: float = 1.0, skip_text: bool = False
 ) -> Image.Image:
@@ -293,6 +309,7 @@ def encode_raster(image: Image.Image, fmt: str) -> bytes:
 
 
 __all__ = [
-    "GENERIC_FONTS", "encode_raster", "missing_glyphs", "raster_font_name", "render_raster", "render_svg",
+    "GENERIC_FONTS", "encode_raster", "missing_glyphs", "node_picture_png", "raster_font_name", "render_raster",
+    "render_svg",
     "text_height", "wrap_text",
 ]

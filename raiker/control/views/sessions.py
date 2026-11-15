@@ -110,6 +110,10 @@ class TurnView(View):
     # DEC-22 step 3 — the earlier turn of this conversation this one asked
     # again, when it was a Retry. The source turn is kept as it was.
     retry_of_turn_id: str | None = None
+    # ADR-0005 §5 — the persona this turn ran as (`persona_id`, `name`,
+    # `instructions_sha256`, and `current`: whether the persona still has
+    # those instructions). None for an ordinary turn.
+    persona: dict[str, Any] | None = None
 
 
 @dataclass(frozen=True)

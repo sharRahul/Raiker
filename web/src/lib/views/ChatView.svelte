@@ -30,7 +30,7 @@
   import ExportConversationDialog from "../components/ExportConversationDialog.svelte";
   import { densityGap, workSurface } from "../workSurface";
   import { api, ApiError, streamPrompt, streamResumeAfterApproval } from "../api";
-  import { contract } from "../generated/apiContract";
+  import { contract, type PersonaView } from "../generated/apiContract";
   import { goalTitle, requestGoalDraft } from "../goalHandoff";
   import { ComposerLookups } from "../composerLookups.svelte";
   import { SourceInspector } from "./chat/sourceInspector.svelte";
@@ -175,6 +175,9 @@
     reasoningChars?: number;
     // DEC-22 step 3 — the earlier turn this one asked again, when it was a Retry.
     retryOf?: string | null;
+    // ADR-0005 — the persona this turn was answered as; `current` is false
+    // once the persona's instructions changed after the turn ran.
+    persona?: { name: string; current: boolean } | null;
     // A turn Raiker refused before sending (an execution profile, a RAIKER.md
     // that needs review): drawn as a refusal with its setting, not a failure.
     refusal?: TurnRefusal | null;
@@ -368,6 +371,8 @@
   // live as compact controls at the bottom of the composer card.
   let modelProfile = $state("");
   let model = $state("");
+  /** Whether the owner chose a model in this composer (Default included). */
+  let modelPicked = false;
   /**
    * The authoritative answer for this surface.
    *
@@ -987,7 +992,10 @@
     // Chat starts on the model Chat was last set to, not on whatever the global
     // default happens to be. An explicit per-turn choice still overrides it.
     surfaceModelRead = surfaceModel("chat").then((remembered) => {
-      if (remembered === null || modelProfile) return;
+      // The owner's own pick wins over this late read — including the
+      // Default row, which leaves `modelProfile` empty (found live 2026-11-19:
+      // choosing Default was replaced a second later by the remembered model).
+      if (remembered === null || modelProfile || modelPicked) return;
       modelProfile = remembered.profileId;
       model = remembered.model;
     }).catch(() => {});
@@ -1317,6 +1325,7 @@
         streaming: true,
         error: null,
         retryOf,
+        persona: chosenPersona !== null ? { name: chosenPersona.name, current: true } : null,
       },
     ];
     // Mutate the $state-proxied instance, not the raw literal: raw-object writes
@@ -1335,6 +1344,11 @@
       attachStore.clear();
       promptPins = [];
     }
+    // ADR-0005 — one persona per turn; its default model, when it has one,
+    // is what the turn asks for (held to readiness and the profile server-side).
+    const sentPersona = chosenPersona;
+    chosenPersona = null;
+    const personaModel = sentPersona?.model_profile ? sentPersona : null;
     streaming = true;
     void scrollToEnd(true);
     try {
@@ -1345,8 +1359,9 @@
           surface: "chat",
           session_id: sessionId ?? undefined,
           ...(retryOf !== null && sessionId !== null ? { retry_of_turn_id: retryOf } : {}),
-          model_profile: modelProfile || undefined,
-          model: model || undefined,
+          model_profile: personaModel !== null ? undefined : modelProfile || undefined,
+          model: personaModel !== null ? undefined : model || undefined,
+          ...(sentPersona !== null ? { persona_id: sentPersona.persona_id } : {}),
           ...(reasoningEfforts.includes(reasoningEffort) ? { reasoning_effort: reasoningEffort } : {}),
           attachments: wireAttachments(sentAttachments),
           ...(Object.keys(sentModes).length > 0 ? { capability_modes: sentModes } : {}),
@@ -1506,7 +1521,14 @@
       detail: command.summary,
     }));
   });
-  const menuItems = $derived(menuKind === "slash" ? slashItems : lookups.mentionItems);
+  // ADR-0005 — `@` lists the owner's personas first, then files.
+  let mentionFragment = $state("");
+  const personaRows = $derived(menuKind === "mention" ? lookups.personaItems(mentionFragment) : []);
+  const menuItems = $derived(
+    menuKind === "slash" ? slashItems : [...personaRows, ...lookups.mentionItems],
+  );
+  /** The persona the next turn is sent as; chosen once per turn. */
+  let chosenPersona = $state<PersonaView | null>(null);
 
   function caret(): number {
     return promptEl?.selectionStart ?? draft.text.length;
@@ -1514,6 +1536,7 @@
 
 
   onMount(lookups.loadSlashCommands);
+  onMount(lookups.loadPersonas);
 
   function trackPromptSelection() {
     promptSelectionStart = promptEl?.selectionStart ?? draft.text.length;
@@ -1567,6 +1590,7 @@
     const mention = mentionAt(draft.text, position);
     if (mention !== null) {
       menuKind = "mention";
+      mentionFragment = mention.fragment;
       void lookups.loadMentions(mention.fragment);
       return;
     }
@@ -1584,6 +1608,20 @@
     }
     const mention = mentionAt(draft.text, caret());
     if (mention === null) return;
+    if (item.kind === "persona") {
+      // A persona is a chip, not prompt text: the `@word` leaves the draft.
+      chosenPersona = lookups.personas.find((persona) => persona.persona_id === item.id) ?? null;
+      const before = draft.text.slice(0, mention.start);
+      const after = draft.text.slice(mention.start + 1 + mention.fragment.length).replace(/^ /, "");
+      draft.text = before + after;
+      menuKind = "none";
+      queueMicrotask(() => {
+        promptEl?.focus();
+        promptEl?.setSelectionRange(before.length, before.length);
+        autoGrow(promptEl ?? null);
+      });
+      return;
+    }
     const applied = applyMention(draft.text, mention, item.id);
     draft.text = applied.text;
     menuKind = "none";
@@ -2494,6 +2532,12 @@
         </div>
 
         <div class="message-group message-group-raiker">
+          {#if turn.persona}
+            <!-- ADR-0005 §5 — which persona answered, and whether it has changed since. -->
+            <p class="persona-line">
+              Raiker as <strong>@{turn.persona.name}</strong>{#if !turn.persona.current}<span class="persona-earlier"> · ran with an earlier version</span>{/if}
+            </p>
+          {/if}
           <!-- BUG-207 slices C and D — the model's own reasoning, and nothing
                standing in for it: shown only when the turn produced some,
                collapsed when the answer starts, absent when there is none.
@@ -2908,6 +2952,21 @@
     contextWarning={composerWarning}
   >
     {#snippet above()}
+      {#if chosenPersona !== null}
+        <div class="prompt-pins" aria-label="Persona for this message">
+          <span class="prompt-pin persona-chip" title={chosenPersona.description || `Answer as @${chosenPersona.name}`}>
+            <Icon name="agent" size="sm" />
+            <span>@{chosenPersona.name}</span>
+            <button
+              type="button"
+              class="pin-remove"
+              aria-label={`Do not answer as @${chosenPersona.name}`}
+              disabled={streaming}
+              onclick={() => (chosenPersona = null)}
+            ><Icon name="x" size="sm" /></button>
+          </span>
+        </div>
+      {/if}
       {#if promptPins.length > 0}
         <div class="prompt-pins" aria-label="Answers added to this prompt">
           {#each promptPins as pin (pin.turnId)}
@@ -2947,8 +3006,8 @@
         <ComposerMenu
           items={menuItems}
           active={menuActive}
-          heading={menuKind === "slash" ? "Commands" : "Files in the code map"}
-          notice={menuKind === "mention" ? lookups.mentionNotice : null}
+          heading={menuKind === "slash" ? "Commands" : personaRows.length > 0 ? "Personas and files" : "Files in the code map"}
+          notice={menuKind === "mention" && personaRows.length === 0 ? lookups.mentionNotice : null}
           onchoose={chooseMenuItem}
         />
       {/if}
@@ -3049,6 +3108,7 @@
             {decision}
             onchosen={(profileId, chosen) => void rememberSurfaceModel("chat", profileId, chosen)}
             onreset={() => void forgetSurfaceModel("chat")}
+            onpicked={() => (modelPicked = true)}
             disabled={streaming}
           />
     {/snippet}
@@ -3348,6 +3408,12 @@
     padding-bottom: calc(var(--space-4) + var(--space-6));
   }
   .prompt-pins { display: flex; flex-wrap: wrap; gap: 0.4rem; }
+  .persona-line {
+    margin: 0 0 var(--space-1);
+    color: var(--text-3);
+    font-size: var(--text-xs);
+  }
+  .persona-line strong { color: var(--text-2); font-weight: 600; }
   .prompt-pin {
     display: inline-flex;
     align-items: center;

@@ -357,7 +357,11 @@ def project_specs(
 
 
 def search_tools(
-    query: str, *, limit: int = 8, mcp_specs: list[ToolSpec] | None = None
+    query: str,
+    *,
+    limit: int = 8,
+    mcp_specs: list[ToolSpec] | None = None,
+    withheld: frozenset[str] = frozenset(),
 ) -> dict[str, object]:
     """The `tool_search` result: full schemas for what *query* matched.
 
@@ -378,7 +382,7 @@ def search_tools(
     from raiker.models.tool_call_validation import tool_spec
 
     mcp = {spec.name: spec for spec in (mcp_specs or [])}
-    searchable = tuple(sorted((*deferred_tool_names(), *mcp)))
+    searchable = tuple(sorted(name for name in (*deferred_tool_names(), *mcp) if name not in withheld))
     names = (
         searchable
         if not query.strip()
@@ -388,6 +392,22 @@ def search_tools(
             extra={name: spec.description for name, spec in mcp.items()},
         )
     )
+    # ADR-0005 — a tool the turn's persona leaves out is never offered by a
+    # search either; returning it made a model search for it again and again.
+    refused = [name for name in names if name in withheld]
+    names = tuple(name for name in names if name not in withheld)
+    if not names and refused:
+        return {
+            "status": "success",
+            "query": query,
+            "matched": 0,
+            "tools": [],
+            "withheld": refused,
+            "note": (
+                "The tools that match are not available in this turn: the owner's persona "
+                "leaves them out. Answer without them, and say what you could not do."
+            ),
+        }
     if not names:
         return {
             "status": "success",

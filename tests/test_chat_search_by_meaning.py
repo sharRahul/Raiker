@@ -52,3 +52,38 @@ def test_another_accounts_chats_are_not_compared(tmp_path: Path) -> None:
     store.insert_turn("kyoto", "kyoto_t", "Book Kyoto flights for April")
     assert meaning_matches(store, "Japan", _embed, user_id="me") == []
     assert [row["session_id"] for row in meaning_matches(store, "Japan", _embed, user_id="someone_else")] == ["kyoto"]
+
+
+def test_a_second_search_reuses_candidate_vectors_in_the_same_space() -> None:
+    from raiker.context import meaning_search
+
+    meaning_search.clear_document_cache()
+    calls: list[str] = []
+
+    def embed(text: str) -> list[float] | None:
+        calls.append(text)
+        return [1.0, 0.0] if "kyoto" in text.lower() or "japan" in text.lower() else [0.0, 1.0]
+
+    embed.space = "ollama:nomic-embed-text"  # type: ignore[attr-defined]
+    candidates = [("a", "Kyoto flights in April"), ("b", "Quarterly revenue chart")]
+    assert meaning_search.rank_by_meaning("Japan holiday", candidates, embed) == ["a"]
+    first = len(calls)
+    assert meaning_search.rank_by_meaning("the Japan trip", candidates, embed) == ["a"]
+    # Only the new query was embedded the second time.
+    assert len(calls) == first + 1
+
+
+def test_an_embedder_that_names_no_space_is_never_cached() -> None:
+    from raiker.context import meaning_search
+
+    meaning_search.clear_document_cache()
+    calls: list[str] = []
+
+    def embed(text: str) -> list[float] | None:
+        calls.append(text)
+        return [1.0, 0.0]
+
+    candidates = [("a", "Kyoto flights in April")]
+    meaning_search.rank_by_meaning("Japan holiday", candidates, embed)
+    meaning_search.rank_by_meaning("Japan holiday", candidates, embed)
+    assert len(calls) == 4

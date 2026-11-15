@@ -58,4 +58,25 @@ describe("ComposerMenu", () => {
     expect(screen.getByText(/Turn on Code map indexing in Permissions/)).toBeInTheDocument();
     expect(screen.queryByText(/\*\*/)).not.toBeInTheDocument();
   });
+
+  it("labels the Personas and Files groups only when both are listed (ADR-0005)", () => {
+    const { unmount } = render(ComposerMenu, {
+      items: [
+        { id: "persona_1", label: "@DataAnalyst", group: "Personas", kind: "persona" },
+        { id: "src/a.ts", label: "src/a.ts", group: "Files" },
+      ],
+      heading: "Personas and files",
+      onchoose: vi.fn(),
+    });
+    expect(screen.getByText("Personas")).toBeInTheDocument();
+    expect(screen.getByText("Files")).toBeInTheDocument();
+    expect(screen.getAllByRole("option")).toHaveLength(2);
+    unmount();
+    render(ComposerMenu, {
+      items: [{ id: "src/a.ts", label: "src/a.ts", group: "Files" }],
+      heading: "Files in the code map",
+      onchoose: vi.fn(),
+    });
+    expect(screen.queryByText("Files")).not.toBeInTheDocument();
+  });
 });

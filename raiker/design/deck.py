@@ -14,8 +14,13 @@ screen reader and a search over the deck still find the words.
 Since 2026-11-18 (BUG-348 DW-11, "slides as editable shapes") each visible text
 layer is a real text box over the picture, at its place, size, colour, weight,
 alignment and line height, and the picture is drawn without the text, so the
-words are edited in PowerPoint rather than painted into the slide. Shapes and
-images stay in the picture; the stored document stays the full editable source.
+words are edited in PowerPoint rather than painted into the slide.
+
+Since 2026-11-19 the rest of the frame is native too (:func:`native_tree`): the
+background, every rectangle, rounded rectangle and ellipse (fill, stroke,
+opacity, rotation) and every image (as its own fitted picture) are separate
+PowerPoint objects, in the document's drawing order, so nothing on a slide is
+a flattened picture. The stored document stays the full editable source.
 """
 
 from __future__ import annotations
@@ -160,6 +165,154 @@ def _slide_texts(frame: Mapping[str, Any], box: tuple[int, int, int, int]) -> st
     )
 
 
+def _shape_fill(color: Any, opacity: float) -> str:
+    if not color:
+        return "<a:noFill/>"
+    alpha = f'<a:alpha val="{max(0, min(100000, round(opacity * 100000)))}"/>' if opacity < 1 else ""
+    return f'<a:solidFill><a:srgbClr val="{_hex(color)}">{alpha}</a:srgbClr></a:solidFill>'
+
+
+def _xfrm(node: Mapping[str, Any], origin: tuple[int, int], emu_per_px: float) -> str:
+    ox, oy = origin
+    x = ox + round(float(node.get("x") or 0) * emu_per_px)
+    y = oy + round(float(node.get("y") or 0) * emu_per_px)
+    w = max(1, round(float(node.get("w") or 1) * emu_per_px))
+    h = max(1, round(float(node.get("h") or 1) * emu_per_px))
+    rot = round(float(node.get("rotation") or 0) * 60000)
+    rotation = f' rot="{rot}"' if rot else ""
+    return f'<a:xfrm{rotation}><a:off x="{x}" y="{y}"/><a:ext cx="{w}" cy="{h}"/></a:xfrm>'
+
+
+def _geometry(node: Mapping[str, Any]) -> str:
+    if node.get("type") == "ellipse":
+        return '<a:prstGeom prst="ellipse"><a:avLst/></a:prstGeom>'
+    radius = float(node.get("radius") or 0)
+    short = max(1.0, min(float(node.get("w") or 1), float(node.get("h") or 1)))
+    if radius <= 0:
+        return '<a:prstGeom prst="rect"><a:avLst/></a:prstGeom>'
+    # roundRect's adjustment is the corner radius over the shorter side, in 1/100000ths of half of it.
+    adj = max(0, min(50000, round(radius / short * 100000)))
+    return f'<a:prstGeom prst="roundRect"><a:avLst><a:gd name="adj" fmla="val {adj}"/></a:avLst></a:prstGeom>'
+
+
+def _shape(shape_id: int, node: Mapping[str, Any], origin: tuple[int, int], emu_per_px: float) -> str:
+    """A rectangle, rounded rectangle or ellipse as an editable PowerPoint shape."""
+    opacity = float(node.get("opacity", 1) or 0)
+    stroke_px = float(node.get("stroke_width") or 0)
+    line = (
+        f'<a:ln w="{max(1, round(stroke_px * emu_per_px))}">{_shape_fill(node.get("stroke"), opacity)}</a:ln>'
+        if stroke_px > 0 and node.get("stroke") else "<a:ln><a:noFill/></a:ln>"
+    )
+    name = escape(str(node.get("name") or node.get("type") or "Shape"), {chr(34): "&quot;"})
+    return (
+        f'<p:sp><p:nvSpPr><p:cNvPr id="{shape_id}" name="{name}"/><p:cNvSpPr/><p:nvPr/></p:nvSpPr>'
+        f"<p:spPr>{_xfrm(node, origin, emu_per_px)}{_geometry(node)}"
+        f"{_shape_fill(node.get('fill'), opacity)}{line}</p:spPr></p:sp>"
+    )
+
+
+def _picture(shape_id: int, node: Mapping[str, Any], origin: tuple[int, int], emu_per_px: float, rel: str) -> str:
+    """An image layer as its own picture, cropped and fitted as the canvas draws it."""
+    name = escape(str(node.get("name") or "Image"), {chr(34): "&quot;"})
+    alt = escape(str(node.get("alt") or ""), {chr(34): "&quot;"})
+    opacity = float(node.get("opacity", 1) or 0)
+    alpha = f'<a:alphaModFix amt="{max(0, min(100000, round(opacity * 100000)))}"/>' if opacity < 1 else ""
+    return (
+        f'<p:pic><p:nvPicPr><p:cNvPr id="{shape_id}" name="{name}" descr="{alt}"/>'
+        '<p:cNvPicPr><a:picLocks noChangeAspect="1"/></p:cNvPicPr><p:nvPr/></p:nvPicPr>'
+        f'<p:blipFill><a:blip r:embed="{rel}">{alpha}</a:blip><a:stretch><a:fillRect/></a:stretch></p:blipFill>'
+        f"<p:spPr>{_xfrm(node, origin, emu_per_px)}"
+        '<a:prstGeom prst="rect"><a:avLst/></a:prstGeom></p:spPr></p:pic>'
+    )
+
+
+def native_tree(
+    frame: Mapping[str, Any],
+    box: tuple[int, int, int, int],
+    picture: Callable[[Mapping[str, Any]], bytes | None],
+) -> tuple[str, list[bytes]]:
+    """The frame as native slide objects, back to front, and the pictures they use.
+
+    ``picture(node)`` returns an image layer's fitted PNG, or None for one whose
+    asset is gone (drawn as the canvas's grey placeholder rectangle instead).
+    """
+    x, y, w, h = box
+    emu_per_px = w / max(1.0, float(frame.get("width") or 1))
+    origin = (x, y)
+    parts: list[str] = []
+    media: list[bytes] = []
+    next_id = 3
+    background = {
+        "type": "rect", "name": "Background", "x": 0, "y": 0, "w": frame.get("width") or 1,
+        "h": frame.get("height") or 1, "fill": frame.get("background") or "#ffffff",
+    }
+    # The frame's words ride as the background's alternative text, as they did
+    # on the picture, so a screen reader and a search still find them.
+    alt = escape(frame_text(frame) or str(frame.get("name") or ""), {chr(34): "&quot;"})
+    parts.append(_shape(2, background, origin, emu_per_px).replace(
+        'name="Background"/>', f'name="Background" descr="{alt}"/>', 1))
+
+    def walk(nodes: Sequence[Mapping[str, Any]]) -> None:
+        nonlocal next_id
+        for node in nodes:
+            if node.get("hidden") or node.get("visible") is False:
+                continue
+            kind = node.get("type")
+            if kind == "stack" and (node.get("fill") or node.get("stroke")):
+                parts.append(_shape(next_id, {**node, "type": "rect"}, origin, emu_per_px))
+                next_id += 1
+            if kind in ("group", "stack"):
+                children = node.get("children")
+                walk(children if isinstance(children, list) else [])
+                continue
+            if kind in ("rect", "ellipse"):
+                parts.append(_shape(next_id, node, origin, emu_per_px))
+            elif kind == "text" and str(node.get("text") or "").strip():
+                parts.append(_text_box(next_id, node, origin, emu_per_px))
+            elif kind == "image":
+                data = picture(node)
+                if data is None:
+                    parts.append(_shape(next_id, {**node, "type": "rect", "fill": "#eeeeee",
+                                                  "stroke": "#999999", "stroke_width": 1}, origin, emu_per_px))
+                else:
+                    media.append(data)
+                    parts.append(_picture(next_id, node, origin, emu_per_px, f"rId{len(media) + 1}"))
+            else:
+                continue
+            next_id += 1
+
+    nodes = frame.get("nodes")
+    walk(nodes if isinstance(nodes, list) else [])
+    return "".join(parts), media
+
+
+def _native_slide_xml(tree: str) -> str:
+    return (
+        '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+        f'<p:sld xmlns:a="{_NS_A}" xmlns:r="{_NS_R}" xmlns:p="{_NS_P}">'
+        "<p:cSld><p:spTree>"
+        '<p:nvGrpSpPr><p:cNvPr id="1" name=""/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr>'
+        '<p:grpSpPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="0" cy="0"/>'
+        '<a:chOff x="0" y="0"/><a:chExt cx="0" cy="0"/></a:xfrm></p:grpSpPr>'
+        f"{tree}</p:spTree></p:cSld><p:clrMapOvr><a:masterClrMapping/></p:clrMapOvr></p:sld>"
+    )
+
+
+def _native_rels(index: int, pictures: int) -> str:
+    rels = [
+        '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>',
+        f'<Relationships xmlns="{_PKG_REL}">',
+        f'<Relationship Id="rId1" Type="{_REL}/slideLayout" Target="../slideLayouts/slideLayout1.xml"/>',
+    ]
+    for number in range(1, pictures + 1):
+        rels.append(
+            f'<Relationship Id="rId{number + 1}" Type="{_REL}/image" '
+            f'Target="../media/slide{index}-image{number}.png"/>'
+        )
+    rels.append("</Relationships>")
+    return "".join(rels)
+
+
 def _slide_xml(
     index: int, name: str, alt: str, box: tuple[int, int, int, int], texts: str = ""
 ) -> str:
@@ -247,18 +400,25 @@ def build_pptx(
     *,
     title: str = "Raiker design",
     editable_text: bool = False,
+    picture: Callable[[Mapping[str, Any]], bytes | None] | None = None,
 ) -> bytes:
     """One slide per frame. ``render_png(frame_id)`` returns ``(png, width, height)``.
 
     With ``editable_text`` the caller's pictures are drawn without text, and
-    each frame's text layers are added as text boxes over them.
+    each frame's text layers are added as text boxes over them. With
+    ``picture`` (an image layer's fitted PNG) every slide is native objects
+    only — :func:`native_tree` — and ``render_png`` is not called.
     """
     chosen = [frame for frame in frames if frame.get("id")][:MAX_SLIDES]
     if not chosen:
         raise ValueError("design_deck_has_no_frames")
     first = chosen[0]
     slide_w, slide_h = _slide_size(float(first.get("width") or 1280), float(first.get("height") or 720))
-    rendered = [(frame, *render_png(str(frame["id"]))) for frame in chosen]
+    rendered = (
+        [(frame, b"", int(float(frame.get("width") or 1)), int(float(frame.get("height") or 1))) for frame in chosen]
+        if picture is not None
+        else [(frame, *render_png(str(frame["id"]))) for frame in chosen]
+    )
 
     content_types = [
         '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>',
@@ -352,6 +512,13 @@ def build_pptx(
         for index, (frame, png, width, height) in enumerate(rendered, start=1):
             box = _fit(width, height, slide_w, slide_h)
             name = str(frame.get("name") or f"Frame {index}")[:120]
+            if picture is not None:
+                tree, media = native_tree(frame, box, picture)
+                for number, data in enumerate(media, start=1):
+                    package.writestr(f"ppt/media/slide{index}-image{number}.png", data)
+                package.writestr(f"ppt/slides/slide{index}.xml", _native_slide_xml(tree))
+                package.writestr(f"ppt/slides/_rels/slide{index}.xml.rels", _native_rels(index, len(media)))
+                continue
             package.writestr(f"ppt/media/frame{index}.png", png)
             package.writestr(
                 f"ppt/slides/slide{index}.xml",

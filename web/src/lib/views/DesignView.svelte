@@ -184,6 +184,7 @@
   let research = $state<{ question: string; answer: string; turnId: string } | null>(null);
   let researching = $state(false);
   let researchError = $state<string | null>(null);
+  let researchSourcesNote = $state<string | null>(null);
   let researchSession = $state<string | null>(null);
 
   /**
@@ -476,11 +477,19 @@
       // here loses the chips and never the findings: provenance for an answer
       // that has already arrived must not be able to take the answer with it.
       closeSource();
+      researchSourcesNote = null;
       try {
         const ledger = await api.sessionSources(researchSession ?? "");
         researchSources = sourcesForTurn(ledger.sources, response.turn_id);
-      } catch {
+      } catch (error) {
         researchSources = [];
+        // QUI-G06 — the findings stay; say that their pages could not be listed.
+        researchSourcesNote = recoveryFailure(
+          "The pages this research read could not be listed",
+          "The findings are kept; they cannot be opened as sources here.",
+          "Open the conversation in Threads to see its sources.",
+          error,
+        );
       }
     } catch (error) {
       research = null;
@@ -913,6 +922,9 @@
         <!-- The answer is model prose, so it renders the way Chat renders one;
              printed raw it showed the model's markdown as asterisks. -->
         <div class="research-body research-answer"><Markdown text={research.answer} /></div>
+        {#if researchSourcesNote}
+          <p class="research-body research-note" role="status">{researchSourcesNote}</p>
+        {/if}
         <!-- BUG-281 — what the turn read, openable at the passage it used,
              without leaving Design for the conversation it ran in. -->
         {#if researchSources.length > 0}

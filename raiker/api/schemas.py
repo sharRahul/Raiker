@@ -223,6 +223,18 @@ class LibraryPinMoveRequest(StrictRequest):
     project_id: str | None = None
 
 
+class PersonaRequest(StrictRequest):
+    """ADR-0005 — a persona as the owner wrote it. Validated in `raiker.personas`."""
+
+    name: str
+    description: str = ""
+    instructions: str
+    model_profile: str | None = None
+    model: str | None = None
+    #: `None` inherits the turn's tools; a list keeps only those families.
+    tool_ceiling: list[str] | None = None
+
+
 class LimitRuleRequest(StrictRequest):
     """QUI-P03 — the limits of an Allow-with-limits rule made from an approval.
 
@@ -976,6 +988,9 @@ class PromptRequest:
     # conversation. Recorded as a link; it grants nothing and repeats nothing on
     # its own — the retry runs as an ordinary governed turn.
     retry_of_turn_id: str | None = None
+    # ADR-0005 — send this turn as one of the owner's personas. It narrows
+    # the turn (instructions, default model, tool ceiling); it never widens it.
+    persona_id: str | None = None
     # Optional concrete model for the chosen profile (per-turn only; provider
     # policy is still enforced downstream).
     model: str | None = None

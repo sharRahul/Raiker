@@ -662,6 +662,9 @@ export interface PromptRequestBody {
   // DEC-22 step 3 — this turn is a Retry of that earlier turn of the same
   // conversation; the server records the link and refuses a source elsewhere.
   retry_of_turn_id?: string;
+  // ADR-0005 — answer as one of the owner's personas. It narrows the turn
+  // (instructions, default model, tool ceiling) and never widens it.
+  persona_id?: string;
 }
 
 export type { HookHandlerView };

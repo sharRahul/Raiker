@@ -594,6 +594,9 @@ class RuntimeOrchestrator:
         self._revealed_tools: set[str] = set()
         # The turns whose request was already read for tools it names.
         self._preselected_turns: set[str] = set()
+        # ADR-0005 — the tools a persona's ceiling leaves out of this turn.
+        # Withheld from the catalogue and refused if proposed anyway.
+        self._persona_excluded_tools: frozenset[str] = frozenset()
 
     def _turn_tool_specs(self, provider: str | None = None, model: str | None = None) -> list[ToolSpec]:
         """The tools this turn may call: the built-ins plus projected MCP tools.
@@ -615,12 +618,24 @@ class RuntimeOrchestrator:
         window = (
             self._context_window_tokens(provider, model) if provider and model else None
         )
-        return project_specs(
+        specs = project_specs(
             self.tool_specs,
-            revealed=frozenset(self._revealed_tools),
+            revealed=frozenset(self._revealed_tools - self._persona_excluded_tools),
             mcp_specs=mcp_tool_specs(self.workspace_root, store, self.tool_broker.principal_id),
             compact=compact_for(window),
         )
+        if not self._persona_excluded_tools:
+            return specs
+        return [spec for spec in specs if spec.name not in self._persona_excluded_tools]
+
+    def _validated_call(self, proposal: ToolCallProposal) -> ToolAction:
+        """`validate_tool_call`, and refused when the turn's persona left the tool out."""
+        action = validate_tool_call(proposal)
+        if action.tool_name in self._persona_excluded_tools:
+            raise ToolCallRejected(
+                f"persona_tool_ceiling:{action.tool_name}", tool_name=action.tool_name
+            )
+        return action
 
     def _preselect_turn_tools(self, envelope: PromptEnvelope) -> None:
         """Carry the deferred tools this turn's request names (once per turn)."""
@@ -630,7 +645,22 @@ class RuntimeOrchestrator:
         self._preselected_turns.add(turn_id)
         from raiker.models.tool_projection import preselect_for_prompt
 
-        picked = preselect_for_prompt(str(envelope.prompt.text or "")[:4000])
+        persona = envelope.prompt.metadata.get("persona")
+        self._persona_excluded_tools = frozenset()
+        if isinstance(persona, dict):
+            from raiker.personas import excluded_tools
+
+            ceiling = persona.get("tool_ceiling")
+            self._persona_excluded_tools = excluded_tools(ceiling if isinstance(ceiling, list) else None)
+        # A search must not offer what the ceiling withholds either; reset for
+        # every turn, so one persona's ceiling never outlives its turn.
+        with contextlib.suppress(AttributeError):
+            self.tool_broker.persona_withheld_tools = self._persona_excluded_tools
+        picked = tuple(
+            name
+            for name in preselect_for_prompt(str(envelope.prompt.text or "")[:4000])
+            if name not in self._persona_excluded_tools
+        )
         if picked:
             self._revealed_tools.update(picked)
             self._event(envelope, "tools_preselected", {"tools": list(picked)})
@@ -958,6 +988,12 @@ class RuntimeOrchestrator:
                     "reasoning_effort": envelope.options.reasoning_effort,
                     "max_tool_calls": envelope.options.max_tool_calls,
                     "max_cost_usd": envelope.options.max_cost_usd,
+                    # ADR-0005 — the resumed leg keeps the persona's ceiling.
+                    "persona": (
+                        envelope.prompt.metadata.get("persona")
+                        if isinstance(envelope.prompt.metadata.get("persona"), dict)
+                        else None
+                    ),
                     # BUG-325 — what the run has spent so far rides with it, so
                     # the turn resumed on a new orchestrator after the decision
                     # meters the whole run rather than starting again at zero.
@@ -1621,6 +1657,38 @@ class RuntimeOrchestrator:
             "name to read it, then follow it. These are the owner's own "
             "instructions, not untrusted workspace data:\n" + "\n".join(lines)
         ), [name for name, _ in entries]
+
+    def _persona_prompt(self, envelope: PromptEnvelope) -> tuple[str, dict[str, Any]] | None:
+        """ADR-0005 — the `@persona` this turn was sent as, as one labelled system message.
+
+        Read from the store by id and used only when its instructions still hash
+        to what the route recorded, so a persona edited mid-turn is never
+        half-applied. The event carries the name, id, hash and ceiling, never
+        the instructions.
+        """
+        record = envelope.prompt.metadata.get("persona")
+        store = getattr(self.tool_broker, "store", None)
+        if not isinstance(record, dict) or store is None:
+            return None
+        try:
+            from raiker import personas
+
+            user_id = store.principal_user_id(envelope.user.id)
+            persona = (
+                personas.get_persona(store, user_id, str(record.get("persona_id") or ""))
+                if user_id else None
+            )
+        except Exception:  # noqa: BLE001 - no persona text rather than an invented one
+            return None
+        if persona is None or persona.instructions_sha256 != record.get("instructions_sha256"):
+            return None
+        return personas.system_message(persona), {
+            "persona_id": persona.persona_id,
+            "name": persona.name,
+            "instructions_sha256": persona.instructions_sha256[:16],
+            "tool_ceiling": list(persona.tool_ceiling) if persona.tool_ceiling is not None else None,
+            "withheld_tools": len(personas.excluded_tools(persona.tool_ceiling)),
+        }
 
     def _instruction_files_prompt(
         self, envelope: PromptEnvelope
@@ -2864,6 +2932,11 @@ class RuntimeOrchestrator:
                 "skills_indexed",
                 {"active_skills": len(skill_names), "names": skill_names},
             )
+        persona_prompt = self._persona_prompt(envelope)
+        if persona_prompt is not None:
+            text, metadata = persona_prompt
+            messages.append(ModelMessage(role="system", content=text))
+            self._event(envelope, "persona_applied", metadata)
         instruction_files = self._instruction_files_prompt(envelope)
         if instruction_files is not None:
             text, metadata = instruction_files
@@ -3342,7 +3415,7 @@ class RuntimeOrchestrator:
                 queue.clear()
                 break
             try:
-                action = validate_tool_call(proposal)
+                action = self._validated_call(proposal)
             except ToolCallRejected as exc:
                 # A queued call that no longer validates is refused on its own and
                 # the queue carries on: one malformed call must not cost the owner
@@ -3615,7 +3688,7 @@ class RuntimeOrchestrator:
                 })
                 proposals = proposals[:remaining_budget]
             try:
-                actions = [validate_tool_call(proposal) for proposal in proposals]
+                actions = [self._validated_call(proposal) for proposal in proposals]
             except ToolCallRejected as exc:
                 self._event(
                     envelope,

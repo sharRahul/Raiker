@@ -467,11 +467,11 @@ def test_a_document_exports_as_slides_one_per_frame(api: Any) -> None:
     assert download.headers["content-disposition"].endswith('.pptx"')
     with zipfile.ZipFile(io.BytesIO(download.content)) as deck:
         names = set(deck.namelist())
-        assert {"[Content_Types].xml", "ppt/presentation.xml", "ppt/slides/slide1.xml", "ppt/media/frame1.png"} <= names
+        assert {"[Content_Types].xml", "ppt/presentation.xml", "ppt/slides/slide1.xml"} <= names
+        # Native objects only: no flattened picture of the frame.
+        assert not any(name.startswith("ppt/media/frame") for name in names)
         slide = deck.read("ppt/slides/slide1.xml").decode()
         assert 'descr="Hello' in slide
-        picture = Image.open(io.BytesIO(deck.read("ppt/media/frame1.png")))
-        assert picture.size == (1080, 1080)
         presentation = deck.read("ppt/presentation.xml").decode()
         assert 'cx="10287000" cy="10287000"' in presentation
 
@@ -492,9 +492,45 @@ def test_a_slides_words_are_an_editable_text_box_over_a_picture_without_them(api
         xml.dom.minidom.parseString(slide)  # well-formed
         assert 'txBox="1"' in slide and "<a:t>Hello" in slide
         assert '<a:srgbClr val="112233">' in slide
-        picture = Image.open(io.BytesIO(deck.read("ppt/media/frame1.png"))).convert("RGB")
-        # No text was painted into the picture: no pixel is the text's colour.
-        assert (0x11, 0x22, 0x33) not in {picture.getpixel((x, y)) for x in range(picture.width) for y in range(picture.height)}
+        # No picture of the frame exists to paint the words into.
+        assert not [name for name in deck.namelist() if name.startswith("ppt/media/")]
+
+
+def test_a_slides_shapes_and_images_are_editable_objects_in_drawing_order(api: Any) -> None:
+    """BUG-348 / DW-11 — rectangles, ellipses and images are PowerPoint objects, not one picture."""
+    import xml.dom.minidom
+    import zipfile
+
+    client, h, ws = api
+    asset = _asset(ws)
+    doc = _new(client, h)
+    _ops(client, h, doc, 1, [
+        {"op": "add_node", "frame_id": "frame-1", "node": {"id": "card", "type": "rect", "x": 20, "y": 20, "w": 400,
+                                                           "h": 200, "fill": "#AA3300", "radius": 20,
+                                                           "stroke": "#000000", "stroke_width": 2, "opacity": 0.5}},
+        {"op": "add_node", "frame_id": "frame-1", "node": {"id": "dot", "type": "ellipse", "x": 500, "y": 20,
+                                                           "w": 100, "h": 100, "fill": "#00AA33"}},
+        {"op": "add_node", "frame_id": "frame-1", "node": {"id": "img", "type": "image", "x": 0, "y": 300, "w": 400,
+                                                           "h": 200, "asset_id": asset, "alt": "Logo"}},
+        _text("t", color="#112233"),
+    ])
+    made = client.post(f"/api/design/documents/{doc['document_id']}/exports",
+                       json={"frame_id": "frame-1", "format": "pptx"}, headers=h).json()
+    download = client.get(f"/api/design/exports/{made['export_id']}/bytes", headers=h)
+    with zipfile.ZipFile(io.BytesIO(download.content)) as deck:
+        slide = deck.read("ppt/slides/slide1.xml").decode()
+        xml.dom.minidom.parseString(slide)
+        rels = deck.read("ppt/slides/_rels/slide1.xml.rels").decode()
+        assert 'prst="roundRect"' in slide and 'prst="ellipse"' in slide
+        assert '<a:srgbClr val="AA3300"><a:alpha val="50000"/>' in slide and '<a:srgbClr val="00AA33">' in slide
+        assert '<a:ln w=' in slide and 'descr="Logo"' in slide and 'r:embed="rId2"' in slide
+        assert "media/slide1-image1.png" in rels
+        picture = Image.open(io.BytesIO(deck.read("ppt/media/slide1-image1.png")))
+        assert picture.size == (400, 200)
+        # Back to front, as drawn: background, card, dot, image, then the words.
+        order = [slide.index(marker) for marker in ('name="Background"', 'prst="roundRect"', 'prst="ellipse"',
+                                                     "<p:pic>", 'txBox="1"')]
+        assert order == sorted(order)
 
 
 def test_a_document_exports_as_a_word_document_with_editable_text(api: Any) -> None:

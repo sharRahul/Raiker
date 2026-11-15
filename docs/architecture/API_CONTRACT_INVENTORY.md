@@ -12,7 +12,7 @@ operation answers with, and whether OpenAPI describes it (OPT-01/OPT-02 —
 * **deferred** — the body has no declared type; a test fails while any is.
 * **special** — a stream, a file or another non-JSON transport; hand-written.
 
-**542 operations: 526 verified, 0 eligible, 0 deferred, 16 special.**
+**546 operations: 530 verified, 0 eligible, 0 deferred, 16 special.**
 
 | Method | Path | Request | Response | Status | Why |
 |---|---|---|---|---|---|
@@ -412,6 +412,10 @@ operation answers with, and whether OpenAPI describes it (OPT-01/OPT-02 —
 | POST | `/api/notifications/test` |  | TestNoticeSent | verified | declared TestNoticeSent |
 | POST | `/api/notifications/{notification_id}/read` |  | Ok | verified | built as Ok |
 | POST | `/api/ollama/pull` | OllamaPullRequestBody | ModelOperationView | verified | ModelOperationService.start |
+| GET | `/api/personas` |  | PersonaList | verified | declared PersonaList |
+| POST | `/api/personas` | PersonaRequest | PersonaView | verified | declared PersonaView |
+| DELETE | `/api/personas/{persona_id}` |  | PersonaRemoved | verified | declared PersonaRemoved |
+| PUT | `/api/personas/{persona_id}` | PersonaRequest | PersonaView | verified | declared PersonaView |
 | GET | `/api/plugins` |  | PluginsView | verified | DashboardService.list_plugins |
 | GET | `/api/projects` |  | ProjectsListView | verified | DashboardService.list_projects |
 | POST | `/api/projects` | CreateProjectRequest | ProjectCreated | verified | declared ProjectCreated |

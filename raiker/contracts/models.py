@@ -346,6 +346,9 @@ EVENT_TYPES = {
     # RAIKER.md — a Build turn carried reviewed instruction files (scopes,
     # states and digest prefixes only; never the text or a path).
     "instruction_files_loaded",
+    # ADR-0005 — a turn was sent as an owner-written `@persona` (name, id,
+    # instructions hash prefix and tool ceiling; never the instructions).
+    "persona_applied",
     # The Knowledge Map's access to one folder on this machine was granted or
     # withdrawn. The payload carries the path deliberately: what an owner opened
     # to the graph, and when, is the whole substance of the record — and

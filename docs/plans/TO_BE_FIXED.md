@@ -1846,3 +1846,12 @@ embedding space and keeps it current in the background. Still open:
   request names; ranking deferred schemas by meaning (to defer more of the core)
   still waits on a reachable embedding model.
 
+
+## 2026-11-19 round — found, not fixed
+
+* **Search by meaning still not qualified live.** Ollama and `nomic-embed-text` were reachable this round, but `POST /api/memory/embedding-index` answered 403 `disabled_by_capability_gate`: the Models (`model_provider_runtime`) gate must be turned on, not only set to Allow. RT-1119-04/-05 in `web/e2e/fixed-1515-round-live.spec.ts` did not pass; RT-1119-06..10 were not run.
+* **Ranking deferred tools by meaning — decided against for now.** Measured with nomic-embed-text: every deferred tool scores 0.46–0.66 with ~0.02 margins ("undo the last change" → `git_push`). Lexical preselection stays.
+* **Managed llama.cpp embedding entry** still needs its SHA-256 and size recorded from the publisher (huggingface.co is reachable now).
+* **MCP Test on a uv-managed interpreter** fails `mcp_command_not_found`: the sandbox does not mount the home folder by design. `round-2026-09-04` test 3 needs a system Python host.
+* **`b9` live spec** still needs a git repository workspace.
+* Live specs rewritten this round: `round-2026-09-15` (8/8), `round-2026-09-04` (3/4), `memory-restart-provider-composer` (3/3), `gcr-provider-validation` (3 pass, 1 skip).

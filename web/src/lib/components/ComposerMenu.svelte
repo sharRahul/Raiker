@@ -32,6 +32,10 @@
     label: string;
     /** The quieter second line. Optional — a path needs none. */
     detail?: string;
+    /** ADR-0005 — the labelled group this row belongs to (*Personas*, *Files*). */
+    group?: string;
+    /** What choosing it does: insert text (the default) or pick a persona. */
+    kind?: "persona";
   }
 
   let {
@@ -48,6 +52,10 @@
     notice?: { text: string; href?: string; linkLabel?: string } | null;
     onchoose: (item: MenuItem) => void;
   } = $props();
+
+  // Group labels only when the list holds more than one group; a list of
+  // files alone is already named by its heading.
+  const grouped = $derived(new Set(items.map((item) => item.group).filter(Boolean)).size > 1);
 </script>
 
 {#if notice !== null}
@@ -65,6 +73,9 @@
     {#if heading}<p class="menu-heading">{heading}</p>{/if}
     <ul role="listbox" aria-label={heading || "Suggestions"}>
       {#each items as item, index (item.id)}
+        {#if grouped && item.group && item.group !== items[index - 1]?.group}
+          <li class="menu-group" role="presentation">{item.group}</li>
+        {/if}
         <li>
           <button
             type="button"
@@ -126,6 +137,12 @@
     font-size: var(--text-sm);
     text-align: left;
     cursor: pointer;
+  }
+  .menu-group {
+    padding: 0.35rem 0.45rem 0.15rem;
+    color: var(--text-3);
+    font-size: var(--text-2xs);
+    font-weight: 600;
   }
   .menu-row:hover { background: var(--sunken); }
   .menu-row.active { background: color-mix(in srgb, var(--accent) 14%, transparent); }

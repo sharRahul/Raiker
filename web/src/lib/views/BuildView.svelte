@@ -1097,6 +1097,8 @@
 
   let modelProfile = $state("");
   let model = $state("");
+  /** Whether the owner chose a model in this composer (Default included). */
+  let modelPicked = false;
   /**
    * The authoritative answer for this surface.
    *
@@ -1157,7 +1159,10 @@
     // Build keeps its own model. Coding work and conversation rarely want the
     // same one, and before this both surfaces shared the global default.
     void surfaceModel("build").then((remembered) => {
-      if (remembered === null || modelProfile) return;
+      // The owner's own pick wins over this late read — including the
+      // Default row, which leaves `modelProfile` empty (found live 2026-11-19:
+      // choosing Default was replaced a second later by the remembered model).
+      if (remembered === null || modelProfile || modelPicked) return;
       modelProfile = remembered.profileId;
       model = remembered.model;
     });
@@ -2865,6 +2870,7 @@
               {decision}
               onchosen={(profileId, chosen) => void rememberSurfaceModel("build", profileId, chosen)}
             onreset={() => void forgetSurfaceModel("build")}
+            onpicked={() => (modelPicked = true)}
               disabled={streaming}
             />
       {/snippet}

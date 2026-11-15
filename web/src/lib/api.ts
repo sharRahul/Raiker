@@ -23,7 +23,7 @@ import { request, requestBlob } from "./api/core";
 // (scripts/api_contract.py); streams, downloads and the few calls that shape a
 // body stay written here.
 import { contract } from "./generated/apiContract";
-import type { VoiceSettingsRequest } from "./generated/apiContract";
+import type { PersonaRequest, VoiceSettingsRequest } from "./generated/apiContract";
 import type {
   CreateStandingGrantRequest,
   SettingsView,
@@ -1090,6 +1090,11 @@ export const api = {
   // B19 — completion behind an `@`-mention in the composer. Paths and languages
   // only, out of the index the owner built, behind the same capability gate.
   codeMapPaths: (fragment: string, limit = 12) => contract.getCodeMapPaths({ q: fragment, limit }),
+  // ADR-0005 — composer personas.
+  personas: () => contract.listPersonas(),
+  createPersona: (body: PersonaRequest) => contract.createPersona(body),
+  updatePersona: (personaId: string, body: PersonaRequest) => contract.updatePersona(personaId, body),
+  deletePersona: (personaId: string) => contract.deletePersona(personaId),
   rebuildCodeMap: () => contract.rebuildCodeMap(),
   // ── Projects (organizing scopes; creating/selecting one grants nothing) ──
   projects: () => contract.listProjects(),

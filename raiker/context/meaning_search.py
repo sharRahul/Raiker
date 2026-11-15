@@ -32,6 +32,13 @@ CANDIDATES = 40
 THRESHOLD = 0.6
 #: Meaning results added to one search.
 MAX_RESULTS = 8
+#: Library search (``relative=True``): a lower floor, then only what is within
+#: :data:`RELATIVE_BAND` of the best match, and only when the best leads the
+#: median candidate by :data:`RELATIVE_LEAD`.
+RELATIVE_FLOOR = 0.52
+RELATIVE_BAND = 0.03
+RELATIVE_LEAD = 0.08
+RELATIVE_MIN_FIELD = 4
 
 Embed = Callable[[str], list[float] | None]
 
@@ -139,6 +146,7 @@ def rank_by_meaning(
     threshold: float = THRESHOLD,
     limit: int = MAX_RESULTS,
     bound: int = CANDIDATES,
+    relative: bool = False,
 ) -> list[str]:
     """The keys of ``candidates`` (``(key, text)`` pairs) about ``query``, best first.
 
@@ -150,6 +158,7 @@ def rank_by_meaning(
     if not vector:
         return []
     scored: list[tuple[float, str]] = []
+    every: list[float] = []
     for index, (key, text) in enumerate(candidates):
         if index >= bound:
             break
@@ -160,7 +169,22 @@ def rank_by_meaning(
         if not other:
             continue
         score = _cosine(vector, other)
+        every.append(score)
         if score >= threshold:
             scored.append((score, key))
     scored.sort(key=lambda pair: pair[0], reverse=True)
+    if relative and scored:
+        # Short titles score low in absolute terms (measured with
+        # nomic-embed-text: related 0.51-0.68, unrelated up to 0.48), so a
+        # fixed cut-off either misses them or admits noise. Keep what sits
+        # close to the best match, and only when the best clearly stands out
+        # from the typical candidate.
+        best = scored[0][0]
+        # A lead needs a field to lead: with a handful of candidates (all of
+        # them relevant, say) the floor alone decides.
+        if len(every) >= RELATIVE_MIN_FIELD:
+            typical = sorted(every)[len(every) // 2]
+            if best - typical < RELATIVE_LEAD:
+                return []
+        scored = [pair for pair in scored if pair[0] >= best - RELATIVE_BAND]
     return [key for _score, key in scored[:limit]]

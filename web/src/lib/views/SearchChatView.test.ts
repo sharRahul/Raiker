@@ -105,6 +105,23 @@ describe("SearchChatView", () => {
     );
   });
 
+  // Found live 2026-11-19: five chats found only by meaning read "5
+  // conversations mention “Japan holiday”", which none of them did.
+  it.each([
+    [[{ match_kind: "words" }], "1 conversation mentions “trip”"],
+    [[{ match_kind: "meaning" }, { match_kind: "meaning" }], "2 conversations are about “trip” in other words"],
+    [[{ match_kind: "words" }, { match_kind: "meaning" }], "1 conversation mentions “trip”; 1 more by meaning"],
+  ])("says how the results matched", async (kinds, expected) => {
+    stubFetch({
+      "GET /api/chat-search": kinds.map((kind, index) => ({ ...MATCH, ...kind, session_id: `sess_${index}` })),
+      "GET /api/work-threads/page": pageOf([]),
+    });
+    render(SearchChatView);
+    await fireEvent.input(screen.getByLabelText("Search chat history"), { target: { value: "trip" } });
+    await fireEvent.click(await screen.findByRole("button", { name: "Search message text" }));
+    expect(await screen.findByText(expected)).toBeInTheDocument();
+  });
+
   // C18 — with an empty box this page stopped being a search and became the
   // board: what the owner is working on, across chats, projects and routines.
   // The routine threads are the half that had no reader at all before C11 gave

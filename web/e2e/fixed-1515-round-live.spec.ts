@@ -24,7 +24,7 @@
  */
 import { expect, test, type Page } from "@playwright/test";
 import { capture } from "./capture";
-import { chooseModelForTurn, signInAsOwner, useHostedModel } from "./hosted-provider";
+import { chooseModelForTurn, setPermission, signInAsOwner, useHostedModel } from "./hosted-provider";
 import { LIVE_BASE as BASE, sendTurn } from "./live";
 
 const OUT = "../../output/playwright/2026-11-19-round";
@@ -216,12 +216,20 @@ test("RT-1119-04 Threads finds a chat by meaning with the built-in embedding mod
   await signInAsOwner(page, BASE);
   // Semantic recall runs where the Models permission is Always allow; Memory's
   // own index build creates the nomic-embed-text space on the local Ollama.
+  // The gate first (Permissions › Models › Provider embeddings, with its reason and confirmation),
+  // then Always allow: the 2026-11-19 first run set only the mode and the
+  // index build answered 403 `disabled_by_capability_gate`.
+  await setPermission(page, BASE, "Provider embeddings", "Turn on", "Live check of search by meaning with the built-in embedding model");
   const allowed = await csrfFetch(page, "POST", "/api/capability-modes/model_provider_runtime/allow", {
     reason: "Live check of search by meaning with the built-in embedding model",
   });
   expect(allowed.status, JSON.stringify(allowed.json)).toBeLessThan(300);
   const built = await csrfFetch(page, "POST", "/api/memory/embedding-index", { provider: "ollama", model: "nomic-embed-text" });
-  test.info().annotations.push({ type: "embedding-index", description: JSON.stringify(built.json).slice(0, 300) });
+  // Built now, or already built by an earlier run (nothing new to index).
+  expect(
+    built.status === 200 || JSON.stringify(built.json).includes("no_memories_to_index"),
+    JSON.stringify(built.json).slice(0, 300),
+  ).toBe(true);
   await page.goto(`${BASE}/#/new-chat`);
   await chooseModelForTurn(page, /Haiku/);
   await sendTurn(page, "In one line: cheap flights to Kyoto in April. End with KYOTO_OK.");
@@ -230,7 +238,9 @@ test("RT-1119-04 Threads finds a chat by meaning with the built-in embedding mod
   const search = page.getByRole("searchbox").first();
   await expect(search).toBeVisible({ timeout: 60_000 });
   await search.fill("Japan holiday");
-  await search.press("Enter");
+  // The box filters titles as you type; the search of what was said (words,
+  // then meaning) runs from *Search message text*.
+  await page.getByRole("button", { name: "Search message text" }).click();
   await expect(page.getByText(/Related by meaning/).first()).toBeVisible({ timeout: 120_000 });
   await capture(page, `${OUT}/04-threads-by-meaning.png`);
 });

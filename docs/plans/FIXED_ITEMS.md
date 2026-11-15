@@ -1,5 +1,17 @@
 # Fixed items
 
+## FIXED-1525 — A short Library title related by meaning fell under a fixed threshold
+
+**Severity: Low. Area: Work / Library. Status: Fixed 2026-11-19 (found live).** Measured with `nomic-embed-text`, related Library titles score 0.51–0.68 and unrelated ones up to 0.48, so the shared 0.6 cut-off missed *Poster for the Kyoto cherry blossom trip* for *Japan holiday* (0.586). Library search now uses a 0.52 floor and keeps only matches within 0.03 of the best, and only when the best leads the median candidate by 0.08 (a library of fewer than four items is judged by the floor). Evidence: `tests/test_library_search.py`; RT-1119-05.
+
+## FIXED-1524 — Threads said conversations *mention* a search they matched only by meaning
+
+**Severity: Low. Area: Work / Threads. Status: Fixed 2026-11-19 (found live).** The count now says which matched by words and which by meaning, and is singular for one (*1 conversation mentions*). Evidence: `SearchChatView.test.ts`; capture `04-threads-by-meaning`.
+
+## FIXED-1523 — Personalisation said it never changes Raiker's instructions, above the Personas card
+
+**Severity: Low. Area: Settings. Status: Fixed 2026-11-19 (found live).** The note now separates appearance from personas and keeps that nothing there changes what Raiker may do. Two personas reasons and the store's own refusals gained owner copy in `reasonCodes.ts`; a Personas read in an unexpected shape lists nothing instead of failing Settings. Evidence: `Personalisation.test.ts`, `tests/test_route_reason_copy.py`.
+
 ## FIXED-1522 — Picking the Default model in a new chat was replaced a second later
 
 **Severity: Medium. Area: Chat / Build composer. Status: Fixed 2026-11-19 (found live this round).** Choosing the row already shown (the Default) fired no callback, so the late read of the surface's remembered model replaced it and the turn ran on another provider. `ModelPicker` now reports every explicit pick (`onpicked`); Chat and Build keep it. Evidence: `ModelPicker.test.ts`; RT-1119-02 receipt reads Haiku 4.5.
@@ -3342,6 +3354,9 @@ file you can open. The two capture sets that remain — `screenshots/pages/` and
 | [FIXED-1382](#fixed-1382--linux-filesystem-flags-broke-windows-type-checking) | Low | Platform portability | Fixed 2026-11-09 |
 | [FIXED-1383](#fixed-1383--keyboard-start-evidence-depended-on-retired-receipt-wording) | Low | Beta live tests | Fixed 2026-11-09 |
 | [FIXED-1384](#fixed-1384--model-downloads-checked-redirect-hosts-after-contacting-them) | High | Model and speech downloads | Fixed 2026-11-09 |
+| [FIXED-1525](#fixed-1525--a-short-library-title-related-by-meaning-fell-under-a-fixed-threshold) | Low | Work / Library | Fixed 2026-11-19 |
+| [FIXED-1524](#fixed-1524--threads-said-conversations-mention-a-search-they-matched-only-by-meaning) | Low | Work / Threads | Fixed 2026-11-19 |
+| [FIXED-1523](#fixed-1523--personalisation-said-it-never-changes-raikers-instructions-above-the-personas-card) | Low | Settings | Fixed 2026-11-19 |
 | [FIXED-1522](#fixed-1522--picking-the-default-model-in-a-new-chat-was-replaced-a-second-later) | Medium | Chat / Build composer | Fixed 2026-11-19 |
 | [FIXED-1521](#fixed-1521--tool-search-offered-tools-a-persona-withholds-and-a-model-looped-on-it) | Medium | Personas / tools | Fixed 2026-11-19 |
 | [FIXED-1520](#fixed-1520--deleting-a-conversation-left-its-retry-links-behind) | Low | Storage | Fixed 2026-11-19 |

@@ -291,6 +291,16 @@
       searching = false;
     }
   }
+
+  /** How many conversations matched, said truthfully: by their words, by meaning, or both. */
+  function searchSummary(found: { match_kind?: string | null }[], term: string): string {
+    const byMeaning = found.filter((session) => session.match_kind === "meaning").length;
+    const byWords = found.length - byMeaning;
+    const n = (count: number) => `${count} conversation${count === 1 ? "" : "s"}`;
+    if (byMeaning === 0) return `${n(byWords)} ${byWords === 1 ? "mentions" : "mention"} “${term}”`;
+    if (byWords === 0) return `${n(byMeaning)} ${byMeaning === 1 ? "is" : "are"} about “${term}” in other words`;
+    return `${n(byWords)} ${byWords === 1 ? "mentions" : "mention"} “${term}”; ${byMeaning} more by meaning`;
+  }
 </script>
 
 <section class="search-chat">
@@ -379,7 +389,7 @@
          presenting it as a narrowing of the board would misstate its scope. -->
     <div class="message-results">
       <p class="result-count">
-        {sessions.length} conversation{sessions.length === 1 ? "" : "s"} mention “{query.trim()}”
+        {searchSummary(sessions, query.trim())}
         <button type="button" class="chip" onclick={() => (sessions = null)}>
           Back to your threads
         </button>

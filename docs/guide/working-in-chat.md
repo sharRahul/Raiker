@@ -220,6 +220,29 @@ The approval setting controls the interaction, not the runtime's protections:
 The selected policy is shared with Build and is remembered for the next
 composer session. It is not the same as Build's Plan/Edit/Auto runtime modes.
 
+### Personas — `@` a specialist
+
+A **persona** is a way of answering you wrote once and pick with `@`:
+`@DataAnalyst`, `@Copywriter`. Add them in **Settings › Personalisation ›
+Personas**: a name (letters and digits), an optional description, the
+instructions it follows (up to 4,000 characters) and, under **Tools**, either
+every tool the turn already has or **Only some tools** — Files, Web, Messages
+and calendars, Memory, Git and GitHub, Commands.
+
+Type `@` in the composer: **Personas** are listed first, then **Files** from
+the code map. Choosing a persona puts a chip *@DataAnalyst ×* above the prompt
+— it is not text in your message, so a file named `DataAnalyst.md` stays
+mentionable. One persona per message; the chip clears when you send.
+
+A persona can only **narrow** a turn, never widen it. Its instructions sit
+beneath Raiker's own rules and grant nothing. Tool families it leaves out are
+not offered to the model, a tool search does not offer them either, and if the
+model asks for one anyway it is refused. Permissions, your execution profile
+and the conversation's carefulness still apply exactly as before. The answer
+reads *Raiker as @DataAnalyst*; after you edit the persona, older answers say
+*ran with an earlier version* — the turn keeps a hash of the instructions it
+ran with. See [ADR-0005](../adr/ADR-0005-composer-personas.md).
+
 ### Slash commands
 
 Typing `/` at the **start** of the prompt opens the command menu. Every entry is
@@ -553,8 +576,12 @@ messages, with the exchange that matched. Where your embedding model may run
 (Settings › Memory), a search that finds few chats by words also looks for
 recent conversations that are *about* the same thing in other words — searching
 *the Japan holiday* can find a chat about *Kyoto flights* — and marks them
-**Related by meaning**. It compares your forty most recent conversations and
-never reaches a hosted model you have not allowed for recall.
+**Related by meaning**; the count above the list says which matched by words
+and which by meaning. It compares your forty most recent conversations and
+never reaches a hosted model you have not allowed for recall. With the built-in
+model (`nomic-embed-text` on your local Ollama) this needs **Permissions ›
+Models › Provider embeddings** turned on and set to **Always allow** or
+**Auto**, and Memory's index built once (Settings › Memory).
 
 **A row opens where the work was done.** A conversation started in Chat opens in
 Chat, one started in Build opens in Build, one started in Design opens in

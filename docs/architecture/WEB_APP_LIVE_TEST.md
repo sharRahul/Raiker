@@ -16,6 +16,60 @@ PR #106: the **user-owned fallback sequence** and **prompt caching + normalised
 cache-hit metrics**.
 
 
+## Result — 2026-11-19 (Personas, local Ollama, search by meaning and native decks)
+
+A Linux workspace served by `raiker-web --port 8765` (`scripts/reset_live_workspace.py`
+at the start of the round, then restarted without a reset after each backend
+change, with `RAIKER_HOOK_EGRESS_ALLOWLIST=127.0.0.1:*` for the hook case),
+built from this round's SPA and backend, driven by Playwright on Chromium at
+1440×1000. Anthropic was connected through **Add model** with an
+identity-linked key and its workspace ID; OpenAI and OpenRouter keys were
+typed into **Add model** in RT-1119-10. Ollama ran locally with
+`nomic-embed-text` and `qwen2.5:0.5b` (Ollama Cloud models need the owner's
+own Ollama sign-in and were not run). Keys were read from the round's
+environment and never written to a spec, log or capture.
+Spec: `web/e2e/fixed-1515-round-live.spec.ts`. Result: **10 of 10 passed**
+(after the fixes below; each case re-run after its fix).
+
+| # | Scenario | Verification | Result |
+|---|---|---|---|
+| RT-1119-01 | A persona added in **Settings › Personalisation › Personas** is offered first under `@`, sent as a chip; the Haiku 4.5 answer follows it and reads *Raiker as @Name*; after an edit, the older answer says *ran with an earlier version* | FIXED-1515 | Passed |
+| RT-1119-02 | A persona that keeps only Memory: a request to search the web makes at most one tool lookup, no web tool runs, the answer says it could not, and the receipt reads Haiku 4.5 | FIXED-1515, FIXED-1521, FIXED-1522 | Passed |
+| RT-1119-03 | **Models › On this computer › Ollama**, `qwen2.5:0.5b` switched on; a Chat turn on it answers *LOCAL_OK* | — | Passed |
+| RT-1119-04 | **Provider embeddings** turned on and Always allow, Memory's index built with `nomic-embed-text`; Work › Threads, *Japan holiday*, **Search message text** finds the *Kyoto flights* chats, *Related by meaning* | FIXED-1494, FIXED-1523, FIXED-1524 | Passed |
+| RT-1119-05 | **Search the Library** for *Japan holiday* finds *Poster for the Kyoto cherry blossom trip*, *Related by meaning* | FIXED-1507, FIXED-1525 | Passed |
+| RT-1119-06 | **Export › Slides (PowerPoint)** of a design with a rounded rectangle, an ellipse and text: the deck holds no flattened frame picture | FIXED-1516 | Passed |
+| RT-1119-07 | A vector PDF of *Ζωή Привет Łódź* records `text_encoding: unicode`, 0 characters replaced | FIXED-1517 | Passed |
+| RT-1119-08 | A brand guide PDF with two captioned swatches and no colour words: *Read 2 values*, `deep-sea=#1144aa`, `coral=#ff7042` | FIXED-1518 | Passed |
+| RT-1119-09 | Design › Documents **Create** with the request refused at the network: *The design was not created. Nothing was changed. Raiker did not answer…*, never *That change was refused.* | FIXED-1519 | Passed |
+| RT-1119-10 | OpenAI and OpenRouter connect through **Add model**; a GPT-4o mini turn answers | — | Passed |
+
+**Older specs rewritten and re-run this round.** `round-2026-09-15-typed-and-authority`
+8/8; `round-2026-09-04-priority` 3/4 (the MCP case needs an interpreter outside the
+home folder, see TO_BE_FIXED); `memory-restart-provider-composer` 3/3;
+`gcr-provider-validation-and-workspace` 3 passed, 1 skipped (the identity-linked
+refusal cannot arise on a connection saved with its workspace).
+
+**Found during the run, fixed.** Picking the Default model was replaced a second
+later by the surface's remembered model, so persona turns ran on GPT-4o mini
+(FIXED-1522); `tool_search` offered tools a persona withholds and the model
+looked one up dozens of times (FIXED-1521); Personalisation said it never
+changes Raiker's instructions, beside the new Personas card (FIXED-1523);
+Threads said *5 conversations mention* for matches found only by meaning
+(FIXED-1524); a short Library title related by meaning scored 0.586 against a
+fixed 0.6 (FIXED-1525).
+
+**Found, not fixed.** See
+[TO_BE_FIXED](../plans/TO_BE_FIXED.md#2026-11-19-round--found-not-fixed).
+
+**Captures.** `output/playwright/2026-11-19-round/` — `01-personas-settings`,
+`01b-persona-chip`, `01c-raiker-as-persona`, `01d-earlier-version`,
+`02-ceiling-turn`, `03-ollama-row`, `03-ollama-answers`, `04-threads-by-meaning`,
+`05-library-by-meaning`, `06-native-deck-export`, `07-unicode-design`,
+`08-brand-guide-swatches`, `09-design-failure-copy`, `10-providers`,
+`10b-openai-answers`, plus the rewritten specs' `memory-permission-after-restart`,
+`models-after-restart`, `composer-large-paste-attachment` and `memory-write-found`.
+
 ## Result — 2026-11-18 (Library search, editable slides and brand guides)
 
 A Linux workspace served by `raiker-web --port 8765` (`scripts/reset_live_workspace.py`

@@ -13,6 +13,10 @@ you set in Settings; further goal-level capabilities are planned and staged in t
 Everything Raiker makes is in **Work › Library**, searchable by words and, where
 your embedding model may run, by meaning; Design exports decks whose words stay
 editable and reads a brand guide PDF into a design system.
+**Personas** (`@DataAnalyst`) let you pick a way of answering you wrote, with
+its own instructions and a narrower set of tools; a persona can only narrow
+what a turn may do. Decks export every shape, picture and word as an editable
+slide object, and vector PDFs keep text in any script the font covers.
 
 Raiker runs as a desktop application on Windows, macOS and Linux. Its desktop
 window, web dashboard and terminal client are available for local, single-owner

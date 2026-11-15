@@ -183,8 +183,8 @@ def test_a_search_never_offers_a_tool_the_persona_withholds() -> None:
 
     withheld = personas.excluded_tools(["memory"])
     found = search_tools("weather in Paris", withheld=withheld)
-    assert found["matched"] == 0 and "weather_lookup" in found["withheld"]  # type: ignore[operator]
+    assert found["matched"] == 0 and "weather_lookup" in str(found["withheld"])
     assert "persona leaves them out" in str(found["note"])
     everything = search_tools("", withheld=withheld)
-    assert "web_search" not in everything["tools"] and "weather_lookup" not in str(everything)
+    assert "web_search" not in str(everything["tools"]) and "weather_lookup" not in str(everything)
     assert search_tools("weather in Paris")["matched"]  # without a persona it is offered

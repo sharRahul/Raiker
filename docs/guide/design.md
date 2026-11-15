@@ -311,7 +311,9 @@ machine and fills the form with the colours, fonts and px/rem sizes it found,
 listing anything it skipped and why. A brand guide **PDF** is read for what its
 text states: each `#hex` or `RGB r, g, b` colour, named by the words beside it
 (*Ocean blue #1A73E8* → `ocean-blue`), and labelled fonts (*Heading font:
-Playfair Display*); colours shown only as swatches are not read; **Or colours from a picture** reads the main colours of a logo
+Playfair Display*), and colours a guide only *shows* — filled swatches at
+least 18 points across — named by the caption under or beside them (*Deep
+Sea* → `deep-sea`), after the colours it states; **Or colours from a picture** reads the main colours of a logo
 or screenshot you have. The source note names the file and its hash. Nothing is
 saved until **Save system**.
 
@@ -376,14 +378,19 @@ shapes as paths, text as real text, an A4 frame as an A4 page — **PDF (one
 raster page)**, **SVG** (text stays text, so it remains editable in a vector
 tool), **JSON** (the frame's structure) or **Slides (PowerPoint), all
 frames**: a `.pptx` deck with one slide per frame, the chosen frame
-first, each slide the frame's shapes and pictures as one picture with every
-text layer over it as a real, editable text box at its place, size, colour and
-weight (the design stays the full editable source), or **Document (Word), all
+first, each slide built from native, editable objects in the order they are
+drawn: the background, every rectangle, rounded rectangle and ellipse (fill,
+outline, opacity, rotation), every picture (cropped and fitted as on the
+canvas) and every text layer as a text box at its place, size, colour and
+weight — nothing on a slide is a flattened picture (the design stays the full
+editable source), or **Document (Word), all
 frames**: a `.docx` with one page per frame, the frame's name as a heading,
 the frame as a picture and then each of its text layers as an ordinary,
-editable paragraph. The vector PDF writes text in the
-Western European character set; any other character becomes `?`, and the export
-records how many. Each export is listed with its version, the result of Check
+editable paragraph. The vector PDF writes text in any script the embedded font
+covers — Greek, Cyrillic, Polish and so on stay real, selectable text; a
+character the font has no glyph for is counted in the export's record. A host
+with no font file to embed falls back to Helvetica and the Western European
+character set, writing `?` for the rest and counting them. Each export is listed with its version, the result of Check
 at that moment, and the file's SHA-256, and downloads from there. PNG and PDF are
 drawn in one sans font — the export records which (the vector PDF embeds it) — and a font you named is
 drawn in it; SVG names your font and a viewer without it substitutes its own.

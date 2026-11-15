@@ -1422,6 +1422,11 @@ Rewind and the GitHub repository connector).
 
 ## Composer agent personas for `@`
 
+**2026-11-19 — built in Chat** ([FIXED-1515](FIXED_ITEMS.md#fixed-1515--composer-personas-adr-0005-slices-13));
+still open: **⋯ › Save as persona** from a turn, a persona's default model chosen
+in its form (the record and the turn already honour one), and the chip in Build
+and Design.
+
 **2026-11-17 — the design is accepted** in
 [ADR-0005](../adr/ADR-0005-composer-personas.md): a persona is owner-authored
 instructions, an optional default model and an optional tool ceiling, applied
@@ -1849,9 +1854,31 @@ embedding space and keeps it current in the background. Still open:
 
 ## 2026-11-19 round — found, not fixed
 
-* **Search by meaning still not qualified live.** Ollama and `nomic-embed-text` were reachable this round, but `POST /api/memory/embedding-index` answered 403 `disabled_by_capability_gate`: the Models (`model_provider_runtime`) gate must be turned on, not only set to Allow. RT-1119-04/-05 in `web/e2e/fixed-1515-round-live.spec.ts` did not pass; RT-1119-06..10 were not run.
-* **Ranking deferred tools by meaning — decided against for now.** Measured with nomic-embed-text: every deferred tool scores 0.46–0.66 with ~0.02 margins ("undo the last change" → `git_push`). Lexical preselection stays.
-* **Managed llama.cpp embedding entry** still needs its SHA-256 and size recorded from the publisher (huggingface.co is reachable now).
-* **MCP Test on a uv-managed interpreter** fails `mcp_command_not_found`: the sandbox does not mount the home folder by design. `round-2026-09-04` test 3 needs a system Python host.
-* **`b9` live spec** still needs a git repository workspace.
-* Live specs rewritten this round: `round-2026-09-15` (8/8), `round-2026-09-04` (3/4), `memory-restart-provider-composer` (3/3), `gcr-provider-validation` (3 pass, 1 skip).
+Run record: [WEB_APP_LIVE_TEST](../architecture/WEB_APP_LIVE_TEST.md#result--2026-11-19-personas-local-ollama-search-by-meaning-and-native-decks).
+
+* ~~**Search by meaning not qualified live.**~~ Closed 2026-11-19: with Ollama
+  and `nomic-embed-text` on this host, Threads (RT-1119-04) and the Library
+  (RT-1119-05) find *Kyoto* items for *Japan holiday*. It needs **Provider
+  embeddings** turned on, not only set to Always allow (the first attempt
+  answered 403 `disabled_by_capability_gate`). Goal noticing by meaning shares
+  the embedder and was not re-run separately.
+* **Ranking deferred tools by meaning — decided against for now.** Measured with
+  nomic-embed-text: every deferred tool scores 0.46–0.66 with ~0.02 margins
+  (*undo the last change* → `git_push`). Lexical preselection stays; revisit
+  with a stronger local embedding model.
+* **Chat search's 0.6 threshold is at the edge for nomic-embed-text.** The Kyoto
+  chat scored 0.621 (query prefix on both sides); embedded with the
+  `search_document:` prefix it would score 0.594. Candidates are embedded as
+  queries today; moving them to the document prefix needs the threshold moved
+  with it (FIXED-1525's relative rule is the likely shape).
+* **Ollama Cloud models** need the owner's own `ollama signin`; only local
+  models (`qwen2.5:0.5b`) were run.
+* **Managed llama.cpp embedding entry** still needs its SHA-256 and size
+  recorded from the publisher (huggingface.co is reachable from this host now).
+* **MCP Test on a uv-managed interpreter** fails `mcp_command_not_found`: the
+  sandbox does not mount the home folder, by design. `round-2026-09-04`'s MCP
+  case needs a host whose Python is outside the home folder.
+* **`b9` live spec** still needs a git repository workspace (`RAIKER_LIVE_WORKSPACE`).
+* **Three parallel Python shards exhausted this host's 7.6 GB `/tmp`** (pytest
+  temp folders) and failed by the hundred; run shards one at a time or with
+  `--basetemp` on disk. CI's runners are unaffected.

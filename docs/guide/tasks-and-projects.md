@@ -387,7 +387,9 @@ Design, answer blocks you pinned from Chat, and pull requests Raiker opened.
 Filter by type or project, or type in **Search the Library**: every word must
 appear in the item's title, kind, conversation or project, and — where your
 embedding model may run — items about the same thing in other words are added
-and marked *Related by meaning*. Each item opens the conversation, turn or Design
+and marked *Related by meaning*. Library titles are short, so a meaning match
+is kept when it clearly leads the rest of the Library, or — in a library of
+fewer than four items — when it clears the floor alone. Each item opens the conversation, turn or Design
 document it came from. A pinned block can be moved to another project or
 unpinned from here. Each project's **Project library** is the same list for
 that project. The Library only reads what already exists; nothing is copied

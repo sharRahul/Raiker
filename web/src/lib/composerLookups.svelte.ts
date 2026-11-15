@@ -53,7 +53,8 @@ export class ComposerLookups {
 
   loadPersonas = async () => {
     try {
-      this.personas = (await api.personas()).personas;
+      const view = await api.personas();
+      this.personas = Array.isArray(view?.personas) ? view.personas : [];
     } catch {
       // A persona list that cannot be read leaves file mentions working.
       this.personas = [];

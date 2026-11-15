@@ -349,10 +349,13 @@ def search_library(
     if embed is not None and len(found) < 5 and rest:
         import contextlib
 
-        from raiker.context.meaning_search import rank_by_meaning
+        from raiker.context.meaning_search import RELATIVE_FLOOR, rank_by_meaning
 
         by_id = {item["item_id"]: item for item in rest}
         with contextlib.suppress(Exception):
-            for key in rank_by_meaning(query, ((item["item_id"], _searchable(item)) for item in rest), embed):
+            for key in rank_by_meaning(
+                query, ((item["item_id"], _searchable(item)) for item in rest), embed,
+                threshold=RELATIVE_FLOOR, relative=True,
+            ):
                 found.append({**by_id[key], "match_kind": "meaning"})
     return found

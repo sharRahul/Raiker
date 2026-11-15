@@ -61,3 +61,33 @@ def test_a_failing_embedder_leaves_the_word_matches() -> None:
 
     found = search_library(ITEMS, "bicycle", embed=broken)
     assert [item["item_id"] for item in found] == ["c"]
+
+
+def test_a_short_title_found_by_meaning_only_when_it_stands_out() -> None:
+    # Scores as measured with nomic-embed-text for "Japan holiday" (2026-11-19).
+    scores = {"a": 0.586, "b": 0.43, "c": 0.48}
+
+    def embed(text: str) -> list[float] | None:
+        if text == "Japan holiday":
+            return [1.0, 0.0]
+        item = next(key for key, value in {"a": "Kyoto", "b": "revenue", "c": "bicycle"}.items() if value in text)
+        import math
+
+        score = scores[item]
+        return [score, math.sqrt(1 - score * score)]
+
+    found = search_library(ITEMS, "Japan holiday", embed=embed)
+    assert [item["item_id"] for item in found] == ["a"]
+
+    # In a field of four or more where nothing stands out, nothing is offered.
+    scores.update({"a": 0.53, "b": 0.52, "c": 0.525})
+    field = ITEMS + [{**ITEMS[1], "item_id": "b2"}]
+    assert search_library(field, "Japan holiday", embed=embed) == []
+
+
+def test_a_small_library_is_judged_by_the_floor_alone() -> None:
+    def embed(text: str) -> list[float] | None:
+        return [1.0, 0.0] if text == "Japan holiday" else [0.586, 0.81]
+
+    two = ITEMS[:1] + [{**ITEMS[0], "item_id": "a2"}]
+    assert [item["item_id"] for item in search_library(two, "Japan holiday", embed=embed)] == ["a", "a2"]

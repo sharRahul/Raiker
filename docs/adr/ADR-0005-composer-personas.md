@@ -2,7 +2,9 @@
 
 ## Status
 
-Accepted as a design on 2026-11-16. Not built. Answers the five questions
+Accepted as a design on 2026-11-16. Built 2026-11-19, all three slices
+([FIXED-1515](../plans/FIXED_ITEMS.md#fixed-1515--composer-personas-adr-0005-slices-13)):
+Chat only; Build and Design keep their composers as they were. Answers the five questions
 [TO_BE_FIXED § Composer agent personas for `@`](../plans/TO_BE_FIXED.md#composer-agent-personas-for-)
 said a design must settle before any code; the build slices at the end are the
 order it will be built in.

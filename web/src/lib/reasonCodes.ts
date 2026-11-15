@@ -149,6 +149,23 @@ const REASON_CODES: Record<string, ReasonCopy> = {
     plain: "Raiker could not tell which account this RAIKER.md belongs to.",
     remediation: "Sign out and sign in again, then open it again.",
   },
+  // ADR-0005 — composer personas.
+  unknown_persona: {
+    plain: "That persona no longer exists, so the message was not sent as it.",
+    remediation: "Choose another persona with @, or send without one.",
+  },
+  persona_user_unknown: {
+    plain: "Raiker could not tell which account these personas belong to.",
+    remediation: "Sign out and sign in again, then try again.",
+  },
+  persona_name_taken: {
+    plain: "You already have a persona with that name.",
+    remediation: "Choose another name.",
+  },
+  too_many_personas: {
+    plain: "You have the most personas one account can keep.",
+    remediation: "Remove one in Settings › Personalisation first.",
+  },
   instruction_file_not_created: {
     plain: "Raiker could not create your global RAIKER.md.",
     remediation: "Check that the data folder is writable, then try again.",

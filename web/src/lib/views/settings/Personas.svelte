@@ -43,8 +43,10 @@
     loadError = null;
     try {
       const view = await api.personas();
-      personas = view.personas;
-      families = view.families;
+      // A read that answers in an unexpected shape lists nothing rather than
+      // taking Settings down with it.
+      personas = Array.isArray(view?.personas) ? view.personas : [];
+      families = Array.isArray(view?.families) ? view.families : [];
     } catch (e) {
       loadError = failure("Your personas could not be read", "The @ menu offers files only until they are.", "Choose Retry to read them again.", e);
     } finally {

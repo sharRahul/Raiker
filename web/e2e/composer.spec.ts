@@ -887,8 +887,10 @@ test("Design starters prepare an editable draft and keep composer controls at na
   // FIXED-1400 — size and count are the composer's own controls now.
   await expect(composer.getByLabel("Size")).toBeVisible();
   await expect(composer.getByLabel("How many")).toBeVisible();
-  await expect(composer.getByLabel("Image model")).toBeVisible();
-  await expect(composer.locator(".model-scope svg")).toHaveCount(2);
+  // One reachable image model is named as text, not offered as a one-item
+  // dropdown (FIXED-1471): its icon, and no chevron.
+  await expect(composer.getByTestId("image-model-single")).toBeVisible();
+  await expect(composer.locator(".model-scope svg")).toHaveCount(1);
   await expect(composer.getByRole("button", { name: "Dictate" })).toBeVisible();
   await capture(page, join(shots, "design-starters-desktop.png"));
   await page.evaluate(() => { document.documentElement.dataset.theme = "dark"; });
@@ -900,7 +902,7 @@ test("Design starters prepare an editable draft and keep composer controls at na
   await page.getByLabel("Password", { exact: true }).fill("test-password");
   await page.getByRole("button", { name: /unlock/i }).click();
   await expect(page.getByRole("heading", { name: "What would you like to create?" })).toBeVisible();
-  await expect(composer.getByLabel("Image model")).toBeVisible();
+  await expect(composer.getByTestId("image-model-single")).toBeVisible();
   await expect(composer.getByRole("button", { name: "Dictate" })).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBeLessThanOrEqual(1);
   await capture(page, join(shots, "design-starters-narrow.png"));

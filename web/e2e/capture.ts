@@ -19,7 +19,7 @@
  */
 import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
-import { basename, dirname, isAbsolute, resolve } from "node:path";
+import { basename, dirname, isAbsolute, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { test, type Locator, type Page } from "@playwright/test";
@@ -46,7 +46,15 @@ const E2E_DIR = dirname(fileURLToPath(import.meta.url));
 
 /** A capture path as an absolute one, anchored at `web/e2e` when relative. */
 export function capturePath(path: string): string {
-  return isAbsolute(path) ? path : resolve(E2E_DIR, path);
+  const absolute = isAbsolute(path) ? path : resolve(E2E_DIR, path);
+  // 2026-11-16 — screenshots and evidence no longer live in the repository.
+  // Older specs still name `docs/plans/screenshots/…`; those captures land in
+  // the git-ignored `output/playwright/screenshots/…` instead.
+  const docs = resolve(E2E_DIR, "..", "..", "docs", "plans", "screenshots");
+  if (absolute === docs || absolute.startsWith(docs + sep)) {
+    return resolve(E2E_DIR, "..", "..", "output", "playwright", "screenshots", absolute.slice(docs.length + 1));
+  }
+  return absolute;
 }
 
 /**

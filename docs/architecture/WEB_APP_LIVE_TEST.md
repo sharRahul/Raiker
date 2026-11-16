@@ -7,6 +7,11 @@
 > encrypted Models UI or reads it from the owner's environment for that run;
 > credentials never belong in a spec, command, log or screenshot.
 
+> **Captures (2026-11-16).** Screenshots and evidence files are not kept in the
+> repository; live runs write them to the git-ignored `output/playwright/`. Paths
+> under `docs/plans/screenshots/` and `docs/plans/evidence/` in older results name
+> files that were removed on the owner's instruction and are kept as history.
+
 ## What this verifies
 
 The full served web stack end to end: `raiker-web` (FastAPI + the built SPA) →
@@ -2913,7 +2918,7 @@ Whisper build and pinned English base model transcribed all nine words exactly
 FIXED-1384: missing explicit Hugging Face CDN hosts and redirect validation
 after contact. The corrected voice and llama.cpp installers pass **53 tests,
 2 platform skips**, including denial before contact and bounded malformed/loop
-redirects. [Speech receipt](../plans/evidence/windows-beta-2026-11-09/speech-roundtrip.xml).
+redirects. `Speech receipt`.
 The personal Windows workflow now opts into this real engine round trip.
 This combines the recorded packaged speaker with source orchestration; a new
 frozen candidate must contain the download correction.
@@ -2937,7 +2942,7 @@ split by exact runtime; none of these partial checks is release sign-off.
 | T-04 correction/forget slice | Disposable source host; enable Memory store, import a synthetic tea preference through Controls, recall using real Ollama Qwen 2.5 coder 7B, edit through Memory, start a new chat and verify the replacement, Forget, start a third chat and verify neither preference is supplied or repeated. Pass after FIXED-1387. Wait for completed response actions, not an old receipt. | `web/e2e/memory-correction-forget-live.spec.ts`; inspected `output/playwright/windows-memory/{01-recalled,02-corrected,03-forgotten}.png` |
 | VD-1 managed setup/test/removal | Exact frozen Windows package `63dcdc53`, MSI administratively extracted on this PC. Choose Lite, CPU and English base in Settings → Voice; install verified engines; Test reports spoke/heard in 13 seconds with 89% word match; Remove reports 0 B. Pass. | `web/e2e/managed-voice-roundtrip-live.spec.ts`, opt-in `RAIKER_LIVE_MANAGED_VOICE=1`; all three `output/playwright/windows-managed-voice/` captures inspected |
 | AG profiles | Fresh disposable source host, Anthropic credentials entered through UI; real model work, balanced memory withholding, owner confirmation, stop and profile version change. 7/7 pass. This is not the calendar/mail T-03 journey. | `web/e2e/goals-execution-profiles-live.spec.ts`; inspected `output/playwright/2026-10-20-goals-execution-profiles/` captures |
-| Windows native accounts | Existing configured disposable accounts; real current-source integration suite with `RAIKER_REQUIRE_ACCOUNT_SANDBOX=1`. 10/10 pass: isolation, concurrency, revocation, owner-profile/local-network refusal and Job limits. | [Test receipt](../plans/evidence/windows-beta-2026-11-09/windows-account-tests.txt) |
+| Windows native accounts | Existing configured disposable accounts; real current-source integration suite with `RAIKER_REQUIRE_ACCOUNT_SANDBOX=1`. 10/10 pass: isolation, concurrency, revocation, owner-profile/local-network refusal and Job limits. | `Test receipt` |
 
 The T-04 diagnostic first appeared to pass but screenshot review found that
 it reused the conversation and an earlier receipt. That result was withdrawn.
@@ -2975,8 +2980,8 @@ reading the UI's actual audio Blob supplied the valid input. This qualifies the
 browser capture-to-managed-engine path with synthetic input, not a physical
 microphone, acoustic/noisy-room accuracy or hands-free conversation.
 
-The redacted [Windows](../plans/evidence/windows-beta-2026-11-09/native-probe.json)
-and [WSL](../plans/evidence/windows-beta-2026-11-09/wsl-probe.json) probes refuse
+The redacted `Windows`
+and `WSL` probes refuse
 availability for an ordinary scratch directory with
 `native_disposable_workspace_required`. They do not close profile reset, LSA
 logon restrictions, explicit ACE review or platform promotion races.

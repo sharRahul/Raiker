@@ -179,6 +179,15 @@ dependencies after every fix.
 
 ## Evidence retention and maintenance
 
+**Where evidence lives (2026-11-16).** Screenshots and run evidence are not kept
+in the repository. Live specs write captures to the git-ignored
+`output/playwright/` (a spec that still names `docs/plans/screenshots/…` is
+redirected there by `web/e2e/capture.ts`); the run record in
+[WEB_APP_LIVE_TEST.md](../architecture/WEB_APP_LIVE_TEST.md) states what each
+capture showed. The former `docs/plans/screenshots/` and `docs/plans/evidence/`
+folders were removed on the owner's instruction; file names in older records are
+historical.
+
 Keep redacted traces, screenshots, artifact hashes, provider receipts and
 validator outputs for the support life of the qualified release. Link newly
 found defects to `TO_BE_FIXED.md`; link verified closure to `FIXED_ITEMS.md`.

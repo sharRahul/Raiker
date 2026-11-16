@@ -709,7 +709,7 @@ real-model journey gates remain; this is not release-owner sign-off.
   delayed model: one model call before/after, identical task identity, failed
   step reason `interrupted_by_restart`, no false completion or duplicate work.
   This is a process-crash check, not a real-model T-03 completion claim.
-  [Redacted receipt](evidence/windows-beta-2026-11-09/goal-restart.json).
+  `Redacted receipt`.
 - **MM-3/MM-4/SB-4:** 13 canary, destructive recovery, egress-verifier and spawn
   inventory tests pass. Forty provider-fault, truthful-reporting, persistence
   and disposable-workspace tests pass. These do not close a full-feature
@@ -722,8 +722,8 @@ real-model journey gates remain; this is not release-owner sign-off.
   Playwright passes 2/2 with screenshots inspected. This is extracted-package
   evidence, not owner-machine install/uninstall evidence or a candidate built
   from the later recovery fixes.
-  [Host receipt](evidence/windows-beta-2026-11-09/packaged-host-smoke.txt),
-  [worker result](evidence/windows-beta-2026-11-09/kokoro-owner-worker.xml).
+  `Host receipt`,
+  `worker result`.
 - **CI-2:** full Windows mypy passes 1,285 files; Ruff and documentation contracts
   pass. Linux filesystem attack tests remain skipped on Windows. Exact-commit
   candidate packaging and required GitHub checks remain required.
@@ -1007,11 +1007,11 @@ These are **source-host** screenshots, taken with a changed working tree over
 `304e71ff`; they are not presented as frozen-candidate screenshots. Original
 capture metadata is retained beside them as `source-manifest.json`.
 
-![Voice is optional and unsupported options are labelled](screenshots/linux-beta-2026-11-09/voice-deferred.png)
+!`Voice is optional and unsupported options are labelled`
 
-![Setup saved with the model explicitly deferred](screenshots/linux-beta-2026-11-09/setup-saved.png)
+!`Setup saved with the model explicitly deferred`
 
-![Chat composer at the 200 percent zoom equivalent](screenshots/linux-beta-2026-11-09/chat-200-percent.png)
+!`Chat composer at the 200 percent zoom equivalent`
 
 ### Reference decisions
 
@@ -1026,15 +1026,15 @@ evidence, licences, sign-off or authorization to widen beta scope.
 The new local all-format artifacts are unsigned `0.0.0` test builds from this
 working tree, collected under `output/linux-beta/packages-hardened/`. They do
 not carry an exact-commit provenance claim. Their
-[checksums](evidence/linux-beta-2026-11-09/SHA256SUMS-linux-x86_64.txt),
-[compression-pressure result](evidence/linux-beta-2026-11-09/rpm-compression-pressure.json),
-[real storage-pressure receipt](evidence/linux-beta-2026-11-09/storage-exhaustion.json)
-and [goal restart receipt](evidence/linux-beta-2026-11-09/goal-restart.json)
+`checksums`,
+`compression-pressure result`,
+`real storage-pressure receipt`
+and `goal restart receipt`
 are retained with this record.
 
 Both timed network recordings are retained privately under `output/` and
-contain no captured payloads. The [installed pre-fix verdict](evidence/linux-beta-2026-11-09/egress-installed-before.json)
-and [corrected-source verdict](evidence/linux-beta-2026-11-09/egress-source-corrected.json)
+contain no captured payloads. The `installed pre-fix verdict`
+and `corrected-source verdict`
 are **not approved**. The latter trace's first/last recorded syscall events
 span 1,805.76 seconds, but the existing verifier measures first/last connection
 activity (181 seconds), which cannot qualify its idle tail. Do not fabricate
@@ -1072,7 +1072,7 @@ and [Data safety drills](https://github.com/sharRahul/Raiker/actions/runs/426393
 are all green, including Ruff, mypy, lint/type checking, every Python shard,
 security/dependency checks and real inference on all three operating systems.
 The exact verification script from Release → Plan also passed locally for
-that SHA ([receipt](evidence/linux-beta-2026-11-09/exact-release-gate-8a053a90.json)).
+that SHA (`receipt`).
 The previous runtime/packaging commit `91b07ce2` additionally passed all desktop
 targets and the Windows-on-Arm emulated installation in
 [Desktop package](https://github.com/sharRahul/Raiker/actions/runs/42637512116).
@@ -1101,11 +1101,11 @@ gates independently of workflow access.
 
 The final source UI status check returned `not_connected`, kept the explicit
 adoption button visible, and observed no public destinations in its focused
-trace ([UI receipt](evidence/linux-beta-2026-11-09/passive-status-ui-8a053a90.json),
-[network receipt](evidence/linux-beta-2026-11-09/passive-status-network-8a053a90.json)).
+trace (`UI receipt`,
+`network receipt`).
 It is a short regression check, not MM-5 acceptance.
 
-![Explicit sign-in and adoption without a background account check](screenshots/linux-beta-2026-11-09/explicit-chatgpt-connection.png)
+!`Explicit sign-in and adoption without a background account check`
 
 ### Electron network process follow-through
 
@@ -1126,7 +1126,7 @@ Validation: 36 desktop unit tests and 13 shell UI tests passed. The new
 embedded-resource test first reaches its server outside the shell, then proves
 the renderer request is blocked before it reaches that server. The corrected
 focused startup trace has no corresponding public IPv4 connections;
-[its raw destination report](evidence/linux-beta-2026-11-09/electron-network-focused.json)
+`its raw destination report`
 retains `2001:4860:4860::8888`. This is **not claimed as zero public-address
 syscalls**: a separate socket/close trace shows a UDP socket whose connect
 fails with ENETUNREACH and closes without a DNS payload. Chromium documents
@@ -1155,33 +1155,33 @@ Runtime commit: `6c211b605d3c42d77215ff69cbed3f346c95d685`.
 [engine/live inference](https://github.com/sharRahul/Raiker/actions/runs/42646385237)
 and the complete [desktop matrix](https://github.com/sharRahul/Raiker/actions/runs/42646385236)
 are green. The macOS live-inference job was cancelled before starting; its
-failed-job rerun passed. The [exact Release Plan gate](evidence/linux-beta-2026-11-09/release-gate-6c211b60.txt)
-passed on this same commit. [Workflow receipt](evidence/linux-beta-2026-11-09/workflow-checks-6c211b60.json).
+failed-job rerun passed. The `exact Release Plan gate`
+passed on this same commit. `Workflow receipt`.
 
 The downloaded unsigned CI `0.0.0` Linux artifacts all match their recorded
 hashes and sizes; RPM reports `xz 6` and passes its payload digests.
 Installed DEB and AppImage smoke/restart/setup persistence, packaged onboarding
 and uninstall-with-data-retention passed on GitHub's Linux runner.
-[Artifact verification](evidence/linux-beta-2026-11-09/ci-linux-verification-6c211b60.json).
+`Artifact verification`.
 The separate local unsigned `0.9.0` candidate also passed hash checks, installed
 host smoke and SPDX/licence inventory. Its extracted AppImage payload passed
 first launch (one test); this is not a claim of native FUSE mounting here.
 
 The final installed-shell audit used that local unsigned `0.9.0` DEB. Its
-[scope](evidence/linux-beta-2026-11-09/installed-shell-6c211b60-scope.json)
+`scope`
 was recorded before capture: fresh synthetic owner, no model selected, Voice
 off, no connected external services. Electron and its frozen-host descendants
 were traced with payloads elided. The driver completed 62 page visits over
 30 minutes and recorded no navigation failures.
-[UI receipt](evidence/linux-beta-2026-11-09/installed-shell-6c211b60-ui-receipt.json).
+`UI receipt`.
 The recorder was stopped after that exercise, before its 33-minute safety timeout.
 
 The unchanged verifier approved **1,862 seconds** of actual destination activity,
 **4,115 observations**, and **zero unexpected hosts** against that scope.
-[Verifier report](evidence/linux-beta-2026-11-09/installed-shell-6c211b60-verifier-report.json).
+`Verifier report`.
 The source metadata capture SHA-256 is
 `1bb8fb59ae41f2b27dc6fa45a5af088c38875c3a06575a02d6de37f5222b15ba`.
-[Capture/trace hashes and limits](evidence/linux-beta-2026-11-09/installed-shell-6c211b60-capture-receipt.json).
+`Capture/trace hashes and limits`.
 The private trace and JSONL remain in ignored `output/linux-beta/egress-shell-hardened/`;
 only redacted receipts are committed.
 
@@ -1189,7 +1189,7 @@ The predeclared exceptions include this machine's native sandbox/control
 probes and Chromium's literal IPv6 route heuristic. All **135** Chromium
 observations use UDP, fail with ENETUNREACH, and close without a send on the
 same thread before close.
-[Probe receipt](evidence/linux-beta-2026-11-09/installed-shell-6c211b60-route-probes.json).
+`Probe receipt`.
 This is not a zero-public-address-syscall claim. The earlier threat-feed,
 ChatGPT sidecar and Electron public-request failures are retained in the
 historical receipts; no destinations or timestamps were removed to obtain approval.
@@ -1199,9 +1199,9 @@ useful-model inference, installed managed speech, enabled connectors, full
 owner-machine canary/recovery evidence or a fresh audit of the signed artifact.
 The seven journeys and owner sign-off remain open. Inspected screenshots:
 
-![Installed candidate with no selected model](screenshots/linux-beta-2026-11-09/installed-models.png)
-![Installed candidate Voice availability](screenshots/linux-beta-2026-11-09/installed-voice.png)
-![Installed candidate with no connected services](screenshots/linux-beta-2026-11-09/installed-connections.png)
+!`Installed candidate with no selected model`
+!`Installed candidate Voice availability`
+!`Installed candidate with no connected services`
 
 ### Verified non-published signed candidate
 
@@ -1234,12 +1234,12 @@ GPG keyring imported from the repository's pinned Linux public key:
 - The generated `RELEASE_EVIDENCE.md` names the correct commit and contains
   no missing-output marker.
 
-[Verification receipt](evidence/linux-beta-2026-11-09/release-candidate-verification-6c211b60.json),
-[workflow results](evidence/linux-beta-2026-11-09/release-workflow-42650624663.json),
-[product verification](evidence/linux-beta-2026-11-09/release-product-verification.log),
-[generated release evidence](evidence/linux-beta-2026-11-09/RELEASE_EVIDENCE-6c211b60.md),
-and [signed provenance](evidence/linux-beta-2026-11-09/release-provenance-6c211b60.json)
-([detached signature](evidence/linux-beta-2026-11-09/release-provenance-6c211b60.json.sig)).
+`Verification receipt`,
+`workflow results`,
+`product verification`,
+`generated release evidence`,
+and `signed provenance`
+(`detached signature`).
 Windows Authenticode identity and native installation were checked on Windows
 by the workflow, not independently executed on Linux. macOS remains unsigned
 at the platform level under the existing beta exception; its Ed25519 manifests
@@ -1268,7 +1268,7 @@ valid Kokoro voice choices. Piper licence/sidecar review is removed work.
 Real direct synthesis passed with verified catalogue assets and Kokoro-ONNX
 0.6.1: 24 kHz, nonzero PCM, 1.877-second clip, 295,440 KiB peak RSS, no observed
 IP destination during synthesis.
-[Synthesis receipt](evidence/linux-beta-2026-11-09/kokoro-only-synthesis.json).
+`Synthesis receipt`.
 The full managed live test correctly refused this busy machine's available
 memory below its 2 GiB reserve; the guard was not weakened.
 
@@ -1282,14 +1282,14 @@ contains voice. No dependency policy was broadened silently.
 The first frozen Linux worker test **passed** using the bundled executable,
 verified real model assets and authenticated loopback requests; unauthenticated
 health requests are refused, WAV output is 24 kHz/nonzero and the worker stops.
-[Frozen-worker receipt](evidence/linux-beta-2026-11-09/kokoro-frozen-worker.xml).
+`Frozen-worker receipt`.
 That is a working-tree freeze qualification, not an exact-commit installer
 claim. Full profile memory admission, Linux Whisper packaging, actual microphone
 round trip and owner's own-PC trial remain separate checks.
 
 The earlier signed DEB was also installed locally and passed its signed
 provenance, fresh owner/setup and restart persistence smoke.
-[Installed signed-candidate receipt](evidence/linux-beta-2026-11-09/signed-candidate-installed-smoke.txt).
+`Installed signed-candidate receipt`.
 This receipt remains attached to pre-removal runtime `6c211b60`.
 
 ## Appendix C — Data-safety evidence

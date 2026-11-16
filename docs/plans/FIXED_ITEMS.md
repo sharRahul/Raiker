@@ -15696,7 +15696,7 @@ writes the Build selection, navigates, and makes **no** call to
 `apps/web/src/lib/views/WorkbenchView.test.ts` (the tile links to `#/projects`
 and states a count rather than a project name);
 `apps/web/src/lib/views/BuildView.test.ts`. Catalogue:
-[`screenshots/pages/`](screenshots/pages) — all 208 images recaptured after the
+`screenshots/pages/` — all 208 images recaptured after the
 fix, so the committed evidence shows the corrected build rather than the one that
 exposed the defects.
 
@@ -21757,7 +21757,7 @@ and 390px, and the checkboxes on Settings → Privacy and Settings → Security 
 the 24px target on a phone that the rest of the product already met. Beyond that it is harness work, and what it protects is every other
 surface: 40 destinations rather than 26, photographed in four display classes
 and both themes, and asserted at four widths by three separate checks.
-[`screenshots/pages/`](screenshots/pages) is named by destination now rather
+`screenshots/pages/` is named by destination now rather
 than by ordinal (`settings-privacy.png`, not `26-`), so adding a destination in
 the middle no longer renames the evidence after it and the catalogue matches the
 theme sweep's existing convention. The 25 ordinal files are replaced; that

@@ -59,3 +59,8 @@ win1312-probe/
 /desktop-dist/
 # DIST-01 — the collected installers, manifests and checksums of a desktop build.
 /desktop-release/
+
+# 2026-11-16 — screenshots and run evidence stay out of the repository;
+# live captures go to output/playwright/ (above).
+docs/plans/screenshots/
+docs/plans/evidence/

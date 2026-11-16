@@ -444,3 +444,11 @@ describe("the Build setup preset (BUG-346)", () => {
     );
   });
 });
+
+describe("the Build preset runs commands only with an acknowledgement (2026-11-16)", () => {
+  it("includes command execution, marked as needing the owner's acknowledgement", () => {
+    const row = BUILD_PRESET.find((entry) => entry.capability === "shell_execution");
+    expect(row?.acknowledge).toBe(true);
+    expect(BUILD_PRESET.filter((entry) => entry.acknowledge).map((entry) => entry.capability)).toEqual(["shell_execution"]);
+  });
+});

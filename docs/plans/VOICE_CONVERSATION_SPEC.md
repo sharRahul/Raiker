@@ -4,7 +4,7 @@
 > own PC first, phone/iPad clients later. All managed TTS profiles use
 > Kokoro-82M; Piper is removed. Production signing infrastructure and
 > mass-market distribution are outside this acceptance scope.
-> [Decision and retained safeguards](PERSONAL_BETA_SCOPE.md).
+> [Decision and retained safeguards](BETA_RELEASE_PLAN.md#appendix-a--owner-scope-2026-11-09).
 
 
 **Status:** V1 implemented, V2 implemented as Preview (see §12a); opened 2026-11-02. Tracked in

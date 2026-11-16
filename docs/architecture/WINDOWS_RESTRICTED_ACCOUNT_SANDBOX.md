@@ -34,8 +34,11 @@ reach because Windows does not grant one standard user another's files.
 4. Stdio over pipes created by the runner; no inherited owner handles.
 
 `CreateProcessWithTokenW`/`CreateProcessAsUserW` need privileges a standard
-user does not hold, so a custom restricted token is not available without a
-privileged helper service; that is a possible later hardening step.
+user does not hold for an arbitrary token. A *restricted version of the
+caller's own primary token* is the documented exception, which is how OpenAI
+Codex's `unelevated` Windows mode runs without an administrator (corrected
+2026-11-16). Raiker does not use it as a default because it cannot contain the
+network ([ADR-0006](../adr/ADR-0006-one-supported-path-per-machine.md)).
 
 ## What it protects, and what it does not
 

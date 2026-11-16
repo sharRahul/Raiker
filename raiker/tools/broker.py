@@ -1573,9 +1573,38 @@ class ToolBroker:
                 if action.tool_name == "edit_file":
                     return self._edit_consequence(action, path)
                 return f"Approving writes this exact change to {path}, once."
+        return self._record_only_consequence(action)
+
+    def _record_only_consequence(self, action: ToolAction) -> str:
+        """What approving does when it cannot carry the action out, in plain words.
+
+        Found in regular use (2026-11-16): on a fresh account, a memory the owner
+        asked Raiker to keep showed *"Records an action-bound approval request
+        only. Approval resolution is metadata-only…"*, the owner allowed it,
+        nothing was saved, and the conversation carried on as if it had been.
+        """
+        gate = None
+        if self.store is not None:
+            from raiker.approvals.execution import ApprovalExecutionBridge
+
+            try:
+                gate = ApprovalExecutionBridge(self.store).metadata_only_gate(
+                    action.tool_name, self.principal_id
+                )
+            except Exception:  # noqa: BLE001 - the sentence falls back, it never fails the call
+                gate = None
+        if gate:
+            from raiker.control.dashboard_parts.approvals import _GATE_LABELS
+
+            label = _GATE_LABELS.get(gate, gate.replace("_", " "))
+            return (
+                f"Approving will not do this: the {label} permission is off, so your "
+                f"decision is recorded and nothing is changed. Turn on {label} in "
+                "Permissions, then ask again."
+            )
         return (
-            "Records an action-bound approval request only. Approval resolution is "
-            "metadata-only and does not execute the action."
+            "Approving records your decision only; Raiker cannot carry this action out "
+            "from an approval, so nothing is changed."
         )
 
     def _edit_consequence(self, action: ToolAction, path: str) -> str:

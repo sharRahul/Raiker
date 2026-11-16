@@ -1,6 +1,6 @@
 /**
  * Quiet UI — the layout system and the long pages rebuilt
- * (docs/plans/quiet-ui/01_LAYOUT_SYSTEM_AND_PAGES.md), against a running host
+ * (docs/plans/QUIET_UI_PLAN.md), against a running host
  * and a real hosted model.
  *
  * Prerequisites:

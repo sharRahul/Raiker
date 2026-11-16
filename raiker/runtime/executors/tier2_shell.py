@@ -24,6 +24,40 @@ def _with_module_note(summary: str, result: Mapping[str, Any]) -> str:
     return f"{summary} {note}" if note else summary
 
 
+UNREACHABLE = "native_sandbox_executable_unreachable"
+
+#: Programs a model commonly names, and the one a typical install has instead.
+_USUAL_ALTERNATIVES: dict[str, tuple[str, ...]] = {
+    "python": ("python3",),
+    "pip": ("pip3", "python3 -m pip"),
+    "py": ("python3", "python"),
+    "pytest": ("python3 -m pytest", "python3 -m unittest"),
+    "node": ("nodejs",),
+}
+
+
+def missing_program_hint(program: str) -> str:
+    """Say which program is not installed, and which installed one to use instead.
+
+    Found in regular use (2026-11-16): a model ran `python …` on Ubuntu, which
+    ships only `python3`, received only `native_sandbox_executable_unreachable`,
+    and told the owner the sandbox could not run tests. The sandbox was fine.
+    """
+    import shutil
+
+    name = Path(program).name
+    found = [
+        alternative for alternative in _USUAL_ALTERNATIVES.get(name, ())
+        if shutil.which(alternative.split()[0]) is not None
+    ]
+    if found:
+        return (
+            f"The program `{name}` is not installed on this computer, so the command did not run. "
+            f"`{found[0]}` is installed: run the command again with it."
+        )
+    return f"The program `{name}` is not installed on this computer, so the command did not run."
+
+
 class ShellExecutor:
     capability = "shell_execution"
 
@@ -90,10 +124,12 @@ class ShellExecutor:
                 host_network_code=self._host_network_code,
             )
         except CommandServiceError as exc:
+            hint = missing_program_hint(command[0]) if exc.reason_code == UNREACHABLE else None
             return ExecutionResult(
                 ok=False, capability=self.capability, action_id=action.action_id,
                 reason_code=exc.reason_code,
-                summary="Shell execution blocked by governed command lifecycle.",
+                summary=hint or "Shell execution blocked by governed command lifecycle.",
+                artifacts={"hint": hint} if hint else {},
             )
         return ExecutionResult(
             ok=result["returncode"] == 0,

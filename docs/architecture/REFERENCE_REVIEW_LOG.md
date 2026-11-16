@@ -354,7 +354,7 @@ responsible for.
 | Agentic coding loop | `docs/architecture/RUNTIME_ORCHESTRATION_SPEC.md` |
 | Tools reference | `docs/architecture/TOOLS_AND_PERMISSIONS_SPEC.md` |
 | Interactive mode | `docs/architecture/COMMANDS_AND_INTERACTIVE_MODE_SPEC.md` |
-| Rich terminal UX | `docs/architecture/VISUAL_DESIGN_SPEC.md`, `docs/architecture/WEB_UI_CONTROL_DECK_PLAN.md`, `docs/architecture/COMMANDS_AND_INTERACTIVE_MODE_SPEC.md` |
+| Rich terminal UX | `docs/architecture/VISUAL_DESIGN_SPEC.md`, `docs/architecture/DESIGN_HISTORY.md`, `docs/architecture/COMMANDS_AND_INTERACTIVE_MODE_SPEC.md` |
 | Checkpointing | `docs/architecture/CHECKPOINTING_AND_REWIND_SPEC.md` |
 | Hooks | `docs/architecture/HOOKS_SPEC.md` |
 | Plugins | `docs/architecture/PLUGIN_SYSTEM_SPEC.md` |
@@ -442,14 +442,14 @@ someone else's computer; Raiker's run on yours.
 | Concept | Raiker specification |
 |---|---|
 | Local-first gateway/control plane | `docs/architecture/ARCHITECTURE.md`, `docs/architecture/CHANNELS_SPEC.md` |
-| Multi-channel inbox | `docs/architecture/CHANNELS_SPEC.md`, `raiker/config/channel-connectors.json`, `docs/architecture/VISUAL_DESIGN_SPEC.md`, `docs/architecture/WEB_UI_CONTROL_DECK_PLAN.md` |
+| Multi-channel inbox | `docs/architecture/CHANNELS_SPEC.md`, `raiker/config/channel-connectors.json`, `docs/architecture/VISUAL_DESIGN_SPEC.md`, `docs/architecture/DESIGN_HISTORY.md` |
 | Channel pairing and sender allowlists | `docs/architecture/CHANNELS_SPEC.md`, `docs/architecture/SECURITY_AND_POLICY.md` |
 | Channel-to-agent routing | `docs/architecture/CHANNELS_SPEC.md`, `docs/architecture/MULTI_AGENT_AND_SUBAGENT_STRATEGY.md` |
 | Gateway daemon mode | `docs/architecture/COMMANDS_AND_INTERACTIVE_MODE_SPEC.md`, `docs/architecture/FULL_PHASE_IMPLEMENTATION_BLUEPRINT.md` |
-| Voice wake/talk mode equivalent | `docs/architecture/VISUAL_DESIGN_SPEC.md`, `docs/architecture/WEB_UI_CONTROL_DECK_PLAN.md`, `docs/architecture/CHANNELS_SPEC.md` |
-| Live canvas/workspace equivalent | `docs/architecture/VISUAL_DESIGN_SPEC.md`, `docs/architecture/WEB_UI_CONTROL_DECK_PLAN.md`, `docs/architecture/FULL_PHASE_IMPLEMENTATION_BLUEPRINT.md` |
-| Companion apps/nodes | `docs/architecture/VISUAL_DESIGN_SPEC.md`, `docs/architecture/WEB_UI_CONTROL_DECK_PLAN.md`, `docs/architecture/CHANNELS_SPEC.md` |
-| Onboarding and connector setup | `docs/architecture/CHANNELS_SPEC.md`, `docs/architecture/VISUAL_DESIGN_SPEC.md`, `docs/architecture/WEB_UI_CONTROL_DECK_PLAN.md` |
+| Voice wake/talk mode equivalent | `docs/architecture/VISUAL_DESIGN_SPEC.md`, `docs/architecture/DESIGN_HISTORY.md`, `docs/architecture/CHANNELS_SPEC.md` |
+| Live canvas/workspace equivalent | `docs/architecture/VISUAL_DESIGN_SPEC.md`, `docs/architecture/DESIGN_HISTORY.md`, `docs/architecture/FULL_PHASE_IMPLEMENTATION_BLUEPRINT.md` |
+| Companion apps/nodes | `docs/architecture/VISUAL_DESIGN_SPEC.md`, `docs/architecture/DESIGN_HISTORY.md`, `docs/architecture/CHANNELS_SPEC.md` |
+| Onboarding and connector setup | `docs/architecture/CHANNELS_SPEC.md`, `docs/architecture/VISUAL_DESIGN_SPEC.md`, `docs/architecture/DESIGN_HISTORY.md` |
 | Skills from bundled/global/workspace scopes | `docs/architecture/PLUGIN_SYSTEM_SPEC.md`, `docs/architecture/FULL_PHASE_IMPLEMENTATION_BLUEPRINT.md` |
 | Channel security diagnostics | `docs/architecture/OWASP_GENAI_SECURITY_MAPPING.md`, `docs/architecture/VERIFICATION_PLAN.md` |
 
@@ -465,14 +465,14 @@ someone else's computer; Raiker's run on yours.
 | Structured tool proposal | `docs/architecture/CONTRACTS.md`, `docs/architecture/TOOLS_AND_PERMISSIONS_SPEC.md` |
 | Verification/reflection | `docs/architecture/RUNTIME_ORCHESTRATION_SPEC.md`, `docs/architecture/VERIFICATION_PLAN.md` |
 | Local-first inference support | `docs/architecture/MODEL_RUNTIME_AND_LOCAL_INFERENCE.md` |
-| Full TUI with streaming output | `docs/architecture/VISUAL_DESIGN_SPEC.md`, `docs/architecture/WEB_UI_CONTROL_DECK_PLAN.md`, `docs/architecture/COMMANDS_AND_INTERACTIVE_MODE_SPEC.md` |
+| Full TUI with streaming output | `docs/architecture/VISUAL_DESIGN_SPEC.md`, `docs/architecture/DESIGN_HISTORY.md`, `docs/architecture/COMMANDS_AND_INTERACTIVE_MODE_SPEC.md` |
 | Interrupt and redirect | `docs/architecture/RUNTIME_ORCHESTRATION_SPEC.md`, `docs/architecture/COMMANDS_AND_INTERACTIVE_MODE_SPEC.md` |
 | Cross-channel conversation continuity | `docs/architecture/CHANNELS_SPEC.md`, `docs/architecture/STORAGE_DATABASE_AND_SEARCH_SPEC.md` |
 | Closed learning loop | `docs/architecture/EIDETIC_MEMORY_AND_LEARNING_SPEC.md`, `docs/architecture/MEMORY_AND_CONTEXT_STRATEGY.md` |
 | Skill creation and skill improvement | `docs/architecture/EIDETIC_MEMORY_AND_LEARNING_SPEC.md`, `docs/architecture/PLUGIN_SYSTEM_SPEC.md` |
 | Full-text session search with summaries | `docs/architecture/STORAGE_DATABASE_AND_SEARCH_SPEC.md`, `docs/architecture/MEMORY_AND_CONTEXT_STRATEGY.md` |
 | User modelling from confirmed facts | `docs/architecture/MEMORY_AND_CONTEXT_STRATEGY.md`, `docs/architecture/EIDETIC_MEMORY_AND_LEARNING_SPEC.md` |
-| Scheduled automations | `docs/architecture/FULL_PHASE_IMPLEMENTATION_BLUEPRINT.md`, `docs/architecture/VISUAL_DESIGN_SPEC.md`, `docs/architecture/WEB_UI_CONTROL_DECK_PLAN.md` |
+| Scheduled automations | `docs/architecture/FULL_PHASE_IMPLEMENTATION_BLUEPRINT.md`, `docs/architecture/VISUAL_DESIGN_SPEC.md`, `docs/architecture/DESIGN_HISTORY.md` |
 | Parallel subagents | `docs/architecture/MULTI_AGENT_AND_SUBAGENT_STRATEGY.md` |
 | Multiple execution backends | `docs/architecture/EXECUTION_ENVIRONMENTS_SPEC.md` |
 
@@ -946,7 +946,7 @@ is a stored date rather than a derived one.
 | Multi-agent teams | `docs/architecture/MULTI_AGENT_AND_SUBAGENT_STRATEGY.md` |
 | Subagent roles | `docs/architecture/MULTI_AGENT_AND_SUBAGENT_STRATEGY.md` |
 | Background task progress | `docs/architecture/RUNTIME_ORCHESTRATION_SPEC.md` |
-| Team UI | `docs/architecture/COMMANDS_AND_INTERACTIVE_MODE_SPEC.md`, `docs/architecture/VISUAL_DESIGN_SPEC.md`, `docs/architecture/WEB_UI_CONTROL_DECK_PLAN.md` |
+| Team UI | `docs/architecture/COMMANDS_AND_INTERACTIVE_MODE_SPEC.md`, `docs/architecture/VISUAL_DESIGN_SPEC.md`, `docs/architecture/DESIGN_HISTORY.md` |
 | Agent recursion limits | `docs/architecture/MULTI_AGENT_AND_SUBAGENT_STRATEGY.md` |
 | Agent security and owner-governed auditability | `docs/architecture/OWASP_GENAI_SECURITY_MAPPING.md`, `docs/architecture/FULL_PHASE_IMPLEMENTATION_BLUEPRINT.md` |
 

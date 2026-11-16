@@ -1,5 +1,5 @@
 /**
- * Quiet UI round 2 — Home and Chat (docs/plans/quiet-ui/03_WELCOME_HOME_AND_CHAT.md),
+ * Quiet UI round 2 — Home and Chat (docs/plans/QUIET_UI_PLAN.md),
  * against a running host and a real hosted model.
  *
  * Runs after `quiet-ui-home-chat-live.spec.ts` on the same workspace: that

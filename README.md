@@ -393,15 +393,16 @@ source](docs/guide/getting-started.md#run-from-source),
 - **[Architecture reference](docs/architecture/README.md)** — implementation,
   contracts, governance, and design specifications.
 - **[Desktop distribution decision](docs/adr/ADR-0003-desktop-distribution.md)**
-  and the [release acceptance matrix](docs/plans/RELEASE_ACCEPTANCE_MATRIX.md).
+  and the [release acceptance matrix](docs/plans/BETA_RELEASE_PLAN.md#appendix-d--desktop-package-acceptance-matrix).
 - **[RAIKER.md instructions](docs/architecture/RAIKER_MD_INSTRUCTIONS.md)** —
   reviewed global and project-root instruction files for Build.
 - **[Composer personas (ADR-0005)](docs/adr/ADR-0005-composer-personas.md)** —
   `@` specialists that can only narrow a turn (built in Chat).
 - **[Ready to use on any machine](docs/plans/READY_TO_USE_PLAN.md)** and
   **[ADR-0006](docs/adr/ADR-0006-one-supported-path-per-machine.md)** — published
-  releases, one command sandbox per platform (WSL2 on Windows), a four-step
-  first run, three permission postures and a Health page.
+  releases, a native command sandbox on every desktop (no WSL2 needed on
+  Windows), a four-step first run, three permission postures, Health, an
+  always-on host and a Pause that interrupts a running step.
 - **[Known limits](docs/architecture/KNOWN_LIMITS.md)** — important boundaries
   and unavailable features.
 - **[Troubleshooting](docs/guide/troubleshooting.md)** — reason codes and fixes.

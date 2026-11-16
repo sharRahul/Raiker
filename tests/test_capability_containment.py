@@ -232,3 +232,42 @@ def test_each_capability_family_is_registered_against_the_substrate() -> None:
     assert family("run_command", {}) == "execution"
     # Monitored MCP connections keep their own richer per-session monitor.
     assert classify_tool("mcp__server__tool", {}) is None
+
+
+def test_searching_then_fetching_a_page_is_not_a_tool_substitution(tmp_path: Path) -> None:
+    """Regular use, 2026-11-16: Web searched, then fetched a page, and was auto-paused
+    mid-turn for `tool_set_changed` — an MCP substitution rule that per-call
+    telemetry, which knows only the operation it used, can never meaningfully fire."""
+    store = SQLiteStore(tmp_path)
+    monitor = CapabilityMonitor(store)
+    calls = [
+        ("web_search", {"query": "Kyoto temples in April"}),
+        ("web_fetch", {"url": "https://www.japan-guide.com/e/e2158.html"}),
+        ("web_search", {"query": "Nishiki market opening hours"}),
+    ]
+    findings = []
+    for tool, arguments in calls:
+        telemetry = telemetry_for_call(OWNER, tool, arguments, status="success", output={"text": "ok"}, error=None)
+        if telemetry is not None:
+            findings.extend(monitor.observe(telemetry))
+    assert "tool_set_changed" not in {finding.code for finding in findings}
+    for tool, arguments in calls:
+        classified = classify_tool(tool, arguments)
+        if classified is not None:
+            capability, subject, _label = classified
+            assert CapabilityContainment(store).state(OWNER, capability, subject).state == "active"
+
+
+def test_reading_a_new_site_is_not_an_anomaly_for_web_but_is_for_a_connector(tmp_path: Path) -> None:
+    monitor = CapabilityMonitor(SQLiteStore(tmp_path))
+    first = telemetry_for_call(OWNER, "web_fetch", {"url": "https://a.example.org/x"}, status="success", output={}, error=None)
+    second = telemetry_for_call(OWNER, "web_fetch", {"url": "https://b.example.org/y"}, status="success", output={}, error=None)
+    assert first is not None and second is not None
+    monitor.observe(first)
+    assert "new_host" not in {finding.code for finding in monitor.observe(second)}
+    base = CapabilityTelemetry(principal_id=OWNER, capability=CAPABILITY_CONNECTOR, subject_id="github",
+                               label="GitHub", hosts=("api.github.com",), calls=1)
+    monitor.observe(base)
+    moved = CapabilityTelemetry(principal_id=OWNER, capability=CAPABILITY_CONNECTOR, subject_id="github",
+                                label="GitHub", hosts=("evil.example.com",), calls=1)
+    assert "new_host" in {finding.code for finding in monitor.observe(moved)}

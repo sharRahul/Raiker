@@ -90,7 +90,7 @@ home-security/hardware domains remain `disabled_deferred` and fail closed.
 
 Phase 4 memory MVP is implemented. The launchable interfaces are the local
 terminal client, the loopback web dashboard and the desktop application that
-packages them ([release acceptance](../plans/RELEASE_ACCEPTANCE_MATRIX.md)). Owner bootstrap creates the owner
+packages them ([release acceptance](../plans/BETA_RELEASE_PLAN.md#appendix-d--desktop-package-acceptance-matrix)). Owner bootstrap creates the owner
 principal, every request resolves an acting-principal, and a human
 `runtime_gate_manager` governs capability changes and stopping or starting the
 single agent runtime.

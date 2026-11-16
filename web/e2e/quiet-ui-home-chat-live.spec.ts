@@ -1,5 +1,5 @@
 /**
- * Quiet UI — Home and Chat (docs/plans/quiet-ui/03_WELCOME_HOME_AND_CHAT.md),
+ * Quiet UI — Home and Chat (docs/plans/QUIET_UI_PLAN.md),
  * against a running host and a real hosted model.
  *
  * Prerequisites:

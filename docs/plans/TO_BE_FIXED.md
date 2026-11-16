@@ -1,10 +1,12 @@
 ## Release blocker: native sandbox migration incomplete
 
 **Direction, 2026-11-16.** [ADR-0006](../adr/ADR-0006-one-supported-path-per-machine.md)
-makes the WSL2 boundary Windows' default and the sandbox account macOS's, each
-set up from Raiker Setup (RU-03 in the [ready-to-use plan](READY_TO_USE_PLAN.md)).
-The AppContainer gaps below remain open but no longer block Windows commands
-once RU-03 lands.
+makes the native restricted-account boundary Windows' default (no WSL2) and the
+sandbox account macOS's, each set up from Raiker Setup (RU-03 and RU-04 in the
+[ready-to-use plan](READY_TO_USE_PLAN.md)). AppContainer is retired as an
+execution boundary, so its ACL gap below no longer blocks Windows commands; the
+restricted account's own gaps (per-task profile reset, logon-right denials,
+explicit-ACE scan) are now P0.
 
 **Windows continuation, 2026-11-10.** FIXED-1386/1387 close nested Escape and
 stale ambient-memory recall. The real UI correction/forget slice, managed
@@ -27,7 +29,7 @@ closed in [FIXED-1283](FIXED_ITEMS.md#fixed-1283--managed-llamacpp-selected-a-so
 unresolved platform-signing, fresh-installer, adversarial, and owner-recorded
 release-evidence gaps. The credential canary, destructive recovery drill, and
 local-only egress recording remain open in
-[DATA_SAFETY_EVIDENCE.md](DATA_SAFETY_EVIDENCE.md).
+[data-safety evidence](BETA_RELEASE_PLAN.md#appendix-c--data-safety-evidence).
 
 Real Windows adversarial ACL testing found that an AppContainer can write into
 `.git` when that directory grants `ALL APPLICATION PACKAGES` modify access,
@@ -1235,12 +1237,12 @@ results to a channel, corrections made by editing and the task receipt
 ([FIXED-1252](FIXED_ITEMS.md#fixed-1252--the-same-aim-across-conversations-was-never-offered-as-a-goal-qui-f03)
 to [FIXED-1263](FIXED_ITEMS.md#fixed-1263--key-figures-read-1200-where-1200-was-meant-found-this-round)).
 QUI-F08 and QUI-F23 shipped earlier as 02, QUI-P06
-and [03, QUI-H04](quiet-ui/03_WELCOME_HOME_AND_CHAT.md#status).
+and [03, QUI-H04](QUIET_UI_PLAN.md#status-2).
 
 * **QUI-F14 — a companion on the desktop.** Planned as *Later*: an opt-in, off
   by default, small transparent window that reacts only to *needs your
   decision* and *done*. It waits for the companion's art
-  ([08](quiet-ui/08_BRAND_AND_VISUAL_SYSTEM.md#status)).
+  ([08](QUIET_UI_PLAN.md#status-3)).
 * ~~**Goals are noticed by shared word forms, not by meaning.**~~ Closed
   2026-11-16 where the owner's embedding model may run
   ([FIXED-1481](FIXED_ITEMS.md#fixed-1481--a-goal-said-in-other-words-was-not-noticed)).
@@ -1339,7 +1341,7 @@ proper defect/evidence ledger; do not duplicate the PAA backlog here.
 ## QUI-G06 — Remaining error recovery audit
 
 **Updated 2026-11-06.** The fifteen Memory action messages are implemented in
-[07 Quick fixes and quality](quiet-ui/07_QUICK_FIXES_AND_QUALITY.md#2026-11-06--qui-g06-memory-error-recovery).
+[07 Quick fixes and quality](QUIET_UI_PLAN.md#2026-11-06--qui-g06-memory-error-recovery).
 Two error paths have running-host browser evidence in
 [WEB_APP_LIVE_TEST.md](../architecture/WEB_APP_LIVE_TEST.md#result--2026-11-06-qui-g06-memory-recovery).
 The other thirteen still need individual live fault-injection evidence.
@@ -1350,7 +1352,7 @@ gate is closed by this limited error-message slice.
 ### QUI-G06 model-management slice — remaining evidence
 
 The 15 model-management recovery implementations are recorded in
-[07 Quick fixes and quality](quiet-ui/07_QUICK_FIXES_AND_QUALITY.md#2026-11-06--qui-g06-model-recovery)
+[07 Quick fixes and quality](QUIET_UI_PLAN.md#2026-11-06--qui-g06-model-recovery)
 and [FIXED-1287](FIXED_ITEMS.md#fixed-1287--model-management-errors-were-hidden-misleading-or-had-no-recovery-step-qui-g06).
 Browser fault-injection cases cover library read/scan and Activity retry,
 cancel, inspection and record cleanup. The other nine paths still need
@@ -1361,7 +1363,7 @@ The remaining cross-app error audit and QUI-G01/G04/G07 stay open.
 ### QUI-G06 connection slice — remaining acceptance evidence
 
 The 15 connection-recovery implementations are recorded in
-[07 Quick fixes and quality](quiet-ui/07_QUICK_FIXES_AND_QUALITY.md#2026-11-06--qui-g06-connection-recovery)
+[07 Quick fixes and quality](QUIET_UI_PLAN.md#2026-11-06--qui-g06-connection-recovery)
 and [FIXED-1288](FIXED_ITEMS.md#fixed-1288--connection-failures-claimed-rollback-or-lost-their-recovery-message-qui-g06).
 The browser run uses explicit endpoint failures and declared Advanced-server
 fixtures. It does not prove real credential-provider recovery, a live server's
@@ -1373,7 +1375,7 @@ remain open; no beta acceptance gate is closed by this slice.
 ## Models simplification — remaining release evidence
 
 The owner-requested UI refinement is recorded in
-[01 Layout system and pages](quiet-ui/01_LAYOUT_SYSTEM_AND_PAGES.md#2026-11-06--owner-requested-models-simplification)
+[01 Layout system and pages](QUIET_UI_PLAN.md#2026-11-06--owner-requested-models-simplification)
 and [FIXED-1291](FIXED_ITEMS.md#fixed-1291--models-dialogs-were-crowded-and-model-settings-showed-every-task-at-once).
 Linux running-host checks cover the layout and navigation. Declared model and
 Hugging Face read fixtures exercise details, picker and long-name layout
@@ -1390,7 +1392,7 @@ the existing usability/screen-reader qualification remain open in
 ## Shared UI refinement — remaining acceptance evidence
 
 The owner-requested shared pass applies to every page through the primitives
-listed in [08 Brand and visual system](quiet-ui/08_BRAND_AND_VISUAL_SYSTEM.md#2026-11-06--shared-ui-refinement-across-pages-and-subpages).
+listed in [08 Brand and visual system](QUIET_UI_PLAN.md#2026-11-06--shared-ui-refinement-across-pages-and-subpages).
 The Linux Chromium catalogue covers navigation and named nested settings/Add
 pages in light and dark themes. It is a layout/read review, not qualification
 of every populated detail state, provider operation or full beta journey.
@@ -1402,7 +1404,7 @@ and managed-download acceptance retain their separate evidence gates.
 
 The fifteen Projects recovery implementations and the related Limits panel fixes
 are recorded in
-[07 Quick fixes and quality](quiet-ui/07_QUICK_FIXES_AND_QUALITY.md#2026-11-06--qui-g06-projects-recovery)
+[07 Quick fixes and quality](QUIET_UI_PLAN.md#2026-11-06--qui-g06-projects-recovery)
 and [FIXED-1299](FIXED_ITEMS.md#fixed-1299--projects-failures-hid-missing-content-or-offered-no-safe-recovery-qui-g06).
 Running-host browser cases inject explicit HTTP failures; they cannot establish
 what a real provider or disk write does when it commits and its response is lost.
@@ -1415,7 +1417,7 @@ for this round's exact results and limitations.
 ## QUI-G06 Approvals, Library and Sessions recovery — remaining evidence
 
 The fifteen implementations are recorded in
-[07 Quick fixes and quality](quiet-ui/07_QUICK_FIXES_AND_QUALITY.md#2026-11-06--qui-g06-approvals-library-and-sessions-recovery)
+[07 Quick fixes and quality](QUIET_UI_PLAN.md#2026-11-06--qui-g06-approvals-library-and-sessions-recovery)
 and [FIXED-1302](FIXED_ITEMS.md#fixed-1302--approvals-library-and-sessions-errors-hid-uncertain-writes-qui-g06).
 Running-host cases cover queue, History, detail and decision failures on a real
 model-raised approval, Library read and unpin, and Sessions read, detail and
@@ -1444,7 +1446,7 @@ ADR names three build slices.
 **Decided 2026-11-07, not built.** The owner chose that `@` in the composer
 routes a prompt to a named specialist agent (for example `@DataAnalyst`,
 `@Copywriter`), as part of the composer control deck in
-[03](quiet-ui/03_WELCOME_HOME_AND_CHAT.md#2026-11-07--composer-control-deck).
+[03](QUIET_UI_PLAN.md#2026-11-07--composer-control-deck).
 Raiker has no persona concept today; `@` mentions a file from the code map.
 Before building, a design must say: what a persona is (instructions, tools,
 default model), how it maps onto execution profiles and Permissions so it can
@@ -1586,7 +1588,7 @@ passing. The two successful artifacts and hashes are retained in
 
 ## Linux hardening follow-through — 2026-11-09
 
-See the [workstream and journey record](LINUX_BETA_2026_11_09.md). Linux Apply
+See the [workstream and journey record](BETA_RELEASE_PLAN.md#appendix-b--linux-qualification-record-2026-11-09). Linux Apply
 parent-handle races and loss of backups after failed rollback are fixed
 (FIXED-1370/1371). Windows/macOS promotion handles and TaskTree file-tool
 handles remain open. Fresh-profile unsolicited threat-feed downloads are
@@ -1629,20 +1631,20 @@ It passed; independent checks verify all ten installer manifests/hashes,
 six Linux GPG signatures, signed channel/provenance, SBOM/lock bindings and
 evidence outputs. This candidate is no longer blocked on creation. The connected integration remains limited, but the Windows owner-PC run on 2026-11-09 successfully dispatched Desktop package through authenticated `gh` (run `42715117417` for `f1c8d1ce`). Direct CLI dispatch is available; an owner start is no longer a general blocker. Beta feature/owner-machine gates
 are separate from artifact creation.
-[Verified candidate and receipts](LINUX_BETA_2026_11_09.md#verified-non-published-signed-candidate).
+[Verified candidate and receipts](BETA_RELEASE_PLAN.md#verified-non-published-signed-candidate).
 
 The full installed-shell capture also found Electron startup resolver traffic
 that the host-only trace missed. FIXED-1376 disables automatic DoH and
 non-loopback shell resource requests; 36 unit and 13 UI tests pass. Chromium's
 non-sending IPv6 UDP route probe remains explicitly recorded. A fresh candidate
 with this shell correction needs its own CI, package and egress evidence.
-[Follow-through](LINUX_BETA_2026_11_09.md#electron-network-process-follow-through).
+[Follow-through](BETA_RELEASE_PLAN.md#electron-network-process-follow-through).
 
 The corrected installed unsigned shell/host profile now has a passing
 1,862-second scoped audit with no unexpected destinations. MM-5 remains
 partial pending useful models, managed speech, enabled integrations and a
 full-feature signed-artifact owner-machine recording. Earlier failed captures
-are retained. [Audit scope and receipts](LINUX_BETA_2026_11_09.md#completed-installed-shell-audit-and-ci-artifact-verification).
+are retained. [Audit scope and receipts](BETA_RELEASE_PLAN.md#completed-installed-shell-audit-and-ci-artifact-verification).
 
 ## Personal-beta scope after owner clarification
 
@@ -1651,7 +1653,7 @@ phone/iPad app access is future work. Production signing/publisher anchors,
 public distribution and a multi-evaluator rollout study are not private
 personal-beta prerequisites. Existing authentication, isolation, Apply/recovery,
 limits and integrity requirements remain.
-[Owner decision](PERSONAL_BETA_SCOPE.md).
+[Owner decision](BETA_RELEASE_PLAN.md#appendix-a--owner-scope-2026-11-09).
 
 Piper and its per-voice licence/JSON-sidecar blockers are removed (FIXED-1378).
 Kokoro int8 serves Lite/Balanced. Real direct synthesis and frozen-worker
@@ -1888,3 +1890,40 @@ Run record: [WEB_APP_LIVE_TEST](../architecture/WEB_APP_LIVE_TEST.md#result--202
 * **Three parallel Python shards exhausted this host's 7.6 GB `/tmp`** (pytest
   temp folders) and failed by the hundred; run shards one at a time or with
   `--basetemp` on disk. CI's runners are unaffected.
+
+## 2026-11-16 regular use — found, not fixed
+
+Found using Raiker as an owner on Linux with real prompts
+([regular-use journeys](TESTING.md#regular-use-journeys)); fixed items are
+FIXED-1526 to FIXED-1529.
+
+* **`run_command`'s command grant has no screen.** The grant is
+  `PUT /api/sessions/{id}/command-grant` only. Since FIXED-1533 a turn without a
+  grant is not offered `run_command`, so Build uses `shell` and asks per command;
+  a standing grant for one conversation (*Allow `python3 -m unittest` here*) is
+  still not reachable from the UI. RU-07 in the ready-to-use plan.
+* **Small models misread tables.** Haiku 4.5 twice ranked a category by
+  percentage when asked "in pounds" (leaving out Groceries, the third-largest
+  rise), and once
+  summed £100 + £40 + £10 as £200. This is the model, not the product; the
+  first-run *Model* step should say which models suit numbers and code.
+* **A question was proposed as a project memory.** After RU-J3, Memory ›
+  Suggestions held *"This is our household budget in pounds. Which three
+  categories grew…"* as a deferred `project` memory (confidence 0.9): the
+  owner's whole question, not a fact. The observer should not propose a
+  request as a memory.
+* **Memory store is off on a fresh account.** FIXED-1531 makes that visible on
+  the card; RU-11 in the ready-to-use plan makes keeping a memory one choice in
+  first run, so the first *remember this* works.
+* **A project with no folder builds in Raiker's own data folder.** RU-J4's project
+  was created from Projects with a name only; Build then worked in the
+  workspace root, wrote `pricing.py` beside `.raiker/`, and **Apply to project**
+  was blocked by `.raiker · protected path`. Creating a project for Build should
+  ask for its folder, or make one (for example `~/Raiker Projects/<name>`).
+  RU-21 in the ready-to-use plan.
+* **Build's outcome reads *Not verified* although the tests passed.** The model
+  ran `python3 -m unittest test_pricing -v`; the project's declared check is
+  `python3 -m unittest -q`, so the outcome says the check did not run after the
+  last change. Build should run the declared checks itself once the model has
+  finished (asking, as any command does). RU-22.
+

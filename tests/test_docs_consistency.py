@@ -200,7 +200,7 @@ def test_personal_agent_positioning_does_not_regress() -> None:
 
     product_specs = (
         "README.md",
-        "docs/plans/ACCEPTANCE_TESTS_BY_PHASE.md",
+        "docs/plans/TESTING.md",
         "docs/architecture/FULL_PHASE_IMPLEMENTATION_BLUEPRINT.md",
         "docs/architecture/NESTED_BOUNDARIES_ARCHITECTURE.md",
         "docs/architecture/EXTENSIBILITY_MODEL.md",

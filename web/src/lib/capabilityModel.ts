@@ -234,12 +234,21 @@ export function unsetResolutionNote(gate: CapabilityGate): string {
  * relay is off until it is turned on. It is listed first because it is the one
  * that makes Accept mean "apply".
  */
-export const BUILD_PRESET: readonly { capability: string; what: string }[] = [
+export const BUILD_PRESET: readonly { capability: string; what: string; acknowledge?: boolean }[] = [
   { capability: "approval_execution_relay", what: "Apply a change once you accept it" },
   { capability: "file_write_execution", what: "Write and edit files in the workspace" },
   { capability: "patch_apply_execution", what: "Apply a reviewed patch" },
   { capability: "git_write_execution", what: "Branch and commit locally" },
   { capability: "checkpoint_restore_execution", what: "Rewind the workspace to a checkpoint" },
+  // Found in regular use (2026-11-16): without it, Build wrote code and could
+  // never run its tests, and told the owner to run them by hand. Tier 2, so the
+  // preset collects its threat-model acknowledgement explicitly; every command
+  // still asks first and runs only inside an enforced sandbox.
+  {
+    capability: "shell_execution",
+    what: "Run commands such as your tests in a sandboxed copy of the project — each one asks you first",
+    acknowledge: true,
+  },
 ];
 
 /** True when every capability in the preset is already available. */

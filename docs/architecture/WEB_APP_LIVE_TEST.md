@@ -16,6 +16,54 @@ PR #106: the **user-owned fallback sequence** and **prompt caching + normalised
 cache-hit metrics**.
 
 
+## Result — 2026-11-16 (Regular-use journeys on Linux)
+
+Raiker used the way its owner uses it: ordinary requests, the product's own
+screens, no marker words (the prompt rules are in
+[TESTING.md § Regular-use journeys](../plans/TESTING.md#regular-use-journeys)).
+An Ubuntu VM (Python 3.14 system, no `python` or `pytest` installed), a source
+host `raiker-web --port 8765` on a workspace reset with
+`scripts/reset_live_workspace.py`, the sandbox runner from the repository's own
+Desktop package build (run 43661795988, `wsl-linux-runner`, digest recorded
+beside it). The probe measured **every observation enforced** under
+Bubblewrap (relay, workspace write, escape write, masked read, egress, seccomp,
+descendant reaping). Anthropic Haiku 4.5 was connected through **Add model**
+with its workspace ID; keys came from the round's environment and were never
+written to a spec, log or capture. Spec: `web/e2e/regular-use-live.spec.ts`.
+
+**Final run: 5 of 5 passed on a fresh workspace, in one run (3.7 min).** Earlier
+runs that found the defects below are part of the record.
+
+| # | Journey | Result | What the owner saw |
+|---|---|---|---|
+| RU-J1 | First run: Anthropic through Add model; a four-day Kyoto plan | Passed | Day 1–4, costs in yen, what to book; the model researched the web first |
+| RU-J2 | The latest Python release and what affects a Django app, with the official notes | Passed | A Python 3.x release and python.org links |
+| RU-J3 | A household-budget CSV in Chat | Passed | The two largest rises named; the turn completes. The model's figures varied by run (once +£90 for +£120) — recorded as the model's arithmetic |
+| RU-J4 | Build: create `pricing.py` and its tests, run them; change the rule; run again | Passed | After *Set up for Build* (with its command acknowledgement), each change accepted; `python` → told it is not installed → `python3` → *All 3 tests passed* in the sandbox |
+| RU-J5 | *Remember … Dr. Okafor, usually on Thursdays*, then a new chat | Passed | The card said Memory store was off and named it; after turning it on and asking again, both memories stored; the new chat answered Dr. Okafor on Thursdays |
+
+**Found during the runs, fixed.** A complete answer read *Not done* after a
+read the model recovered from (FIXED-1527); an attached document sent the model
+looking for a file (FIXED-1526); *Set up for Build* did not include commands, so
+Build could never run tests (FIXED-1528); the receipt read *1 repository read
+read* (FIXED-1529); a missing `python` read as a sandbox limitation (FIXED-1530);
+allowing a memory with Memory store off saved nothing behind an unreadable
+sentence (FIXED-1531); Web was auto-paused mid-turn as a "tool substitution"
+(FIXED-1532); `run_command` was offered without the grant it needs
+(FIXED-1533); every research turn raised a Web "security anomaly" notice
+(FIXED-1534).
+
+**Found, not fixed.** A project with no folder builds in Raiker's data folder,
+so **Apply to project** is blocked; Build's outcome reads *Not verified* when
+the model runs the tests with a different command than the declared check; a
+question was proposed as a project memory; `run_command`'s grant has no screen;
+small models misread tables — all in
+[TO_BE_FIXED](../plans/TO_BE_FIXED.md#2026-11-16-regular-use--found-not-fixed).
+
+**Captures.** `output/playwright/regular-use/` — `j1-trip-plan`,
+`j2-web-answer`, `j3-budget`, `j4-set-up-for-build`, `j4a-first-build`,
+`j4b-rule-changed`, `j5a-memory-store-off`, `j5a-remember`, `j5b-recalled`.
+
 ## Result — 2026-11-19 (Personas, local Ollama, search by meaning and native decks)
 
 A Linux workspace served by `raiker-web --port 8765` (`scripts/reset_live_workspace.py`
@@ -776,7 +824,7 @@ unit suite proves them.
 
 ## Result — 2026-10-25 (Quiet UI brand, Diagnostics and open items, hosted Anthropic Haiku 4.5)
 
-The round of 2026-10-25 across the [Quiet UI plan](../plans/quiet-ui/README.md):
+The round of 2026-10-25 across the [Quiet UI plan](../plans/QUIET_UI_PLAN.md):
 the open ring and the QUI-V01 palette, Diagnostics and Recovery, the pages that
 already fit, Build and Design, and the open items of earlier rounds
 ([FIXED-1168](../plans/FIXED_ITEMS.md#fixed-1168--the-app-mark-was-the-eye-orb-qui-w01-qui-v03-qui-v04)
@@ -898,7 +946,7 @@ waiting approval's expiry into the past through the store
 
 ## Result — 2026-10-21 (Quiet UI layout system and pages, hosted Anthropic Haiku 4.5)
 
-The layouts and page plans in the [Quiet UI plan](../plans/quiet-ui/01_LAYOUT_SYSTEM_AND_PAGES.md#status)
+The layouts and page plans in the [Quiet UI plan](../plans/QUIET_UI_PLAN.md#status-1)
 ([FIXED-1101](../plans/FIXED_ITEMS.md#fixed-1101--the-shell-was-wider-and-looser-than-the-layout-system-qui-l01-qui-l14)
 to [FIXED-1123](../plans/FIXED_ITEMS.md#fixed-1123--chats-readiness-steps-disappeared-with-the-models-overview-qui-l08)).
 Fresh workspaces served by `raiker-web` on `127.0.0.1:8765` at 1440×900 (and
@@ -926,8 +974,8 @@ second time after the readiness fix below.
 
 ## Result — 2026-10-21 (Quiet UI round 2: Home, Chat, setup and quality checks, hosted Anthropic Haiku 4.5)
 
-The second round of the [Quiet UI plan](../plans/quiet-ui/03_WELCOME_HOME_AND_CHAT.md#status)
-and [07](../plans/quiet-ui/07_QUICK_FIXES_AND_QUALITY.md)
+The second round of the [Quiet UI plan](../plans/QUIET_UI_PLAN.md#status-2)
+and [07](../plans/QUIET_UI_PLAN.md#07-quick-fixes-and-quality)
 ([FIXED-1080](../plans/FIXED_ITEMS.md#fixed-1080--home-offered-five-threads-to-continue-instead-of-the-one-with-its-next-step-qui-h01)
 to [FIXED-1100](../plans/FIXED_ITEMS.md#fixed-1100--a-long-conversation-rendered-every-turn-qui-g04)).
 Fresh workspaces served by `raiker-web` on `127.0.0.1:8765`. The round-1 spec
@@ -953,7 +1001,7 @@ appears in a spec, command, document, screenshot or the server log. Specs:
 
 ## Result — 2026-10-21 (Quiet UI Home and Chat, hosted Anthropic Haiku 4.5)
 
-QUI-H01 to QUI-W06 from the [Quiet UI plan](../plans/quiet-ui/03_WELCOME_HOME_AND_CHAT.md)
+QUI-H01 to QUI-W06 from the [Quiet UI plan](../plans/QUIET_UI_PLAN.md#03-welcome-home-and-chat)
 ([FIXED-1057](../plans/FIXED_ITEMS.md#fixed-1057--home-had-no-way-to-start-work-by-asking-qui-h01)
 to [FIXED-1079](../plans/FIXED_ITEMS.md#fixed-1079--the-top-bars-icon-buttons-had-no-visible-tooltip-qui-q06)).
 A fresh workspace served by `raiker-web` on `127.0.0.1:8765` at 1440×900. The
@@ -2002,7 +2050,7 @@ Those gates remain in [TO_BE_FIXED.md](../plans/TO_BE_FIXED.md#models-simplifica
 ## Result — 2026-11-06 Shared UI refinement
 
 **Candidate and scope.** `6893c3d1` plus the shared UI changes in
-[08 Brand and visual system](../plans/quiet-ui/08_BRAND_AND_VISUAL_SYSTEM.md#2026-11-06--shared-ui-refinement-across-pages-and-subpages).
+[08 Brand and visual system](../plans/QUIET_UI_PLAN.md#2026-11-06--shared-ui-refinement-across-pages-and-subpages).
 Linux Codespace, Python 3.14, Node 24 and managed Playwright Chromium against
 the same disposable owner workspace. This pass applies the requested Apple,
 macOS and Impeccable design references through shared primitives. No provider
@@ -2096,7 +2144,7 @@ macOS/Windows rendering, screen readers, or all populated workspace states.
 ## Result — 2026-11-06 QUI-G06 Settings recovery
 
 **Scope.** Fifteen Settings error paths from
-[07 Quick fixes and quality](../plans/quiet-ui/07_QUICK_FIXES_AND_QUALITY.md#2026-11-06--qui-g06-settings-recovery).
+[07 Quick fixes and quality](../plans/QUIET_UI_PLAN.md#2026-11-06--qui-g06-settings-recovery).
 Built SPA served by real FastAPI from `/tmp/raiker-settings-recovery` on port
 8765; owner created and authenticated through the UI. Endpoint fault injection
 returns HTTP 503 to exercise failures without performing an installation or
@@ -2143,7 +2191,7 @@ lint, build and the 29 focused tests passed.
 ## Result — 2026-11-06 QUI-G06 Projects recovery
 
 **Scope.** Fifteen Projects error paths from
-[07 Quick fixes and quality](../plans/quiet-ui/07_QUICK_FIXES_AND_QUALITY.md#2026-11-06--qui-g06-projects-recovery),
+[07 Quick fixes and quality](../plans/QUIET_UI_PLAN.md#2026-11-06--qui-g06-projects-recovery),
 plus the Limits read/save failures found during implementation. Built SPA served
 by real FastAPI from `/tmp/raiker-project-recovery` on port 8765, Linux Chromium,
 1280×800. The owner signs in through the UI. Projects are created through the UI;
@@ -2237,7 +2285,7 @@ and final Svelte check (zero errors/warnings) passed on the completed source.
 ## Result — 2026-11-06 QUI-G06 Approvals, Library and Sessions recovery
 
 **Scope.** The fifteen paths in
-[07 Quick fixes and quality](../plans/quiet-ui/07_QUICK_FIXES_AND_QUALITY.md#2026-11-06--qui-g06-approvals-library-and-sessions-recovery)
+[07 Quick fixes and quality](../plans/QUIET_UI_PLAN.md#2026-11-06--qui-g06-approvals-library-and-sessions-recovery)
 and the open-queue fix found in this round. Built SPA served by real FastAPI
 from `/tmp/raiker-approvals-recovery` on port 8765, Linux Chromium, 1280×800.
 The owner signs in through the UI. Anthropic was connected through Models with
@@ -2305,7 +2353,7 @@ The five GitHub workflows remain current; none was stale enough to remove.
 ## Result — 2026-11-07 Composer control deck
 
 **Scope.** The fifteen items of
-[03, Composer control deck](../plans/quiet-ui/03_WELCOME_HOME_AND_CHAT.md#2026-11-07--composer-control-deck)
+[03, Composer control deck](../plans/QUIET_UI_PLAN.md#2026-11-07--composer-control-deck)
 under the owner's 2026-11-07 decisions (floating glass capsule; input and
 context slice; labelled token estimates; `@` personas deferred to their own
 design). Built SPA served by real FastAPI from a disposable workspace on port
@@ -2387,7 +2435,7 @@ are not built; see
 ## Result — 2026-11-07 Dark ladder and five-line composer
 
 **Scope.** The owner's dark-theme review and composer requests, recorded in
-[08, Dark theme luminance ladder](../plans/quiet-ui/08_BRAND_AND_VISUAL_SYSTEM.md#2026-11-07--dark-theme-luminance-ladder):
+[08, Dark theme luminance ladder](../plans/QUIET_UI_PLAN.md#2026-11-07--dark-theme-luminance-ladder):
 - the supplied palette as a five-step ladder;
 - visible selection, hover and focus;
 - a 3:1 composer edge;
@@ -2439,7 +2487,7 @@ tests passed.
 ## Result — 2026-11-07 Composer execution states
 
 **Scope.** The fifteen items of
-[03, Composer execution states](../plans/quiet-ui/03_WELCOME_HOME_AND_CHAT.md#2026-11-07--composer-execution-states).
+[03, Composer execution states](../plans/QUIET_UI_PLAN.md#2026-11-07--composer-execution-states).
 The built SPA was served by real FastAPI from a disposable workspace on port
 8765, in Windows Chromium at 1440×900. Anthropic was connected through Models
 with the owner-supplied key and workspace ID

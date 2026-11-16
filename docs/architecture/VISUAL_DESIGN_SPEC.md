@@ -5,7 +5,7 @@
 > components in `web/src/lib/components/`. Where this document and the code
 > disagree, the code wins and this document must be updated.
 >
-> `docs/architecture/WEB_UI_CONTROL_DECK_PLAN.md` decides *what each screen is for*. This
+> `docs/architecture/DESIGN_HISTORY.md` decides *what each screen is for*. This
 > document decides *how anything is drawn*, so a contributor can build a new page
 > without inventing a size, a shade, a duration, or a bar.
 >
@@ -222,7 +222,7 @@ Unchanged from the token pass that shipped with the first half of BUG-37, and
 restated here so this document is complete:
 
 - **The Quiet UI palette (2026-10-25).** The roles decided in
-  [Quiet UI 08, QUI-V01](../plans/quiet-ui/08_BRAND_AND_VISUAL_SYSTEM.md#qui-v01--colour-tokens)
+  [Quiet UI 08, QUI-V01](../plans/QUIET_UI_PLAN.md#qui-v01--colour-tokens)
   replaced the three-colour palette of 2026-08-16. Every other token is derived
   from one of these roles rather than introduced beside them:
 
@@ -400,7 +400,7 @@ seven questions above.
 
 [UX-01–UX-12](../plans/PERSONAL_AUTONOMOUS_AGENT_SPEC.md) use these existing
 semantic tokens, local fonts and shared components. The
-[personal-agent UX specification](../plans/PERSONAL_AGENT_UX_SPEC.md) owns screen purpose,
+[personal-agent UX specification](../plans/PERSONAL_AUTONOMOUS_AGENT_SPEC.md#personal-agent-ui-and-ux) owns screen purpose,
 state/action behavior and progressive disclosure; this document continues to
 own drawing rules. Improve clarity through layout, hierarchy and useful copy,
 not a new palette or heavy decoration. UX-11 applies keyboard/screen-reader,
@@ -411,7 +411,7 @@ success colours. Visual polish cannot close an untested usability outcome.
 
 ## 2026-11-06 shared refinement
 
-The [Quiet UI visual-system checklist](../plans/quiet-ui/08_BRAND_AND_VISUAL_SYSTEM.md#2026-11-06--shared-ui-refinement-across-pages-and-subpages)
+The [Quiet UI visual-system checklist](../plans/QUIET_UI_PLAN.md#2026-11-06--shared-ui-refinement-across-pages-and-subpages)
 applies across pages through shared primitives. Buttons and chips paint hover
 immediately and ease on return. Native disclosures keep their triangle and
 keyboard behavior with a consistent target floor. Explicit `aria-invalid`
@@ -429,7 +429,7 @@ consent, lifecycle or provider behavior.
 
 ## 2026-11-06 icon and option-control scale
 
-The [Quiet UI visual-system plan](../plans/quiet-ui/08_BRAND_AND_VISUAL_SYSTEM.md#2026-11-06--icon-and-option-control-scale)
+The [Quiet UI visual-system plan](../plans/QUIET_UI_PLAN.md#2026-11-06--icon-and-option-control-scale)
 sets the following shared scale across the routed product:
 
 - Icons use the 16 / 18 / 22 / 28 px `sm` / `md` / `lg` / `xl` optical roles.
@@ -443,7 +443,7 @@ sets the following shared scale across the routed product:
   capsule instead: the existing rounded card, floated with margins, on a
   translucent `--glass-surface` with `--glass-blur` and a 1 px border, solid
   where blur is unsupported or reduced transparency is requested. See
-  [03, Composer control deck](../plans/quiet-ui/03_WELCOME_HOME_AND_CHAT.md#2026-11-07--composer-control-deck).
+  [03, Composer control deck](../plans/QUIET_UI_PLAN.md#2026-11-07--composer-control-deck).
 
 The icon and control scale follows Apple's clear symbols, lozenge slider thumb
 and distinguishable toggle states. This does not change Raiker's palette, Inter

@@ -8,7 +8,7 @@ The detailed component responsibilities remain in:
 - `docs/architecture/ARCHITECTURE.md`
 - `docs/architecture/CONTRACTS.md`
 - `docs/architecture/COMMANDS_AND_INTERACTIVE_MODE_SPEC.md`
-- `docs/architecture/WEB_UI_CONTROL_DECK_PLAN.md` (what each screen is for)
+- `docs/architecture/DESIGN_HISTORY.md` (what each screen is for)
 - `docs/architecture/VISUAL_DESIGN_SPEC.md` (how anything is drawn)
 - `docs/architecture/CHANNELS_SPEC.md`
 - `docs/architecture/TOOLS_AND_PERMISSIONS_SPEC.md`

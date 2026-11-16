@@ -360,6 +360,12 @@
     governedGates.length > 0 && buildPresetSatisfied(governedGates),
   );
 
+  /** The owner ticked what running commands means (the Tier 2 row of the preset). */
+  let presetUnderstood = $state(false);
+  const presetNeedsAck = $derived(
+    presetPending.some((gate) => BUILD_PRESET.find((row) => row.capability === gate.capability)?.acknowledge),
+  );
+
   async function applyBuildPreset() {
     if (mutationBusy || presetPending.length === 0) return;
     presetBusy = true;
@@ -369,14 +375,21 @@
     try {
       for (const gate of presetPending) {
         const target = enableableTargets(gate)[0];
-        if (!target) {
+        const acknowledge = BUILD_PRESET.find((row) => row.capability === gate.capability)?.acknowledge === true;
+        if (!target || (acknowledge && !presetUnderstood)) {
           failed.push(gate.capability);
           continue;
         }
         try {
+          const reason = "Build setup preset via web UI";
+          // A Tier 2 row: the owner ticked what it means, so its threat-model
+          // acknowledgement is recorded and the step-up confirmation sent —
+          // the same two the single-permission dialog collects.
+          if (acknowledge) await api.recordThreatModelAck(gate.capability, reason);
           await api.setCapabilityState(gate.capability, {
             target_state: target,
-            reason: "Build setup preset via web UI",
+            reason,
+            ...(acknowledge ? { confirmation_token: "owner-confirmed-build-setup" } : {}),
           });
           applied.push(gate.capability);
         } catch {
@@ -770,13 +783,22 @@
                 <button
                   type="button"
                   class="btn btn-primary btn-sm"
-                  disabled={mutationBusy}
+                  disabled={mutationBusy || (presetNeedsAck && !presetUnderstood)}
                   onclick={() => void applyBuildPreset()}
                 >
                   {presetBusy ? "Turning on…" : `Turn on ${presetPending.length}`}
                 </button>
               </div>
             </div>
+            {#if presetNeedsAck}
+              <label class="preset-ack">
+                <input type="checkbox" bind:checked={presetUnderstood} />
+                <span>
+                  I understand Build can run commands, such as my tests, in a sandboxed copy of the project.
+                  Each command asks me first, and nothing runs where the sandbox is not enforced.
+                </span>
+              </label>
+            {/if}
             {#if presetOpen}
               <ul class="preset-list">
                 {#each BUILD_PRESET as row (row.capability)}
@@ -1173,6 +1195,14 @@
     align-items: center;
     gap: var(--space-2);
     flex-wrap: wrap;
+  }
+  .preset-ack {
+    display: flex;
+    gap: var(--space-2);
+    align-items: flex-start;
+    margin-top: var(--space-3);
+    font-size: var(--text-sm);
+    color: var(--text-2);
   }
   .preset-list {
     list-style: none;

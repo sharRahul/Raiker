@@ -43,8 +43,8 @@ Canonical technical references:
 
 | Question | Document |
 |---|---|
-| How should personal-agent UI/UX be implemented? | [UX specification](plans/PERSONAL_AGENT_UX_SPEC.md) and [task decisions](plans/PERSONAL_AUTONOMOUS_AGENT_SPEC.md) |
-| What is the Quiet UI redesign for laptop and desktop? | [Quiet UI redesign plan](plans/quiet-ui/README.md) |
+| How should personal-agent UI/UX be implemented? | [UX specification](plans/PERSONAL_AUTONOMOUS_AGENT_SPEC.md#personal-agent-ui-and-ux) and [task decisions](plans/PERSONAL_AUTONOMOUS_AGENT_SPEC.md) |
+| What is the Quiet UI redesign for laptop and desktop? | [Quiet UI redesign plan](plans/QUIET_UI_PLAN.md) |
 | What makes Raiker ready to use on any machine? | [Ready-to-use plan](plans/READY_TO_USE_PLAN.md) and [ADR-0006](adr/ADR-0006-one-supported-path-per-machine.md) |
 | What stands between Raiker and its first beta? | [First beta release plan](plans/BETA_RELEASE_PLAN.md) and the [beta guide](guide/beta.md) |
 | How will Raiker hold a spoken conversation on-device? | [Native voice conversation](plans/VOICE_CONVERSATION_SPEC.md) |
@@ -75,20 +75,22 @@ Canonical technical references:
 - [Composer personas narrow a turn](adr/ADR-0005-composer-personas.md) — a
   persona can only narrow what a turn may do.
 - [One supported path per machine](adr/ADR-0006-one-supported-path-per-machine.md)
-  — the default command boundary on each platform, postures, Health and
-  published releases.
+  — the native command sandbox on each desktop (no WSL2 needed on Windows),
+  postures, Health, an always-on host, Pause and published releases.
 - [OWASP GenAI mapping](architecture/OWASP_GENAI_SECURITY_MAPPING.md) and
   [OWASP Agentic mapping](architecture/OWASP_AGENTIC_TOP10_MAPPING.md) — control
   coverage tied to the implementation.
 
 ## Plans, evidence, and history
 
+- **[Plans index](plans/README.md)** — what each plan owns after the
+  2026-11-16 consolidation.
+- [Ready to use](plans/READY_TO_USE_PLAN.md) — the remaining work before daily
+  use, and [Testing](plans/TESTING.md) — how it is tested with real prompts.
 - [Open defects](plans/TO_BE_FIXED.md) and [fixed items](plans/FIXED_ITEMS.md)
-- [Proposed additions](plans/PERSONAL_AUTONOMOUS_AGENT_SPEC.md)
-- [Release acceptance scenarios](plans/TESTING.md) — candidate scope, RR-01–RR-41, pass criteria and GO/NO-GO evidence
-- [Live manual test plan](plans/TESTING.md) and
-  [test-round record](plans/TESTING.md)
-- [Screenshot evidence](plans/TESTING.md)
+- [Live test record](architecture/WEB_APP_LIVE_TEST.md) — every live round's
+  scenarios, results and captures.
+- [Design history](architecture/DESIGN_HISTORY.md) — superseded design plans.
 - [Licensing policy](licensing/LICENSING_POLICY.md) and
   [relicensing audit](licensing/APACHE_2_RELICENSING_AUDIT.md)
 

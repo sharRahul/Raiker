@@ -699,8 +699,14 @@ class CapabilityMonitor:
         # A subject's very first invocation establishes the baseline silently:
         # with no history, everything is "new", which is not yet an anomaly.
         has_history = bool(prior)
+        # Reading pages on new hosts is what the Web subject is for: every search
+        # result is a host it has not used before. Its destinations are governed
+        # by the web-access policy (HTTPS, private-address guard, blocklist), so a
+        # "new host" finding there was a notice on every research turn (regular
+        # use, 2026-11-16). A connector or plugin reaching a new host still is one.
+        browsing = telemetry.subject_id == "web"
 
-        new_host = self._new_host(telemetry, prior, name) if has_history else None
+        new_host = self._new_host(telemetry, prior, name) if has_history and not browsing else None
         if new_host is not None:
             findings.append(new_host)
         if has_history:

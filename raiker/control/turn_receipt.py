@@ -25,7 +25,9 @@ _READ_NOUNS: dict[str, str] = {
     "web": "web page",
     "connector": "message",
     "memory": "memory",
-    "repository": "repository read",
+    # The client appends "read" (`3 files read`); the noun alone, or a
+    # repository check read "1 repository read read" (found 2026-11-16).
+    "repository": "repository check",
 }
 
 #: Read-shaped tools that are bookkeeping rather than reading the owner's things.

@@ -151,16 +151,19 @@ acceptance, and images go through the `image_generation` gate
 The same host, dashboard and gateway run on Windows, macOS and Linux; what
 differs per machine is the **command boundary** and how it is set up.
 [ADR-0006](../adr/ADR-0006-one-supported-path-per-machine.md) fixes one default
-per platform — Bubblewrap and seccomp on Linux, the WSL2 `RaikerSandbox`
-distribution running the same Linux runner on Windows, and the `_raikersandbox`
-account under Seatbelt on macOS — each set up from **Raiker Setup** and
+per platform — Bubblewrap and seccomp on Linux, the native restricted-account
+sandbox on Windows (dedicated `RaikerSandbox` users, a Job Object and firewall
+rules; no WSL2), and the `_raikersandbox` account under Seatbelt on macOS — each
+set up from **Raiker Setup** and
 admitted only when the probe measures every mandatory observation enforced
 ([native sandbox migration](NATIVE_SANDBOX_MIGRATION.md)). Above the boundary,
 the owner chooses one of three **postures** (Ask first, Work in the sandbox,
 Read-only), each a fixed bundle of the decision modes the
 [authority router](DECISION_MODES_SPEC.md) already enforces; a **Health** page
-reports every readiness fact with the page that fixes it. None of this adds an
-authority path. Delivery and evidence:
+reports every readiness fact with the page that fixes it. The host can run as a
+per-user service so goals and routines continue with the window closed, and
+Pause parks a running turn at its next safe boundary for Resume. None of this
+adds an authority path. Delivery and evidence:
 [ready-to-use plan](../plans/READY_TO_USE_PLAN.md).
 
 ## Personal autonomous-agent direction

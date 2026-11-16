@@ -2,11 +2,14 @@
 
 **Default boundary per platform (2026-11-16,
 [ADR-0006](../adr/ADR-0006-one-supported-path-per-machine.md)):** Linux keeps
-Bubblewrap; Windows uses the [WSL2 backend](#wsl2-backend-2026-11-01-runner-side-implemented-measurement-incomplete)
-by default (every observation measured enforced on 2026-11-08), with the
-restricted-account pool and AppContainer under Advanced and refused until each
-passes its probe; macOS uses the [sandbox account](#macos-sandbox-account-2026-11-01-implemented-measured-on-macos-15-ci),
-set up from Raiker Setup behind one administrator prompt (RU-03 in the
+Bubblewrap; Windows uses the native
+[restricted-account sandbox](WINDOWS_RESTRICTED_ACCOUNT_SANDBOX.md) by default —
+no WSL2 — set up from Raiker Setup behind one UAC prompt (the same design as
+OpenAI Codex's `elevated` Windows sandbox), with the
+[WSL2 backend](#wsl2-backend-2026-11-01-runner-side-implemented-measurement-incomplete)
+as an option for Linux toolchains and AppContainer retired as an execution
+boundary; macOS uses the [sandbox account](#macos-sandbox-account-2026-11-01-implemented-measured-on-macos-15-ci),
+set up from Raiker Setup behind one administrator prompt (RU-03 and RU-04 in the
 [ready-to-use plan](../plans/READY_TO_USE_PLAN.md)).
 
 Status (2026-11-02): **native execution is on where measured; not yet
@@ -665,6 +668,14 @@ separately checked tunnel. Refused destinations are appended to the run's
 output so the agent can name the host to ask for.
 
 ## Windows MXC evaluation (2026-10-30)
+
+> **Superseded in part, 2026-11-16.** OpenAI's Codex Windows sandbox
+> documentation now names `mxc` as its recommended mode on Windows 11 24H2+
+> (build 26100.9278 or later), with `elevated` and `unelevated` as fallbacks
+> ([Codex Windows sandbox](https://learn.chatgpt.com/docs/windows/windows-sandbox)).
+> The statement below that no source ties Codex to MXC is therefore out of date.
+> The decision stands until Raiker's own probe measures MXC: RU-05 in the
+> [ready-to-use plan](../plans/READY_TO_USE_PLAN.md).
 
 Microsoft MXC is public (`github.com/microsoft/mxc`). It is a cross-platform
 execution-container project whose default Windows backend is itself

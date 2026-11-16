@@ -150,12 +150,12 @@ the same five files; it refuses to publish an unsigned stable release.
 ## Beta release checklist
 
 A beta goes to the `beta` channel as a **draft**, and is published only when
-the [beta release acceptance](../plans/ACCEPTANCE_TESTS_BY_PHASE.md#beta-release-acceptance)
+the [beta release acceptance](../plans/TESTING.md#beta-release-acceptance)
 rows hold on its commit:
 
 1. CI is green on the commit, including `desktop-package.yml` when packaging
    paths changed since the last run.
-2. The [release acceptance matrix](../plans/RELEASE_ACCEPTANCE_MATRIX.md) is
+2. The [release acceptance matrix](../plans/BETA_RELEASE_PLAN.md#appendix-d--desktop-package-acceptance-matrix) is
    current for every platform the beta offers.
 3. The latest live rounds in
    [WEB_APP_LIVE_TEST.md](../architecture/WEB_APP_LIVE_TEST.md) pass on that

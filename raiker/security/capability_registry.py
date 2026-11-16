@@ -143,7 +143,13 @@ def telemetry_for_call(
         label=label,
         operation=_operation(tool_name, arguments),
         hosts=_hosts(arguments, payload),
-        tools=(_operation(tool_name, arguments),),
+        # No advertised tool set: a brokered call knows the one operation it
+        # used, not what the subject offers. Recording that operation here made
+        # `tool_set_changed` (an MCP substitution rule) fire as soon as a subject
+        # used a second operation — Web searched, then fetched a page, and was
+        # auto-paused mid-turn (found in regular use, 2026-11-16). The operation
+        # stays in `operation`.
+        tools=(),
         calls=1,
         bytes_in=_measure(arguments),
         bytes_out=_measure(payload),

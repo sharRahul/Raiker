@@ -8,7 +8,7 @@ subsets) so the web app loads no external fonts and works fully offline.
 | Inter (Rasmus Andersson) | `inter-latin.woff2`, `inter-latin-ext.woff2` | variable 100–900 | SIL Open Font License 1.1 |
 | JetBrains Mono (JetBrains) | `jetbrains-mono-latin.woff2`, `jetbrains-mono-latin-ext.woff2` | variable 100–800 | SIL Open Font License 1.1 |
 
-Inter replaced Manrope on 2026-10-25 ([Quiet UI 08, QUI-V02](../../../../docs/plans/quiet-ui/08_BRAND_AND_VISUAL_SYSTEM.md#qui-v02--type-and-spacing)).
+Inter replaced Manrope on 2026-10-25 ([Quiet UI 08, QUI-V02](../../../../docs/plans/QUIET_UI_PLAN.md#qui-v02--type-and-spacing)).
 The files are the `@fontsource-variable/inter` 5.3.0 subsets.
 
 ## Copyright notices

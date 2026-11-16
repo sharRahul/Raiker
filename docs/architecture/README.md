@@ -45,12 +45,12 @@ work; existing implementation status and known limits remain authoritative.
 
 | Topic | Document |
 |---|---|
-| Personal-agent journeys, states, decisions and results | [Personal-agent UX](../plans/PERSONAL_AGENT_UX_SPEC.md) and [implementation tasks](../plans/PERSONAL_AUTONOMOUS_AGENT_SPEC.md) |
+| Personal-agent journeys, states, decisions and results | [Personal-agent UX](../plans/PERSONAL_AUTONOMOUS_AGENT_SPEC.md#personal-agent-ui-and-ux) and [implementation tasks](../plans/PERSONAL_AUTONOMOUS_AGENT_SPEC.md) |
 | Build requirements and coding workspace | [Build workspace](../plans/BUILD_WORKSPACE_SPEC.md) |
 | Design requirements and workspace | [Design workspace](../plans/DESIGN_WORKSPACE_SPEC.md) |
 | Build turn protocol | [Raiker Build process](RAIKER_BUILD_PROCESS.md) |
 | Terminal commands and interactive mode | [Commands and interactive mode](COMMANDS_AND_INTERACTIVE_MODE_SPEC.md) |
-| Web dashboard behavior | [Web UI control deck](WEB_UI_CONTROL_DECK_PLAN.md) |
+| Web dashboard behavior | [Web UI control deck](DESIGN_HISTORY.md#web-ui-control-deck-plan-superseded-by-the-quiet-ui-plan) |
 | Visual language and responsive layout | [Visual design](VISUAL_DESIGN_SPEC.md) |
 | Application host, startup, updates, and packaging | [Desktop distribution](DESKTOP_DISTRIBUTION_DESIGN.md) |
 
@@ -127,7 +127,7 @@ and planned memory work is
 | Pre-commit validation | [Local validation gate](LOCAL_VALIDATION_GATE.md) |
 | Concise feature coverage | [Feature coverage matrix](FEATURE_COVERAGE_MATRIX.md) |
 | Deferred work and open gaps | [Gap and TODO analysis](GAP_AND_TODO_ANALYSIS.md) |
-| Acceptance tests by phase | [Acceptance tests by phase](../plans/ACCEPTANCE_TESTS_BY_PHASE.md) |
+| Acceptance tests by phase | [Acceptance tests by phase](../plans/TESTING.md#appendix--acceptance-tests-by-phase-historical) |
 | Real-provider web-app testing | [Web app live test](WEB_APP_LIVE_TEST.md) |
 
 Browser procedures and dated evidence are stored under [plans](../plans/).
@@ -138,10 +138,10 @@ Browser procedures and dated evidence are stored under [plans](../plans/).
 |---|---|
 | Standing implementation brief | [Handoff](HANDOFF.md) |
 | Architecture-decision template | [ADR template](ADR_TEMPLATE.md) |
-| Dependency-safe implementation sequence | [Build order](BUILD_ORDER.md) |
+| Dependency-safe implementation sequence | [Build order](DESIGN_HISTORY.md#build-order-implementation-sequence) |
 | Original phase blueprint | [Full phase implementation blueprint](FULL_PHASE_IMPLEMENTATION_BLUEPRINT.md) |
 | Small-step local-model development guide | [Local LLM builder guide](LOCAL_LLM_BUILDER_GUIDE.md) |
-| Reference concept-to-requirement mapping | [Reference requirements matrix](REFERENCE_REQUIREMENTS_MATRIX.md) |
+| Reference concept-to-requirement mapping | [Reference requirements matrix](DESIGN_HISTORY.md#reference-requirements-matrix-superseded-by-reference-platform-compatibility) |
 | Dated reference research | [Reference review log](REFERENCE_REVIEW_LOG.md) |
 | Product boundaries and non-goals | [Non-goals and boundaries](NON_GOALS_AND_BOUNDARIES.md) |
 

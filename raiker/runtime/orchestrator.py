@@ -111,7 +111,7 @@ from raiker.tools.broker import ToolBroker
 from raiker.tools.mcp_tools import is_mcp_tool, mcp_tool_specs
 from raiker.tools.presentation import tool_row
 from raiker.verification.models import VerificationResult
-from raiker.verification.verifier import Verifier
+from raiker.verification.verifier import READ_ONLY_TOOLS, Verifier
 
 # How often a streaming turn checks whether the owner asked it to stop. One
 # cheap indexed read a second: fast enough that Stop feels immediate, rare
@@ -597,6 +597,11 @@ class RuntimeOrchestrator:
         # ADR-0005 — the tools a persona's ceiling leaves out of this turn.
         # Withheld from the catalogue and refused if proposed anyway.
         self._persona_excluded_tools: frozenset[str] = frozenset()
+        # Tools that cannot work in this conversation, so they are not offered:
+        # `run_command` without a command grant (regular use, 2026-11-16 — a
+        # model tried it first, was refused, and the turn recorded a failed
+        # step; `shell`, which asks per command, is what can run).
+        self._ungranted_tools: frozenset[str] = frozenset()
 
     def _turn_tool_specs(self, provider: str | None = None, model: str | None = None) -> list[ToolSpec]:
         """The tools this turn may call: the built-ins plus projected MCP tools.
@@ -618,15 +623,16 @@ class RuntimeOrchestrator:
         window = (
             self._context_window_tokens(provider, model) if provider and model else None
         )
+        hidden = self._persona_excluded_tools | self._ungranted_tools
         specs = project_specs(
             self.tool_specs,
-            revealed=frozenset(self._revealed_tools - self._persona_excluded_tools),
+            revealed=frozenset(self._revealed_tools - hidden),
             mcp_specs=mcp_tool_specs(self.workspace_root, store, self.tool_broker.principal_id),
             compact=compact_for(window),
         )
-        if not self._persona_excluded_tools:
+        if not hidden:
             return specs
-        return [spec for spec in specs if spec.name not in self._persona_excluded_tools]
+        return [spec for spec in specs if spec.name not in hidden]
 
     def _validated_call(self, proposal: ToolCallProposal) -> ToolAction:
         """`validate_tool_call`, and refused when the turn's persona left the tool out."""
@@ -645,6 +651,9 @@ class RuntimeOrchestrator:
         self._preselected_turns.add(turn_id)
         from raiker.models.tool_projection import preselect_for_prompt
 
+        self._ungranted_tools = (
+            frozenset({"run_command"}) if not self._has_command_grant(envelope) else frozenset()
+        )
         persona = envelope.prompt.metadata.get("persona")
         self._persona_excluded_tools = frozenset()
         if isinstance(persona, dict):
@@ -655,7 +664,7 @@ class RuntimeOrchestrator:
         # A search must not offer what the ceiling withholds either; reset for
         # every turn, so one persona's ceiling never outlives its turn.
         with contextlib.suppress(AttributeError):
-            self.tool_broker.persona_withheld_tools = self._persona_excluded_tools
+            self.tool_broker.persona_withheld_tools = self._persona_excluded_tools | self._ungranted_tools
         picked = tuple(
             name
             for name in preselect_for_prompt(str(envelope.prompt.text or "")[:4000])
@@ -664,6 +673,19 @@ class RuntimeOrchestrator:
         if picked:
             self._revealed_tools.update(picked)
             self._event(envelope, "tools_preselected", {"tools": list(picked)})
+
+    def _has_command_grant(self, envelope: PromptEnvelope) -> bool:
+        """Whether this conversation holds an unexpired `run_command` grant."""
+        store = getattr(self.tool_broker, "store", None)
+        if store is None:
+            return False
+        try:
+            owner = self.tool_broker.owner_scope or self.tool_broker.principal_id
+            return store.load_session_command_grant(
+                session_id=envelope.session_id, principal_id=owner
+            ) is not None
+        except Exception:  # noqa: BLE001 - an unreadable grant is no grant
+            return False
 
     def _reveal_searched_tools(self, action: ToolAction, result: ToolResult) -> None:
         """Keep what a `tool_search` returned callable for the rest of the turn.
@@ -3356,6 +3378,9 @@ class RuntimeOrchestrator:
         # message and Markdown's paragraph boundary is what separates two of
         # them. Empty rounds contribute nothing.
         answer_segments: list[str] = []
+        # The text of the reply that ended the loop with no further tool call:
+        # the answer written *after* the last tool result, if there was one.
+        closing_text = ""
         # QUI-A rules — a local model gets one chance to correct a block the
         # runtime refused, and then the answer stands as it is.
         block_retry_used = False
@@ -3665,6 +3690,7 @@ class RuntimeOrchestrator:
                     break
                 answer_segments.append(response.text)
                 final_text = answer_so_far()
+                closing_text = response.text
                 break
 
             # Text written *alongside* a tool call is part of the answer, and is
@@ -3992,7 +4018,18 @@ class RuntimeOrchestrator:
         if status is None:
             self._state(machine, envelope, "RESPONDING")
             if last_result is not None and last_action is not None:
-                status = "completed" if last_result.status == "success" else "failed"
+                # Found in regular use (2026-11-16): a failed *read* the model
+                # recovered from — it went on to answer from what it had — made
+                # a complete, cited answer read "Not done". A read changes
+                # nothing, so its failure stays visible as a failed step (the
+                # turn reads "Partially completed") without failing the turn. A
+                # failed write, command or anything else still fails it.
+                recovered_read = (
+                    last_result.status != "success"
+                    and last_action.tool_name in READ_ONLY_TOOLS
+                    and bool(closing_text.strip())
+                )
+                status = "completed" if last_result.status == "success" or recovered_read else "failed"
                 message = final_text or self._format_from_result(last_action, last_result)
             else:
                 status = "completed"

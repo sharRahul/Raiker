@@ -1,251 +1,262 @@
-# Ready to use — simplify Raiker for every machine
+# Ready to use — Raiker on the owner's desktop, every day
 
-**Status:** active plan, opened 2026-11-16. **Owner:** release owner.
+**Status:** active plan, opened 2026-11-16, rewritten the same day with the
+owner's direction. **Owner:** release owner.
 **Decision record:** [ADR-0006](../adr/ADR-0006-one-supported-path-per-machine.md).
-**Target:** the owner can download Raiker on any of their machines, open it,
-connect a model and get useful, safe work done the same day — without a
-terminal, without reading the architecture, and without a capability being
-silently unavailable.
+**Release gates and evidence:** [BETA_RELEASE_PLAN.md](BETA_RELEASE_PLAN.md).
+**How it is tested:** [TESTING.md](TESTING.md).
 
-Raiker is an **autonomous and secure personal AI agent**. The runtime that
-makes it secure exists and is tested (governed actions, approvals, the native
-sandbox, encrypted storage, audit). What stands between the owner and daily use
-is not more capability; it is that the product is **not yet published**, that
-**command execution is refused by default on Windows and macOS**, and that the
-owner meets **too many decisions on the first day**. This plan removes those
-three obstacles and nothing else. It does not reopen any security rule.
+Raiker is an **autonomous and secure personal AI agent**. The governed runtime
+exists and is tested. This plan is the remaining work between that runtime and
+the owner using Raiker every day on a **Windows or Linux desktop**, with macOS
+supported and a phone app later. Every item keeps Raiker strict: no approval,
+audit record, encryption step or sandbox observation is removed to make
+something simpler.
 
-It sits beside, and narrows, the [first beta release plan](BETA_RELEASE_PLAN.md):
-where the two disagree about *what the owner meets first*, this plan wins;
-release gates and evidence stay in that plan and in
-[RELEASE_ACCEPTANCE_MATRIX.md](RELEASE_ACCEPTANCE_MATRIX.md). Defects stay in
-[TO_BE_FIXED.md](TO_BE_FIXED.md), closures in [FIXED_ITEMS.md](FIXED_ITEMS.md).
+## Owner direction (2026-11-16)
 
-## How to read this plan
-
-Each item has an ID (**RU-nn**), what is true **today** with its evidence, the
-**change**, and the **done when** check that closes it. Priority **P0** blocks
-"ready to use"; **P1** should land with it; **P2** follows. Effort **S** is
-under a day, **M** two to five days, **L** more than a week.
+| Area | Direction |
+|---|---|
+| Coding agent | Commands must not be refused by default on Windows and macOS. |
+| Command sandbox | One default per platform with its setup in Raiker: **Bubblewrap** on Linux, **Seatbelt** on macOS, and a **native Windows sandbox that does not need WSL2**. WSL2 stays an option, not a requirement. |
+| Permissions and approvals | Keep them strict; make them easy to use. |
+| Memory | Confirm whether Raiker is at par or ahead, and make memory easy to use. |
+| Goals, tasks, schedules | Raiker can run as an **always-on host**, and **Pause interrupts a step that is already running**. |
+| Devices | Windows and Linux desktops first; macOS supported; a phone app is a later plan. |
 
 ## Where Raiker stands (2026-11-16)
 
 | Fact | Evidence |
 |---|---|
-| No release has ever been published. Every installer is a CI artifact the owner has to find under **Actions**. | `gh release list` is empty; [Getting started](../guide/getting-started.md#install-the-desktop-app) |
-| The installers exist for Windows x86-64/Arm (emulated), macOS Apple silicon, Linux x86-64/ARM64, and pass their package smoke tests. | [RELEASE_ACCEPTANCE_MATRIX.md](RELEASE_ACCEPTANCE_MATRIX.md), `desktop-package.yml` |
-| Linux enforces the command sandbox (Bubblewrap + seccomp) on a stock install. | [Native sandbox migration](../architecture/NATIVE_SANDBOX_MIGRATION.md) |
-| On Windows, the AppContainer boundary still fails the real `.git` ACL test, so execution is refused — **but the WSL2 boundary measured every observation enforced** on the owner's Windows 11 PC (2026-11-08). | [WSL2 re-measured](../architecture/NATIVE_SANDBOX_MIGRATION.md#wsl2-re-measured-on-the-beta-candidate-2026-11-08), [TO_BE_FIXED § native sandbox](TO_BE_FIXED.md#release-blocker-native-sandbox-migration-incomplete) |
-| On macOS, a dedicated sandbox account under Seatbelt is implemented and passed macOS 15 CI; it needs one administrator setup step that only exists as a command (`sudo raiker-command-runner --setup-account`). | [macOS sandbox account](../architecture/NATIVE_SANDBOX_MIGRATION.md#macos-sandbox-account-2026-11-01-implemented-measured-on-macos-15-ci) |
-| Permissions lists **80** rows over **70** capabilities; Settings has **16** sections. Every row is honest, and most owners will never need to read them. | `web/src/lib/capabilityModel.ts`, `web/src/lib/settingsSections.ts`, [Implementation status](../architecture/IMPLEMENTATION_STATUS.md) |
-| Hosted models (Anthropic, OpenAI, OpenRouter), local Ollama models and search by meaning with the built-in `nomic-embed-text` pass live. | [Live record 2026-11-19](../architecture/WEB_APP_LIVE_TEST.md#result--2026-11-19-personas-local-ollama-search-by-meaning-and-native-decks) |
-| Search by meaning works only after the owner turns on **Provider embeddings**, sets it to Always allow, and builds Memory's index — three steps nobody would find. | [TO_BE_FIXED § 2026-11-19](TO_BE_FIXED.md#2026-11-19-round--found-not-fixed) |
+| No release has been published; installers exist only as CI artifacts. | `gh release list` is empty; [Getting started](../guide/getting-started.md#install-the-desktop-app) |
+| **Linux** enforces the command sandbox (Bubblewrap + seccomp) on a stock install. | [Native sandbox migration](../architecture/NATIVE_SANDBOX_MIGRATION.md) |
+| **Windows already has a native sandbox without WSL2**: the restricted-account boundary (`RaikerSandbox` users, a Job Object, an outbound firewall rule and a WFP loopback filter). It measured every observation enforced on the owner's Windows 11 PC and ran Node, Git, MSYS and system Python. It is not on by default because its one-time setup needs an administrator and exists only as a command (`raiker-command-runner --setup-account`). | [Windows restricted-account sandbox](../architecture/WINDOWS_RESTRICTED_ACCOUNT_SANDBOX.md) |
+| AppContainer, the older Windows boundary, fails a real `.git` ACL test and blocks ordinary toolchains. WSL2 measured enforced on 2026-11-08. | [TO_BE_FIXED § native sandbox](TO_BE_FIXED.md#release-blocker-native-sandbox-migration-incomplete) |
+| **macOS** has a sandbox account under Seatbelt, passing macOS 15 CI, set up only from the command line with `sudo`. | [macOS sandbox account](../architecture/NATIVE_SANDBOX_MIGRATION.md#macos-sandbox-account-2026-11-01-implemented-measured-on-macos-15-ci) |
+| Permissions lists 80 rows over 70 capabilities; Settings has 16 sections. | `web/src/lib/capabilityModel.ts`, `web/src/lib/settingsSections.ts` |
+| Pause stops filing new goal steps; a running step finishes its turn. Stop interrupts at the next safe boundary but cannot resume. | [BUG-355](TO_BE_FIXED.md#bug-355--goals-ship-without-intake-from-chat-validator-backed-criteria-or-a-restart-scenario) |
+| Goals and routines run only while Raiker is open; Restart from Settings needs `systemd --user` or `launchd`. | [Remote access](../architecture/REMOTE_ACCESS.md) |
+| **Regular use on Linux (2026-11-16):** a first Build turn wrote code but could not run its tests — *Set up for Build* did not include commands, and `run_command`'s grant has no screen. Fixed for the preset (FIXED-1528); the grant remains (RU-07). | [Regular-use journeys](TESTING.md#regular-use-journeys), [TO_BE_FIXED](TO_BE_FIXED.md#2026-11-16-regular-use--found-not-fixed) |
+| Hosted models, local Ollama models and search by meaning pass live; search by meaning needed three hidden steps. | [Live record 2026-11-19](../architecture/WEB_APP_LIVE_TEST.md#result--2026-11-19-personas-local-ollama-search-by-meaning-and-native-decks) |
 
-## What the reference agents do, and what Raiker takes from each
+## What the reference agents do
 
-Read for shape and practice, not copied. Each row names what Raiker adopts and
-what it deliberately does not.
+Reviewed 2026-11-16 from each product's own documentation where it is public,
+and from its source where it is open. Claude, ChatGPT, Cursor, Perplexity and
+Meta Muse are closed products, so only their documentation (and, for Meta
+Muse, press coverage) can be read. **Hermes Agent** (MIT) and the **OpenAI
+Codex** Windows sandbox (`openai/codex`, `codex-rs/windows-sandbox-rs`) are open
+source and were read at source level.
 
-| Reference | What it does well | Raiker adopts | Raiker does not adopt |
-|---|---|---|---|
-| **Claude Code** ([sandboxing](https://code.claude.com/docs/en/sandboxing), [sandbox environments](https://code.claude.com/docs/en/sandbox-environments)) | OS sandbox per platform: Seatbelt on macOS, Bubblewrap on Linux **and WSL2**; native Windows is not sandboxed and is pointed at WSL2. Permission modes decide *whether* a tool runs; the sandbox decides *what it can reach* once it runs, so sandboxed commands can run without a prompt. | WSL2 as Windows' command boundary (RU-03); "inside the sandbox, no prompt" as the everyday posture for commands (RU-07); a short, named set of postures instead of a per-capability first impression. | Running unsandboxed on native Windows. |
-| **ChatGPT** (desktop and agent) | One download, sign in, start typing. Agent work runs in a separate virtual computer, and the user takes over for log-ins and payments. Memory is one switch plus a list you can edit. | First run ends in a working chat in minutes (RU-05); a turn that needs the owner says so and waits (already true of approvals); Memory's controls on one page (RU-10). | A provider-hosted account as the only way in; Raiker stays local-first and works with the owner's own keys and local models. |
-| **Cursor** | Few modes (Agent / Ask / Manual), project rules in a file, an auto-run allowlist, and background agents in remote machines. | RAIKER.md already matches project rules; three postures (RU-07); remote execution stays an explicit option (SSH and Daytona already exist). | A global "run everything" switch. |
-| **Perplexity** | Answer first, sources beside it; spaces that group research. | Already present (source chips, Library, projects); this plan only makes web access part of the first-day defaults where the owner chooses it (RU-06). | — |
-| **Meta Muse** ([personal agent launch](https://thenextweb.com/news/meta-muse-personal-ai-agent-launch), [Muse Spark](https://engadget.com/ai/metas-muse-spark-model-brings-reasoning-capabilities-to-the-meta-ai-app-161456684.html)) | Consumer-grade simplicity: a named personal agent across apps and voice, tasks run in an isolated cloud machine, payments through a dedicated agent wallet. Coverage notes that trust is the barrier to handing over personal affairs. | Trust made visible: every action is said before it runs and recorded after; personas give the agent a name and voice (ADR-0005). | Holding the owner's card or paying on their behalf (Raiker's money rules stay: the owner approves and the provider's own page does it); cloud-only execution. |
-| **Hermes Agent** (Nous Research, [docs](https://hermes-agent.nousresearch.com/docs/), [overview](https://parallel.ai/articles/what-is-hermes-agent)) | One-line install, a setup wizard, a `doctor` command, and a choice of terminal backends (local, Docker, SSH and hosted sandboxes) set by one config value; runs on a small always-on server and reaches the owner through chat apps. | A **Health check** that diagnoses and fixes in place (RU-04); the execution backend named and chosen in one place (RU-03); "Raiker on an always-on machine" as a documented later path (RU-14). | Docker as the default sandbox (Raiker removed Docker/Podman in favour of native boundaries; see the [sandbox migration](../architecture/NATIVE_SANDBOX_MIGRATION.md#docker-and-podman-removal)). |
-
-## Principles
-
-1. **One supported path per machine.** For each platform the owner meets one
-   way to install, one command boundary and one update channel. Alternatives
-   stay available under **Advanced**, never on the first screen.
-2. **Safe by default, useful by default.** The defaults must already be able to
-   do the everyday work (chat, research, files in a project, commands inside
-   the sandbox) without a prompt for what cannot leave the boundary, and must
-   ask for everything that can.
-3. **Unavailable is said, with the fix.** A capability the machine cannot
-   provide is shown with the one step that makes it available (or that it
-   cannot be), never as a silent refusal on first use.
-4. **Fewer decisions, not fewer safeguards.** Simplification removes choices
-   from the first day; it never removes an approval, an audit record, an
-   encryption step or a sandbox observation.
-5. **Published or it does not exist.** The owner installs from a release page,
-   with `SHA256SUMS.txt`, and gets updates from inside the app.
+| Reference | What was found | What Raiker takes |
+|---|---|---|
+| **Claude Code** — [sandboxing](https://code.claude.com/docs/en/sandboxing), [permissions](https://code.claude.com/docs/en/permissions), [memory](https://code.claude.com/docs/en/memory) | Seatbelt on macOS, Bubblewrap on Linux and WSL2; no native Windows sandbox. Six permission modes (`default`/Manual, `acceptEdits`, `plan`, `auto` with a classifier, `dontAsk`, `bypassPermissions`). Memory is `CLAUDE.md` (owner-written, and it reads `AGENTS.md`) plus **auto memory** Claude writes and the owner can open and edit. | Postures that separate *whether* a tool runs from *what it can reach* (RU-07); reading `AGENTS.md`/`CLAUDE.md` as reviewed instructions (RU-16); a readable, editable memory summary (RU-11). Not taken: a classifier as the authority, a bypass mode. |
+| **OpenAI Codex (ChatGPT)** — [Windows sandbox docs](https://learn.chatgpt.com/docs/windows/windows-sandbox), [design post](https://openai.com/index/building-codex-windows-sandbox/), source | Native Windows sandbox, recommended over WSL2. Three modes: `mxc` (Windows' own process isolation, Windows 11 24H2+), `elevated` (dedicated lower-privilege sandbox users, filesystem boundaries and firewall rules, one administrator-approved setup) and `unelevated` (a restricted token derived from the user, ACL rules, weaker network isolation). | Raiker's restricted-account boundary **is** the `elevated` design; it becomes Windows' default with its setup in Raiker (RU-03). MXC is re-evaluated (RU-05). The `unelevated` design is not a default because it cannot contain the network. |
+| **ChatGPT** — [memory help](https://help.openai.com/en/articles/8590148-memory-faq) | Memory updates itself and shows a readable, editable summary; it references past chats; one switch, Temporary Chat for none. | One memory page that reads as a summary, one switch, Incognito (RU-10, RU-11). |
+| **Cursor** — [docs](https://docs.cursor.com/get-started/concepts) | A few agent modes, project rules in `.cursor/rules`, background agents with local-to-cloud hand-off; general memories were folded into rules. | Rules imported like RAIKER.md (RU-16); Raiker's always-on host is its background agent (RU-13). |
+| **Perplexity** — [assistants with memory](https://www.perplexity.ai/en-GB/hub/blog/introducing-ai-assistants-with-memory), [scheduled tasks](https://testingcatalog.com/perplexity-adds-scheduled-tasks-feature-for-pro-and-enterprise-users) | Answers with sources; memory on/off with incognito; scheduled searches; "Brain" remembers the agent's own work (what failed, what was corrected). | Sources already ship. Memory of Raiker's own work is a P2 item (RU-12). |
+| **Meta Muse** — [launch](https://thenextweb.com/news/meta-muse-personal-ai-agent-launch), [Muse Spark](https://engadget.com/ai/metas-muse-spark-model-brings-reasoning-capabilities-to-the-meta-ai-app-161456684.html) (press coverage; no first-party text was reachable) | A named personal agent that keeps working after the app closes, in an isolated cloud machine, paying through an agent wallet; coverage names trust as the barrier. | Always-on work on the owner's own machine (RU-13); every action said before and recorded after. Not taken: holding the owner's card. |
+| **Hermes Agent** — [source](https://github.com/NousResearch/hermes-agent), [docs](https://hermes-agent.nousresearch.com/docs/) | Native Windows installer (PowerShell) as well as Linux/macOS; six terminal backends (local, Docker, SSH, Modal, Daytona, Vercel Sandbox); `hermes setup`, `hermes doctor`; an always-on gateway (Telegram, Discord, Slack, WhatsApp, Signal, email); memory in `MEMORY.md` and `USER.md` plus FTS5 session search; `AGENTS.md` for workspace instructions; `/stop` or a new message interrupts; `hermes import-agent` imports from Claude Code, Codex and Cursor. | Health with fixes (RU-08); the always-on host with chat-app reach (RU-13); importing another agent's instructions and memory (RU-16). Not taken: Docker as the default boundary. |
 
 ## The plan
 
-### Milestone A — the owner can install and use it (P0)
+Priority **P0** blocks "ready to use"; **P1** lands with it; **P2** follows.
+Effort **S** < 1 day, **M** 2–5 days, **L** > 1 week.
 
-**RU-01 · Publish rolling personal releases. P0, S.**
-*Today:* `release.yml` exists and ran on 2026-11-15, but nothing is published.
-*Change:* publish `0.9.0-beta.N` as a GitHub **pre-release** from `main` when
-CI is green, one asset per platform plus `SHA256SUMS.txt`, unsigned under the
-[personal beta scope](PERSONAL_BETA_SCOPE.md), with the unsigned-build steps
-for Windows SmartScreen and macOS Gatekeeper on the release page.
-*Done when:* `gh release list` shows a pre-release whose assets install on a
-clean Windows 11, macOS 15 and Ubuntu 24.04 machine (IN-5 in the beta plan),
-and Getting started links to it.
+### A. Install and update
 
-**RU-02 · In-app updates from that channel. P0, M.**
-*Today:* the updater, manifest checks and pre-update backup are specified in
-the beta plan (IN-4) and implemented for the desktop shell.
-*Change:* point the default channel at the published pre-releases; **Settings ›
-About & updates** shows the current and available version and **Update**.
-*Done when:* an installed `beta.N` updates to `beta.N+1` in place, keeps its
-data, and **Roll back** returns to `beta.N` (IN-4 evidence).
+**RU-01 · Publish personal pre-releases. P0, S.** Publish `0.9.0-beta.N` as a
+GitHub pre-release from green `main`: one asset per platform and
+`SHA256SUMS.txt`, unsigned under the [owner scope](BETA_RELEASE_PLAN.md#appendix-a--owner-scope-2026-11-09),
+with the SmartScreen and Gatekeeper steps on the release page.
+*Done when* a clean Windows 11 and Ubuntu 24.04 machine install from the
+release page, and Getting started links to it.
 
-**RU-03 · Commands run on every desktop platform, in its sandbox. P0, L.**
-*Today:* Linux enforced; Windows refused (AppContainer ACL gap); macOS needs a
-command-line setup.
-*Change (ADR-0006 §1):*
-- **Windows:** the WSL2 boundary becomes the default command backend. **Raiker
-  Setup** offers *Set up the command sandbox* (imports the `RaikerSandbox`
-  distribution with systemd on, installs the packaged Linux runner, runs the
-  probe). Linux toolchains (Node, Python, Git, Rust) run inside the
-  distribution against the project copy. Windows-only toolchains (MSBuild,
-  PowerShell scripts) are not reachable there, because the boundary denies WSL
-  interop; the restricted-account and AppContainer backends that would run them
-  stay under **Advanced** and stay refused until each passes its own probe.
-- **macOS:** **Raiker Setup** runs the existing `--setup-account` step behind
-  one administrator prompt, then the probe.
-- **Linux:** no change; Setup states that Bubblewrap is present or names the
-  package to install.
-- Where the owner declines the setup, commands stay refused, and Build says so
-  with the button that sets it up.
-*Done when:* on a clean Windows 11, macOS 15 and Ubuntu 24.04 machine, the probe
-reports every mandatory observation **enforced** after Setup, and a Build turn
-runs `npm test` (or `pytest`) in a disposable copy and shows its output; the
-beta plan's SB-1/SB-2/SB-6 rows are updated with that evidence.
+**RU-02 · Update in place. P0, M.** The app updates from that channel, keeps
+data, and **Roll back** returns to the previous build (IN-4).
+*Done when* `beta.N` → `beta.N+1` → roll back keeps conversations, memory and
+personas on both platforms.
 
-**RU-04 · A Health check that fixes, not only reports. P0, M.**
-*Today:* Diagnostics shows readiness facts; fixes live on other pages.
-*Change:* one **Health** page (and `raiker doctor` from a terminal for the
-same checks) listing, per row, *what works / what does not / the button that
-fixes it*: model reachable, command sandbox, encryption and backups, embedding
-model, voice runtime, updates, disk and memory headroom. Each fix routes
-through the page that owns it, so no new authority path exists.
-*Done when:* every row has a live check and a working fix route; a fresh
-machine with nothing set up shows exactly the rows RU-05 will fix, and none
-after it.
+### B. Commands run on every desktop, in a native sandbox
 
-**RU-05 · A ten-minute first run that ends in a working chat. P0, M.**
-*Today:* account → model setup → several optional screens; search by meaning
-and commands need separate trips into Settings and Permissions.
-*Change:* first run is **four** steps — *Account* (password, recovery codes),
-*Model* (sign in to a provider with a key, or pick a local model Raiker finds
-or installs), *This machine* (command sandbox from RU-03, the built-in
-embedding model when Ollama is present, backups to a folder), *Posture*
-(RU-07). Each step has a **Skip — do this later**, and Health lists what was
-skipped. The workbench opens on a composer with three example requests that
-work with what was set up.
-*Done when:* a person who has never seen Raiker reaches a first answer in under
-ten minutes on each platform (timed on three clean machines), and Health shows
-nothing unexpected afterwards.
+**RU-03 · Windows: the native restricted-account sandbox by default, no WSL2.
+P0, M.** Raiker Setup's *This machine* step offers **Set up the command
+sandbox**: one UAC prompt runs `--setup-account` (sandbox users and group,
+`C:\RaikerSandbox`, the outbound firewall rule, the WFP loopback filter), then
+the probe. Commands then run in a disposable copy as `RaikerSandbox`, with
+Windows toolchains (Node, Git, Python, MSYS). Close the account's known gaps
+before calling it the default: a per-task profile reset, logon-right denials
+(network and remote) and the explicit-ACE scan under denied drive roots
+([TO_BE_FIXED](TO_BE_FIXED.md#release-blocker-native-sandbox-migration-incomplete)).
+AppContainer is retired as an execution boundary. Declining setup leaves
+commands refused, said with the button that sets it up.
+*Done when* on a clean Windows 11 PC, after one UAC prompt, the probe reports
+every mandatory observation enforced, and a Build turn runs `npm test` and
+`pytest` in a copy and shows their output.
 
-### Milestone B — fewer decisions every day (P1)
+**RU-04 · Linux and macOS. Linux P0 S, macOS P1 M.** Linux: Setup confirms
+Bubblewrap (or names the package). macOS: Setup runs the sandbox-account setup
+behind one administrator prompt, then the probe.
+*Done when* the same Build turn passes on Ubuntu 24.04 and macOS 15.
 
-**RU-06 · Search by meaning without three hidden steps. P1, S.**
-*Today:* needs Provider embeddings on, Always allow, and an index build.
-*Change:* when the built-in model is local (`nomic-embed-text` on loopback
-Ollama, or the managed llama.cpp entry once its hash is recorded), first run's
-*This machine* step offers **Find things by meaning (stays on this computer)**;
-accepting it turns on that one capability scoped to the **local** embedding
-profile only, and the background indexer builds the space. A hosted embedding
-model still asks exactly as today.
-*Done when:* on a fresh workspace with Ollama, accepting the step and asking
-Threads for *Japan holiday* finds a *Kyoto* chat with no visit to Permissions
-(RT-1119-04 without its first two steps).
+**RU-05 · WSL2 and MXC as options. P2, M.** WSL2 stays available under
+**Advanced** for Linux toolchains on Windows. Re-evaluate Microsoft's MXC with
+Raiker's probe: Codex now recommends MXC on Windows 11 24H2+, which supersedes
+the 2026-10-30 note that no source tied Codex to it
+([MXC evaluation](../architecture/NATIVE_SANDBOX_MIGRATION.md#windows-mxc-evaluation-2026-10-30)).
+*Done when* MXC's probe result is recorded; it is offered only if every
+mandatory observation is enforced.
 
-**RU-07 · Three postures in place of a first-day permission list. P1, M.**
-*Today:* 80 permission rows, each with a decision mode; a fresh account starts
-on the local baseline and Build is one decision.
-*Change (ADR-0006 §2):* **Settings › Permissions** opens on three postures —
-**Ask first** (today's baseline), **Work in the sandbox** (file edits and
-commands inside the disposable copy run without a prompt; anything that leaves
-the copy, the machine or spends money asks), **Read-only** (nothing changes
-anywhere). A posture is a named bundle of the existing decision modes — no
-new authority path, the same step-up to change it. The per-capability list
-stays one click away as **Customise**, and a customised posture says so.
-*Done when:* choosing a posture writes exactly the documented modes (unit
-test over the mapping), every row stays reachable, and the live Build journey
-passes in **Work in the sandbox** with no prompt for in-copy edits and a prompt
-for `git push`.
+**RU-21 · A project for Build has a folder. P0, S.** Creating a project from
+Build or Projects asks for its folder (or makes one under `~/Raiker Projects`);
+Build never works in Raiker's own data folder.
+*Done when* RU-J4 applies its change to the project folder with **Apply to
+project**.
 
-**RU-08 · Settings in five groups. P1, M.**
-*Today:* 16 sections.
-*Change:* **You** (account, personalisation, personas, notifications, voice),
-**Models**, **Permissions & privacy** (postures, privacy, web access,
-execution profiles), **Data** (memory, backups, usage), **This machine**
-(health, runtime, updates, advanced). Deep links keep working
-(`#/settings?tab=…` maps to the new place).
-*Done when:* every existing `tab=` link lands on its section; the surface sweep
-(`surface-sweep-live.spec.ts`) passes; no setting is lost.
+**RU-22 · Build runs the declared checks itself. P1, M.** When the model has
+finished, Build runs the project's declared checks in the sandbox (asking like
+any command) so the outcome is *Verified* or says what failed, whatever command
+form the model chose.
+*Done when* RU-J4 ends *Verified*.
 
-**RU-09 · One place for what is not ready. P1, S.**
-*Today:* limits are spread across KNOWN_LIMITS, the beta guide and TO_BE_FIXED.
-*Change:* Health's last section, **Not available on this machine**, lists each
-refused capability with its reason code's owner copy and whether a fix exists;
-the beta guide links to it.
-*Done when:* every capability the runtime refuses on the host appears there,
-and none that it allows.
+### C. Permissions: strict, and easy to use
 
-**RU-10 · Memory on one page. P1, S.**
-*Today:* Memory has five tabs and Settings › Memory engine holds the recall
-backend.
-*Change:* Memory opens on **What Raiker remembers** (search, edit, forget) with
-**Suggestions** as a count; recall backend and indexing move under Memory ›
-Controls; Settings links there.
-*Done when:* the memory live specs pass against the new layout and no control
-is lost.
+**RU-06 · Ten families in plain words. P1, M.** Group the 80 rows into ten
+families an owner recognises — Files, Commands, Web, Messages and calendar,
+Memory, Git and GitHub, Models, Money, Devices and home, Other agents and
+plugins — each with one line on what it allows and its current setting. The
+per-capability rows stay under each family.
+*Done when* every capability belongs to exactly one family (unit test) and the
+surface sweep passes.
 
-### Milestone C — any machine, any time (P2)
+**RU-07 · Three postures. P1, M.** Permissions opens on **Ask first** (today's
+baseline), **Work in the sandbox** (edits and commands *inside the disposable
+copy* run without a prompt; anything that leaves the copy, the machine, writes
+durable memory, sends a message or spends money asks) and **Read-only**. Each
+is a documented bundle of existing decision modes, changed through the same
+step-up; customising one is said. The posture falls back to *Ask first* when
+the sandbox probe is not fully enforced.
+Show the per-conversation command grant on the command's approval card
+(*Allow `python3 -m unittest` for this conversation*), so `run_command` is
+reachable without the API.
+*Done when* the posture → mode mapping is unit-tested and a Build journey in
+**Work in the sandbox** asks only for `git push`.
 
-**RU-11 · Small machines.** A *Light* profile chosen automatically below 8 GB
-RAM: no local chat model offered by default, hosted or LAN model first, voice
-Lite only, background indexing paced. *Done when:* the installed app is usable
-on a 4 GB VM with a hosted model.
+**RU-08 · Health. P0, M.** One page (and `raiker doctor`) listing each
+readiness fact with the page that fixes it: model, command sandbox, encryption
+and backups, embedding model, voice, updates, disk and memory, always-on host.
+*Done when* a fresh machine shows exactly what first run fixes, and nothing
+after.
 
-**RU-12 · Windows on Arm, natively.** Build the host for `windows-arm64` (today
-it runs under emulation). *Done when:* the arm64 installer passes the package
-smoke tests on an Arm runner.
+**RU-09 · Four-step first run. P0, M.** *Account* → *Model* → *This machine*
+(command sandbox, local embedding model, backups, always-on) → *Posture*.
+Each but *Account* can be skipped and is listed on Health.
+*Done when* a first-time user reaches a first useful answer in under ten
+minutes on Windows and Linux.
 
-**RU-13 · Portable data.** **Move Raiker to another machine**: an encrypted
-export of workspace, settings and personas, imported by first run's *I have a
-backup*. *Done when:* a workspace moved Windows → macOS keeps its
-conversations, memory and personas, and asks for provider keys again (keys are
-never exported in clear).
+### D. Memory: ahead on control, behind on ease
 
-**RU-14 · Raiker on an always-on machine.** A documented, tested path to run
-the host on a home server or small VPS and reach it from the owner's devices
-through Remote access (two-step sign-in is already mandatory), with goals and
-routines running while the laptop sleeps. *Done when:* RT-SEC-04 to RT-SEC-12
-pass from a second device against a Linux server install.
+**Verdict (2026-11-16).** Raiker is **ahead** of the references on control:
+every memory has provenance, scope, retention and a review step; recall is
+local by default (`nomic-embed-text`), Incognito withholds everything, and
+forgetting is the owner's alone. It is **at par** on recall breadth: approved
+memories, search of past conversations by words and by meaning (FTS5 and
+embeddings, as in Hermes Agent and ChatGPT's chat-history reference), the
+Library and RAIKER.md. It is **behind** on ease: proposals need a visit to
+Memory, there is no readable summary (ChatGPT, Claude auto memory), five tabs
+plus a Settings section, three hidden steps for search by meaning, and it does
+not read `AGENTS.md`/`CLAUDE.md`. It also does not remember its own work
+(Perplexity Brain, Hermes Agent's self-written skills).
 
-## What gets simpler, and what does not change
+**RU-10 · Keep or skip, where the answer is. P1, S.** A memory Raiker proposes
+appears under the answer as *Remember: "…"* with **Keep** and **Not this**;
+nothing is stored until Keep, exactly as today, but without leaving the
+conversation. Batch review stays in Memory.
+*Done when* a proposal is kept from Chat and appears in Memory with its
+provenance.
 
-| Simpler | Unchanged |
-|---|---|
-| One install per platform, from a release page, updated in place | Hashes verified; unsigned builds labelled as such |
-| Commands work after one Setup step on every desktop OS | Commands never run outside a measured, enforced sandbox |
-| Three postures on the first screen of Permissions | Every capability, decision mode, approval and audit record |
-| Four first-run steps, each skippable | Account, encryption and recovery codes are not skippable |
-| Search by meaning offered locally in one step | A hosted embedding model still asks first |
-| Five Settings groups | Every setting; every deep link |
+**RU-11 · One memory page that reads as a summary. P1, M.** Memory opens on
+**What Raiker knows about you**: approved memories grouped by topic, each
+editable and forgettable in place, with a count of suggestions waiting. One
+switch (*Use memory*), Incognito for a conversation, and *Find by meaning
+(stays on this computer)* as a single choice when the embedding model is local
+(Provider embeddings scoped to the loopback profile only). Recall settings move
+under Memory › Controls.
+*Done when* the memory journeys pass with no visit to Permissions or Settings.
+
+**RU-12 · Raiker remembers its own work. P2, M.** After a task, Raiker may
+propose a *lesson* ("`npm test` needs `--runInBand` in this repository"),
+reviewed like any memory and recalled for the same project.
+*Done when* a lesson kept on one task is recalled on the next in that project.
+
+### E. Always on, and a Pause that really pauses
+
+**RU-13 · Raiker as an always-on host. P0, L.** The host runs without the
+window: a **Keep Raiker running** choice registers it as a user service
+(`systemd --user` with lingering on Linux; a per-user logon task or Windows
+service on Windows; `launchd` on macOS), and the desktop app becomes a client
+of the running host (local, or a home server or small VPS reached through
+Remote access with its mandatory two-step sign-in). Goals, routines and
+background runs continue when the window is closed; results reach the owner
+through notifications and paired channels (Signal, Telegram). Restart from
+Settings works on every platform once registered.
+*Done when* on Windows and Linux a routine scheduled for five minutes later
+runs with the window closed, its result is delivered, and the host survives a
+log-out and a reboot.
+
+**RU-14 · Pause interrupts a running step and Resume continues it. P0, L.**
+Pause takes effect at the running step's **next safe boundary**: before the
+next model call, between tool calls, and — for a running command — by freezing
+its process tree (`cgroup.freeze` on Linux, the Job Object's processes on
+Windows, `SIGSTOP` to the sandbox account's processes on macOS). The turn is
+parked in the suspended-turn store the approval path already uses
+(`insert_suspended_turn`), with its messages, pending calls, spend and
+persona; **Resume** re-enters the same turn. A command frozen longer than a
+limit (default 30 minutes) is stopped and reported, never left holding the
+sandbox; a pause never skips an approval, and a resumed turn re-checks
+permissions, profile and budget before its next action.
+*Done when* a goal step running a two-minute command is paused, stays frozen
+with no further output, and on Resume finishes with the same result as
+uninterrupted; and a Chat turn paused between tool calls resumes with its
+history intact (the last row of BUG-355).
+
+### F. Interoperability
+
+**RU-15 · Raiker as an MCP server. P2, M.** Other agents (Claude, ChatGPT,
+Cursor, Hermes Agent) can call Raiker's memory search, Library and tasks over
+MCP; every call enters the same gateway, approvals and audit.
+
+**RU-16 · Import another agent's setup. P1, M.** Read `AGENTS.md`, `CLAUDE.md`
+and `.cursor/rules` as RAIKER.md does — reviewed by digest before use — and
+import memories and conversations from ChatGPT and Claude exports, and Hermes
+Agent's `MEMORY.md`/`USER.md`, as suggestions to review.
+
+**RU-17 · Move Raiker to another machine. P1, M.** An encrypted export of
+workspace, settings and personas, imported by first run's *I have a backup*;
+provider keys are asked for again.
+
+### G. Later
+
+* **RU-18 · Phone app.** A client of the always-on host (RU-13); the PWA first.
+* **RU-19 · Small machines.** A *Light* profile below 8 GB of memory.
+* **RU-20 · Windows on Arm, native.**
 
 ## Delivery order
 
-1. **Week 1:** RU-01, RU-04 (checks first, fixes as they land), RU-06.
-2. **Week 2:** RU-03 Windows (WSL2 default) and macOS (Setup step); RU-05.
-3. **Week 3:** RU-02, RU-07, RU-09; clean-machine runs on three platforms.
-4. **Week 4:** RU-08, RU-10; the seven beta journeys on the published build.
-5. **After:** RU-11 to RU-14.
+1. **Week 1:** RU-01, RU-08, RU-03 (setup in Raiker; account gaps closed).
+2. **Week 2:** RU-09, RU-04 (Linux), RU-10, RU-11.
+3. **Week 3:** RU-14 (Pause), RU-02, RU-07, RU-06.
+4. **Week 4:** RU-13 (always-on), RU-16, RU-17; the regular-use journeys in
+   [TESTING.md](TESTING.md#regular-use-journeys) on the published build.
+5. **After:** RU-04 (macOS), RU-05, RU-12, RU-15, RU-18 to RU-20.
 
-Anything P0 that is not green by week 3 is shown as *Not available on this
-machine* (RU-09) with its fix, rather than delaying the release.
+A P0 item that is not green by week 3 is shown on Health as *Not available on
+this machine*, with its fix, rather than delaying the release.
 
 ## Changelog
 
-- **2026-11-16** — Opened. Reference review (Claude Code, ChatGPT, Cursor,
-  Perplexity, Meta Muse, Hermes Agent); decisions recorded in
-  [ADR-0006](../adr/ADR-0006-one-supported-path-per-machine.md).
+- **2026-11-16** — Opened from the reference review. Rewritten the same day
+  with the owner's direction: a native Windows sandbox without WSL2 (the
+  restricted-account boundary, matching Codex's `elevated` design), strict but
+  simple permissions, the memory verdict, an always-on host and a Pause that
+  interrupts a running step.

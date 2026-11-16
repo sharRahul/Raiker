@@ -228,7 +228,7 @@ Before coding, confirm:
 - [ ] Storage tables/paths are specified.
 - [ ] Policy decisions are specified.
 - [ ] Failure modes are specified.
-- [ ] Tests are listed in `docs/architecture/ACCEPTANCE_TESTS_BY_PHASE.md`.
+- [ ] Tests are listed in `docs/plans/TESTING.md`.
 - [ ] No non-goal is violated.
 
 ## Accepted personal-agent direction — 2026-10-07

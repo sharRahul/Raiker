@@ -27,7 +27,7 @@ checklists are not active product documentation. Current status is maintained in
 - Hosted multi-user deployment and mobile/IDE clients. (The desktop
   application ships; signed releases and an update through a published signed
   channel are not yet tested — see the
-  [release acceptance matrix](../plans/RELEASE_ACCEPTANCE_MATRIX.md).)
+  [release acceptance matrix](../plans/BETA_RELEASE_PLAN.md#appendix-d--desktop-package-acceptance-matrix).)
 - Tamper-evident audit storage and a dedicated secret-management service.
 
 These areas remain disabled and fail closed. Strict non-allow blocking, role

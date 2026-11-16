@@ -4,7 +4,7 @@
 
 Accepted and implemented on 2026-10-17 (DIST-01 – DIST-12). Platform
 verification is recorded per target in the
-[release acceptance matrix](../plans/RELEASE_ACCEPTANCE_MATRIX.md). No signed
+[release acceptance matrix](../plans/BETA_RELEASE_PLAN.md#appendix-d--desktop-package-acceptance-matrix). No signed
 release has been published, because the signing identities are the release
 owner's to configure; see [Known limitations](#known-limitations).
 

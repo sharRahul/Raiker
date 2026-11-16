@@ -817,7 +817,7 @@ The approved Control Deck work was tracked in a design and an implementation
 plan dated 2026-07-16 that were **never committed to this repository**. What
 survives of them is the shipped product plus two maintained documents:
 
-- [`WEB_UI_CONTROL_DECK_PLAN.md`](WEB_UI_CONTROL_DECK_PLAN.md) — what each screen
+- [`WEB_UI_CONTROL_DECK_PLAN.md`](DESIGN_HISTORY.md#web-ui-control-deck-plan-superseded-by-the-quiet-ui-plan) — what each screen
   is for
 - [`VISUAL_DESIGN_SPEC.md`](VISUAL_DESIGN_SPEC.md) — how anything is drawn
 

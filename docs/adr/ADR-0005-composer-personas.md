@@ -17,7 +17,7 @@ order it will be built in.
 
 On 2026-11-07 the owner decided that `@` in the composer routes a prompt to a
 named specialist (`@DataAnalyst`, `@Copywriter`) as part of the composer control
-deck ([03](../plans/quiet-ui/03_WELCOME_HOME_AND_CHAT.md#2026-11-07--composer-control-deck)).
+deck ([03](../plans/QUIET_UI_PLAN.md#2026-11-07--composer-control-deck)).
 Raiker has no persona today, and `@` already mentions a file from the code map.
 
 The reference products were read for the shape, not copied:

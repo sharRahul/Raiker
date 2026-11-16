@@ -1,5 +1,41 @@
 # Fixed items
 
+## FIXED-1534 — Every research turn raised a "security anomaly" notice for Web
+
+**Severity: Low. Area: Security monitor / web. Status: Fixed 2026-11-16 (found in regular use).** Each page Raiker read on a site it had not read before raised *Security anomaly on 'Web' — contacted a host it had not used before*. For Web that is its function, and its destinations are already governed by the web-access policy (HTTPS, private-address guard, blocklist). The new-host rule no longer applies to the Web subject; it still applies to connectors, plugins and every other subject. Evidence: `tests/test_capability_containment.py::test_reading_a_new_site_is_not_an_anomaly_for_web_but_is_for_a_connector`.
+
+## FIXED-1533 — Build was offered a command tool it could never use
+
+**Severity: Medium. Area: Build / tools. Status: Fixed 2026-11-16 (found in regular use).** `run_command` runs only under a per-conversation command grant, which no screen can create; a model asked to run tests tried it first, was refused `command_grant_required`, and the turn recorded a failed step before falling back to `shell`. A turn is now offered `run_command` (and a tool search returns it) only when its conversation holds an unexpired grant; otherwise the model goes straight to `shell`, which asks before each command. Evidence: `tests/test_run_command_offered_with_grant.py`; RU-J4.
+
+## FIXED-1532 — Web research was auto-paused mid-turn as a "tool substitution"
+
+**Severity: High. Area: Security monitor / web. Status: Fixed 2026-11-16 (found in regular use).** Asked for a Kyoto trip plan, the model searched the web and then fetched a travel page; the capability monitor raised `tool_set_changed` (high), auto-paused **Web**, refused the next fetches as `capability_contained`, and the turn ended *Not done* with no plan. The rule exists to catch an MCP server swapping the tools it advertises; per-call telemetry knows only the one operation each call used, so any second operation (search, then fetch) looked like a substitution. Per-call telemetry no longer claims an advertised tool set (the operation is still recorded); new-host, volume, sensitive-value and error-burst rules are unchanged, and MCP connections keep their own monitor. Evidence: `tests/test_capability_containment.py::test_searching_then_fetching_a_page_is_not_a_tool_substitution` (fails without the fix); RU-J1.
+
+## FIXED-1531 — Allowing a memory on a fresh account saved nothing, behind a sentence nobody could read
+
+**Severity: High. Area: Approvals / memory. Status: Fixed 2026-11-16 (found in regular use).** *Please remember that … my dentist is Dr. Okafor, usually on Thursdays* raised an approval card that read *"Records an action-bound approval request only. Approval resolution is metadata-only and does not execute the action."* The owner chose **Allow once**; Memory store is off on a fresh account, so the decision was recorded (`executes_action: false`), nothing was stored, and the model had already said *"I'll store that information for you."* A later chat recalled the dentist only by searching the old conversation, without the day. When approving cannot carry an action out, the card and the model now read *"Approving will not do this: the Memory store permission is off, so your decision is recorded and nothing is changed. Turn on Memory store in Permissions, then ask again."* — the permission named the way Permissions names it. Evidence: `tests/test_record_only_approval_copy.py`; RU-J5.
+
+## FIXED-1530 — A command whose program was not installed read as a sandbox limitation
+
+**Severity: Medium. Area: Build / commands. Status: Fixed 2026-11-16 (found in regular use).** On Ubuntu, which ships `python3` and no `python`, a model's approved `python test_pricing.py` was refused `native_sandbox_executable_unreachable`; the model was told only the code, and told the owner the sandbox could not run tests. Measured on the same host, `python3 -m unittest -q` ran in the sandbox and passed 3 tests. The failed command now says which program is missing and which installed one to use (`python` → `python3`, `pip` → `pip3`, `pytest` → `python3 -m pytest`). Evidence: `tests/test_shell_missing_program_hint.py`; RU-J4.
+
+## FIXED-1529 — A turn's receipt read "1 repository read read"
+
+**Severity: Low. Area: Chat / receipt. Status: Fixed 2026-11-16 (found in regular use).** The repository family's noun already ended in *read*, and the receipt appends *read*. It is now *1 repository check read*. Evidence: the receipt tests.
+
+## FIXED-1528 — On a fresh install, Build wrote code but could never run its tests
+
+**Severity: High. Area: Build / permissions. Status: Fixed 2026-11-16 (found in regular use).** *Set up for Build* turned on file writes, patches, Git and rewind, but not command execution, and `run_command`'s per-conversation command grant has no screen at all. A first Build turn on Linux — with the sandbox fully enforced — wrote `pricing.py` and its tests, was refused `command_grant_required` four times, and told the owner to run the tests by hand. *Set up for Build* now includes **Run commands** (`shell_execution`), with its Tier 2 threat-model acknowledgement taken from an explicit checkbox in the preset (*I understand Build can run commands… Each command asks me first*); the button stays disabled until it is ticked. Each command still asks before it runs and runs only inside an enforced sandbox. Evidence: `capabilityModel.test.ts`; RU-J4.
+
+## FIXED-1527 — A complete answer read "Not done" because a read the model recovered from had failed
+
+**Severity: Medium. Area: Runtime / turn outcome. Status: Fixed 2026-11-16 (found in regular use).** With a budget CSV attached, a model called `read_file` on the attachment's name, the read failed (`not_found`), and the model then answered correctly from the attachment — but the turn closed as *failed* and Chat read *Not done*, because the last tool that ran had failed. A failed **read-only** call followed by a closing answer now completes the turn; the failed step stays visible (*Partially completed*). A failed write, command or other action still fails the turn, and a failed read with no answer after it still fails. Evidence: `tests/test_recovered_read_failure.py`; RU-J3.
+
+## FIXED-1526 — An attached document was described in a way that sent the model looking for a file
+
+**Severity: Low. Area: Context / attachments. Status: Fixed 2026-11-16 (found in regular use).** The uploaded-document header now says the full text follows and that it is not a file in the workspace, so file tools are not needed. Evidence: `tests/test_context_gatherer_document_header.py`.
+
 ## FIXED-1525 — A short Library title related by meaning fell under a fixed threshold
 
 **Severity: Low. Area: Work / Library. Status: Fixed 2026-11-19 (found live).** Measured with `nomic-embed-text`, related Library titles score 0.51–0.68 and unrelated ones up to 0.48, so the shared 0.6 cut-off missed *Poster for the Kyoto cherry blossom trip* for *Japan holiday* (0.586). Library search now uses a 0.52 floor and keeps only matches within 0.03 of the best, and only when the best leads the median candidate by 0.08 (a library of fewer than four items is judged by the floor). Evidence: `tests/test_library_search.py`; RT-1119-05.
@@ -1564,7 +1600,7 @@ runtime dependencies; they cannot be reported as included.
 
 **Evidence.** `tests/test_voice_v1.py`, `tests/test_desktop_build.py`,
 `tests/test_voice_live.py::test_packaged_kokoro_worker_uses_verified_assets_and_local_token`;
-[personal scope and run record](LINUX_BETA_2026_11_09.md#owner-scope-and-kokoro-only-personal-build).
+[personal scope and run record](BETA_RELEASE_PLAN.md#owner-scope-and-kokoro-only-personal-build).
 
 ## FIXED-1377 — Release matrix missed the completed onboarding screenshot
 
@@ -1598,7 +1634,7 @@ embedded-image server that gets no renderer request. A focused production-style
 startup trace no longer shows the public IPv4 connections. It still records
 Chromium's non-sending IPv6 UDP reachability probe; this is documented, not
 silently removed from evidence or called a DNS query. Full fresh-candidate
-egress acceptance remains open. [Run record](LINUX_BETA_2026_11_09.md#electron-network-process-follow-through).
+egress acceptance remains open. [Run record](BETA_RELEASE_PLAN.md#electron-network-process-follow-through).
 
 ## FIXED-1375 — Reading ChatGPT status started an unrequested network-capable sidecar
 
@@ -1633,7 +1669,7 @@ The journal records newly created directories before project writes. Tested
 with deterministic ENOSPC and a real dedicated 16 MiB tmpfs filled to 98.02%
 (`tests/test_storage_exhaustion_live.py`); originals restored exactly.
 The hard-kill regression still kills after actual project writes, independently
-of how many backup copies precede them. [Run record](LINUX_BETA_2026_11_09.md).
+of how many backup copies precede them. [Run record](BETA_RELEASE_PLAN.md#appendix-b--linux-qualification-record-2026-11-09).
 
 ## FIXED-1372 — A fresh local-only profile downloaded public feeds at startup
 
@@ -1644,7 +1680,7 @@ Settings explains what Update now downloads and when later refreshes occur.
 Feed writes invalidate their cache, so a rapid failed refresh cannot keep
 showing an old success because of an equal filesystem timestamp.
 Covered by `tests/test_site_reputation.py`. Full exact-candidate 30-minute
-egress qualification remains open. [Run record](LINUX_BETA_2026_11_09.md).
+egress qualification remains open. [Run record](BETA_RELEASE_PLAN.md#appendix-b--linux-qualification-record-2026-11-09).
 
 ## FIXED-1373 — Whisper models still had no immutable download pins
 
@@ -1653,7 +1689,7 @@ and sizes resolved from Hugging Face. The voice suite passes with Windows
 listening installability and Linux's missing-engine refusal tested separately.
 Amy's ONNX digest is pinned but its licence remains unreviewed, so it stays
 refused. This closes model pinning only, not managed Voice V1, Piper's JSON
-sidecar or packaged speech qualification. [Review](LINUX_BETA_2026_11_09.md#voice-licence-and-distribution-review).
+sidecar or packaged speech qualification. [Review](BETA_RELEASE_PLAN.md#voice-licence-and-distribution-review).
 
 ## FIXED-1374 — RPM used unbounded level-9 multithreaded xz compression
 
@@ -1663,7 +1699,7 @@ ceiling that compressor fails while single-threaded `w6.xzdio` succeeds.
 RPM configuration now explicitly selects xz level 6. The historical terminating
 signal is unproved; this is a verified resource-bound correction, not a claim
 of a kernel OOM diagnosis. All-format and installed-candidate acceptance are
-tracked separately in the [run record](LINUX_BETA_2026_11_09.md).
+tracked separately in the [run record](BETA_RELEASE_PLAN.md#appendix-b--linux-qualification-record-2026-11-09).
 
 ## Windows sandboxed runs were one at a time, so background runs were impossible
 
@@ -3354,6 +3390,15 @@ file you can open. The two capture sets that remain — `screenshots/pages/` and
 | [FIXED-1382](#fixed-1382--linux-filesystem-flags-broke-windows-type-checking) | Low | Platform portability | Fixed 2026-11-09 |
 | [FIXED-1383](#fixed-1383--keyboard-start-evidence-depended-on-retired-receipt-wording) | Low | Beta live tests | Fixed 2026-11-09 |
 | [FIXED-1384](#fixed-1384--model-downloads-checked-redirect-hosts-after-contacting-them) | High | Model and speech downloads | Fixed 2026-11-09 |
+| [FIXED-1534](#fixed-1534--every-research-turn-raised-a-security-anomaly-notice-for-web) | Low | Security monitor / web | Fixed 2026-11-16 |
+| [FIXED-1533](#fixed-1533--build-was-offered-a-command-tool-it-could-never-use) | Medium | Build / tools | Fixed 2026-11-16 |
+| [FIXED-1532](#fixed-1532--web-research-was-auto-paused-mid-turn-as-a-tool-substitution) | High | Security monitor / web | Fixed 2026-11-16 |
+| [FIXED-1531](#fixed-1531--allowing-a-memory-on-a-fresh-account-saved-nothing-behind-a-sentence-nobody-could-read) | High | Approvals / memory | Fixed 2026-11-16 |
+| [FIXED-1530](#fixed-1530--a-command-whose-program-was-not-installed-read-as-a-sandbox-limitation) | Medium | Build / commands | Fixed 2026-11-16 |
+| [FIXED-1529](#fixed-1529--a-turns-receipt-read-1-repository-read-read) | Low | Chat / receipt | Fixed 2026-11-16 |
+| [FIXED-1528](#fixed-1528--on-a-fresh-install-build-wrote-code-but-could-never-run-its-tests) | High | Build / permissions | Fixed 2026-11-16 |
+| [FIXED-1527](#fixed-1527--a-complete-answer-read-not-done-because-a-read-the-model-recovered-from-had-failed) | Medium | Runtime / turn outcome | Fixed 2026-11-16 |
+| [FIXED-1526](#fixed-1526--an-attached-document-was-described-in-a-way-that-sent-the-model-looking-for-a-file) | Low | Context / attachments | Fixed 2026-11-16 |
 | [FIXED-1525](#fixed-1525--a-short-library-title-related-by-meaning-fell-under-a-fixed-threshold) | Low | Work / Library | Fixed 2026-11-19 |
 | [FIXED-1524](#fixed-1524--threads-said-conversations-mention-a-search-they-matched-only-by-meaning) | Low | Work / Threads | Fixed 2026-11-19 |
 | [FIXED-1523](#fixed-1523--personalisation-said-it-never-changes-raikers-instructions-above-the-personas-card) | Low | Settings | Fixed 2026-11-19 |
@@ -35867,7 +35912,7 @@ installation cases in `tests/test_api_contract_responses.py`.
 
 **Fixed.** The release product is the desktop package: `scripts/build_desktop_app.py` freezes the host (with the command runner and the in-app guide), writes `installation.json`, smoke-tests the frozen host, and packages it with the pinned electron-builder as NSIS + MSI (Windows), dmg + zip (macOS Apple silicon and Intel), and AppImage + deb + rpm (Linux x86-64 and ARM64). `.github/workflows/desktop-package.yml` builds, installs, smoke-tests, opens the installed window, completes onboarding and uninstalls on each platform's own runner; `release.yml` calls it with the signing identities and publishes `desktop-<channel>.json`. First run gained This device, Permissions and Check stages; the vault key moved to the OS key store; desktop updates verify a signed manifest before installing.
 
-**Evidence.** [Release acceptance matrix](RELEASE_ACCEPTANCE_MATRIX.md): every native target PASS in CI run 39041854653 (commit `914b60a`), including the real Windows and macOS windows this item asked for. Signing with real identities is unexercised until the release owner adds them; the pipeline refuses to publish without them.
+**Evidence.** [Release acceptance matrix](BETA_RELEASE_PLAN.md#appendix-d--desktop-package-acceptance-matrix): every native target PASS in CI run 39041854653 (commit `914b60a`), including the real Windows and macOS windows this item asked for. Signing with real identities is unexercised until the release owner adds them; the pipeline refuses to publish without them.
 
 ---
 
@@ -40167,7 +40212,7 @@ MT-04 assert neither *enable its gate* nor *could not be reached* appears.
 
 **Severity: Medium. Area: Goals / Chat. Status: Fixed 2026-10-26.**
 
-**Observed.** [06, QUI-F03](quiet-ui/README.md#documents) asked Raiker to notice an aim that comes up in more than one conversation and offer to track it, once, never again after **Not now**. Goals could only be written from Work › Goals, so an aim stated in Chat stayed in the transcript.
+**Observed.** [06, QUI-F03](QUIET_UI_PLAN.md#documents) asked Raiker to notice an aim that comes up in more than one conversation and offer to track it, once, never again after **Not now**. Goals could only be written from Work › Goals, so an aim stated in Chat stayed in the transcript.
 
 **Fixed.** Two ways in, both ending at the Goals form the owner already uses; nothing runs until the owner saves the goal, accepts it and starts it. **Make this a goal** in a finished turn's actions opens Work › Goals filled in from the request, with *Filled in from “…”* naming the request and the conversation's project kept (`goalHandoff.ts`). `raiker/goals/noticing.py` compares the newest request with the owner's earlier conversations by shared content words (at least three, and at least half of the shorter request), skips aims already a goal and aims dismissed before, and `GET /api/goals/suggestion` answers with at most one. `GoalSuggestion.svelte` shows it under the conversation as *This looks like an ongoing goal. Track it?* with **Track it** and **Not now**; **Not now** is kept (migration `RAIKER-2124-goal-suggestion-dismissals`) so the same aim is never offered again. Matching is by words, not by a model, so it reads nothing outside the owner's own conversations.
 
@@ -40624,7 +40669,7 @@ showing loading, and manifest failures had no alert semantics or submit guard.
 The per-account editor also claimed rollback without confirming it.
 
 **Fixed.** Implemented the 15-item connection slice in
-[07 Quick fixes and quality](quiet-ui/07_QUICK_FIXES_AND_QUALITY.md#2026-11-06--qui-g06-connection-recovery).
+[07 Quick fixes and quality](QUIET_UI_PLAN.md#2026-11-06--qui-g06-connection-recovery).
 Each error names the action and affected object, retains HTTP/refusal evidence
 and gives a safe next check. Transport failures preserve read-back guidance.
 Connections offers **Refresh connections**, including inside a failed Add
@@ -40686,7 +40731,7 @@ squeezed their descriptions, and Hugging Face exceeded its dialog's width.
 Runtime settings mounted serving, folders, defaults, tuning and activity at once.
 
 **Fixed.** Applied the documented QUI-L03/L04/L08 refinement in
-[01 Layout system and pages](quiet-ui/01_LAYOUT_SYSTEM_AND_PAGES.md#2026-11-06--owner-requested-models-simplification).
+[01 Layout system and pages](QUIET_UI_PLAN.md#2026-11-06--owner-requested-models-simplification).
 The dropdown now uses the shared cog icon. Provider choices are searchable,
 compact rows; permissions/network and optional installation tools are
 available in disclosures. Privacy, cost and readiness remain reviewable, and
@@ -40736,7 +40781,7 @@ confirmation content was unbounded, and heading/action groups could squeeze
 each other. Field states and keyboard-focused table rows lacked shared styles.
 
 **Fixed.** Applied the fifteen-point refinement in
-[08 Brand and visual system](quiet-ui/08_BRAND_AND_VISUAL_SYSTEM.md#2026-11-06--shared-ui-refinement-across-pages-and-subpages).
+[08 Brand and visual system](QUIET_UI_PLAN.md#2026-11-06--shared-ui-refinement-across-pages-and-subpages).
 Empty states keep a plain icon, title and next action. Fine boundaries replace
 attention/callout stripes; quotation rules are one pixel, and reasoning/recall
 use neutral fill. Tabs use compact rounded rectangles with focus drawn inside
@@ -40835,7 +40880,7 @@ is preserved. Update status has a retry action that clears stale error text
 when the host answers.
 
 **Evidence.** See the 15-item checklist in
-[07 Quick fixes and quality](quiet-ui/07_QUICK_FIXES_AND_QUALITY.md#2026-11-06--qui-g06-settings-recovery)
+[07 Quick fixes and quality](QUIET_UI_PLAN.md#2026-11-06--qui-g06-settings-recovery)
 and [running-host evidence](../architecture/WEB_APP_LIVE_TEST.md#result--2026-11-06-qui-g06-settings-recovery).
 
 **Found during live review.** The provider helper could wait for a missing Add
@@ -40864,7 +40909,7 @@ sandbox behavior is unchanged. GitHub's Windows job provides the host evidence.
 Projects used generic status-only errors, discarded known rows on a failed
 refresh and rendered failed task/image reads as empty lists and zero counts.
 The fifteen action/read paths in
-[07 Quick fixes and quality](quiet-ui/07_QUICK_FIXES_AND_QUALITY.md#2026-11-06--qui-g06-projects-recovery)
+[07 Quick fixes and quality](QUIET_UI_PLAN.md#2026-11-06--qui-g06-projects-recovery)
 now name the affected state and a safe next step, retain HTTP/refusal evidence
 and preserve creation, attachment, context and move drafts. Unconfirmed writes
 ask the owner to inspect saved state before repeating them. Known conflicts
@@ -40913,7 +40958,7 @@ project that was never saved. A failed Sessions delete cleared nothing but
 offered no way to check.
 
 The fifteen paths in
-[07 Quick fixes and quality](quiet-ui/07_QUICK_FIXES_AND_QUALITY.md#2026-11-06--qui-g06-approvals-library-and-sessions-recovery)
+[07 Quick fixes and quality](QUIET_UI_PLAN.md#2026-11-06--qui-g06-approvals-library-and-sessions-recovery)
 now use `errorCopy.failure`: what failed, what it affected and one safe step,
 with the HTTP status and refusal code as evidence. Unconfirmed decisions,
 answers, replacements, continuations, unpins, moves and deletes ask the owner
@@ -40955,7 +41000,7 @@ was one small line, an upload showed nothing until it finished, and building
 on an earlier answer meant copying and pasting it.
 
 **Fixed.** The fifteen items of
-[03, Composer control deck](quiet-ui/03_WELCOME_HOME_AND_CHAT.md#2026-11-07--composer-control-deck),
+[03, Composer control deck](QUIET_UI_PLAN.md#2026-11-07--composer-control-deck),
 under the owner's 2026-11-07 decisions:
 
 * The shared frame is a floating glass capsule (`--glass-surface`,
@@ -40999,7 +41044,7 @@ The composer grew to about eighteen lines. Build's dictation was only in its
 **+** menu, while Chat and Design showed a microphone.
 
 **Fixed.** The owner's palette and priorities, recorded in
-[08, Dark theme luminance ladder](quiet-ui/08_BRAND_AND_VISUAL_SYSTEM.md#2026-11-07--dark-theme-luminance-ladder):
+[08, Dark theme luminance ladder](QUIET_UI_PLAN.md#2026-11-07--dark-theme-luminance-ladder):
 * the canvas, sidebar, cards and composer, hover wells, and menus and dialogs
   are five ordered steps;
 * new role tokens: `--sidebar-bg`, `--dialog-bg`, `--nav-selected`,
@@ -41035,7 +41080,7 @@ turn had been running. Once a turn was stopped, the only way on was to retype
 the request.
 
 **Fixed.** The fifteen items of
-[03, Composer execution states](quiet-ui/03_WELCOME_HOME_AND_CHAT.md#2026-11-07--composer-execution-states),
+[03, Composer execution states](QUIET_UI_PLAN.md#2026-11-07--composer-execution-states),
 in Chat and Build:
 
 * Send becomes **Stop safely** in its own place while the prompt is empty, and
@@ -42332,7 +42377,7 @@ non-critical approval.
 request claimed nothing changed. Goal polling cleared an action error before
 the owner could act on it, and refreshing Skills discarded the last known list.
 
-**Fixed.** The [20-item implementation checklist](quiet-ui/07_QUICK_FIXES_AND_QUALITY.md#2026-11-09--qui-g06-skills-goals-rewind-and-github-recovery)
+**Fixed.** The [20-item implementation checklist](QUIET_UI_PLAN.md#2026-11-09--qui-g06-skills-goals-rewind-and-github-recovery)
 names each failed operation and a recovery step. Uncertain writes advise
 checking the saved state before repeating them; drafts stay available to copy.
 Goal polling retains action notices and Skills retains its last known list.
@@ -42353,7 +42398,7 @@ failure appeared as an empty list. Image lifecycle errors asserted unchanged
 state despite a lost response being ambiguous; image and model read failures
 had no direct recovery control.
 
-**Fixed.** The [20-item checklist](quiet-ui/07_QUICK_FIXES_AND_QUALITY.md#2026-11-09--beta-recovery-follow-through-on-this-pc)
+**Fixed.** The [20-item checklist](QUIET_UI_PLAN.md#2026-11-09--beta-recovery-follow-through-on-this-pc)
 implements the remaining Messaging and Design image recovery slice. Channel
 mutations return an explicit success result so only confirmed writes dismiss
 the editor. Reads retain last-known profiles/images with a stale warning;

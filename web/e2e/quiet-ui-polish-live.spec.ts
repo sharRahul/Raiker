@@ -1,6 +1,6 @@
 /**
  * Quiet UI — the brand, Diagnostics and Recovery, the pages that already fit,
- * and the open items of earlier rounds (docs/plans/quiet-ui/README.md, round of
+ * and the open items of earlier rounds (docs/plans/QUIET_UI_PLAN.md, round of
  * 2026-10-25), against a running host and a real hosted model.
  *
  * Prerequisites:

@@ -13,7 +13,7 @@ installed, smoke-tested, onboarded and uninstalled on each platform's own
 runner. The decisions are in
 [ADR-0003](../adr/ADR-0003-desktop-distribution.md) (DIST-01 – DIST-12),
 the process in [Releasing](../guide/releasing.md), and the per-platform
-evidence in the [release acceptance matrix](../plans/RELEASE_ACCEPTANCE_MATRIX.md).
+evidence in the [release acceptance matrix](../plans/BETA_RELEASE_PLAN.md#appendix-d--desktop-package-acceptance-matrix).
 Where this page describes the payload installers below, that path is retained
 for headless servers and is no longer published.
 

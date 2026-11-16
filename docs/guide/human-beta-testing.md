@@ -314,7 +314,7 @@ This is the human-only companion to [the testing plan](../plans/TESTING.md),
 not a replacement for it. Link returned results to their exact candidate and
 to T-01/T-14 (understanding/accessibility), VD-1/V-01 (physical audio), approved
 connector consent, UX readability and the owner's acceptance decision.
-The [personal scope](../plans/PERSONAL_BETA_SCOPE.md) is at most five users,
+The [personal scope](../plans/BETA_RELEASE_PLAN.md#appendix-a--owner-scope-2026-11-09) is at most five users,
 PC first. This guide does not introduce a mandatory three-person study.
 
 Do not assign the following as novice “human-only” tests: BUG-360's legacy

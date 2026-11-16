@@ -1,4 +1,289 @@
-# Raiker Web UI/UX Design Plan: "Control Deck" (corrected)
+# Design history
+
+**Historical record.** This file keeps superseded design plans in one place so
+the current architecture documents stay short. Nothing here is maintained
+against the code: for what is implemented now read
+[Implementation status](IMPLEMENTATION_STATUS.md), for the components and
+governed flow read [Architecture](ARCHITECTURE.md), and for how Raiker compares
+with reference platforms read
+[Reference platform compatibility](REFERENCE_PLATFORM_COMPATIBILITY.md).
+
+Each section below was a separate document until 2026-11-16 and is kept
+verbatim under its original title.
+
+## Build order (implementation sequence)
+
+> Merged from `docs/architecture/DESIGN_HISTORY.md` on 2026-11-16; the original file was removed.
+
+**Historical record.** This document defines the dependency-safe order Raiker
+was implemented in. It is not maintained against the code; for what is
+implemented now read [`IMPLEMENTATION_STATUS.md`](IMPLEMENTATION_STATUS.md), and
+for per-capability executor status read
+[`RUNTIME_EXECUTORS_SPEC.md`](RUNTIME_EXECUTORS_SPEC.md).
+
+It makes the build sequence explicit enough that a builder agent does not
+implement UI, tools, memory, plugins, channels, or storage lifecycles before the
+contracts and safety rails exist. (It once complemented a
+`docs/foundation/09_IMPLEMENTATION_PLAN.md` that predates this repository and was
+never committed to it; the phase detail it referred to is now in
+[`FULL_PHASE_IMPLEMENTATION_BLUEPRINT.md`](FULL_PHASE_IMPLEMENTATION_BLUEPRINT.md).)
+
+Phase order controls implementation sequencing only. It does not create an interface hierarchy.
+
+---
+
+### Required Reading Order
+
+Every implementation task must start with this sequence:
+
+```text
+README.md
+  -> docs/architecture/IMPLEMENTATION_STATUS.md
+  -> docs/architecture/FEATURE_COVERAGE_MATRIX.md
+  -> docs/architecture/FULL_PHASE_IMPLEMENTATION_BLUEPRINT.md
+  -> docs/architecture/DESIGN_HISTORY.md
+  -> docs/architecture/ARCHITECTURE.md
+  -> docs/architecture/CONTRACTS.md
+  -> docs/architecture/API_AND_CONTRACT_SCHEMAS.md
+  -> docs/architecture/EVENT_CATALOG.md
+  -> docs/architecture/RUNTIME_STATE_MACHINE.md
+  -> docs/architecture/STORAGE_DATABASE_AND_SEARCH_SPEC.md
+  -> docs/architecture/SECURITY_AND_POLICY.md
+  -> docs/architecture/THREAT_MODEL.md
+  -> docs/architecture/NON_GOALS_AND_BOUNDARIES.md
+  -> docs/architecture/FULL_PHASE_IMPLEMENTATION_BLUEPRINT.md
+  -> docs/architecture/FULL_PHASE_IMPLEMENTATION_BLUEPRINT.md
+  -> docs/architecture/IMPLEMENTATION_STATUS.md
+  -> docs/architecture/IMPLEMENTATION_STATUS.md
+  -> docs/architecture/IMPLEMENTATION_STATUS.md
+  -> docs/architecture/IMPLEMENTATION_STATUS.md
+  -> docs/architecture/IMPLEMENTATION_STATUS.md
+  -> docs/architecture/IMPLEMENTATION_STATUS.md
+  -> docs/architecture/RUNTIME_ORCHESTRATION_SPEC.md
+  -> docs/architecture/TOOLS_AND_PERMISSIONS_SPEC.md
+  -> docs/architecture/COMMANDS_AND_INTERACTIVE_MODE_SPEC.md
+  -> docs/architecture/MODEL_RUNTIME_AND_LOCAL_INFERENCE.md
+  -> docs/architecture/MODEL_PROVIDER_CONTRACT.md
+  -> docs/architecture/CHANNELS_SPEC.md
+  -> docs/UI_UX_DESIGN_SPEC.md
+  -> docs/architecture/MEMORY_AND_CONTEXT_STRATEGY.md
+  -> docs/architecture/MEMORY_GOVERNANCE_RULES.md
+  -> docs/architecture/PLUGIN_SYSTEM_SPEC.md
+  -> docs/architecture/PLUGIN_MANIFEST_SCHEMA.md
+  -> docs/architecture/RAIKER_TOOL_AND_PLUGIN_CATALOG.md
+  -> docs/architecture/ACCEPTANCE_TESTS_BY_PHASE.md
+  -> docs/architecture/DESIGN_HISTORY.md
+  -> docs/architecture/VERIFICATION_PLAN.md
+  -> docs/architecture/LOCAL_VALIDATION_GATE.md
+  -> config/model-profiles.json
+  -> config/channel-connectors.json
+```
+
+A builder must not skip the status, schema, event, runtime state, storage, security, threat-model, non-goals, acceptance-test, verification, or registry docs because they are the controls that keep the implementation deterministic.
+
+---
+
+### Phase 1 Dependency Graph
+
+```text
+RAIKER-0001 scaffold
+  -> RAIKER-0002 dev tooling
+    -> RAIKER-0101 contracts
+      -> RAIKER-0102 IDs/timestamps
+        -> RAIKER-0201 SQLite bootstrap
+        -> RAIKER-0202 JSONL event writer
+        -> RAIKER-0203 built-in registries
+          -> RAIKER-0301 static policy config
+            -> RAIKER-0302 policy engine
+              -> RAIKER-0401 tool broker routing
+                -> RAIKER-0402 read_file
+                -> RAIKER-0403 list_directory
+                -> RAIKER-0404 glob/grep
+                -> RAIKER-0405 approval-gated local action placeholder
+          -> RAIKER-0501 mock model provider
+            -> RAIKER-0502 model router interface
+            -> RAIKER-0503 terminal launch profile resolution
+          -> RAIKER-0601 runtime states
+            -> RAIKER-0602 classifier/planner
+            -> RAIKER-0603 verification stub
+              -> RAIKER-0701 agent gateway
+                -> RAIKER-0702 session manager
+                -> RAIKER-0703 checkpoint service
+                  -> RAIKER-0801 global raiker launch
+                  -> RAIKER-0802 terminal prompt path
+                  -> RAIKER-0803 terminal approval behaviour
+                  -> RAIKER-0804 terminal registry panels
+                    -> RAIKER-0901 end-to-end smoke tests
+                    -> RAIKER-0902 documentation/validation report
+```
+
+---
+
+### Non-Negotiable Sequencing Rules
+
+1. Contracts before runtime.
+2. Event envelope before event writer.
+3. SQLite bootstrap before event indexing.
+4. Policy engine before tool execution.
+5. Tool broker before any filesystem/search/local-command action.
+6. Mock model provider before model routing tests.
+7. Runtime state machine before terminal prompt orchestration.
+8. Agent gateway before any client-specific prompt path.
+9. Checkpoint stub before terminal end-to-end completion criteria.
+10. Equal-interface metadata before first terminal-specific implementation.
+11. Lifecycle metadata contracts before lifecycle metadata storage.
+12. Lifecycle metadata storage before lifecycle summaries.
+13. Lifecycle summaries before any future lifecycle approval handoff.
+14. Lifecycle approval handoff before any future runtime graph/memory/rollback execution work.
+
+If a builder needs to violate this order for bootstrap reasons, it must document the temporary exception in the PR and add a follow-up task that restores the canonical order.
+
+---
+
+### Phase 1 Build Slices
+
+| Slice | Task IDs | Output | Must not do |
+|---|---|---|---|
+| Foundation | RAIKER-0001 to RAIKER-0002 | Package, tests, dev tooling | No runtime behaviour. |
+| Contracts | RAIKER-0101 to RAIKER-0102 | Versioned schemas and ID helpers | No tool execution. |
+| Storage/events | RAIKER-0201 to RAIKER-0203 | SQLite, JSONL, registries | No active channels or hosted providers. |
+| Policy | RAIKER-0301 to RAIKER-0302 | Static allow/deny/needs_approval decisions | No command execution. |
+| Tools | RAIKER-0401 to RAIKER-0405 | Brokered read/list/glob/grep plus approval placeholder | No direct file access from runtime. |
+| Models | RAIKER-0501 to RAIKER-0503 | Mock provider and profile resolution | No network or hosted provider calls. |
+| Runtime | RAIKER-0601 to RAIKER-0603 | Deterministic state machine and verifier stub | No parallel agent teams. |
+| Gateway/session/checkpoint | RAIKER-0701 to RAIKER-0703 | Shared gateway and checkpoint stub | No client bypass path. |
+| Terminal MVP | RAIKER-0801 to RAIKER-0804 | First terminal client through gateway | No terminal-only architecture. |
+| Validation | RAIKER-0901 to RAIKER-0902 | Smoke tests and report | No unverified completion claim. |
+
+---
+
+### Phase 2 Dependency Graph
+
+```text
+RAIKER-1001 Phase 2 plan
+  -> RAIKER-1002 CI baseline
+    -> RAIKER-1101 task contract + storage
+      -> RAIKER-1102 task manager
+        -> RAIKER-1103 task events
+    -> RAIKER-1601 event query service
+      -> RAIKER-1602 /events command
+    -> RAIKER-1701 /status and /tasks
+    -> RAIKER-1501 checkpoint timeline
+  -> RAIKER-1201 side-question contract
+    -> RAIKER-1202 side-question runtime
+  -> RAIKER-1301 interrupt/steer contracts
+    -> RAIKER-1302 safe-boundary handling
+  -> RAIKER-1401 approval inbox
+    -> RAIKER-1402 approval commands
+  -> RAIKER-1502 checkpoint restore/fork
+  -> RAIKER-1801 stat_path/diff_files
+    -> RAIKER-1802 write/edit/patch with snapshots
+  -> RAIKER-1901 git wrappers
+  -> RAIKER-2001 provider health check
+    -> RAIKER-2002 llama.cpp server detection
+  -> RAIKER-2101 memory candidate listing
+    -> RAIKER-2201 integration validation
+```
+
+---
+
+### Phase 2 Build Slices
+
+| Slice | Task IDs | Output | Must not do |
+|---|---|---|---|
+| Foundation | RAIKER-1001 to RAIKER-1002 | CI, status ledger, build plan | No runtime behaviour change. |
+| Task management | RAIKER-1101 to RAIKER-1103 | Task storage, manager, events | No tool execution. |
+| Event viewer | RAIKER-1601 to RAIKER-1602 | Event query service and /events | No event log mutation. |
+| Terminal inspection | RAIKER-1701, RAIKER-1501 | /status, /tasks, /checkpoints | No restore/fork execution. |
+| Side questions | RAIKER-1201 to RAIKER-1202 | Child-turn contract and runtime | No active task mutation. |
+| Interrupt/steer | RAIKER-1301 to RAIKER-1302 | Interrupt contracts and safe-boundary | No silent cancellation. |
+| Approvals | RAIKER-1401 to RAIKER-1402 | Approval inbox and commands | No auto-approval. |
+| File tools | RAIKER-1801 to RAIKER-1802 | stat_path, diff_files, write/patch proposal | No unrestricted file mutation. |
+| Git wrappers | RAIKER-1901 | Git status/diff/log with policy | No git push/merge without approval. |
+| Model providers | RAIKER-2001 to RAIKER-2002 | Health check, llama.cpp server detection | No hosted model calls. |
+| Memory | RAIKER-2101 | Memory candidate listing | No durable memory writes. |
+| Validation | RAIKER-2201 | Integration tests and status update | No unverified completion claim. |
+
+---
+
+### Phase 3 Storage Lifecycle Build Order
+
+Slice G is the current deepest Phase 3 storage lifecycle preparation slice. Future agents must follow this sequence:
+
+```text
+Slice C graph/codemap dry-run planning
+  -> Slice D semantic-memory review queue
+    -> Slice E approval preview contracts
+      -> Slice F approval audit + rollback planning
+        -> Slice G storage lifecycle metadata
+          -> Slice H metadata-only retention/cleanup-preview/approval-handoff planning
+```
+
+Slice G may create and inspect metadata records only. It must not be used as a trigger for graph indexing, semantic/vector memory writes, embeddings, rollback execution, plugin execution, channels, subagents, or remote/container/cloud execution.
+
+---
+
+### Builder Stop Conditions
+
+A builder must stop and update documentation before coding if:
+
+- a contract field is missing or ambiguous;
+- an event name is not in `docs/architecture/EVENT_CATALOG.md`;
+- a state transition is not allowed by `docs/architecture/RUNTIME_STATE_MACHINE.md`;
+- a storage table or column is missing from the storage spec;
+- a tool lacks policy, failure modes, or output limits;
+- an approval flow is not action-bound;
+- a lifecycle metadata record would imply runtime execution;
+- a later-phase feature would need active runtime wiring;
+- a client would bypass the Agent Gateway;
+- a change would make terminal/TUI canonical over another enabled primary interface.
+
+---
+
+### PR Completion Gate
+
+Every implementation PR must include:
+
+```markdown
+## Task IDs
+- RAIKER-....
+
+## Build order position
+- Slice: ...
+- Depends on: ...
+
+## Contracts/events/storage/policy affected
+- Contracts: ...
+- Events: ...
+- Storage: ...
+- Policy: ...
+
+## Validation
+- [ ] python -m pytest
+- [ ] python -m ruff check .
+- [ ] python -m mypy raiker apps tests
+- [ ] python scripts/validate_phase_status.py
+- [ ] raiker smoke test, if terminal path affected
+
+## Invariants
+- [ ] No client bypasses Agent Gateway
+- [ ] No tool executes without policy decision
+- [ ] Equal primary-interface invariant preserved
+- [ ] Phase-scheduled features remain disabled unless this task explicitly enables them
+- [ ] Slice G lifecycle metadata remains metadata-only unless a later approved task explicitly changes that with docs, tests, policy, rollback, and CI evidence
+```
+
+### Phase 3 Slice H lifecycle retention reference
+
+Slice H is metadata-only retention, cleanup-preview, and approval-handoff planning. Keep detailed contract and safety requirements in `docs/architecture/IMPLEMENTATION_STATUS.md`; this document only references Slice H where its local status, validation, command, event, or storage responsibility applies.
+
+### Phase 3 Slice I lifecycle evidence reference
+
+Slice I lifecycle evidence bundles, policy simulations, JSON exports, CLI surfaces, SQLite metadata tables, and disabled-runtime validation are centralized in `docs/architecture/IMPLEMENTATION_STATUS.md`. Slice I is metadata-only/read-only/export-only/simulation-only and does not mark Phase 3 complete.
+
+## Web UI Control Deck plan (superseded by the Quiet UI plan)
+
+> Merged from `docs/architecture/DESIGN_HISTORY.md` on 2026-11-16; the original file was removed.
 
 > **Status:** adopted design plan, corrected against the codebase as of 2026-07-10.
 > This document supersedes the draft Control Deck plan and the previous web UI direction.
@@ -7,9 +292,9 @@
 
 ---
 
-## Personal-agent interaction direction — 2026-10-08
+### Personal-agent interaction direction — 2026-10-08
 
-The [personal-agent UX specification](../plans/PERSONAL_AGENT_UX_SPEC.md) and
+The [personal-agent UX specification](../plans/PERSONAL_AUTONOMOUS_AGENT_SPEC.md#personal-agent-ui-and-ux) and
 [UX-01–UX-12 implementation plan](../plans/PERSONAL_AUTONOMOUS_AGENT_SPEC.md)
 now own target intake, Home, goals/tasks, approvals, background readiness,
 results, personal context, recovery and continuity. Each task records a reason,
@@ -23,7 +308,7 @@ a claim new goal/profile controls exist. ADD-26's implemented responsive shell
 is reused. Current implementation status and real API/lifecycle contracts govern
 what can be displayed and acted on.
 
-## 0. Corrections applied to the draft plan
+### 0. Corrections applied to the draft plan
 
 The draft was verified claim-by-claim against the repository. These corrections are
 binding for implementation; everything else in the draft carries over.
@@ -77,7 +362,7 @@ binding for implementation; everything else in the draft carries over.
 
 ---
 
-## 1. Purpose and sources
+### 1. Purpose and sources
 
 This plan defines the target web UI/UX for Raiker's local single-user web surface
 (`raiker-web` + `web`), designed to scale into the Phase 8 multi-surface vision
@@ -96,7 +381,7 @@ the code: `raiker/phase_gates.py` (53 capabilities), `raiker/runtime/executors/_
 `raiker/control/dtos.py` (gate DTO fields), `raiker/runtime/state_machine.py` (19 states),
 `raiker/cli/commands.py` (~80 slash commands), and `web/src` (kept logic layer).
 
-### The goal this design serves (from `docs/architecture/HANDOFF.md`)
+#### The goal this design serves (from `docs/architecture/HANDOFF.md`)
 
 Raiker is a full-fledged, secure AI agent that connects to **any** backend LLM (local
 llama.cpp, Ollama, LM Studio; home-lab vLLM; hosted Anthropic, OpenAI, Gemini,
@@ -105,7 +390,7 @@ governed, default-ask, human-governed, and fail-closed where required**. The UI'
 to make that posture effortless to see, trust, and operate, and to make model choice a
 first-class, one-screen experience.
 
-### Posture this design is built on (HANDOFF part 8)
+#### Posture this design is built on (HANDOFF part 8)
 
 Integrated capabilities (the 29 in `REAL_EXECUTOR_CAPABILITIES`) default to
 `enabled_runtime`; non-integrated capabilities stay `disabled` and fail closed. Safety is
@@ -115,7 +400,7 @@ per-action decision, not the gate flip.
 
 ---
 
-## 2. Design goals and principles
+### 2. Design goals and principles
 
 1. **One honest control center.** Every card is a 1:1 projection of an `AgentEvent` or a
    governed API response; nothing happens off-timeline.
@@ -137,9 +422,9 @@ per-action decision, not the gate flip.
 
 ---
 
-## 3. The iconic identity: "Control Deck"
+### 3. The iconic identity: "Control Deck"
 
-### 3.1 Concept
+#### 3.1 Concept
 
 Raiker behaves like certified avionics, not a chatbot: fail-closed, guarded controls, an
 append-only recorder, a master stop, checklists before dangerous actions, a human always
@@ -161,14 +446,14 @@ cockpit:
 The tone is **calm precision**: low-glare surfaces, thin luminous strokes, dense but
 ordered data, motion only when state genuinely changes.
 
-### 3.2 Mark and wordmark
+#### 3.2 Mark and wordmark
 
 The shipped shield-R monogram stays (it already reads "governed by design" and is
 established in the favicon). The wordmark sets RAIKER in Manrope 700 with wide tracking.
 State-aware favicon tinting (idle / turn in flight / approvals pending / STOP) is a
 polish-phase item.
 
-### 3.3 Motion signature
+#### 3.3 Motion signature
 
 One easing (`cubic-bezier(0.2, 0, 0, 1)`, 160–240 ms) and three moves only:
 
@@ -181,13 +466,13 @@ One easing (`cubic-bezier(0.2, 0, 0, 1)`, 160–240 ms) and three moves only:
 
 ---
 
-## 4. Design tokens
+### 4. Design tokens
 
 Implemented in `web/src/app.css`. Components consume tokens only — never raw
 colours — so both themes stay in lockstep. Existing token *names* are kept so the
 component layer needs no changes.
 
-### 4.1 Colour
+#### 4.1 Colour
 
 Reset on **2026-08-16** to the owner's three-colour palette. Three colours per
 theme, named on `:root` as `--brand-gold` `#ecd06f`, `--brand-blue` `#2779a7`,
@@ -211,7 +496,7 @@ icon. **Trust scale:** trusted = calm green; authenticated = blue; untrusted = h
 amber quarantine border. All pairs meet WCAG AA in both themes; risk and trust are never
 colour-only (icon + text label always accompany).
 
-### 4.2 Typography — bundled, offline
+#### 4.2 Typography — bundled, offline
 
 - **Display + UI:** **Manrope** (variable 200–800), self-hosted woff2
   (`assets/fonts/manrope-*.woff2`). Wordmark and view titles at 700, UI text 400–600.
@@ -223,7 +508,7 @@ colour-only (icon + text label always accompany).
 - Scale (px/line): 28/34 display, 20/28 title, 15/22 body, 13/18 caption, 12.5/18 mono.
   A **compact density** toggle (preferences, polish phase) drops body to 14/20.
 
-### 4.3 Space, radius, elevation, iconography
+#### 4.3 Space, radius, elevation, iconography
 
 - 4 px base grid; component paddings 8/12/16/24; page gutters 24 (desktop) / 16 (narrow).
 - Radius: 6–8 px controls, 10–12 px cards, full round only for STOP and status dots.
@@ -235,9 +520,9 @@ colour-only (icon + text label always accompany).
 
 ---
 
-## 5. Information architecture
+### 5. Information architecture
 
-### 5.1 Navigation model
+#### 5.1 Navigation model
 
 **Command palette first, thin rail second.** The runtime is command-addressable
 (`handle_slash_command`, ~80 commands), so the palette (⌘K / Ctrl-K) is the GUI
@@ -269,7 +554,7 @@ Global chrome on every screen:
   "ends all active tasks at the next safe boundary — not an instant force-kill"; confirm
   issues `POST /api/interrupts`). Keyboard reachable, screen-reader announced.
 
-### 5.2 The mutation funnel (unchanged security model)
+#### 5.2 The mutation funnel (unchanged security model)
 
 All runtime mutation (runtime modes, capability gates, decision modes, dangerous-cap
 enablement) lives in **one** place — Settings → Security Settings — behind step-up auth.
@@ -279,13 +564,13 @@ remain metadata-only on resolve.
 
 ---
 
-## 6. Screen specifications
+### 6. Screen specifications
 
 Each screen lists purpose, key components, backend mapping, and security invariants.
 Endpoints marked **(new)** are catalogued in Section 9; everything else exists today in
 `raiker/api/`.
 
-### 6.0 First run: Pre-flight onboarding
+#### 6.0 First run: Pre-flight onboarding
 
 From zero to a governed first turn in four steps: bootstrap owner (guided
 `/bootstrap-owner` equivalent — **(new)** `POST /api/bootstrap`, console fallback remains
@@ -295,7 +580,7 @@ key env) → confirm workspace → trust summary ("Local by default. Nothing lea
 machine unless you open an egress valve. Every AI action defaults to ask."). Mirrors
 `docs/guide/getting-started-*`.
 
-### 6.1 Deck (the conversation)
+#### 6.1 Deck (the conversation)
 
 - **Turn cards** render the governed loop:
   - **State Tape**: the four-phase ribbon from `turnPhases.ts`; expanding shows the full
@@ -320,7 +605,7 @@ machine unless you open an egress valve. Every AI action defaults to ask."). Mir
 - Invariants: nothing executes client-side; streamed text renders as untrusted model
   output; channel-sourced turns carry the quarantine container.
 
-### 6.2 Ops
+#### 6.2 Ops
 
 Tasks (list, status, safe-boundary cancel — `GET /api/tasks`) today; proposals & review
 (**(new)** `GET /api/proposals`, `GET /api/review/{id}`), subagents & teams (**(new)**
@@ -328,7 +613,7 @@ Tasks (list, status, safe-boundary cancel — `GET /api/tasks`) today; proposals
 with the "no background daemon" note) as those reads land. No run/execute buttons for
 anything the backend cannot execute.
 
-### 6.3 Approvals (the Annunciator)
+#### 6.3 Approvals (the Annunciator)
 
 Risk-sorted queue with age, capability, source turn; permanent banner: *"Approval
 resolution is metadata-only. Recording a decision does not execute the action."* Where
@@ -340,7 +625,7 @@ with mandatory reason. Previews & audit tabs (**(new)** reads mirroring
 resolve (server-enforced; controls hidden when not permitted); no payload editing; no
 force execution.
 
-### 6.4 Memory
+#### 6.4 Memory
 
 Layer tabs (Profile · Project · Episodic · Procedural · Eidetic · Gist · Semantic ·
 Graph · User model) with source, confidence, sensitivity, retention, trust, and approval
@@ -355,7 +640,7 @@ read-only. Backend: **(new)** memory/vector/graph/skill-candidate reads (Section
 mutations only through the existing brokered/approval path. Memory writes never bypass
 approval.
 
-### 6.5 Models
+#### 6.5 Models
 
 - **Provider board:** local first (llama.cpp default, Ollama, LM Studio, vLLM) with live
   health, detected models, capability flags, one-click governed **Use**. Hosted section
@@ -371,7 +656,7 @@ approval.
   renders the exact `reason_code` (`hosted_api_key_missing`, `model_connection_required`, gate
   disabled) as guidance with a deep link into the Security Settings Guarded Switch flow.
 
-### 6.6 Extend (plugins, channels, execution environments)
+#### 6.6 Extend (plugins, channels, execution environments)
 
 Plugins (id, version, status, permissions, signature posture, dependency pins,
 install-plan viewer, runtime grants, execution records, governed **Revoke**; honest
@@ -384,7 +669,7 @@ container execution (image allowlist status), fail-closed remote/SSH/cloud rows 
 `activation_blocked:no_executor` (**(new)** `GET /api/execution-profiles`). Allowlist and
 key values are never displayed.
 
-### 6.7 Recorder (events, checkpoints, lifecycle)
+#### 6.7 Recorder (events, checkpoints, lifecycle)
 
 Append-only timeline with filter chips, risk colouring, parent-child indentation for
 subagents, raw payload in mono (`GET /api/events`). Checkpoints rail renders what the
@@ -394,7 +679,7 @@ explicitly metadata-only (`GET /api/checkpoints`, `GET /api/checkpoints/{id}`). 
 lifecycle and exports as governed reads land (**(new)** Section 9). No edit/delete
 affordances anywhere.
 
-### 6.8 Settings
+#### 6.8 Settings
 
 - **Security Settings** (step-up auth wraps everything):
   - **Runtime mode** via the Guarded Switch with readiness prerequisites listed.
@@ -432,7 +717,7 @@ affordances anywhere.
 
 ---
 
-## 7. Signature component library
+### 7. Signature component library
 
 | Component | Role | Notes |
 |---|---|---|
@@ -458,7 +743,7 @@ correction 5. Capability status derives from real gate fields only.)
 
 ---
 
-## 8. Coverage matrix
+### 8. Coverage matrix
 
 The draft's capability-to-UI-home matrix carries over unchanged except: checkpoint rows
 say "turn checkpoints today, taxonomy is spec ceiling"; the sessions row says
@@ -467,7 +752,7 @@ and capability-status rows derive from gate fields, not honesty labels.
 
 ---
 
-## 9. API additions required (read-heavy, no new authority)
+### 9. API additions required (read-heavy, no new authority)
 
 Every addition is a typed read projection of an existing service through the same
 auth/redaction middleware, or a thin governed pass-through to an existing service method.
@@ -500,7 +785,7 @@ assets bundled (fonts included) — the built app runs fully offline.
 
 ---
 
-## 10. Cross-cutting UX rules
+### 10. Cross-cutting UX rules
 
 - **Truthfulness:** UI copy renders only backend-confirmed states; anything deferred says
   deferred; nothing implies email sends, calendar sync, remote execution, secret storage,
@@ -521,7 +806,7 @@ assets bundled (fonts included) — the built app runs fully offline.
 
 ---
 
-## 11. Implementation plan
+### 11. Implementation plan
 
 Follows the repo's slice discipline (tests + validators + docs per slice; commit and push
 per phase). Each workstream ships behind the web validation gate (`lint`, `check`,
@@ -547,7 +832,7 @@ tests.
 
 ---
 
-## 12. Non-goals and guardrails
+### 12. Non-goals and guardrails
 
 - No client-side policy, gates, or authority; no secrets entry or storage; no
   localStorage tokens.
@@ -564,7 +849,7 @@ tests.
 of a governed agent, where every switch is guarded, every action is recorded, and the
 human is always the pilot in command.
 
-## Personal-agent goal overview target
+### Personal-agent goal overview target
 
 PAA-07 adds goal references/progress to existing Chat/Build/Tasks/Projects,
 Approvals and Activity rather than a new authority-bearing work mode. Home
@@ -573,3 +858,132 @@ due next. Goal detail shows success criteria, plan/tasks, usable artifacts,
 verified receipts, named blockers, budgets and pause/resume/stop. Delivery
 failure is distinct from work failure. Planned controls stay hidden until their
 routes and executors exist. See [the target spec](../plans/PERSONAL_AUTONOMOUS_AGENT_SPEC.md).
+
+## Reference requirements matrix (superseded by reference platform compatibility)
+
+> Merged from `docs/architecture/DESIGN_HISTORY.md` on 2026-11-16; the original file was removed.
+
+This document maps reference agent-platform concepts into Raiker requirements. It exists to prevent shallow imitation: if Raiker borrows an idea from coding agents, local-first tools, model runtimes, memory systems, plugin systems, channel gateways, graph/codemap tools, or OWASP GenAI controls, the requirement must be mapped to a Raiker contract, event, storage location, policy rule, test, and build phase.
+
+Reference systems are inspiration only. Raiker's source of truth is this repository's documentation.
+
+---
+
+### Mapping Rules
+
+Each reference capability must map to:
+
+1. Raiker capability name;
+2. build phase;
+3. canonical spec file;
+4. contracts affected;
+5. storage affected;
+6. events emitted;
+7. policy/security controls;
+8. acceptance tests;
+9. out-of-scope notes.
+
+If any field is missing, the requirement is not builder-proof.
+
+---
+
+### Core Agent Runtime Requirements
+
+| Reference capability | Raiker requirement | Phase | Canonical docs | Acceptance proof |
+|---|---|---:|---|---|
+| Agentic loop: gather context, act, observe, verify | Deterministic runtime state machine with context, planning, policy, execution, observation, verification, response, checkpoint | Phase 1 | `docs/architecture/RUNTIME_STATE_MACHINE.md`, `docs/architecture/RUNTIME_ORCHESTRATION_SPEC.md` | State transition and event sequence tests |
+| Tool-mediated local work | Tool Broker is the only path to filesystem/search/command actions | Phase 1 | `docs/architecture/TOOLS_AND_PERMISSIONS_SPEC.md` | Broker tests prove no tool runs without policy |
+| Permissioned actions | Static policy returns `allow`, `deny`, or `needs_approval` | Phase 1 | `docs/architecture/SECURITY_AND_POLICY.md` | Policy tests for allow/deny/approval |
+| Approval-gated risky actions | Approval request bound to exact action ID | Phase 1 | `docs/architecture/API_AND_CONTRACT_SCHEMAS.md` | Approval mismatch tests |
+| Append-only audit | JSONL events plus SQLite index | Phase 1 | `docs/architecture/EVENT_CATALOG.md`, `docs/architecture/STORAGE_DATABASE_AND_SEARCH_SPEC.md` | Event append/index tests |
+| Checkpoint/resume | Checkpoint manifest after completed turn; later restore/fork | Phase 1-2 | `docs/architecture/CHECKPOINTING_AND_REWIND_SPEC.md` | Checkpoint write/read and restore approval tests |
+| Interruptible work | Pause/cancel/steer and side questions at safe boundaries | Phase 2 | `docs/architecture/RUNTIME_ORCHESTRATION_SPEC.md` | Side question and safe-boundary tests |
+
+---
+
+### Interface And Client Requirements
+
+| Reference capability | Raiker requirement | Phase | Canonical docs | Acceptance proof |
+|---|---|---:|---|---|
+| Terminal coding agent | `raiker` launches first local terminal client | Phase 1 | `README.md`, `docs/architecture/COMMANDS_AND_INTERACTIVE_MODE_SPEC.md` | Global command smoke test |
+| Rich local workspace | TUI panels for task, approval, checkpoint, event, memory, model, permission, diagnostics | Phase 2 | `docs/architecture/DESIGN_HISTORY.md`, `docs/architecture/VISUAL_DESIGN_SPEC.md` | TUI event-driven panel tests |
+| Desktop/web dashboard | Local app surfaces for sessions, tasks, approvals, events, memory, graph, plugins, channels | Phase 3 | `docs/architecture/DESIGN_HISTORY.md`, `docs/architecture/VISUAL_DESIGN_SPEC.md` | Gateway parity and event stream tests |
+| Mobile app control | Apple/Android apps are equal primary interfaces, not notification-only companions | Phase 3 | `docs/architecture/DESIGN_HISTORY.md`, `docs/architecture/VISUAL_DESIGN_SPEC.md`, `docs/architecture/CHANNELS_SPEC.md` | Stale mobile approval rejection tests |
+| Chat/channel access | External messages normalise into ChannelMessageEnvelope and gateway path | Phase 4 | `docs/architecture/CHANNELS_SPEC.md` | Pairing, sender trust, rate-limit tests |
+| Interface parity | Every enabled interface uses same action contracts and policy path | Phase 1-5 | `docs/architecture/FEATURE_COVERAGE_MATRIX.md` | Equal-interface invariant tests |
+
+---
+
+### Model Runtime Requirements
+
+| Reference capability | Raiker requirement | Phase | Canonical docs | Acceptance proof |
+|---|---|---:|---|---|
+| Deterministic test model | `mock` model provider for offline tests | Phase 1 | `docs/architecture/MODEL_RUNTIME_AND_LOCAL_INFERENCE.md` | Mock provider deterministic tests |
+| Local model providers | Ollama (native default profile; no model shipped — the owner chooses one of the models a running Ollama serves, FIXED-737), llama.cpp server, LM Studio, OpenAI-compatible local endpoints | Phase 2 | `docs/architecture/MODEL_RUNTIME_AND_LOCAL_INFERENCE.md`, `raiker/config/model-profiles.json` | Provider profile and chat/tool-call tests |
+| Hosted provider controls | Hosted providers disabled until privacy/egress/budget policy allows | Phase 3-5 | `docs/architecture/SECURITY_AND_POLICY.md`, `docs/architecture/MODEL_RUNTIME_AND_LOCAL_INFERENCE.md` | Hosted fallback denied tests |
+| Tool-call parsing | Model output parsed as untrusted structured proposal | Phase 1-2 | `docs/architecture/API_AND_CONTRACT_SCHEMAS.md` | Invalid model tool call tests |
+| Context limits | Context budget and source priority before model calls | Phase 2 | `docs/architecture/MODEL_RUNTIME_AND_LOCAL_INFERENCE.md` | Truncation priority tests |
+
+---
+
+### Memory, Graph, And Learning Requirements
+
+| Reference capability | Raiker requirement | Phase | Canonical docs | Acceptance proof |
+|---|---|---:|---|---|
+| Working memory | Current-turn scratchpad and task context | Phase 1 | `docs/architecture/MEMORY_AND_CONTEXT_STRATEGY.md` | Context gatherer tests |
+| Durable memory | Profile/project/episodic/procedural memory with governance | Phase 2 | `docs/architecture/MEMORY_AND_CONTEXT_STRATEGY.md` | Memory approval and provenance tests |
+| Eidetic observation | Raw observation metadata with retention and gist memory | Phase 2 | `docs/architecture/EIDETIC_MEMORY_AND_LEARNING_SPEC.md` | Retention and gist creation tests |
+| Semantic search | Local vector metadata with sensitivity/provenance filters | Phase 3 | `docs/architecture/STORAGE_DATABASE_AND_SEARCH_SPEC.md` | Sensitivity-filtered retrieval tests |
+| Graph/codemap | SQLite graph nodes/edges plus recursive CTEs | Phase 3 | `docs/architecture/GRAPH_MEMORY_AND_CODEMAP_SPEC.md`, `docs/architecture/STORAGE_DATABASE_AND_SEARCH_SPEC.md` | Impact-analysis CTE tests |
+| Skill learning | Verified task trajectory may become proposed skill only after tests and approval | Phase 2-3 | `docs/architecture/EIDETIC_MEMORY_AND_LEARNING_SPEC.md`, `docs/architecture/PLUGIN_SYSTEM_SPEC.md` | Skill proposal/approval tests |
+
+---
+
+### Plugin, Hook, And Extension Requirements
+
+| Reference capability | Raiker requirement | Phase | Canonical docs | Acceptance proof |
+|---|---|---:|---|---|
+| Lifecycle hooks | Hook events with bounded decision authority | Phase 2 | `docs/architecture/HOOKS_SPEC.md` | Hook cannot bypass managed deny |
+| Plugin manifest | Explicit manifest, permissions, trust, supply-chain metadata | Phase 3 | `docs/architecture/PLUGIN_SYSTEM_SPEC.md` | Manifest validation tests |
+| Permission diff | Show expanded permissions before enable/update | Phase 3 | `docs/architecture/PLUGIN_SYSTEM_SPEC.md` | Permission diff tests |
+| Plugin tools | Plugin tools register through broker only | Phase 3 | `docs/architecture/TOOLS_AND_PERMISSIONS_SPEC.md` | Plugin tool broker-route tests |
+| Plugin channels | Channel plugins require pairing/sender policy | Phase 3-4 | `docs/architecture/CHANNELS_SPEC.md` | Unknown sender rejection tests |
+
+---
+
+### Execution And Multi-Agent Requirements
+
+| Reference capability | Raiker requirement | Phase | Canonical docs | Acceptance proof |
+|---|---|---:|---|---|
+| Subagents | Bounded specialist agents with parent verification | Phase 4 | `docs/architecture/MULTI_AGENT_AND_SUBAGENT_STRATEGY.md` | Parent verification and cancellation tests |
+| Multi-agent teams | Planner/executor/critic patterns with limits | Phase 4-5 | `docs/architecture/MULTI_AGENT_AND_SUBAGENT_STRATEGY.md` | Budget/depth/runtime tests |
+| Worktree/container execution | Explicit execution profiles with snapshots/artifacts | Phase 4 | `docs/architecture/EXECUTION_ENVIRONMENTS_SPEC.md` | Profile and cleanup tests |
+| SSH/VPS/Kubernetes/cloud execution | Policy-gated remote execution with resource/cost controls | Phase 4-5 | `docs/architecture/EXECUTION_ENVIRONMENTS_SPEC.md` | Egress/resource/budget tests |
+
+---
+
+### OWASP GenAI Security Requirements
+
+| Risk area | Raiker requirement | Phase | Canonical docs | Acceptance proof |
+|---|---|---:|---|---|
+| Prompt injection | Treat prompts/files/tool outputs/channel messages as untrusted | Phase 1-5 | `docs/architecture/THREAT_MODEL.md`, `docs/architecture/OWASP_GENAI_SECURITY_MAPPING.md` | Injection fixture tests |
+| Sensitive information disclosure | Redact secrets and block unsafe egress | Phase 1-5 | `docs/architecture/SECURITY_AND_POLICY.md` | Secret redaction and hosted-deny tests |
+| Supply chain | Dependencies/plugins/providers need provenance and trust controls | Phase 3-5 | `docs/architecture/PLUGIN_SYSTEM_SPEC.md` | Signature/checksum and permission-diff tests |
+| Excessive agency | Bounded tools, approvals, subagent limits, budgets | Phase 1-5 | `docs/architecture/THREAT_MODEL.md` | Approval, depth, budget, cancellation tests |
+| Insecure output handling | Model output is parsed, validated, and policy-reviewed | Phase 1-5 | `docs/architecture/API_AND_CONTRACT_SCHEMAS.md` | Invalid structured output tests |
+| Data poisoning | Memory and graph writes require provenance and trust labels | Phase 2-5 | `docs/architecture/MEMORY_AND_CONTEXT_STRATEGY.md` | Poisoned memory candidate tests |
+
+---
+
+### Builder Use
+
+When implementing a feature, use this matrix to answer:
+
+- Which reference concept am I implementing?
+- Which Raiker requirement owns it?
+- Which build phase allows active wiring?
+- Which contract/event/storage/policy docs apply?
+- Which tests prove it is complete?
+- Which phase-scheduled boundaries must remain disabled?
+
+If the answer is unclear, update the docs before coding.

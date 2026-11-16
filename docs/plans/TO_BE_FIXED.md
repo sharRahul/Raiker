@@ -1,5 +1,11 @@
 ## Release blocker: native sandbox migration incomplete
 
+**Direction, 2026-11-16.** [ADR-0006](../adr/ADR-0006-one-supported-path-per-machine.md)
+makes the WSL2 boundary Windows' default and the sandbox account macOS's, each
+set up from Raiker Setup (RU-03 in the [ready-to-use plan](READY_TO_USE_PLAN.md)).
+The AppContainer gaps below remain open but no longer block Windows commands
+once RU-03 lands.
+
 **Windows continuation, 2026-11-10.** FIXED-1386/1387 close nested Escape and
 stale ambient-memory recall. The real UI correction/forget slice, managed
 Voice setup/test/removal and ten native account tests now have

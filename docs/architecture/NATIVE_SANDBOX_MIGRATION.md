@@ -1,5 +1,14 @@
 # Native sandbox migration
 
+**Default boundary per platform (2026-11-16,
+[ADR-0006](../adr/ADR-0006-one-supported-path-per-machine.md)):** Linux keeps
+Bubblewrap; Windows uses the [WSL2 backend](#wsl2-backend-2026-11-01-runner-side-implemented-measurement-incomplete)
+by default (every observation measured enforced on 2026-11-08), with the
+restricted-account pool and AppContainer under Advanced and refused until each
+passes its probe; macOS uses the [sandbox account](#macos-sandbox-account-2026-11-01-implemented-measured-on-macos-15-ci),
+set up from Raiker Setup behind one administrator prompt (RU-03 in the
+[ready-to-use plan](../plans/READY_TO_USE_PLAN.md)).
+
 Status (2026-11-02): **native execution is on where measured; not yet
 release-ready.** Docker and Podman are no longer invoked anywhere in Raiker.
 Every command runs in a disposable task copy through the native boundary

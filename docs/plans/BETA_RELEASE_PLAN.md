@@ -5,6 +5,12 @@
 > Piper is removed in favor of Kokoro-82M. The earlier `6c211b60` signed
 > candidate/audit precede this change and retain their original SHA.
 > [Authoritative scope and remaining engineering checks](PERSONAL_BETA_SCOPE.md).
+>
+> 2026-11-16: what the owner meets first — publishing, the default command
+> boundary per platform (WSL2 on Windows), first run, postures and Health — is
+> owned by the [ready-to-use plan](READY_TO_USE_PLAN.md)
+> ([ADR-0006](../adr/ADR-0006-one-supported-path-per-machine.md)); this plan
+> keeps the release gates and their evidence.
 
 
 **Status:** active plan, opened 2026-11-02. **Owner:** release owner.

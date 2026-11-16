@@ -23,6 +23,7 @@ Prefer these when another technical document disagrees:
 | What requirements must Design meet? | [Design workspace](../plans/DESIGN_WORKSPACE_SPEC.md) |
 | What are the components and governed action flow? | [Architecture](ARCHITECTURE.md) |
 | What is implemented right now? | [Implementation status](IMPLEMENTATION_STATUS.md) |
+| How does Raiker install, sandbox commands and become usable on each machine? | [ADR-0006](../adr/ADR-0006-one-supported-path-per-machine.md) and the [ready-to-use plan](../plans/READY_TO_USE_PLAN.md) |
 | What are the trust boundaries and fail-closed controls? | [Security architecture](SECURITY_ARCHITECTURE.md) |
 | What is the security philosophy? | [Security and policy](SECURITY_AND_POLICY.md) |
 | How does another device reach Raiker, and what protects it? | [Remote access](REMOTE_ACCESS.md) |

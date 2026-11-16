@@ -27,7 +27,9 @@ else to install first, and no terminal.
    first time, **Raiker Setup** finishes the installation (below).
 3. Create your local account and follow the guided setup ([First run](#first-run)).
 
-**No release has been published yet** (2026-10-20). Until one is, the
+**No release has been published yet** (checked 2026-11-16; publishing personal
+pre-releases is RU-01 of the [ready-to-use plan](../plans/READY_TO_USE_PLAN.md)).
+Until one is, the
 installers built by CI for each packaging change are attached to the **Desktop
 package** workflow runs under the repository's **Actions** tab. They are unsigned test
 builds: Windows SmartScreen shows *Windows protected your PC* (choose **More

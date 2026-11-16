@@ -31,6 +31,10 @@ dependency setup**: no Python, Node.js, Git, package manager or terminal. The
 Raiker engine is bundled inside the application.
 
 1. Open the [latest Raiker release](https://github.com/sharRahul/Raiker/releases/latest).
+   *None is published yet (2026-11-16); until one is, use the installers
+   attached to the **Desktop package** workflow runs under Actions. Publishing
+   personal pre-releases is the first step of the
+   [ready-to-use plan](docs/plans/READY_TO_USE_PLAN.md).*
 2. Download the installer for your computer (table below).
 3. Run the installer.
 4. Follow the guided setup: create your local account, check what your device
@@ -393,7 +397,11 @@ source](docs/guide/getting-started.md#run-from-source),
 - **[RAIKER.md instructions](docs/architecture/RAIKER_MD_INSTRUCTIONS.md)** —
   reviewed global and project-root instruction files for Build.
 - **[Composer personas (ADR-0005)](docs/adr/ADR-0005-composer-personas.md)** —
-  the accepted design for `@` specialists that can only narrow a turn.
+  `@` specialists that can only narrow a turn (built in Chat).
+- **[Ready to use on any machine](docs/plans/READY_TO_USE_PLAN.md)** and
+  **[ADR-0006](docs/adr/ADR-0006-one-supported-path-per-machine.md)** — published
+  releases, one command sandbox per platform (WSL2 on Windows), a four-step
+  first run, three permission postures and a Health page.
 - **[Known limits](docs/architecture/KNOWN_LIMITS.md)** — important boundaries
   and unavailable features.
 - **[Troubleshooting](docs/guide/troubleshooting.md)** — reason codes and fixes.

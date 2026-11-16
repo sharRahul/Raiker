@@ -146,6 +146,23 @@ one model call through the owner's router and is applied only on the owner's
 acceptance, and images go through the `image_generation` gate
 ([Design workspace](../plans/DESIGN_WORKSPACE_SPEC.md)).
 
+## Running on any machine
+
+The same host, dashboard and gateway run on Windows, macOS and Linux; what
+differs per machine is the **command boundary** and how it is set up.
+[ADR-0006](../adr/ADR-0006-one-supported-path-per-machine.md) fixes one default
+per platform — Bubblewrap and seccomp on Linux, the WSL2 `RaikerSandbox`
+distribution running the same Linux runner on Windows, and the `_raikersandbox`
+account under Seatbelt on macOS — each set up from **Raiker Setup** and
+admitted only when the probe measures every mandatory observation enforced
+([native sandbox migration](NATIVE_SANDBOX_MIGRATION.md)). Above the boundary,
+the owner chooses one of three **postures** (Ask first, Work in the sandbox,
+Read-only), each a fixed bundle of the decision modes the
+[authority router](DECISION_MODES_SPEC.md) already enforces; a **Health** page
+reports every readiness fact with the page that fixes it. None of this adds an
+authority path. Delivery and evidence:
+[ready-to-use plan](../plans/READY_TO_USE_PLAN.md).
+
 ## Personal autonomous-agent direction
 
 The [personal-agent target](../plans/PERSONAL_AUTONOMOUS_AGENT_SPEC.md) adds durable goals
@@ -156,6 +173,9 @@ Owner delegation narrows scope, and current gates/policy/executor availability
 still decide every action. Aggregate budgets, durable claims, pause/Stop,
 restart revalidation and independent completion checks are required.
 
-This is the accepted target, not a shipped goal service. PAA-01/02/08 in the
+Durable goals, their coordinator, evidence, Stop, Pause/Resume and budgets
+ship today (Work › Goals); the rows still open are in
+[BUG-355](../plans/TO_BE_FIXED.md#bug-355--goals-ship-without-intake-from-chat-validator-backed-criteria-or-a-restart-scenario).
+PAA-01/02/08 in the
 [delivery plan](../plans/PERSONAL_AUTONOMOUS_AGENT_SPEC.md) own rollout.
 Local-first hosting and local/private/hosted inference remain separate choices.

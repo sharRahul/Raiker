@@ -30,7 +30,7 @@
 
 ## FIXED-1527 — A complete answer read "Not done" because a read the model recovered from had failed
 
-**Severity: Medium. Area: Runtime / turn outcome. Status: Fixed 2026-11-16 (found in regular use).** With a budget CSV attached, a model called `read_file` on the attachment's name, the read failed (`not_found`), and the model then answered correctly from the attachment — but the turn closed as *failed* and Chat read *Not done*, because the last tool that ran had failed. A failed **read-only** call followed by a closing answer now completes the turn; the failed step stays visible (*Partially completed*). A failed write, command or other action still fails the turn, and a failed read with no answer after it still fails. Evidence: `tests/test_recovered_read_failure.py`; RU-J3.
+**Severity: Medium. Area: Runtime / turn outcome. Status: Fixed 2026-11-16 (found in regular use).** With a budget CSV attached, a model called `read_file` on the attachment's name, the read failed (`not_found`), and the model then answered correctly from the attachment — but the turn closed as *failed* and Chat read *Not done*, because the last tool that ran had failed. A **read-only** call that *failed* (not one a gate withheld, which stays the runtime's refusal under BUG-60), followed by a closing answer, now completes the turn; the failed step stays visible (*Partially completed*). A failed write, command or other action still fails the turn, and a failed read with no answer after it still fails. Evidence: `tests/test_recovered_read_failure.py`; RU-J3.
 
 ## FIXED-1526 — An attached document was described in a way that sent the model looking for a file
 

@@ -4024,8 +4024,10 @@ class RuntimeOrchestrator:
                 # nothing, so its failure stays visible as a failed step (the
                 # turn reads "Partially completed") without failing the turn. A
                 # failed write, command or anything else still fails it.
+                # Only a read that *failed*: a read a gate withheld ("denied")
+                # is still the runtime's refusal to disclose (BUG-60).
                 recovered_read = (
-                    last_result.status != "success"
+                    last_result.status == "failed"
                     and last_action.tool_name in READ_ONLY_TOOLS
                     and bool(closing_text.strip())
                 )

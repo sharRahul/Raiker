@@ -14,6 +14,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from raiker.api.app import create_app
+from raiker.context.gatherer import ContextGatherer
 from raiker.storage.sqlite import SQLiteStore
 
 
@@ -45,6 +46,18 @@ def _session(client: TestClient, h: dict[str, str]) -> str:
 def test_a_correction_is_a_proposal_until_the_owner_decides(client: TestClient) -> None:
     h = _headers(client)
     session_id = _session(client, h)
+    workspace = Path(client.app.state.workspace_root)  # type: ignore[attr-defined]
+    owner = client.get("/api/auth/whoami", headers=h).json()["principal_id"]
+
+    def recall_from_another_chat() -> list[str]:
+        return ContextGatherer().gather(
+            workspace_root=workspace,
+            session_id="sess_later",
+            turn_id="turn_later",
+            prompt_text="Does Anna prefer short replies?",
+            owner_principal_id=owner,
+        ).recalled_memory_ids()
+
     proposed = client.post(
         "/api/memory/proposals",
         json={"text": "  Anna prefers   short replies. ", "session_id": session_id},
@@ -56,14 +69,16 @@ def test_a_correction_is_a_proposal_until_the_owner_decides(client: TestClient) 
     pending = client.get("/api/memory/proposals", headers=h).json()
     assert [row["candidate_id"] for row in pending] == [body["candidate_id"]]
     assert client.get("/api/memory", headers=h).json() == []
+    assert recall_from_another_chat() == []
     decided = client.post(
         f"/api/memory/proposals/{body['candidate_id']}/decision",
         json={"decision": "approved", "expected_decision": "deferred"},
         headers=h,
     )
     assert decided.status_code == 200, decided.text
-    texts = [row["text"] for row in client.get("/api/memory", headers=h).json()]
-    assert texts == ["Anna prefers short replies."]
+    [memory] = client.get("/api/memory", headers=h).json()
+    assert memory["text"] == "Anna prefers short replies."
+    assert recall_from_another_chat() == [memory["memory_id"]]
 
 
 def test_a_secret_like_correction_is_never_remembered(client: TestClient) -> None:

@@ -203,17 +203,19 @@ test("RU-J4 Build creates tested code in a project and changes it safely", async
   async function build(request: string): Promise<void> {
     await page.getByLabel("Describe the change").fill(request);
     await page.getByRole("button", { name: /^(Run|Plan|Propose)$/ }).first().click();
+    const turn = page.locator("article.turn").filter({ hasText: request });
+    const outcome = turn.getByTestId("build-outcome");
     // Accept each proposed change the way the owner reviews them, until the turn ends.
     for (let round = 0; round < 12; round += 1) {
       const accept = page.locator("section.decisions").getByRole("button", { name: "Accept", disabled: false }).first();
       const allow = page.getByRole("button", { name: "Allow once", disabled: false }).first();
-      const ended = page.getByTestId("turn-control");
-      await expect(accept.or(allow).or(page.getByTestId("build-outcome").last()).first()).toBeVisible({ timeout: 300_000 });
+      await expect(accept.or(allow).or(outcome).first()).toBeVisible({ timeout: 300_000 });
       if (await accept.isVisible().catch(() => false)) { await accept.click(); continue; }
       if (await allow.isVisible().catch(() => false)) { await allow.click(); continue; }
-      if (!(await ended.isVisible().catch(() => false))) break;
+      break;
     }
-    await expect(page.getByTestId("turn-control")).toBeHidden({ timeout: 300_000 });
+    await expect(outcome.getByText(/^python3 -m unittest -q — passed$/)).toBeVisible({ timeout: 120_000 });
+    await expect(outcome).toHaveAttribute("data-outcome", /^completed_/);
   }
 
   await build(
@@ -225,14 +227,7 @@ test("RU-J4 Build creates tested code in a project and changes it safely", async
     "The shop has changed its rule: orders of exactly £100 should also get the discount. Update the code " +
       "and the tests, and run the tests again.",
   );
-  const outcome = page.getByTestId("build-outcome").last();
-  await expect(outcome).toBeVisible({ timeout: 120_000 });
-  test.info().annotations.push({ type: "outcome", description: (await outcome.getAttribute("data-outcome")) ?? "" });
   await capture(page, join(OUT, "j4b-rule-changed.png"));
-  await expect(outcome).toHaveAttribute("data-outcome", /completed/);
-  // The tests ran in the sandbox: a command row finished, none was refused for a grant.
-  const did = page.getByRole("list", { name: "What Raiker did in this turn" }).last();
-  await expect(did.getByText(/refused — command_grant_required/)).toHaveCount(0);
 });
 
 test("RU-J5 something the owner asks Raiker to remember is used later", async ({ page }) => {
@@ -254,11 +249,10 @@ test("RU-J5 something the owner asks Raiker to remember is used later", async ({
     await ask(page, request);
   }
   for (let round = 0; round < 6 && (await allowIfAsked(page)); round += 1) await lastAnswer(page);
-  // The record, not the prose: both facts are in Memory.
-  await expect.poll(async () => page.evaluate(async () => {
-    const rows = (await (await fetch("/api/memory")).json()) as { text: string }[];
-    return rows.map((row) => row.text).join(" | ");
-  }), { timeout: 120_000 }).toMatch(/Thursday/);
+  await page.goto(`${BASE}/#/memory?tab=memories`);
+  const memories = page.getByRole("tabpanel", { name: "Memories" });
+  await expect(memories.getByRole("heading", { name: /metric units/i }).first()).toBeVisible({ timeout: 120_000 });
+  await expect(memories.getByRole("heading", { name: /(?=.*Okafor)(?=.*Thursday)/i }).first()).toBeVisible();
   await capture(page, join(OUT, "j5a-remember.png"));
   await page.getByRole("button", { name: "New chat" }).first().click();
   await chooseModelForTurn(page, /Haiku/);

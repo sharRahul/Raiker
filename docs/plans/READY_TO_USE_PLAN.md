@@ -253,6 +253,11 @@ provider keys are asked for again.
 A P0 item that is not green by week 3 is shown on Health as *Not available on
 this machine*, with its fix, rather than delaying the release.
 
+The [regular-use journeys](TESTING.md#regular-use-journeys) record the testing
+coverage and live runs. RU-J4 checks the declared test result for both Build
+turns, and RU-J5 checks the approved facts in Memory before recall in a new
+chat. Release qualification still requires a live run on the published build.
+
 ## Changelog
 
 - **2026-11-16** — Opened from the reference review. Rewritten the same day

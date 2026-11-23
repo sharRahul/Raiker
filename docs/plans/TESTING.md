@@ -153,6 +153,14 @@ It checks that the CSV rows remain in the model's context after a redundant
 file read fails and that the answer completes the turn. The browser journey
 above still exercises the upload screen and a live model.
 
+RU-J4 reads the declared check's result on each Build turn. Both the initial
+implementation and the rule change must show `python3 -m unittest -q` passed.
+RU-J5 reads both approved facts on the **Memories** tab before asking the
+follow-up question in a new chat. The
+[memory correction regression](../../tests/test_correction_memory.py) also
+checks that a reviewed proposal can enter another chat's context only after
+approval.
+
 Planned with their items: RU-J6 *Pause a goal step mid-command and resume it*
 (RU-14), RU-J7 *A routine runs with the window closed* (RU-13), RU-J8 *Build on
 Windows with the native sandbox after one UAC prompt* (RU-03).

@@ -148,6 +148,11 @@ Spec: [`web/e2e/regular-use-live.spec.ts`](../../web/e2e/regular-use-live.spec.t
 | RU-J4 | Build: create, test, change | *Create pricing.py with a function final_price(total) that takes 10% off orders over £100, and test_pricing.py with unittest tests for £50, £100 and £150. Then run the tests.* then *The shop has changed its rule: orders of exactly £100 should also get the discount. Update the code and the tests, and run the tests again.* | Each change is proposed and accepted; the project's check (`python3 -m unittest -q`) runs in the command sandbox; the outcome is completed |
 | RU-J5 | Memory across conversations | *Please remember that I prefer metric units, and that my dentist is Dr. Okafor, usually on Thursdays.* then, in a new chat, *Which day do I usually see my dentist, and who is it?* | The memory is stored only after the owner allows it; the later answer names Dr. Okafor and Thursday |
 
+RU-J3 also has an [automated runtime regression test](../../tests/test_recovered_read_failure.py).
+It checks that the CSV rows remain in the model's context after a redundant
+file read fails and that the answer completes the turn. The browser journey
+above still exercises the upload screen and a live model.
+
 Planned with their items: RU-J6 *Pause a goal step mid-command and resume it*
 (RU-14), RU-J7 *A routine runs with the window closed* (RU-13), RU-J8 *Build on
 Windows with the native sandbox after one UAC prompt* (RU-03).

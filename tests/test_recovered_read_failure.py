@@ -34,8 +34,10 @@ def test_an_uploaded_csv_can_be_used_after_a_failed_read(tmp_path: Path) -> None
         ModelResponse(text=answer),
     ])
     orchestrator = _orchestrator(tmp_path, router)
+    store = orchestrator.tool_broker.store
+    assert store is not None
     attachment = store_document(
-        orchestrator.tool_broker.store,
+        store,
         filename=filename,
         media_type="text/csv",
         data=csv.encode(),

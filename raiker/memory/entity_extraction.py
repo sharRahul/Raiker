@@ -131,6 +131,28 @@ def extract_relationship_candidates(text: str) -> tuple[ExtractedRelationship, .
     return tuple(extracted)
 
 
+_REQUEST_START = re.compile(
+    r"^(?:please\s+)?(?:can|could|would|will|should|tell|show|list|find|give|"
+    r"make|write|build|explain|compare|calculate|work\s+out|help|which|what|"
+    r"who|when|where|why|how)\b",
+    re.I,
+)
+
+
+def reads_as_request(text: str) -> bool:
+    """True when a passage asks for something rather than states a fact.
+
+    A question or an instruction to Raiker is the owner's request, not a fact
+    about them; proposing it as a memory files the whole prompt (seen in the
+    2026-11-16 regular-use round with a household-budget question).
+    """
+
+    if "?" in text:
+        return True
+    sentences = [_clean(item) for item in re.findall(r"[^.!?\n]+", text)]
+    return any(_REQUEST_START.match(sentence) for sentence in sentences if sentence)
+
+
 def propose_memory_relationships(
     store: SQLiteStore, memory_id: str, owner_principal_id: str
 ) -> ExtractionSummary:
@@ -184,7 +206,11 @@ def propose_completed_turn_memories(
     suppressed = 0
     for role, raw_text in (("user", user_text), ("assistant", assistant_text)):
         text = raw_text.strip()[:8_000]
-        if not text or not extract_relationship_candidates(text):
+        if (
+            not text
+            or (role == "user" and reads_as_request(text))
+            or not extract_relationship_candidates(text)
+        ):
             skipped += 1
             continue
         # §13.2 item 4 — a passage the owner forgot is not proposed again

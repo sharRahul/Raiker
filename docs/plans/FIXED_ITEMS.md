@@ -1,5 +1,9 @@
 # Fixed items
 
+## FIXED-1535 — A question was proposed as a project memory
+
+**Severity: Low. Area: Memory / observer. Status: Fixed 2026-11-24 (found in regular use).** After RU-J3, Memory › Suggestions held *"This is our household budget in pounds. Which three categories grew…"* as a deferred `project` memory: the passage's first sentence matched the `is_a` rule, so the owner's whole question was filed as a fact. The completed-turn observer no longer proposes an owner's passage that asks a question or gives Raiker an instruction (*Which…*, *Work out…*, *Can you…*); statements are proposed as before. Evidence: `tests/test_memory_forget_suppression.py::test_a_question_is_not_proposed_as_a_memory`, `::test_an_instruction_is_not_proposed_as_a_memory`.
+
 ## FIXED-1534 — Every research turn raised a "security anomaly" notice for Web
 
 **Severity: Low. Area: Security monitor / web. Status: Fixed 2026-11-16 (found in regular use).** Each page Raiker read on a site it had not read before raised *Security anomaly on 'Web' — contacted a host it had not used before*. For Web that is its function, and its destinations are already governed by the web-access policy (HTTPS, private-address guard, blocklist). The new-host rule no longer applies to the Web subject; it still applies to connectors, plugins and every other subject. Evidence: `tests/test_capability_containment.py::test_reading_a_new_site_is_not_an_anomaly_for_web_but_is_for_a_connector`.

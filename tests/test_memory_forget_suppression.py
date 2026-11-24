@@ -15,7 +15,7 @@ import pytest
 
 from raiker.cli.principal_resolver import bootstrap_owner
 from raiker.control.dashboard import DashboardService
-from raiker.memory.entity_extraction import propose_completed_turn_memories
+from raiker.memory.entity_extraction import ExtractionSummary, propose_completed_turn_memories
 from raiker.memory.store import MemoryGovernance, write_memory
 from raiker.storage.sqlite import SQLiteStore
 from tests.factories import governed_action
@@ -48,7 +48,7 @@ def _remember(ws: Path, store: SQLiteStore, text: str = FACT) -> str:
     ).memory_id
 
 
-def _propose(store: SQLiteStore, turn: str, text: str = FACT) -> object:
+def _propose(store: SQLiteStore, turn: str, text: str = FACT) -> ExtractionSummary:
     return propose_completed_turn_memories(
         store, owner_principal_id=OWNER, session_id="sess_1", turn_id=turn,
         source_event_id="evt_1", user_text=text, assistant_text="",
@@ -133,3 +133,19 @@ def test_the_same_words_waiting_for_a_decision_are_proposed_once(workspace: Path
     assert first.proposed == 1  # type: ignore[attr-defined]
     assert again.proposed == 0 and again.already_present == 1  # type: ignore[attr-defined]
     assert len(store.list_memory_candidates(decision="deferred", owner_principal_id=OWNER)) == 1
+
+
+def test_a_question_is_not_proposed_as_a_memory(workspace: Path) -> None:
+    store = DashboardService(workspace).store
+    question = (
+        "This is our household budget in pounds. "
+        "Which three categories grew the most?"
+    )
+    summary = _propose(store, "turn_question", question)
+    assert summary.proposed == 0
+
+
+def test_an_instruction_is_not_proposed_as_a_memory(workspace: Path) -> None:
+    store = DashboardService(workspace).store
+    summary = _propose(store, "turn_ask", "This is my budget. Work out the total.")
+    assert summary.proposed == 0

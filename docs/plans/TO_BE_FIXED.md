@@ -1907,7 +1907,8 @@ FIXED-1526 to FIXED-1529.
   rise), and once
   summed £100 + £40 + £10 as £200. This is the model, not the product; the
   first-run *Model* step should say which models suit numbers and code.
-* **A question was proposed as a project memory.** After RU-J3, Memory ›
+* ~~**A question was proposed as a project memory.**~~ Closed 2026-11-24
+  ([FIXED-1535](FIXED_ITEMS.md#fixed-1535--a-question-was-proposed-as-a-project-memory)). After RU-J3, Memory ›
   Suggestions held *"This is our household budget in pounds. Which three
   categories grew…"* as a deferred `project` memory (confidence 0.9): the
   owner's whole question, not a fact. The observer should not propose a

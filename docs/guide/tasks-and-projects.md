@@ -280,8 +280,13 @@ is a quiet icon rather than a red one.
 
 ## Projects
 
-A project is a **named scope**: its own folder inside the workspace, plus the
-sessions and checkpoints created while it is active. It is an organising label,
+A project is a **named scope**: its own folder, plus the sessions and
+checkpoints created while it is active. **Create project** makes that folder in
+`Raiker Projects` in your home folder (`~/Raiker Projects/<name>`; set
+`RAIKER_PROJECTS_HOME` to put it elsewhere), so Build's work is a folder you
+can open in your own editor, never inside Raiker's data folder. An existing
+folder of the same name is never reused: the next is `<name> 2`. Projects made
+before 2026-11-25 keep their folder under `.raiker/projects/` and work as before. It is an organising label,
 not an authority — selecting a project grants nothing, and its folder can never
 leave the workspace.
 

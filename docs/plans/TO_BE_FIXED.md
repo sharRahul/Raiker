@@ -1898,7 +1898,9 @@ Run record: [WEB_APP_LIVE_TEST](../architecture/WEB_APP_LIVE_TEST.md#result--202
   models (`qwen2.5:0.5b`) were run.
 * **Managed llama.cpp embedding entry** still needs its SHA-256 and size
   recorded from the publisher (huggingface.co is reachable from this host now).
-* **MCP Test on a uv-managed interpreter** fails `mcp_command_not_found` (since
+* ~~**MCP Test on a uv-managed interpreter**~~ Fixed 2026-11-25
+  ([FIXED-1557](FIXED_ITEMS.md#fixed-1557--an-interpreter-a-toolchain-manager-installed-could-not-run-in-the-sandbox)):
+  one install below a recognised toolchain store is reachable read-only. It failed `mcp_command_not_found` (since
   2026-11-25 the failure says why: [FIXED-1545](FIXED_ITEMS.md#fixed-1545--an-mcp-program-in-the-home-folder-read-as-missing-with-no-reason)): the
   sandbox does not mount the home folder, by design. `round-2026-09-04`'s MCP
   case needs a host whose Python is outside the home folder.
@@ -1936,7 +1938,8 @@ FIXED-1526 to FIXED-1529.
 * **Memory store is off on a fresh account.** FIXED-1531 makes that visible on
   the card; RU-11 in the ready-to-use plan makes keeping a memory one choice in
   first run, so the first *remember this* works.
-* **A project with no folder builds in Raiker's own data folder.** *Reduced
+* ~~**A project with no folder builds in Raiker's own data folder.**~~ Fixed
+  2026-11-25 ([FIXED-1559](FIXED_ITEMS.md#fixed-1559--a-new-project-had-no-folder-outside-raikers-data)). *Reduced
   2026-11-25:* a project turn's command that names no folder now runs in the
   project ([FIXED-1549](FIXED_ITEMS.md#fixed-1549--a-projects-command-with-no-folder-ran-at-the-workspace-root));
   a name-only project's folder is still `.raiker/projects/<name>`. RU-J4's project
@@ -1945,7 +1948,8 @@ FIXED-1526 to FIXED-1529.
   was blocked by `.raiker · protected path`. Creating a project for Build should
   ask for its folder, or make one (for example `~/Raiker Projects/<name>`).
   RU-21 in the ready-to-use plan.
-* **Build's outcome reads *Not verified* although the tests passed.** The model
+* ~~**Build's outcome reads *Not verified* although the tests passed.**~~
+  Fixed 2026-11-25 ([FIXED-1558](FIXED_ITEMS.md#fixed-1558--build-left-declared-checks-to-the-model)). The model
   ran `python3 -m unittest test_pricing -v`; the project's declared check is
   `python3 -m unittest -q`, so the outcome says the check did not run after the
   last change. Build should run the declared checks itself once the model has
@@ -1966,7 +1970,9 @@ FIXED-1526 to FIXED-1529.
   card that it will not fit and how to set `OLLAMA_CONTEXT_LENGTH`.
   *2026-11-25:* the server check now says so with the fix
   ([FIXED-1547](FIXED_ITEMS.md#fixed-1547--an-ollama-model-spilling-to-the-cpu-was-not-said));
-  requesting a smaller context is still open.
+  requesting a smaller context is still open. *Closed 2026-11-25:* Raiker now
+  talks to Ollama through `/api/chat` with `options.num_ctx`
+  ([FIXED-1556](FIXED_ITEMS.md#fixed-1556--ollama-loaded-every-model-at-its-full-context)).
 * **Ollama Cloud answered HTTP 402.** `gpt-oss:20b-cloud`, connected through
   **Add model › On this computer › Ollama**, refused the first turn with
   `provider_quota_exhausted:http_402`; Raiker said the account has no credit or

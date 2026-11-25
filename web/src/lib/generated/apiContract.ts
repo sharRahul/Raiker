@@ -1883,6 +1883,7 @@ export type CreateProjectRequest = {
   parent_id?: string | null;
   attach_path?: string | null;
   attach_writable?: boolean;
+  create_folder?: boolean;
 };
 
 export type CreateRemoteMcpServerRequest = {

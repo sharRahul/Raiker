@@ -805,6 +805,9 @@ class CreateProjectRequest(StrictRequest):
     parent_id: str | None = None
     attach_path: str | None = None
     attach_writable: bool = True
+    # RU-21 — make the project its own folder under `~/Raiker Projects`
+    # (named by the server, never by the client) and attach it as the root.
+    create_folder: bool = False
 
 
 class SelectProjectRequest(StrictRequest):

@@ -990,6 +990,14 @@ def toolchain_mounts(executable: str | Path, workspace_root: Path) -> list[str]:
             return []  # would hold the project
         if prefix == usr or (usr in prefix.parents and local not in (prefix, *prefix.parents)):
             continue
+        from raiker.execution.commands.user_toolchains import reachable_prefix
+
+        if reachable_prefix(candidate) == prefix:
+            # One install in a recognised manager's store, read-only, holding
+            # no credential-shaped file (user_toolchains): the home stays out.
+            if str(prefix) not in mounts:
+                mounts.append(str(prefix))
+            continue
         if len(prefix.parts) < 3 or any(
             prefix == home or home in prefix.parents or prefix in home.parents for home in homes
         ):

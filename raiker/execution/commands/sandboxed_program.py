@@ -125,11 +125,32 @@ def sandbox_interpreter(name: str, search_path: str, workspace: Path) -> Path:
             place == root or root in place.parents
             for place in (candidate, found_path)
             for root in unreachable
-        ):
+        ) or _in_user_toolchain(candidate, found_path, workspace):
             # As found, not resolved: a virtualenv finds itself from the name it
             # was started under, and the boundary mounts both prefixes.
             return found_path
     raise FileNotFoundError(name)
+
+
+def _in_user_toolchain(candidate: Path, found: Path, workspace: Path) -> bool:
+    """Both names inside one reachable install of a toolchain manager's store."""
+    from raiker.execution.commands.user_toolchains import reachable_prefix
+
+    prefix = reachable_prefix(found)
+    if prefix is None or workspace == prefix or workspace in prefix.parents:
+        return False
+    return candidate == prefix or prefix in candidate.parents
+
+
+def _reachable_interpreter(interpreter: Path, base: Path) -> Path:
+    """*interpreter*, or its copy in the toolchain cache where the boundary needs one."""
+    from raiker.execution.commands.user_toolchains import cached_copy, needs_copy, reachable_prefix
+
+    prefix = reachable_prefix(interpreter)
+    if prefix is None or not needs_copy():
+        return interpreter
+    copy = cached_copy(prefix, base / "toolchains")
+    return copy / Path(os.path.abspath(interpreter)).relative_to(prefix)
 
 
 def _terminate_tree(proc: subprocess.Popen[bytes]) -> None:
@@ -177,6 +198,7 @@ def run_bounded(
     root = Path(workspace).resolve()
     interpreter = sandbox_interpreter(command[0], env.get("PATH", ""), root)
     with scratch_run(root, label, timeout_seconds=timeout) as run:
+        interpreter = _reachable_interpreter(interpreter, run.folder.parent)
         folder, args = stage_program_folder(root, command[1:], run.folder / "program")
         argv = run.command([str(interpreter), *args], cwd=folder)
         return _drain_bounded(

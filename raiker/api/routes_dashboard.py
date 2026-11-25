@@ -2119,6 +2119,7 @@ async def create_project(
         parent_id=body.parent_id,
         attach_path=body.attach_path,
         attach_writable=body.attach_writable,
+        create_folder=body.create_folder,
     )
     if not result.ok:
         # A name another project already has is a conflict with that project,
@@ -2128,7 +2129,7 @@ async def create_project(
         if result.reason_code in {"duplicate_project_name", "duplicate_project_root"}:
             raise refusal(status.HTTP_409_CONFLICT, result.reason_code)
         raise refusal(status.HTTP_400_BAD_REQUEST
-                if body.attach_path is not None
+                if body.attach_path is not None or body.create_folder
                 else status.HTTP_403_FORBIDDEN, result.reason_code)
     answer: ProjectCreated = cast(ProjectCreated, {"ok": True, **result.data})
     return serialize_dto(answer)

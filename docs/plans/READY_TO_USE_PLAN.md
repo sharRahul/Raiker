@@ -114,14 +114,16 @@ Build never works in Raiker's own data folder.
 project**.
 *Progress 2026-11-25:* a project turn's command with no folder runs in the
 project's copy, not the workspace root ([FIXED-1549](FIXED_ITEMS.md#fixed-1549--a-projects-command-with-no-folder-ran-at-the-workspace-root));
-asking for (or making) a folder outside `.raiker` is open.
+**Create project** now makes `~/Raiker Projects/<name>` and attaches it
+([FIXED-1559](FIXED_ITEMS.md#fixed-1559--a-new-project-had-no-folder-outside-raikers-data)); the RU-J4 live run on the published build is open.
 
 **RU-22 · Build runs the declared checks itself. P1, M.** When the model has
 finished, Build runs the project's declared checks in the sandbox (asking like
 any command) so the outcome is *Verified* or says what failed, whatever command
 form the model chose.
 *Done when* RU-J4 ends *Verified*.
-*Progress 2026-11-25:* the outcome says what would verify it ([FIXED-1554](FIXED_ITEMS.md#fixed-1554--not-verified-did-not-say-how-to-verify)); Build running the checks itself is open.
+*Progress 2026-11-25:* the outcome says what would verify it ([FIXED-1554](FIXED_ITEMS.md#fixed-1554--not-verified-did-not-say-how-to-verify)); Since FIXED-1558 Build runs the declared checks itself once the model has
+finished; the RU-J4 live run is open.
 
 ### C. Permissions: strict, and easy to use
 

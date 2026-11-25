@@ -288,7 +288,8 @@
     creating = true;
     createError = null;
     try {
-      await api.createProject(name);
+      // RU-21 — a new project is its own folder under ~/Raiker Projects.
+      await api.createProject(name, null, true, true);
       newName = "";
       await load();
       onchanged?.();
@@ -641,6 +642,10 @@
     <span class="error" role="alert">{createError}</span>
   {/if}
 </form>
+<p class="sub where-hint" data-testid="project-folder-hint">
+  A new project gets its own folder in <code>Raiker Projects</code> in your home folder, so you can open it in
+  your own editor too.
+</p>
 
 {#if attachOpen}
   <form
@@ -1550,6 +1555,7 @@
   .kicker {
     margin: var(--space-3) 0 0.4rem;
   }
+  .sub.where-hint { margin: var(--space-2) 0 var(--space-3); }
   .sub {
     color: var(--text-3);
     font-size: var(--text-sm);

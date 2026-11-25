@@ -17,7 +17,13 @@ from raiker.cli.commands import (
     handle_reasoning_command,
     render_models,
 )
-from raiker.models.contracts import ModelCapabilities, ModelMessage, ModelRequest, ToolSpec
+from raiker.models.contracts import (
+    ModelCapabilities,
+    ModelMessage,
+    ModelRequest,
+    ModelStreamEvent,
+    ToolSpec,
+)
 from raiker.models.exceptions import ProviderConfigurationError, ProviderPolicyError
 from raiker.models.factory import ModelProviderFactory, ProviderRuntimePolicy
 from raiker.models.providers.openai_compatible import AsyncOpenAICompatibleProvider, _join
@@ -121,31 +127,27 @@ def test_ollama_profile_advertises_native_tool_calls() -> None:
 
 
 def test_ollama_factory_sends_tools_and_parses_native_tool_call() -> None:
+    """Ollama is reached on its native /api/chat, with the context Raiker chose."""
     seen: dict[str, object] = {}
+    paths: list[str] = []
 
     def handler(request: httpx.Request) -> httpx.Response:
+        paths.append(request.url.path)
+        if request.url.path == "/api/show":
+            return httpx.Response(200, json={"model_info": {"qwen35.context_length": 262144}})
         seen.update(json.loads(request.content.decode()))
         return httpx.Response(
             200,
             json={
-                "choices": [
-                    {
-                        "message": {
-                            "content": "",
-                            "tool_calls": [
-                                {
-                                    "id": "call_ollama_ls",
-                                    "type": "function",
-                                    "function": {
-                                        "name": "list_directory",
-                                        "arguments": "{\"path\":\".\"}",
-                                    },
-                                }
-                            ],
-                        },
-                        "finish_reason": "tool_calls",
-                    }
-                ]
+                "message": {
+                    "role": "assistant",
+                    "content": "",
+                    "tool_calls": [{"function": {"name": "list_directory", "arguments": {"path": "."}}}],
+                },
+                "done": True,
+                "done_reason": "stop",
+                "prompt_eval_count": 40,
+                "eval_count": 7,
             },
         )
 
@@ -167,12 +169,60 @@ def test_ollama_factory_sends_tools_and_parses_native_tool_call() -> None:
         )
     )
 
+    assert paths == ["/api/show", "/api/chat"]
     assert seen["tools"] == [ToolSpec("list_directory", "List a directory").to_openai_tool()]
-    assert seen["tool_choice"] == "auto"
+    # Not the model's 262,144: the smallest step that holds this request.
+    assert seen["options"]["num_ctx"] == 8192  # type: ignore[index]
     assert response.finish_reason == "tool_calls"
-    assert response.tool_calls[0].call_id == "call_ollama_ls"
+    assert response.tool_calls[0].call_id == "call_0"
     assert response.tool_calls[0].tool_name == "list_directory"
     assert response.tool_calls[0].arguments == {"path": "."}
+    assert response.usage == {"prompt_tokens": 40, "completion_tokens": 7, "total_tokens": 47}
+
+
+def test_ollama_streams_ndjson_into_the_same_events() -> None:
+    lines = [
+        {"message": {"role": "assistant", "thinking": "hm"}, "done": False},
+        {"message": {"role": "assistant", "content": "Hel"}, "done": False},
+        {"message": {"role": "assistant", "content": "lo"}, "done": False},
+        {"message": {"role": "assistant", "content": ""}, "done": True, "done_reason": "stop",
+         "prompt_eval_count": 5, "eval_count": 2},
+    ]
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path == "/api/show":
+            return httpx.Response(404, json={"error": "not found"})
+        assert request.url.path == "/api/chat"
+        body = json.loads(request.content.decode())
+        assert body["stream"] is True and body["options"]["num_ctx"] == 8192
+        return httpx.Response(200, text="\n".join(json.dumps(line) for line in lines) + "\n")
+
+    provider = AsyncOpenAICompatibleProvider(
+        "p", "ollama", "gemma3:1b", "http://127.0.0.1:11434/v1",
+        ModelCapabilities(supports_streaming=True),
+        client=httpx.AsyncClient(transport=httpx.MockTransport(handler)),
+    )
+
+    async def collect() -> list[ModelStreamEvent]:
+        return [event async for event in provider.stream_chat(
+            ModelRequest("p", "ollama", "gemma3:1b", [ModelMessage("user", "hi")])
+        )]
+
+    events = asyncio.run(collect())
+    kinds = [event.event_type for event in events]
+    assert kinds == ["reasoning_delta", "text_delta", "text_delta", "usage", "finish"]
+    assert "".join(event.text_delta for event in events) == "Hello"
+
+
+def test_ollama_context_steps_up_with_the_request_and_stops_at_the_model() -> None:
+    from raiker.models.providers.ollama_native import context_for
+
+    small = ModelRequest("p", "ollama", "m", [ModelMessage("user", "hi")], max_tokens=1024)
+    large = ModelRequest("p", "ollama", "m", [ModelMessage("user", "x" * 90_000)], max_tokens=1024)
+    assert context_for(small, maximum=262_144) == 8192
+    assert context_for(large, maximum=262_144) == 32_768
+    assert context_for(large, maximum=16_384) == 16_384
+    assert context_for(small, maximum=None) == 8192
 
 
 def test_stream_cancellation_preserves_cancelled_error() -> None:

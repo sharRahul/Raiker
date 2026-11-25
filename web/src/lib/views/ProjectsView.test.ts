@@ -90,7 +90,7 @@ describe("ProjectsView", () => {
     await waitFor(() => expect(screen.getByText("No projects yet")).toBeInTheDocument());
   });
 
-  it("creates a project by POSTing only the name and notifies the shell", async () => {
+  it("creates a project as its own folder (RU-21) and notifies the shell", async () => {
     const mock = stubFetch({
       "GET /api/projects": { projects: [], active_project_id: null },
       "GET /api/projects/tree": [],
@@ -114,7 +114,7 @@ describe("ProjectsView", () => {
         (c) => (c[1]?.method ?? "GET").toUpperCase() === "POST",
       );
       expect(post).toBeTruthy();
-      expect(JSON.parse(post![1]!.body as string)).toEqual({ name: "Tejas Mk1A" });
+      expect(JSON.parse(post![1]!.body as string)).toEqual({ name: "Tejas Mk1A", create_folder: true });
     });
     await waitFor(() => expect(onchanged).toHaveBeenCalled());
   });

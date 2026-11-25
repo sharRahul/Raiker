@@ -3,11 +3,56 @@
 from __future__ import annotations
 
 import os
+import re
 import stat
 from pathlib import Path
 
 LEGACY_PROJECT_ROOT = "projects"
 MANAGED_PROJECT_ROOT = ".raiker/projects"
+#: Where a project made for Build gets its own folder (RU-21).
+PROJECTS_HOME_ENV = "RAIKER_PROJECTS_HOME"
+PROJECTS_HOME_NAME = "Raiker Projects"
+_UNSAFE_NAME = re.compile(r'[<>:"/\\|?*\x00-\x1f]')
+_RESERVED = {"con", "prn", "aux", "nul", *(f"com{n}" for n in range(1, 10)), *(f"lpt{n}" for n in range(1, 10))}
+
+
+def projects_home() -> Path:
+    """``~/Raiker Projects``, or the folder ``RAIKER_PROJECTS_HOME`` names."""
+    configured = os.environ.get(PROJECTS_HOME_ENV, "").strip()
+    return Path(configured).expanduser() if configured else Path.home() / PROJECTS_HOME_NAME
+
+
+def folder_name(name: str) -> str:
+    """A project's name as a folder name every desktop can hold."""
+    cleaned = _UNSAFE_NAME.sub("-", name).strip().strip(". ")
+    cleaned = re.sub(r"\s+", " ", cleaned)[:80].strip()
+    if not cleaned or cleaned.casefold() in _RESERVED:
+        cleaned = f"Project {cleaned}".strip()
+    return cleaned
+
+
+def make_project_folder(name: str, home: Path | None = None) -> Path | None:
+    """A new, empty folder for *name* under the projects home.
+
+    ``Pricing``, then ``Pricing 2``, … — an existing folder is never adopted.
+    ``None`` when no folder could be made.
+    """
+    base = home if home is not None else projects_home()
+    try:
+        base.mkdir(parents=True, exist_ok=True)
+    except OSError:
+        return None
+    stem = folder_name(name)
+    for index in range(1, 100):
+        candidate = base / (stem if index == 1 else f"{stem} {index}")
+        try:
+            candidate.mkdir()
+        except FileExistsError:
+            continue
+        except OSError:
+            return None
+        return candidate
+    return None
 
 
 def project_root_parts(root_subpath: str) -> tuple[str, tuple[str, ...]] | None:

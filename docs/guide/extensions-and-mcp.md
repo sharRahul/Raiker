@@ -344,6 +344,19 @@ decision, not a permission one: a deferred tool is refused by nothing and reache
 in one call. The **Context** panel in either composer says how many are sent and
 how many are on request.
 
+### A server whose Python or Node is in your home folder
+
+The sandbox never sees your home folder, which holds keys, tokens and mail. An
+interpreter that **uv**, **pyenv**, **nvm**, **mise**, **asdf** or **Volta**
+installed there is the exception: the one version folder it lives in (for
+example `~/.local/share/uv/python/cpython-3.12.8-…`) is reachable read-only, and
+only when nothing inside it looks like a credential (`.npmrc`, `.netrc`,
+`credentials*`, `*.pem`, `id_*` …) and no link in it leads elsewhere. On Linux
+that folder is mounted read-only; on Windows and macOS, whose sandbox is a
+separate account, it is copied once into Raiker's toolchain cache in the
+sandbox's own folder and run from there, so nothing in your profile is
+re-permissioned. An interpreter anywhere else in your home is still passed over.
+
 ## Skills
 
 A skill is a `SKILL.md` document — instructions Raiker follows when the task

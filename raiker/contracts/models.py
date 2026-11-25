@@ -150,6 +150,7 @@ EVENT_TYPES = {
     # B4 — tool calls a turn proposed but did not run, with the counts and the
     # boundary that stopped them (budget, approval, or policy).
     "model_tool_calls_dropped",
+    "build_declared_checks_proposed",
     # ADD-02 — tool calls held behind an approval boundary rather than dropped.
     # Counts and the parked call's place in its batch; the calls themselves are
     # parked with the turn and drained one decision at a time on resume.

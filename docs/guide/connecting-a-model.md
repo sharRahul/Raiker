@@ -112,6 +112,14 @@ The check is a read of Ollama's own model list on this machine. It never leaves
 the machine, never goes through a proxy, and changes nothing — your choice is
 still only ever made by you.
 
+**How much context Ollama loads.** Raiker talks to a local Ollama through its
+own chat API and says how much context to load: the smallest of 8,192, 16,384,
+32,768, 65,536 or 131,072 tokens that holds the conversation and the answer,
+never above what the model was trained for. Without this Ollama loaded a model
+at its full window — 262,144 tokens for `qwen3.5:9b`, too much for a 16 GB card
+— and answers crawled on the CPU. A conversation that grows moves up a step, and
+each step reloads the model once.
+
 **Ollama running here is not the same as a model running here.** Ollama also
 serves cloud models (names ending `-cloud` or `:cloud`, such as
 `gpt-oss:20b-cloud`), and a prompt to one of those is processed at ollama.com.

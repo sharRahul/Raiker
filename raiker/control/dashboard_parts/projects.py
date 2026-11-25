@@ -22,6 +22,7 @@ from raiker.control.dtos import ControlResult
 from raiker.control.project_migration import _default_root_label
 from raiker.control.project_paths import MANAGED_PROJECT_ROOT as _MANAGED_PROJECT_ROOT
 from raiker.control.project_paths import contained_project_root as _contained_project_root
+from raiker.control.project_paths import make_project_folder
 from raiker.control.project_paths import project_root_parts as _project_root_parts
 from raiker.control.project_revision import (
     PROJECT_CONFLICT,
@@ -138,6 +139,7 @@ class ProjectService:
         parent_id: str | None = None,
         attach_path: str | None = None,
         attach_writable: bool = True,
+        create_folder: bool = False,
     ) -> ControlResult:
         """Create a named project folder (human gate-manager only).
 
@@ -177,6 +179,15 @@ class ProjectService:
         ):
             return ControlResult(ok=False, reason_code="duplicate_project_root")
         project_id = new_id("proj_")
+        if create_folder and attach_path is None:
+            # RU-21 — a project for Build is a real folder the owner can open
+            # in their own editor, never Raiker's data folder. The server names
+            # it from the project's name; an existing folder of that name is
+            # never reused, so a project cannot adopt files it did not make.
+            made = make_project_folder(cleaned)
+            if made is None:
+                return ControlResult(ok=False, reason_code="project_folder_unavailable")
+            attach_path, attach_writable = str(made), True
         if attach_path is not None:
             # No managed folder is made: the owner's folder is the root, and
             # creating a second one under `.raiker/projects/` would leave an

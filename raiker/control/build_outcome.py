@@ -349,3 +349,27 @@ def _folder(value: Any) -> str:
     while text.startswith("./"):
         text = text[2:]
     return text or "."
+
+
+def checks_due(
+    *,
+    tool_actions: Iterable[Mapping[str, Any]],
+    command_runs: Iterable[Mapping[str, Any]],
+    checks: Sequence[str],
+) -> list[str]:
+    """RU-22 — the declared checks the runtime should still run for this turn.
+
+    Those that did not run, exactly as written, after the turn's last file
+    change. Nothing when the turn changed no file, when a check is waiting on
+    the owner, or when no check is declared.
+    """
+    if not checks:
+        return []
+    outcome = classify_build_turn(tool_actions=tool_actions, command_runs=command_runs, checks=checks)
+    if outcome["outcome"] in {"no_change", "blocked"}:
+        return []
+    return [
+        str(row["command"])
+        for row in outcome["checks"]
+        if row["result"] in {"not_run", "ran_before_change"}
+    ]

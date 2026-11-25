@@ -1134,11 +1134,20 @@ export const api = {
   // `attachPath` is the exception and the only path the client ever sends: the
   // owner is naming a folder they already have, which the server validates and
   // records as a grant before it becomes a root.
-  createProject: (name: string, attachPath: string | null = null, attachWritable = true) =>
+  // RU-21 — `createFolder` asks the server to make the project its own folder
+  // under `~/Raiker Projects` (named by the server) and attach it.
+  createProject: (
+    name: string,
+    attachPath: string | null = null,
+    attachWritable = true,
+    createFolder = false,
+  ) =>
     contract.createProject(
-      attachPath === null
-        ? { name }
-        : { name, attach_path: attachPath, attach_writable: attachWritable },
+      attachPath !== null
+        ? { name, attach_path: attachPath, attach_writable: attachWritable }
+        : createFolder
+          ? { name, create_folder: true }
+          : { name },
     ),
   // ── Project roots ──────────────────────────────────────────────────────
   // One directory at a time, never the whole tree: a folder the owner attached

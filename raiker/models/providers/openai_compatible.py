@@ -19,6 +19,7 @@ from raiker.models.contracts import (
     ModelResponse,
     ModelStreamEvent,
     ProviderModelInfo,
+    ToolCallProposal,
 )
 from raiker.models.exceptions import (
     ModelProviderError,
@@ -29,6 +30,7 @@ from raiker.models.exceptions import (
     stream_failure,
 )
 from raiker.models.health import ProviderHealth
+from raiker.models.providers import ollama_native
 from raiker.models.providers.http import (
     ProviderHttpTransport,
     bounded_lines,
@@ -273,6 +275,10 @@ class AsyncOpenAICompatibleProvider:
     #: OpenRouter's ``provider`` routing preferences. Never overrides a field
     #: Raiker sets itself (model, messages, tools, …).
     extra_body: Mapping[str, Any] = field(default_factory=dict)
+    #: Ollama only: talk to its native ``/api/chat`` so the context Ollama
+    #: loads is Raiker's choice, not the model's full trained window.
+    ollama_native_chat: bool = True
+    _context_maximum: dict[str, int] = field(default_factory=dict, init=False, repr=False)
 
     def __post_init__(self) -> None:
         # OpenAI reports an exhausted allowance as 429 `insufficient_quota` and
@@ -478,7 +484,128 @@ class AsyncOpenAICompatibleProvider:
                 payload["reasoning_summary"] = reasoning.summary
         return payload
 
+    def _uses_ollama_native(self) -> bool:
+        return self.provider == "ollama" and self.ollama_native_chat
+
+    async def _ollama_maximum(self, model: str) -> int | None:
+        """The model's trained context, read once from ``/api/show``."""
+        if model in self._context_maximum:
+            return self._context_maximum[model] or None
+        maximum = 0
+        try:
+            detail = await self._native_request("POST", "/api/show", json={"model": model})
+            info = detail.get("model_info")
+            if isinstance(info, Mapping):
+                for key, value in info.items():
+                    if str(key).endswith(".context_length") and isinstance(value, int) and value > 0:
+                        maximum = value
+                        break
+            maximum = maximum or (_context_length(detail) or 0)
+        except Exception:  # noqa: BLE001 — an unknown maximum falls back to a safe default
+            maximum = 0
+        self._context_maximum[model] = maximum
+        return maximum or None
+
+    async def _ollama_body(self, request: ModelRequest, *, stream: bool) -> dict[str, Any]:
+        if request.tools and not self.capabilities.supports_tool_calls:
+            raise ProviderUnsupportedCapabilityError("tool_calls_unsupported")
+        if request.response_schema is not None and not self.capabilities.supports_json_schema:
+            raise ProviderUnsupportedCapabilityError("json_schema_unsupported")
+        model = request.model or self.model
+        num_ctx = ollama_native.context_for(request, maximum=await self._ollama_maximum(model))
+        return ollama_native.payload(
+            request,
+            model=model,
+            stream=stream,
+            num_ctx=num_ctx,
+            vision=self.capabilities.supports_vision,
+            tools=self.capabilities.supports_tool_calls,
+        )
+
+    def _text_calls_allowed(self) -> bool:
+        return self.tool_call_mode in {"text_json", "native_or_text_json", "native_or_json_schema"}
+
+    async def _ollama_chat(self, request: ModelRequest) -> ModelResponse:
+        response = await self._http.request(
+            "POST",
+            _join_origin(self.endpoint, "/api/chat"),
+            json=await self._ollama_body(request, stream=False),
+        )
+        data = json_object(response)
+        ollama_native.raise_error(data, streaming=False)
+        raw = data.get("message")
+        message: dict[str, Any] = raw if isinstance(raw, dict) else {}
+        content = message.get("content")
+        text = content if isinstance(content, str) else ""
+        calls = ollama_native.tool_calls(message.get("tool_calls"))
+        if not calls and self._text_calls_allowed():
+            calls = _parse_text_json_tool_calls(text)
+            if calls:
+                text = ""
+        thinking = message.get("thinking")
+        return ModelResponse(
+            text=text,
+            tool_calls=calls,
+            finish_reason=ollama_native.finish_reason(data, has_tools=bool(calls)),
+            usage=ollama_native.usage(data),
+            reasoning=thinking if isinstance(thinking, str) else "",
+        )
+
+    async def _ollama_stream(self, request: ModelRequest) -> AsyncIterator[ModelStreamEvent]:
+        streamed: list[str] = []
+        calls: list[ToolCallProposal] = []
+        async with self._http.stream(
+            "POST",
+            _join_origin(self.endpoint, "/api/chat"),
+            json=await self._ollama_body(request, stream=True),
+            timeout=self.timeout,
+        ) as response:
+            async for line in bounded_lines(response):
+                if not line.strip():
+                    continue
+                try:
+                    decoded = json.loads(line)
+                except json.JSONDecodeError as exc:
+                    raise ProviderStreamError("malformed_ndjson") from exc
+                if not isinstance(decoded, dict):
+                    continue
+                ollama_native.raise_error(decoded, streaming=True)
+                raw = decoded.get("message")
+                message: dict[str, Any] = raw if isinstance(raw, dict) else {}
+                thinking = message.get("thinking")
+                if isinstance(thinking, str) and thinking:
+                    yield ModelStreamEvent(event_type="reasoning_delta", reasoning_delta=thinking)
+                text = message.get("content")
+                if isinstance(text, str) and text:
+                    streamed.append(text)
+                    yield ModelStreamEvent(event_type="text_delta", text_delta=text)
+                calls.extend(ollama_native.tool_calls(message.get("tool_calls"), offset=len(calls)))
+                if decoded.get("done") is True:
+                    if not calls and self._text_calls_allowed():
+                        calls = _parse_text_json_tool_calls("".join(streamed))
+                    for call in calls:
+                        yield ModelStreamEvent(
+                            event_type="tool_call_delta",
+                            tool_call_delta={
+                                "call_id": call.call_id,
+                                "tool_name": call.tool_name,
+                                "arguments": call.arguments,
+                            },
+                        )
+                    counted = ollama_native.usage(decoded)
+                    if counted:
+                        yield ModelStreamEvent(event_type="usage", metadata={"usage": counted})
+                    yield ModelStreamEvent(
+                        event_type="finish",
+                        finish_reason=ollama_native.finish_reason(decoded, has_tools=bool(calls)),
+                    )
+                    return
+        # MD-5 — the connection closed in order before `done`: a lost answer.
+        raise ProviderStreamError("stream_ended_without_finish")
+
     async def chat(self, request: ModelRequest) -> ModelResponse:
+        if self._uses_ollama_native():
+            return await self._ollama_chat(request)
         response = await self._request(
             "POST", self.chat_path, json=self._payload(request, stream=False)
         )
@@ -522,6 +649,20 @@ class AsyncOpenAICompatibleProvider:
     async def stream_chat(self, request: ModelRequest) -> AsyncIterator[ModelStreamEvent]:
         if not self.capabilities.supports_streaming:
             raise ProviderUnsupportedCapabilityError("streaming_unsupported")
+        if self._uses_ollama_native():
+            try:
+                async for event in self._ollama_stream(request):
+                    yield event
+            except asyncio.CancelledError:
+                raise
+            except ProviderStreamError:
+                raise
+            except Exception as exc:
+                raised = stream_failure(exc)
+                if raised is exc:
+                    raise
+                raise raised from exc
+            return
         tool_calls: dict[int, dict[str, str]] = {}
         finish_emitted = False
         # BD-5 — the streamed answer, kept so a model that wrote its tool call

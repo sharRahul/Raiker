@@ -390,7 +390,11 @@ you stopped it after it changed files, and what it applied stays.
 The checks are yours. In **Work → Projects**, open the project and write one
 command per line under **Checks** (at most ten), such as `pytest -q` or
 `npm test`, then **Save context**. Build turns in that project are asked to run
-each one exactly as written after their last change. **Verified** means every
+each one exactly as written after their last change, and when the model
+finishes without doing so, **Build runs them itself**: each check that did not
+run after the last change is proposed as a command, exactly as written, through
+the same approval, sandbox and record as any other, and the model then reads the
+results and closes the turn. **Verified** means every
 check ran *after* the last change and exited 0, read from Raiker's own command
 record, not from what the model said it did. A check that ran before the last
 change, a command that only looks like it, or no checks at all leaves the

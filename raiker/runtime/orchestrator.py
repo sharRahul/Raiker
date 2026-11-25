@@ -1571,6 +1571,41 @@ class RuntimeOrchestrator:
         if engine is not None:
             engine.authority = authority
 
+    def _declared_checks_due(self, envelope: PromptEnvelope) -> list[str]:
+        """RU-22 — this Build turn's declared checks not yet run after its last change."""
+        store = getattr(self.tool_broker, "store", None)
+        if store is None or not envelope.turn_id:
+            return []
+        try:
+            # A turn resumed after an approval is rebuilt without the
+            # composer's metadata, so the session's own record says which
+            # surface and project it belongs to.
+            session = store.load_session(envelope.session_id) or {}
+            surface = str(envelope.prompt.metadata.get("surface") or session.get("origin") or "chat")
+            project_id = str(
+                envelope.prompt.metadata.get("project_id") or session.get("project_id") or ""
+            ).strip()
+            if surface != "build" or not project_id:
+                return []
+            from raiker.control.build_outcome import checks_due
+            from raiker.execution.commands.store import CommandStore
+
+            context = store.load_effective_project_context(project_id)
+            checks = [str(item) for item in context.get("checks") or []]
+            if not checks:
+                return []
+            owner = self._source_owner(envelope)
+            runs = [
+                {**run.__dict__, "state": getattr(run.state, "value", run.state)}
+                for run in CommandStore(store).list_runs(owner, session_id=envelope.session_id, limit=500)
+                if run.turn_id == envelope.turn_id
+            ]
+            actions = store.list_turn_tool_actions(envelope.session_id, envelope.turn_id)
+            return checks_due(tool_actions=actions, command_runs=runs, checks=checks)
+        except Exception:  # noqa: BLE001 — a record that cannot be read proposes nothing
+            _LOGGER.debug("declared checks could not be read", exc_info=True)
+            return []
+
     def _task_tree_authority(
         self, envelope: PromptEnvelope, owner: str, authority: Any, task_root: Path | None
     ) -> Any:
@@ -3384,6 +3419,7 @@ class RuntimeOrchestrator:
         # QUI-A rules — a local model gets one chance to correct a block the
         # runtime refused, and then the answer stands as it is.
         block_retry_used = False
+        declared_checks_started = False
 
         def answer_so_far() -> str:
             return "\n\n".join(part for part in (text.strip() for text in answer_segments) if part)
@@ -3688,10 +3724,27 @@ class RuntimeOrchestrator:
                     answer_segments.append(OUTPUT_LIMIT_CUT_OFF)
                     final_text = answer_so_far()
                     break
-                answer_segments.append(response.text)
-                final_text = answer_so_far()
-                closing_text = response.text
-                break
+                due = [] if declared_checks_started else self._declared_checks_due(envelope)
+                if not due:
+                    answer_segments.append(response.text)
+                    final_text = answer_so_far()
+                    closing_text = response.text
+                    break
+                # RU-22 — the model has finished, and a check the owner declared
+                # did not run after the last change. The runtime proposes each
+                # one itself, exactly as written, through the same governed
+                # command path (policy, approval, sandbox, record) as any call
+                # the model makes; the model then reads the results and closes.
+                declared_checks_started = True
+                self._event(envelope, "build_declared_checks_proposed", {"checks": len(due)})
+                response = replace(
+                    response,
+                    tool_calls=[
+                        ToolCallProposal(f"raiker_check_{index}", "shell", {"command": check})
+                        for index, check in enumerate(due)
+                    ],
+                    finish_reason="tool_calls",
+                )
 
             # Text written *alongside* a tool call is part of the answer, and is
             # kept before the call is proposed so a turn that stops, parks or

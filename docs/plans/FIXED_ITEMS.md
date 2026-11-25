@@ -1,5 +1,21 @@
 # Fixed items
 
+## FIXED-1559 — A new project had no folder outside Raiker's data
+
+**Severity: Medium. Area: Projects / Build (RU-21). Status: Fixed 2026-11-25.** **Create project** made `.raiker/projects/<slug>` inside Raiker's own data folder, which the owner could not easily open and Apply treated as protected territory (RU-J4). Of the two options — keep managed folders and migrate later, or give each project a real folder — the second was taken without a migration: **Create project** now makes `~/Raiker Projects/<name>` (or under `RAIKER_PROJECTS_HOME`), named by the server from the project's name, never adopting an existing folder (`Pricing 2` …), and attaches it as the project's writable root through the same governed attach path as **Attach existing folder**. Projects made before keep their managed folder and work unchanged, so nothing has to move. The API keeps its old default; `create_folder: true` asks for the new one. Evidence: `tests/test_project_folder.py`, `web/src/lib/views/ProjectsView.test.ts`.
+
+## FIXED-1558 — Build left declared checks to the model
+
+**Severity: Medium. Area: Build / verification (RU-22). Status: Fixed 2026-11-25.** A Build turn was verified only when the model ran each declared check exactly as written; in RU-J4 it ran `python3 -m unittest test_pricing -v` instead of `python3 -m unittest -q` and the turn read *Not verified* though the tests passed. When the model finishes, the runtime now reads the turn's own records and proposes every declared check that did not run after the last change, exactly as written, as `shell` calls through the same policy, approval, sandbox and command record as a model's call (`build_declared_checks_proposed` is recorded); the model then reads the results and closes the turn. Once per turn, only in a Build session whose project declares checks, never while a check is waiting on the owner, and a resumed turn reads its surface and project from the session. Evidence: `tests/test_build_runs_declared_checks.py`.
+
+## FIXED-1557 — An interpreter a toolchain manager installed could not run in the sandbox
+
+**Severity: Medium. Area: MCP / sandbox. Status: Fixed 2026-11-25.** The sandbox passed over every interpreter in the owner's home, so an MCP server on a uv-managed Python failed its Test with `mcp_command_not_found` though it ran in a terminal (2026-11-19). The home stays out; one install folder directly below a recognised store — uv, pyenv, pyenv-win, nvm, nvm-windows, mise, asdf, Volta — is now reachable read-only when nothing in it is credential-shaped (`.npmrc`, `.netrc`, `.pypirc`, `credentials*`, `id_*`, `*.pem`, `*.key` …) and no link leaves it. Linux mounts that folder read-only; Windows and macOS, whose boundary is a separate account, copy it once into a toolchain cache in the sandbox's own base (keyed by path and file sizes, at most 1 GB) and run the copy, so the owner's profile is never re-permissioned. Evidence: `tests/test_user_toolchains.py`. The 2026-09-04 MCP live case on the Windows test PC fails for a different reason, `native_sandbox_required`: this PC's sandbox account is not set up yet (one owner UAC prompt, RU-03).
+
+## FIXED-1556 — Ollama loaded every model at its full context
+
+**Severity: High. Area: Models / Ollama. Status: Fixed 2026-11-25.** Raiker reached Ollama through its OpenAI-compatible `/v1` route, which takes no `num_ctx`, so Ollama 0.40 loaded `qwen3.5:9b` at 262,144 tokens — 15 GB on a 16 GB card, 8 % on the CPU — and a one-line answer took minutes (RT-1125-04). Measured on the test PC: `/v1` with `options.num_ctx` still loaded 32,768; `/api/chat` loaded 4,096. Chat and streaming to a local Ollama now use its native `/api/chat` on the same policy-checked origin, with `options.num_ctx` the smallest of 8,192 to 131,072 that holds the messages, tools and answer budget, never above the model's trained context (read once from `/api/show`); steps, so a conversation reloads the model a few times rather than every turn. Tool calls, thinking, usage and the lost-stream rule read into the same events. Live: `qwen3.5:9b` loaded at 8,192 tokens, 100 % on the GPU, first answer in 4.7 s. Evidence: `tests/test_async_runtime_completion.py` (`test_ollama_factory_sends_tools_and_parses_native_tool_call`, `test_ollama_streams_ndjson_into_the_same_events`, `test_ollama_context_steps_up_with_the_request_and_stops_at_the_model`).
+
 ## FIXED-1555 — The telemetry heading sat against the support-bundle button
 
 **Severity: Low. Area: Diagnostics / layout. Status: Fixed 2026-11-25.** Found in RT-1125-09's capture: in Diagnostics › Share or export, *Can I see this outside Raiker?* started directly under **Build support bundle**, with no space between two different subjects. The heading now has the section gap above it (`--space-5`), as the other sections do. The OTLP live case's *Metadata only* check also reads the visible badge only, so it passes on a workspace that already has a collector. Evidence: RT-1125-09's second capture.
@@ -2097,6 +2113,10 @@ file you can open. The two capture sets that remain — `screenshots/pages/` and
 
 | ID | Severity | Area | Status |
 |---|---|---|---|
+| [FIXED-1559](#fixed-1559--a-new-project-had-no-folder-outside-raikers-data) | Medium | Projects / Build (RU-21) | Fixed 2026-11-25 |
+| [FIXED-1558](#fixed-1558--build-left-declared-checks-to-the-model) | Medium | Build / verification (RU-22) | Fixed 2026-11-25 |
+| [FIXED-1557](#fixed-1557--an-interpreter-a-toolchain-manager-installed-could-not-run-in-the-sandbox) | Medium | MCP / sandbox | Fixed 2026-11-25 |
+| [FIXED-1556](#fixed-1556--ollama-loaded-every-model-at-its-full-context) | High | Models / Ollama | Fixed 2026-11-25 |
 | [FIXED-1555](#fixed-1555--the-telemetry-heading-sat-against-the-support-bundle-button) | Low | Diagnostics / layout | Fixed 2026-11-25 |
 | [FIXED-1554](#fixed-1554--not-verified-did-not-say-how-to-verify) | Low | Build / outcome (RU-22) | Fixed 2026-11-25 |
 | [FIXED-1553](#fixed-1553--nine-more-errors-said-what-failed-and-nothing-else) | Low | UI copy (QUI-G06) | Fixed 2026-11-25 |

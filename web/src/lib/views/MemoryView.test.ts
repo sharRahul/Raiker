@@ -548,6 +548,33 @@ describe("MemoryView import review (BUG-244)", () => {
     ).toBe(false);
   });
 
+  it("reads another agent's Markdown memory file as records to review (RU-16)", async () => {
+    const fetchMock = stubFetch({
+      ...base,
+      "POST /api/memory/import/preview": {
+        ok: true, total: 2, new_count: 2, duplicate_count: 0, duplicates: [], similar_count: 0, source_class: "foreign",
+        records: [
+          { index: 0, text: "Prefers metric units", scope: "user", memory_id: "", status: "new" },
+          { index: 1, text: "Dentist is Dr. Okafor", scope: "user", memory_id: "", status: "new" },
+        ],
+      },
+    });
+    render(MemoryView, { props: { tab: "controls" } });
+    await waitFor(() => expect(screen.getByText(/advanced memory management/i)).toBeInTheDocument());
+    const input = document.querySelector<HTMLInputElement>('.file-button input[type="file"]');
+    const body = "Prefers metric units\n§\nDentist is Dr. Okafor\n";
+    const file = new File([body], "MEMORY.md", { type: "text/markdown" });
+    Object.defineProperty(file, "text", { value: async () => body, configurable: true });
+    Object.defineProperty(input!, "files", { value: [file], configurable: true });
+    await fireEvent.change(input!);
+    expect(await screen.findByRole("button", { name: /Import 2 records$/ })).toBeInTheDocument();
+    const preview = fetchMock.mock.calls.find(([url]) => String(url) === "/api/memory/import/preview");
+    expect(JSON.parse(String(preview?.[1]?.body)).memories).toEqual([
+      { text: "Prefers metric units", scope: "user" },
+      { text: "Dentist is Dr. Okafor", scope: "user" },
+    ]);
+  });
+
   it("offers no ordinary import when every record is already stored", async () => {
     stubFetch({
       ...base,

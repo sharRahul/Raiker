@@ -1,5 +1,9 @@
 # Fixed items
 
+## FIXED-1541 — Another agent's Markdown memory could not be imported
+
+**Severity: Low. Area: Memory / import. Status: Fixed 2026-11-25.** Memory's import took only Raiker's own JSON export, so an owner moving from Hermes Agent (`MEMORY.md`, `USER.md`) or keeping notes as a Markdown list read *This file is not a valid Raiker memory export.* (RU-16). **Review import** now also takes `.md`, `.markdown` and `.txt`: entries separated by a `§` line (Hermes Agent's format), else bullet or numbered items, else paragraphs, each a `user`-scope record without headings, empties or repeats, in the same review and governed write path as an export. Evidence: `web/src/lib/memoryImportText.test.ts`, `web/src/lib/views/MemoryView.test.ts` (*reads another agent's Markdown memory file as records to review (RU-16)*).
+
 ## FIXED-1540 — A command could not be allowed for a conversation from any screen
 
 **Severity: Medium. Area: Approvals / commands. Status: Fixed 2026-11-25.** `run_command` runs only under a per-conversation command grant, and the grant was reachable through `PUT /api/sessions/{id}/command-grant` alone, so Build asked again for every `python3 -m unittest` (RU-07). The floating approval card now offers **Allow `<command>` in this conversation** when the command reads back as exact plain words — no quoting, shell operators, globbing, variables, redaction or truncation. It records that one argv for eight hours (300-second run limit) and approves the run in hand; nothing else is widened. Evidence: `web/src/lib/commandGrant.test.ts`, `web/src/lib/components/ApprovalPrompt.test.ts` (*allows an exact command for this conversation…*, *offers no conversation grant for a command a shell would reinterpret*).
@@ -2037,6 +2041,7 @@ file you can open. The two capture sets that remain — `screenshots/pages/` and
 
 | ID | Severity | Area | Status |
 |---|---|---|---|
+| [FIXED-1541](#fixed-1541--another-agents-markdown-memory-could-not-be-imported) | Low | Memory / import | Fixed 2026-11-25 |
 | [FIXED-1540](#fixed-1540--a-command-could-not-be-allowed-for-a-conversation-from-any-screen) | Medium | Approvals / commands | Fixed 2026-11-25 |
 | [FIXED-1539](#fixed-1539--a-memory-raiker-proposed-could-only-be-kept-from-memory) | Medium | Chat / memory | Fixed 2026-11-25 |
 | [FIXED-1538](#fixed-1538--first-run-did-not-say-which-models-suit-numbers-and-code) | Low | First run / models | Fixed 2026-11-25 |

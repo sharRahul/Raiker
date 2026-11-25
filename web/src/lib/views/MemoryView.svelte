@@ -42,6 +42,7 @@
     type MemoryFilter,
   } from "../memoryLifecycle";
   import { memoryEvidence, proposalEvidence } from "../memoryEvidence";
+  import { memoriesFromText } from "../memoryImportText";
 
   type MemoryImport = Array<Partial<MemoryControlView> & { text: string }>;
   let memories = $state<MemoryControlView[] | null>(null);
@@ -270,7 +271,10 @@
     const file = input.files?.[0];
     if (!file) return;
     try {
-      const parsed = JSON.parse(await file.text()) as unknown;
+      const raw = await file.text();
+      // RU-16 — another agent's Markdown memory (Hermes MEMORY.md/USER.md, a
+      // bullet list) is read as records to review, like an export.
+      const parsed = /\.(md|markdown|txt)$/i.test(file.name) ? memoriesFromText(raw) : (JSON.parse(raw) as unknown);
       const values = Array.isArray(parsed) ? parsed : typeof parsed === "object" && parsed !== null && Array.isArray((parsed as { memories?: unknown }).memories) ? (parsed as { memories: unknown[] }).memories : [];
       if (!values.every((value) => typeof value === "object" && value !== null && typeof (value as { text?: unknown }).text === "string")) throw new Error("schema");
       importPreview = values as MemoryImport; importFileName = file.name; actionError = null;
@@ -281,7 +285,7 @@
       importAlready = null;
       try { importAlready = await api.previewMemoryImport(importPreview); }
       catch { importAlready = null; }
-    } catch { importPreview = null; importAlready = null; actionError = "This file is not a valid Raiker memory export."; }
+    } catch { importPreview = null; importAlready = null; actionError = "This file is not a Raiker memory export or a Markdown memory file."; }
     // A file input keeps its value, so choosing the same file again after an
     // undo would otherwise not fire `change`.
     input.value = "";
@@ -895,7 +899,7 @@
   </section>
 {/if}
 
-  <details class="advanced"><summary><span><strong>Advanced memory management</strong><small>Import or export governed memory records.</small></span><Icon name="chevron-down" size="md" /></summary><div class="advanced-body"><button class="btn btn-ghost" onclick={() => void exportMemories()}>Export memories</button><label class="btn btn-ghost file-button">Review import<input type="file" accept="application/json,.json" onchange={(e) => void reviewImport(e)} /></label>{#if importPreview}
+  <details class="advanced"><summary><span><strong>Advanced memory management</strong><small>Import or export governed memory records.</small></span><Icon name="chevron-down" size="md" /></summary><div class="advanced-body"><button class="btn btn-ghost" onclick={() => void exportMemories()}>Export memories</button><label class="btn btn-ghost file-button">Review import<input type="file" accept="application/json,.json,.md,.markdown,.txt,text/markdown,text/plain" onchange={(e) => void reviewImport(e)} /></label>{#if importPreview}
       <!-- BUG-244 — what this would change, before it changes anything. A
            re-import must not duplicate: recall is budgeted, and four copies of
            one sentence take four of the slots a turn has for remembering. -->

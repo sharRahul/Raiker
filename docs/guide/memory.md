@@ -370,6 +370,11 @@ own retention/erasure process; Raiker must not claim that copy vanished early.
 **Memory → Controls → Advanced memory management** exports every
 recallable memory as JSON and takes one back.
 
+It also takes another agent's Markdown memory: Hermes Agent's `MEMORY.md` or
+`USER.md` (entries separated by a `§` line), or any bullet list such as the notes
+in a `CLAUDE.md`. Each entry becomes one record about you, in the same review as
+an export — nothing is stored until you choose **Import**.
+
 An import is not a second way into the store: each record goes through the same
 governed write path a proposal does, and is recorded as a lifecycle event with
 `source: user_import`. What it will not do is store the same sentence twice.

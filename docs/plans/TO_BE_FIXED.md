@@ -1973,6 +1973,21 @@ FIXED-1526 to FIXED-1529.
   requesting a smaller context is still open. *Closed 2026-11-25:* Raiker now
   talks to Ollama through `/api/chat` with `options.num_ctx`
   ([FIXED-1556](FIXED_ITEMS.md#fixed-1556--ollama-loaded-every-model-at-its-full-context)).
+* **On the Windows test PC, commands now run in WSL2; programs still cannot.**
+  2026-11-25: the `RaikerSandbox` WSL2 distribution and the restricted accounts
+  were already set up, but the source checkout had no Linux runner
+  (`native_sandbox_wsl_runner_missing`) and the workspace still chose the
+  account boundary. With the runner built in WSL Ubuntu
+  (`cargo build --release -p raiker-command-runner --target x86_64-unknown-linux-musl`,
+  installed with `scripts/build_native_runner.py --wsl --from <file>`) and WSL2
+  chosen, Build's commands run sandboxed (RT-1125-14). MCP stdio servers and
+  hooks run Windows interpreters, which only the restricted-account boundary
+  can hold; the runner refuses that boundary
+  (`native_sandbox_account_profile_isolation_unavailable`) until the four gaps
+  in the [release blocker](#release-blocker-native-sandbox-migration-incomplete)
+  are closed — per-account profile reset, explicit descendant ACLs, explicit
+  allows below denied drive roots, and the loopback-port approximation. That is
+  security engineering in the Rust runner of its own (RU-03), not a setting.
 * **Ollama Cloud answered HTTP 402.** `gpt-oss:20b-cloud`, connected through
   **Add model › On this computer › Ollama**, refused the first turn with
   `provider_quota_exhausted:http_402`; Raiker said the account has no credit or

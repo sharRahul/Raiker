@@ -1730,6 +1730,8 @@ push-to-talk turn in Chat transcribes and answers aloud. Also open: the
 packaged desktop build has not been rebuilt with `pywhispercpp` collected
 (`--bundle-voice`), and `requirements/voice.txt` was extended with hashes read
 from PyPI in this round, so the Windows voice workflow should be re-run.
+*Re-run 2026-11-25:* **Personal Windows voice** passed on `main` (run
+45518199280) with the hashed `requirements/voice.txt`.
 
 ## Built-in embedding model — what the first slice did not do
 

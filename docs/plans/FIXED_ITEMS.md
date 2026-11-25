@@ -1,5 +1,9 @@
 # Fixed items
 
+## FIXED-1542 — A project's .cursorrules was ignored
+
+**Severity: Low. Area: Build / instructions. Status: Fixed 2026-11-25.** A project set up for Cursor keeps its rules in `.cursorrules`, which Build ignored after FIXED-1536 added `AGENTS.md` and `CLAUDE.md`. `.cursorrules` is now the last name a project root is read for, under the same review; the multi-file `.cursor/rules` folder is still not read, because a project has one instruction file. Evidence: `tests/test_raiker_md.py::test_cursorrules_is_the_last_fallback`.
+
 ## FIXED-1541 — Another agent's Markdown memory could not be imported
 
 **Severity: Low. Area: Memory / import. Status: Fixed 2026-11-25.** Memory's import took only Raiker's own JSON export, so an owner moving from Hermes Agent (`MEMORY.md`, `USER.md`) or keeping notes as a Markdown list read *This file is not a valid Raiker memory export.* (RU-16). **Review import** now also takes `.md`, `.markdown` and `.txt`: entries separated by a `§` line (Hermes Agent's format), else bullet or numbered items, else paragraphs, each a `user`-scope record without headings, empties or repeats, in the same review and governed write path as an export. Evidence: `web/src/lib/memoryImportText.test.ts`, `web/src/lib/views/MemoryView.test.ts` (*reads another agent's Markdown memory file as records to review (RU-16)*).
@@ -2041,6 +2045,7 @@ file you can open. The two capture sets that remain — `screenshots/pages/` and
 
 | ID | Severity | Area | Status |
 |---|---|---|---|
+| [FIXED-1542](#fixed-1542--a-projects-cursorrules-was-ignored) | Low | Build / instructions | Fixed 2026-11-25 |
 | [FIXED-1541](#fixed-1541--another-agents-markdown-memory-could-not-be-imported) | Low | Memory / import | Fixed 2026-11-25 |
 | [FIXED-1540](#fixed-1540--a-command-could-not-be-allowed-for-a-conversation-from-any-screen) | Medium | Approvals / commands | Fixed 2026-11-25 |
 | [FIXED-1539](#fixed-1539--a-memory-raiker-proposed-could-only-be-kept-from-memory) | Medium | Chat / memory | Fixed 2026-11-25 |

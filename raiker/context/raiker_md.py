@@ -8,7 +8,7 @@ In short:
   (``.raiker/user-instructions/<user id>/RAIKER.md``) and the project root's
   ``RAIKER.md``. A ``RAIKER.md`` in a subdirectory is never read, and no
   import or ``@file`` expansion exists. A project root with no ``RAIKER.md``
-  is read for ``AGENTS.md``, then ``CLAUDE.md`` (RU-16), under the same
+  is read for ``AGENTS.md``, then ``CLAUDE.md``, then ``.cursorrules`` (RU-16), under the same
   review: one file per project, the first name present, never merged.
 * A project uses file instructions only after the owner turns them on for it.
 * Discovering a file does not approve it. The owner reviews the exact bytes
@@ -38,7 +38,9 @@ from raiker.context.redaction import redact_text
 
 FILENAME: Final = "RAIKER.md"
 #: A project root's names, in order. The first present is the project's file.
-PROJECT_FILENAMES: Final = (FILENAME, "AGENTS.md", "CLAUDE.md")
+#: ``.cursorrules`` is Cursor's single-file rules; its ``.cursor/rules`` folder of
+#: several files is not read, because a project has one instruction file.
+PROJECT_FILENAMES: Final = (FILENAME, "AGENTS.md", "CLAUDE.md", ".cursorrules")
 #: Bumped when what the model is shown for the same bytes changes (the
 #: redactor's projection or the wrapper). A review binds to it, so a new
 #: projection is reviewed again rather than trusted on the old approval.

@@ -73,6 +73,14 @@ def test_a_project_root_falls_back_to_agents_md_then_claude_md(tmp_path: Path) -
     assert (read.name, read.text) == ("RAIKER.md", "Raiker rules")
 
 
+def test_cursorrules_is_the_last_fallback(tmp_path: Path) -> None:
+    (tmp_path / ".cursorrules").write_text("Cursor rules", encoding="utf-8")
+    read = raiker_md.read_instruction_file(tmp_path, raiker_md.PROJECT_FILENAMES)
+    assert (read.name, read.text) == (".cursorrules", "Cursor rules")
+    (tmp_path / "CLAUDE.md").write_text("Claude rules", encoding="utf-8")
+    assert raiker_md.read_instruction_file(tmp_path, raiker_md.PROJECT_FILENAMES).name == "CLAUDE.md"
+
+
 def test_the_global_file_never_reads_another_agents_name(tmp_path: Path) -> None:
     (tmp_path / "AGENTS.md").write_text("Agent rules", encoding="utf-8")
     assert raiker_md.read_instruction_file(tmp_path).state == "absent"

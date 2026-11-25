@@ -1989,7 +1989,10 @@ FIXED-1526 to FIXED-1529.
   in the [release blocker](#release-blocker-native-sandbox-migration-incomplete)
   close — per-account profile reset, explicit descendant ACLs, explicit allows
   below denied drive roots, and the loopback-port approximation (RU-03). Until
-  then a Windows owner who needs Windows-only toolchains has no boundary.
+  then a Windows owner who needs Windows-only toolchains has no boundary for
+  *commands*. MCP servers no longer wait on it: since
+  [FIXED-1561](FIXED_ITEMS.md#fixed-1561--an-owner-could-not-add-a-local-mcp-server-and-none-could-drive-an-application)
+  an owner-added server runs as the owner, as in Claude Code and Codex.
 * **Ollama Cloud answered HTTP 402.** `gpt-oss:20b-cloud`, connected through
   **Add model › On this computer › Ollama**, refused the first turn with
   `provider_quota_exhausted:http_402`; Raiker said the account has no credit or

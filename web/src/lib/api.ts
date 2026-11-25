@@ -411,6 +411,9 @@ export const api = {
     contract.renameMcpServer(serverId, expectedName === undefined ? { name } : { name, expected_name: expectedName }),
   deleteMcpServer: (serverId: string, expectedName?: string) =>
     contract.deleteMcpServer(serverId, expectedName === undefined ? {} : { expected_name: expectedName }),
+  // MCP-HOST — a local server by its command; it runs as the owner.
+  createLocalMcpServer: (name: string, command: string, args: string[], env: Record<string, string>) =>
+    contract.createLocalMcpServer({ name, command, args, env }),
   createRemoteMcpServer: (
     name: string,
     endpoint_url: string,

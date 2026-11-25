@@ -12,7 +12,7 @@ operation answers with, and whether OpenAPI describes it (OPT-01/OPT-02 —
 * **deferred** — the body has no declared type; a test fails while any is.
 * **special** — a stream, a file or another non-JSON transport; hand-written.
 
-**546 operations: 530 verified, 0 eligible, 0 deferred, 16 special.**
+**547 operations: 531 verified, 0 eligible, 0 deferred, 16 special.**
 
 | Method | Path | Request | Response | Status | Why |
 |---|---|---|---|---|---|
@@ -301,6 +301,7 @@ operation answers with, and whether OpenAPI describes it (OPT-01/OPT-02 —
 | GET | `/api/mcp/offers` |  | McpOffer[] | verified | DashboardService.list_mcp_offers |
 | GET | `/api/mcp/servers` |  | McpServerView[] | verified | DashboardService.list_mcp_servers |
 | POST | `/api/mcp/servers` | CreateMcpServerRequest | McpServerCreated | verified | declared by cast |
+| POST | `/api/mcp/servers/local` | CreateLocalMcpServerRequest | LocalMcpServerCreated | verified | declared by cast |
 | POST | `/api/mcp/servers/remote` | CreateRemoteMcpServerRequest | RemoteMcpServerCreated | verified | declared by cast |
 | DELETE | `/api/mcp/servers/{server_id}` |  | McpServerDeleted | verified | declared by cast |
 | PUT | `/api/mcp/servers/{server_id}` | RenameMcpServerRequest | McpServerRenamed | verified | declared by cast |

@@ -703,6 +703,81 @@ class RuntimeControlService:
             return mapped
         return ControlResult(ok=True, data=dict(result.artifacts or {}))
 
+    def create_local_mcp_server(
+        self,
+        acting_principal_id: str | None,
+        name: str,
+        command: str,
+        args: list[str],
+        env: dict[str, str] | None = None,
+    ) -> ControlResult:
+        """MCP-HOST — register a local stdio server the owner runs as themselves.
+
+        The design Claude Code and Codex use: a server the owner configures is
+        started by its own command, outside the command sandbox, with the
+        owner's access, so it can drive the applications it exists to drive.
+        What governs it is the owner's act of adding it (human-only), the
+        acceptance of each tool it declares before the model sees it, and the
+        gateway's approvals and audit on every call. A shell is never a server.
+        The server's ``env`` values are stored as its secrets.
+        """
+        from raiker.runtime.executors.mcp import McpConnectorExecutor, _normalize_server_name
+
+        principal, err = resolve_local_principal(self._workspace_root, acting_principal_id)
+        if principal is None:
+            return ControlResult(ok=False, reason_code=err or "principal_not_resolved")
+        if principal.principal_type != PrincipalType.HUMAN:
+            return ControlResult(ok=False, reason_code="not_authorized_human")
+        normalized = _normalize_server_name(name)
+        if normalized is None:
+            return ControlResult(ok=False, reason_code="mcp_invalid_server_name")
+        argv = [command.strip(), *(str(part) for part in args)]
+        if not argv[0] or len(argv) > 64 or any(len(part) > 4096 or "\x00" in part for part in argv):
+            return ControlResult(ok=False, reason_code="mcp_command_invalid")
+        refused = McpConnectorExecutor.validate_owner_command(argv)
+        if refused is not None:
+            return ControlResult(ok=False, reason_code=refused)
+        if self._store.get_mcp_server_by_name(principal.principal_id, normalized) is not None:
+            return ControlResult(ok=False, reason_code="mcp_name_taken")
+        server_id = new_id("mcp_")
+        self._store.create_mcp_server(
+            server_id=server_id,
+            principal_id=principal.principal_id,
+            name=normalized,
+            command=argv,
+            template=None,
+            transport="stdio",
+            status="created",
+        )
+        for variable, value in (env or {}).items():
+            stored = self.set_mcp_server_secret(acting_principal_id, server_id, variable, value)
+            if not stored.ok:
+                self._store.delete_mcp_server(server_id, principal.principal_id)
+                return stored
+        self._writer.append(
+            make_event(
+                session_id="mcp",
+                turn_id=None,
+                event_type="mcp_connection_added",
+                actor="control_service",
+                # The program's name and how many arguments: never the
+                # arguments themselves, which can hold paths or tokens.
+                payload={
+                    "server_id": server_id,
+                    "name": normalized,
+                    "transport": "stdio",
+                    "program": argv[0].replace("\\", "/").rsplit("/", 1)[-1],
+                    "argument_count": len(argv) - 1,
+                    "runs_as": "owner",
+                    "secret_count": len(env or {}),
+                },
+            )
+        )
+        return ControlResult(
+            ok=True,
+            data={"server_id": server_id, "name": normalized, "transport": "stdio", "runs_as": "owner"},
+        )
+
     def create_remote_mcp_server(
         self, acting_principal_id: str | None, name: str, endpoint_url: str, auth_ref: str | None
     ) -> ControlResult:

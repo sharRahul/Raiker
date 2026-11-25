@@ -549,6 +549,28 @@ describe("McpView — servers a plugin offers", () => {
     );
   });
 
+  it("adds a server on this computer by its command, as Claude Desktop does (MCP-HOST)", async () => {
+    const fetchMock = stubFetch({
+      "GET /api/mcp/servers": [],
+      "GET /api/mcp/offers": [],
+      "GET /api/capability-gates": ENABLED_GATES,
+      ...monitorRoutes(),
+      "POST /api/mcp/servers/local": { ok: true, server_id: "mcp_2", name: "blender", transport: "stdio", runs_as: "owner" },
+    });
+    render(McpView);
+    expect(await screen.findByTestId("mcp-local")).toBeInTheDocument();
+    await fireEvent.input(screen.getByLabelText("Name", { exact: true }), { target: { value: "blender" } });
+    await fireEvent.input(screen.getByLabelText("Command"), { target: { value: "uvx" } });
+    await fireEvent.input(screen.getByLabelText("Arguments (one per line)"), { target: { value: "blender-mcp" } });
+    await fireEvent.click(screen.getByRole("button", { name: "Add this server" }));
+    await waitFor(() => {
+      const call = fetchMock.mock.calls.find(([url]) => String(url).endsWith("/api/mcp/servers/local"));
+      expect(call).toBeTruthy();
+      expect(JSON.parse(String(call![1]!.body))).toEqual({ name: "blender", command: "uvx", args: ["blender-mcp"], env: {} });
+    });
+    expect(await screen.findByText(/It runs as you on this computer/)).toBeInTheDocument();
+  });
+
   it("shows an offer the owner already took up as added, with no button", async () => {
     stubFetch({
       "GET /api/mcp/servers": [],

@@ -1,5 +1,6 @@
 <script lang="ts">
   import { mcpProvenance } from "../mcpProvenance";
+  import { argsFromLines, envFromLines, serversFromConfig } from "../mcpLocalConfig";
   import EmptyState from "../components/EmptyState.svelte";
   import { askConfirm } from "../confirm.svelte";
   import { formatTimestamp } from "../format";
@@ -201,6 +202,67 @@
     } finally {
       loading = false;
     }
+  }
+
+  // MCP-HOST — a server on this computer, as Claude Desktop, Cursor and Codex add one.
+  let localName = $state("");
+  let localCommand = $state("");
+  let localArgs = $state("");
+  let localEnv = $state("");
+  let localPaste = $state("");
+
+  async function addLocal(event: Event) {
+    event.preventDefault();
+    const { env, refused } = envFromLines(localEnv);
+    if (refused.length) {
+      error = `Not added: “${refused.join("”, “")}” is not NAME=value. Your entries are kept here; correct those lines, then add again.`;
+      return;
+    }
+    busy = "local";
+    error = null;
+    notice = null;
+    try {
+      const created = await api.createLocalMcpServer(localName.trim(), localCommand.trim(), argsFromLines(localArgs), env);
+      notice = `Added “${created.name}”. It runs as you on this computer. Choose Test to start it and review the tools it offers.`;
+      localName = localCommand = localArgs = localEnv = "";
+      await load();
+    } catch (e) {
+      error = connectionFailure(`Could not add “${localName.trim()}”`, "Nothing was started; your entries are kept here.", "Check the command, then add it again.", e);
+    } finally {
+      busy = null;
+    }
+  }
+
+  async function importLocal(event: Event) {
+    event.preventDefault();
+    let parsed;
+    try {
+      parsed = serversFromConfig(localPaste);
+    } catch {
+      error = "That is not a server list Raiker can read. Nothing was added. Paste the mcpServers block from Claude Desktop or Cursor, then choose Add these servers.";
+      return;
+    }
+    busy = "local-import";
+    error = null;
+    notice = null;
+    const added: string[] = [];
+    const failed: string[] = [];
+    for (const server of parsed.servers) {
+      try {
+        const created = await api.createLocalMcpServer(server.name, server.command, server.args, server.env);
+        added.push(created.name);
+      } catch {
+        failed.push(server.name);
+      }
+    }
+    busy = null;
+    notice =
+      `Added ${added.length} server(s)${added.length ? `: ${added.join(", ")}` : ""}.` +
+      (parsed.skipped.length ? ` Skipped ${parsed.skipped.join(", ")} (no command; add a remote server by its address).` : "") +
+      (failed.length ? ` Not added: ${failed.join(", ")} (a name already used, or a shell). Check them, then add them on their own.` : "") +
+      (added.length ? " Choose Test on each to start it and review its tools." : "");
+    if (added.length) localPaste = "";
+    await load();
   }
 
   async function create(event: Event) {
@@ -853,6 +915,49 @@
   is the same one, and because hiding it entirely would leave the empty state
   pointing at nothing.
 -->
+<section class="local" aria-labelledby="mcp-local-h" data-testid="mcp-local">
+  <h2 id="mcp-local-h" class="local-h">Add a server on this computer</h2>
+  <p class="local-scope">
+    A server you add here runs <strong>as you, on this computer</strong>, outside the command sandbox — the way
+    Claude Desktop, Cursor and Codex run one — so it can work with your applications (Blender, a browser, Office,
+    your files). Raiker asks you to accept each tool it offers before Raiker may use it, asks before any action
+    as your permissions say, and records every call. Add only servers you trust. A shell is never a server.
+  </p>
+  <form class="create" onsubmit={addLocal}>
+    <div class="field">
+      <label class="field-label" for="mcp-local-name">Name</label>
+      <input id="mcp-local-name" class="input" bind:value={localName} placeholder="e.g. blender" autocomplete="off" />
+    </div>
+    <div class="field">
+      <label class="field-label" for="mcp-local-command">Command</label>
+      <input id="mcp-local-command" class="input" bind:value={localCommand} placeholder="e.g. uvx, npx, python, or a full path" autocomplete="off" spellcheck="false" />
+    </div>
+    <div class="field">
+      <label class="field-label" for="mcp-local-args">Arguments (one per line)</label>
+      <textarea id="mcp-local-args" class="input mono" rows="2" bind:value={localArgs} placeholder="blender-mcp" spellcheck="false"></textarea>
+    </div>
+    <div class="field">
+      <label class="field-label" for="mcp-local-env">Variables (NAME=value per line, kept as its secrets)</label>
+      <textarea id="mcp-local-env" class="input mono" rows="2" bind:value={localEnv} spellcheck="false"></textarea>
+    </div>
+    <button class="btn btn-primary" type="submit" disabled={busy === "local" || !localName.trim() || !localCommand.trim()}>
+      {busy === "local" ? "Adding…" : "Add this server"}
+    </button>
+  </form>
+  <details class="paste">
+    <summary>Paste from Claude Desktop or Cursor</summary>
+    <form class="create" onsubmit={importLocal}>
+      <div class="field wide">
+        <label class="field-label" for="mcp-local-paste">The <code>mcpServers</code> block</label>
+        <textarea id="mcp-local-paste" class="input mono" rows="6" bind:value={localPaste} spellcheck="false" placeholder={'{ "mcpServers": { "blender": { "command": "uvx", "args": ["blender-mcp"] } } }'}></textarea>
+      </div>
+      <button class="btn" type="submit" disabled={busy === "local-import" || !localPaste.trim()}>
+        {busy === "local-import" ? "Adding…" : "Add these servers"}
+      </button>
+    </form>
+  </details>
+</section>
+
 <details class="example">
   <summary>Developer example — generate a local sample server</summary>
   <!-- REM-MCP-02 — the reviewed scope, not an adjective. -->
@@ -877,6 +982,13 @@
 </details>
 
 <style>
+  .local { margin-top: var(--space-5); }
+  .local-h { font-size: var(--text-md); margin: 0 0 var(--space-2); }
+  .local-scope { margin: 0 0 var(--space-3); color: var(--text-2); font-size: var(--text-sm); line-height: 1.5; max-width: var(--prose-measure); }
+  .local .mono { font-family: var(--font-mono); font-size: var(--text-sm); }
+  .local .wide { flex: 1 1 100%; }
+  .local .wide .input { width: 100%; }
+  .paste summary { cursor: pointer; color: var(--text-2); font-size: var(--text-sm); font-weight: 600; margin-bottom: var(--space-2); }
   .example { margin-top: var(--space-4); border: 1px solid var(--border); border-radius: var(--r-md); background: var(--surface); padding: var(--space-3) var(--space-4); }
   .example summary { cursor: pointer; color: var(--text-2); font-size: var(--text-md); font-weight: 650; }
   .example-scope { margin: var(--space-3) 0 0; color: var(--text-2); font-size: var(--text-sm); line-height: 1.5; max-width: var(--prose-measure); }

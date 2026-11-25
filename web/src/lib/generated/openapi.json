@@ -9373,6 +9373,41 @@
         "title": "CreateGoalRequest",
         "type": "object"
       },
+      "CreateLocalMcpServerRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "args": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Args",
+            "type": "array"
+          },
+          "command": {
+            "title": "Command",
+            "type": "string"
+          },
+          "env": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "default": {},
+            "title": "Env",
+            "type": "object"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "command"
+        ],
+        "title": "CreateLocalMcpServerRequest",
+        "type": "object"
+      },
       "CreateMcpServerRequest": {
         "additionalProperties": false,
         "properties": {
@@ -20007,6 +20042,41 @@
           "published_at"
         ],
         "title": "LlamaUpdateCheck",
+        "type": "object"
+      },
+      "LocalMcpServerCreated": {
+        "properties": {
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          },
+          "runs_as": {
+            "const": "owner",
+            "title": "Runs As",
+            "type": "string"
+          },
+          "server_id": {
+            "title": "Server Id",
+            "type": "string"
+          },
+          "transport": {
+            "const": "stdio",
+            "title": "Transport",
+            "type": "string"
+          }
+        },
+        "required": [
+          "ok",
+          "server_id",
+          "name",
+          "transport",
+          "runs_as"
+        ],
+        "title": "LocalMcpServerCreated",
         "type": "object"
       },
       "LocalModelDeployRequest": {
@@ -50193,6 +50263,45 @@
           }
         },
         "summary": "Create Mcp Server"
+      }
+    },
+    "/api/mcp/servers/local": {
+      "post": {
+        "description": "MCP-HOST — add a local server by its command; it runs as the owner.\n\nClaude Desktop's `mcpServers` and Codex's `[mcp_servers]`: the program and\nits arguments, and its own variables. Test-connect runs the handshake and\nlists the tools it declares for the owner to accept.",
+        "operationId": "create_local_mcp_server_api_mcp_servers_local_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateLocalMcpServerRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LocalMcpServerCreated"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Local Mcp Server"
       }
     },
     "/api/mcp/servers/remote": {

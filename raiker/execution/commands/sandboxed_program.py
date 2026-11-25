@@ -249,9 +249,11 @@ def _drain_bounded(
     timeout: float,
     max_stdout: int,
     stderr_tail: int,
+    cwd: str | None = None,
 ) -> BoundedRun:
     proc = subprocess.Popen(  # noqa: S603 - the runner's own argv, no shell
         argv,
+        cwd=cwd,
         stdin=subprocess.PIPE,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,

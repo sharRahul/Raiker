@@ -344,6 +344,36 @@ decision, not a permission one: a deferred tool is refused by nothing and reache
 in one call. The **Context** panel in either composer says how many are sent and
 how many are on request.
 
+### Add a server on this computer
+
+**Connections › Advanced › MCP servers › Add a server on this computer** adds a
+local stdio server by the command that starts it — the same three things Claude
+Desktop's `mcpServers`, Cursor's `mcp.json` and Codex's `[mcp_servers]` hold:
+the **command** (`uvx`, `npx`, `python`, or a full path), its **arguments** one
+per line, and its **variables** as `NAME=value`, which are kept as that server's
+secrets. **Paste from Claude Desktop or Cursor** takes the whole `mcpServers`
+block and adds each server in it.
+
+A server you add this way **runs as you, on this computer**, outside the command
+sandbox. That is how Claude Code ("local MCP servers … run with your full
+access"; its sandbox "covers shell commands only") and Codex run one, and it is
+what lets a server drive your applications — Blender, a browser, Office, the
+desktop — on Windows, macOS and Linux alike. What governs it instead of a
+sandbox:
+
+* **You added it.** Only you can, never the agent, and a shell (`cmd`,
+  `powershell`, `bash` …) is never accepted as a server.
+* **You accept each tool** it declares on **Test** before Raiker is offered it,
+  and a tool that changes is held again.
+* **Permissions and approvals** decide every call (the MCP decision mode), and
+  every call is recorded.
+* **Its environment is built, not inherited:** who you are, your profile and
+  program folders and, on Linux, the display — never a provider key or a Raiker
+  setting.
+
+Servers Raiker generates from a template (the developer example) still run in
+the command sandbox.
+
 ### On Windows, with WSL2 chosen
 
 With **WSL2** chosen as the command sandbox (Settings › Advanced), MCP servers
@@ -351,7 +381,8 @@ and hooks run in Raiker's own WSL2 distribution under the same boundary as
 commands, on the distribution's `python3` and `node` (setup installs both; the
 sandbox status lists them). A server written for Windows is started by name:
 `C:\Python313\python.exe server.py` runs as `python3 server.py`. A server
-that needs a Windows-only program waits for the account sandbox.
+that needs a Windows program is added under **Add a server on this computer**
+instead, where it runs as you.
 
 ### A server whose Python or Node is in your home folder
 

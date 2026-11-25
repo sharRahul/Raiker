@@ -963,7 +963,7 @@ def mcp_scope(
     its connection. Raiker's client advertises no roots and reads no resources
     (`unsupported_feature_notes` names them when a server offers them).
     """
-    from raiker.runtime.executors.mcp import allowed_mcp_env_names, mcp_stdio_env
+    from raiker.runtime.executors.mcp import allowed_mcp_env_names, mcp_host_env, mcp_stdio_env
     from raiker.runtime.mcp_endpoint_policy import (
         LOOPBACK,
         PRIVATE_NETWORK,
@@ -1004,7 +1004,10 @@ def mcp_scope(
         "runs_on": "this_machine",
         "network": "unrestricted",
         "encrypted": None,
-        "environment": sorted(mcp_stdio_env()),
+        # MCP-HOST — a server the owner registered runs with the host
+        # environment (who the user is, the desktop); one Raiker generated
+        # keeps the sandbox's.
+        "environment": sorted(mcp_stdio_env() if template else mcp_host_env()),
         "granted_environment": list(allowed_mcp_env_names()),
         "token_reference": None,
         "working_folder": "workspace",

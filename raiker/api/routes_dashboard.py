@@ -31,6 +31,7 @@ from raiker.api.schemas import (
     ContainMcpServerRequest,
     ConversationBranchRequest,
     CreateCodeWorktreeRequest,
+    CreateLocalMcpServerRequest,
     CreateMcpServerRequest,
     CreateProjectRequest,
     CreateRemoteMcpServerRequest,
@@ -84,6 +85,7 @@ from raiker.api.wire.execution import (
     ExecutionEnvironmentSelected,
 )
 from raiker.api.wire.mcp import (
+    LocalMcpServerCreated,
     McpContainment,
     McpResumed,
     McpServerConnected,
@@ -520,6 +522,29 @@ async def create_mcp_server(
         McpServerCreated,
         _mcp_result(
             _service(request).create_mcp_server(auth_data[0].principal_id, body.name, body.template)
+        ),
+    )
+    return serialize_dto(answer)
+
+
+@router.post("/api/mcp/servers/local")
+async def create_local_mcp_server(
+    body: CreateLocalMcpServerRequest,
+    request: Request,
+    auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+) -> dict[str, Any]:
+    """MCP-HOST — add a local server by its command; it runs as the owner.
+
+    Claude Desktop's `mcpServers` and Codex's `[mcp_servers]`: the program and
+    its arguments, and its own variables. Test-connect runs the handshake and
+    lists the tools it declares for the owner to accept.
+    """
+    answer = cast(
+        LocalMcpServerCreated,
+        _mcp_result(
+            _service(request).control.create_local_mcp_server(
+                auth_data[0].principal_id, body.name, body.command, body.args, body.env
+            )
         ),
     )
     return serialize_dto(answer)

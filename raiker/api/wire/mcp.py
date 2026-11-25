@@ -14,6 +14,14 @@ class McpServerCreated(TypedDict):
     name: str
 
 
+class LocalMcpServerCreated(TypedDict):
+    ok: bool
+    server_id: str
+    name: str
+    transport: Literal["stdio"]
+    runs_as: Literal["owner"]
+
+
 class RemoteMcpServerCreated(TypedDict):
     ok: bool
     server_id: str

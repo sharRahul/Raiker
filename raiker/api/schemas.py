@@ -906,6 +906,19 @@ class RenameMcpServerRequest(StrictRequest):
     expected_name: str | None = None
 
 
+class CreateLocalMcpServerRequest(StrictRequest):
+    # MCP-HOST — register a local stdio server by the command that starts it,
+    # as an owner does in Claude Desktop's `mcpServers` or Codex's
+    # `[mcp_servers]`. It runs as the owner, outside the command sandbox; each
+    # tool it declares is accepted before the model is offered it. `env` is the
+    # server's own variables, kept as its secrets, never logged.
+
+    name: str
+    command: str
+    args: list[str] = []
+    env: dict[str, str] = {}
+
+
 class CreateRemoteMcpServerRequest(StrictRequest):
     # Add a remote (HTTP) MCP connection (monitored MCP connections, Phase A).
     # `endpoint_url` is the owner-added server URL; `auth_ref` optionally names

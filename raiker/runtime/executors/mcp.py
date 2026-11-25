@@ -32,8 +32,9 @@ import contextlib
 import json
 import os
 import re
+import shutil
 import threading
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
@@ -95,6 +96,17 @@ def _is_unmonitored(workspace: Path, principal_id: str, server_id: str | None) -
 # basename so an absolute interpreter path (``/usr/bin/python3``) still resolves.
 _BUILTIN_MCP_COMMANDS: frozenset[str] = frozenset({"python", "python3", "node"})
 
+#: Launchers an owner-registered server may use besides the interpreters
+#: (MCP-HOST): the way every published server is installed (`npx -y …`,
+#: `uvx …`, `docker run -i …`). A shell is never one.
+_OWNER_MCP_LAUNCHERS: frozenset[str] = frozenset(
+    {"npx", "uvx", "uv", "docker", "podman", "deno", "bun", "bunx", "pipx", "py"}
+)
+#: Never a server's program, whoever registered it: a shell runs anything.
+_SHELLS: frozenset[str] = frozenset(
+    {"sh", "bash", "zsh", "fish", "dash", "ksh", "csh", "tcsh", "cmd", "powershell", "pwsh", "wsl"}
+)
+
 MCP_SESSION_TIMEOUT = 20.0
 _MAX_TIMEOUT = 60.0
 MCP_MAX_OUTPUT_BYTES = 200_000
@@ -112,6 +124,56 @@ class _BoundedStdio:
     stderr_tail: bytes = b""
     overflowed: bool = False
     timed_out: bool = False
+
+
+def host_executable(name: str, env: Mapping[str, str]) -> str | None:
+    """*name* resolved on the server's own PATH, as the owner's terminal would."""
+    if Path(name).is_absolute():
+        return name if Path(name).is_file() else None
+    return shutil.which(name, path=env.get("PATH") or env.get("Path"))
+
+
+def run_host_stdio(
+    command: list[str],
+    payload: bytes,
+    *,
+    cwd: str,
+    env: dict[str, str],
+    timeout: float,
+    max_stdout: int = MCP_MAX_OUTPUT_BYTES,
+    stderr_tail: int = MCP_STDERR_TAIL_BYTES,
+) -> _BoundedStdio:
+    """MCP-HOST — run an owner-registered server as the owner, on this computer.
+
+    The way Claude Code and Codex run a local stdio server: outside the command
+    sandbox, with the owner's own access, because a server that drives an
+    application (Blender, Office, a browser, the desktop) cannot do so from
+    inside a boundary built to keep it away from them. What stays is everything
+    that is not the boundary: the environment is constructed (no provider key or
+    Raiker secret is inherited), the session is bounded in time and output, the
+    owner registered the server and accepts each tool it declares, and every
+    call goes through the gateway's approvals and audit.
+    """
+    from raiker.execution.commands.sandboxed_program import _drain_bounded
+
+    executable = host_executable(command[0], env)
+    if executable is None:
+        raise FileNotFoundError(command[0])
+    run = _drain_bounded(
+        [executable, *command[1:]],
+        payload,
+        env=env,
+        timeout=timeout,
+        max_stdout=max_stdout,
+        stderr_tail=stderr_tail,
+        cwd=cwd,
+    )
+    return _BoundedStdio(
+        stdout=run.stdout,
+        stderr_tail=run.stderr_tail,
+        overflowed=run.overflowed,
+        timed_out=run.timed_out,
+    )
 
 
 def run_bounded_stdio(
@@ -271,6 +333,41 @@ def mcp_stdio_env(source: dict[str, str] | None = None) -> dict[str, str]:
     # of waiting on a pipe buffer the server never flushes.
     built.setdefault("PYTHONUNBUFFERED", "1")
     built.setdefault("PYTHONIOENCODING", "utf-8")
+    return built
+
+
+#: MCP-HOST — what a server that runs as the owner also needs to find the
+#: owner's desktop and applications: who the user is, where programs are
+#: installed, and the display or session bus on Linux. Still built, never
+#: inherited: no provider key or Raiker setting rides along.
+_MCP_HOST_ENV: tuple[str, ...] = (
+    "USERNAME",
+    "USER",
+    "LOGNAME",
+    "USERDOMAIN",
+    "HOMEDRIVE",
+    "HOMEPATH",
+    "PROGRAMFILES",
+    "PROGRAMFILES(X86)",
+    "PROGRAMW6432",
+    "PROGRAMDATA",
+    "ALLUSERSPROFILE",
+    "COMMONPROGRAMFILES",
+    "PUBLIC",
+    "SESSIONNAME",
+    "DISPLAY",
+    "WAYLAND_DISPLAY",
+    "XDG_RUNTIME_DIR",
+    "XDG_SESSION_TYPE",
+    "DBUS_SESSION_BUS_ADDRESS",
+)
+
+
+def mcp_host_env(source: dict[str, str] | None = None) -> dict[str, str]:
+    """The environment an owner-registered server runs with (MCP-HOST)."""
+    env = dict(os.environ) if source is None else source
+    built = mcp_stdio_env(env)
+    built.update({name: env[name] for name in _MCP_HOST_ENV if name in env})
     return built
 
 
@@ -669,19 +766,19 @@ class McpConnectorExecutor:
     ) -> ExecutionResult:
         command = [str(part) for part in action.arguments.get("command", [])]
         ctx.command = command
-        reason = self._validate_command(command)
+        server_id = self._resolve_server_id(action, principal_id, command)
+        on_host = self._owner_registered(server_id, principal_id)
+        reason = self._validate_owner_command(command) if on_host else self._validate_command(command)
         if reason is not None:
             return self._fail(action.action_id, reason)
         # DEC-15 step 2 — the secrets the owner gave this server, and only
         # this server, added to its constructed environment.
         from raiker.runtime.mcp_secrets import secret_env
 
-        secrets = secret_env(
-            self._store, principal_id, self._resolve_server_id(action, principal_id, command)
-        )
+        secrets = secret_env(self._store, principal_id, server_id)
         try:
             responses, bytes_in, bytes_out = self._run_session(
-                command, requests, timeout, ctx, secrets=secrets
+                command, requests, timeout, ctx, secrets=secrets, on_host=on_host
             )
         except SandboxError as exc:
             self._observe_failure(action, principal_id, ctx)
@@ -985,6 +1082,39 @@ class McpConnectorExecutor:
                     return str(row["server_id"])
         return None
 
+    def _owner_registered(self, server_id: str | None, principal_id: str) -> bool:
+        """MCP-HOST — a profile the owner added runs as the owner.
+
+        A server Raiker generated from a template (code the model or Raiker
+        wrote) keeps the sandbox; one the owner registered by its command —
+        typed, offered by a catalogue and accepted, or imported — is theirs,
+        as a server in Claude Code or Codex is.
+        """
+        if not server_id:
+            return False
+        row = self._store.get_mcp_server(server_id, principal_id)
+        return row is not None and not str(row.get("template") or "").strip()
+
+    def _validate_owner_command(self, command: list[str]) -> str | None:
+        return McpConnectorExecutor.validate_owner_command(command)
+
+    @staticmethod
+    def validate_owner_command(command: list[str]) -> str | None:
+        """What an owner-registered server may be started with: any program, never a shell."""
+        if not command:
+            return "mcp_command_not_allowlisted"
+        stem = Path(command[0]).name.lower()
+        for suffix in (".exe", ".cmd", ".bat", ".com"):
+            if stem.endswith(suffix):
+                stem = stem[: -len(suffix)]
+        if stem in _SHELLS:
+            return "mcp_command_is_a_shell"
+        if Path(command[0]).name.lower().endswith((".bat", ".cmd")) and Path(command[0]).is_absolute():
+            # A batch file is a shell script; only a launcher found by name
+            # (npx.cmd) is accepted, as Windows installs those.
+            return "mcp_command_is_a_shell"
+        return None
+
     # ── validation ──
     def _validate_command(self, command: list[str]) -> str | None:
         if not command or Path(command[0]).name not in allowed_mcp_commands():
@@ -1184,6 +1314,7 @@ class McpConnectorExecutor:
         ctx: _SessionCtx | None = None,
         *,
         secrets: dict[str, str] | None = None,
+        on_host: bool = False,
     ) -> tuple[dict[Any, dict[str, Any]], int, int]:
         """Run a bounded, non-interactive JSON-RPC stdio session.
 
@@ -1200,14 +1331,15 @@ class McpConnectorExecutor:
         payload = "".join(json.dumps(req) + "\n" for req in requests).encode("utf-8")
         bytes_out = len(payload)
         try:
-            session = run_bounded_stdio(
+            runner = run_host_stdio if on_host else run_bounded_stdio
+            session = runner(
                 command,
                 payload,
                 cwd=str(self._ws),
                 # SEC-MCP-01 — constructed, never inherited. Omitting `env`
                 # hands the child every variable Raiker was started with,
                 # provider keys included.
-                env={**mcp_stdio_env(), **(secrets or {})},
+                env={**(mcp_host_env() if on_host else mcp_stdio_env()), **(secrets or {})},
                 timeout=timeout,
             )
         except FileNotFoundError:

@@ -782,6 +782,9 @@ CASES: Cases = {
     ("POST", "/api/mcp/servers"): plain(
         "/api/mcp/servers", {"name": "echo", "template": "python-stdio-echo"}
     ),
+    ("POST", "/api/mcp/servers/local"): plain(
+        "/api/mcp/servers/local", {"name": "local", "command": "uvx", "args": ["some-mcp-server"]}
+    ),
     ("POST", "/api/mcp/servers/remote"): plain(
         "/api/mcp/servers/remote", {"name": "remote", "endpoint_url": "https://mcp.example.com/rpc"}
     ),

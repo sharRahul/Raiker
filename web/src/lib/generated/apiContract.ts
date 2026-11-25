@@ -1886,6 +1886,13 @@ export type CreateProjectRequest = {
   create_folder?: boolean;
 };
 
+export type CreateLocalMcpServerRequest = {
+  name: string;
+  command: string;
+  args?: string[];
+  env?: Record<string, string>;
+};
+
 export type CreateRemoteMcpServerRequest = {
   name: string;
   endpoint_url: string;
@@ -5816,6 +5823,14 @@ export type RemoteAccessView = {
   start_message: string | null;
 };
 
+export type LocalMcpServerCreated = {
+  ok: boolean;
+  server_id: string;
+  name: string;
+  transport: "stdio";
+  runs_as: "owner";
+};
+
 export type RemoteMcpServerCreated = {
   ok: boolean;
   server_id: string;
@@ -8067,6 +8082,8 @@ export const contract = {
     request<McpServerView[]>("/api/mcp/servers"),
   createMcpServer: (body: CreateMcpServerRequest) =>
     call<McpServerCreated>("POST", "/api/mcp/servers", { body }),
+  createLocalMcpServer: (body: CreateLocalMcpServerRequest) =>
+    call<LocalMcpServerCreated>("POST", "/api/mcp/servers/local", { body }),
   createRemoteMcpServer: (body: CreateRemoteMcpServerRequest) =>
     call<RemoteMcpServerCreated>("POST", "/api/mcp/servers/remote", { body }),
   deleteMcpServer: (serverId: string, query: { expected_name?: string } = {}) =>

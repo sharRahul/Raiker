@@ -449,6 +449,7 @@ VERIFIED: frozenset[tuple[str, str]] = frozenset(
         ("POST", "/api/local-runtimes/detect"),
         ("POST", "/api/managed-files/{file_id}/retry"),
         ("POST", "/api/mcp/servers"),
+        ("POST", "/api/mcp/servers/local"),
         ("POST", "/api/mcp/servers/remote"),
         ("POST", "/api/mcp/servers/{server_id}/connect"),
         ("POST", "/api/mcp/servers/{server_id}/kill"),

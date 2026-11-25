@@ -1,5 +1,9 @@
 # Fixed items
 
+## FIXED-1539 — A memory Raiker proposed could only be kept from Memory
+
+**Severity: Medium. Area: Chat / memory. Status: Fixed 2026-11-25.** A memory Raiker proposed from a completed answer waited in Memory › Suggestions, so keeping it meant leaving the conversation (RU-10). A proposal now carries the conversation and turn it came from (`source_session_id`, `source_turn_id` on `GET /api/memory/proposals`), and the answer that proposed it shows *Remember: "…"* with **Keep** and **Not this**. Nothing is stored until Keep, through the same decision route and rules as Suggestions; Not this rejects it; one read serves every answer on screen. Evidence: `web/src/lib/components/TurnMemoryProposals.test.ts`, `tests/test_memory_proposal_source.py`.
+
 ## FIXED-1538 — First run did not say which models suit numbers and code
 
 **Severity: Low. Area: First run / models. Status: Fixed 2026-11-25.** In regular use Haiku 4.5 ranked a budget category by percentage when asked "in pounds" and once summed £100 + £40 + £10 as £200. That is the model, not the product, but first run let the owner pick a default with nothing said about fit. The Model step now says, beside the providers, *For sums, tables and code, choose a larger model. Small, fast models answer quickly but can misread a table or a total; you can change the default any time in Models.* Evidence: `web/src/lib/views/ModelSetupView.test.ts` (*opens the providers when the recommendation asks for a model*).
@@ -2029,6 +2033,7 @@ file you can open. The two capture sets that remain — `screenshots/pages/` and
 
 | ID | Severity | Area | Status |
 |---|---|---|---|
+| [FIXED-1539](#fixed-1539--a-memory-raiker-proposed-could-only-be-kept-from-memory) | Medium | Chat / memory | Fixed 2026-11-25 |
 | [FIXED-1538](#fixed-1538--first-run-did-not-say-which-models-suit-numbers-and-code) | Low | First run / models | Fixed 2026-11-25 |
 | [FIXED-1537](#fixed-1537--permissions-was-grouped-in-six-headings-an-owner-had-to-learn) | Low | Permissions / UI | Fixed 2026-11-25 |
 | [FIXED-1536](#fixed-1536--a-projects-agentsmd-or-claudemd-was-ignored) | Medium | Build / instructions | Fixed 2026-11-25 |

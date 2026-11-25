@@ -68,6 +68,7 @@
   import ClarifyCard from "../components/ClarifyCard.svelte";
   import TurnReceipt from "../components/TurnReceipt.svelte";
   import CorrectionMemory from "../components/CorrectionMemory.svelte";
+  import TurnMemoryProposals from "../components/TurnMemoryProposals.svelte";
   import { correctionToRemember } from "../corrections";
   import { ownerQuestions } from "../clarify";
   import SkillLinkNotice from "../components/SkillLinkNotice.svelte";
@@ -2711,6 +2712,10 @@
             {#if correction !== null}
               <!-- QUI-F20 — the owner corrected Raiker: offer to remember it. -->
               <CorrectionMemory {sessionId} turnId={turn.response.turn_id} text={correction} />
+            {/if}
+            {#if turn.response.status === "completed"}
+              <!-- RU-10 — a memory proposed from this answer: Keep or Not this, here. -->
+              <TurnMemoryProposals {sessionId} turnId={turn.response.turn_id} />
             {/if}
           {/if}
 

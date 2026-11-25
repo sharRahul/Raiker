@@ -176,6 +176,8 @@ nothing is stored until Keep, exactly as today, but without leaving the
 conversation. Batch review stays in Memory.
 *Done when* a proposal is kept from Chat and appears in Memory with its
 provenance.
+*Progress 2026-11-25:* Keep and Not this under the answer shipped
+([FIXED-1539](FIXED_ITEMS.md#fixed-1539--a-memory-raiker-proposed-could-only-be-kept-from-memory)); the live journey is not re-run.
 
 **RU-11 · One memory page that reads as a summary. P1, M.** Memory opens on
 **What Raiker knows about you**: approved memories grouped by topic, each

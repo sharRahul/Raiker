@@ -4388,6 +4388,8 @@ export type MemoryProposal = {
   decision: string;
   created_at: string;
   similar_memory: SimilarMemory | null;
+  source_session_id: string;
+  source_turn_id: string;
 };
 
 /** What a purge removes, and the id the owner must send back to confirm it. */

@@ -319,6 +319,11 @@ with **Save** and **Dismiss**. Save keeps your own words as a memory, through
 the same review Memory's Suggestions use (secret-like text is never kept);
 Dismiss keeps nothing.
 
+**When Raiker proposes a memory from an answer**, the answer is followed by
+*Remember: "…"* with **Keep** and **Not this**. Nothing is stored until you press
+Keep, under the same rules as Memory › Suggestions, where the same proposal
+waits if you leave it; Not this turns it down.
+
 Conversation text has its own size, apart from the rest of Raiker: **Settings →
 Personalisation → Chat text size** (110% unless you choose 100%, 125% or 140%).
 

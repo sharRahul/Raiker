@@ -35,6 +35,11 @@ class MemoryProposal(TypedDict):
     created_at: str
     #: FIXED-1439 — set when an approved memory says nearly the same thing.
     similar_memory: SimilarMemory | None
+    #: RU-10 — the conversation and turn that proposed it, so the answer it
+    #: came from can offer Keep and Not this in place. Empty for a correction
+    #: or an import.
+    source_session_id: str
+    source_turn_id: str
 
 
 class MemoryRelationshipProposal(TypedDict):
@@ -374,6 +379,8 @@ def memory_proposal(row: dict[str, Any]) -> MemoryProposal:
         "decision": str(row.get("decision") or ""),
         "created_at": str(row.get("created_at") or ""),
         "similar_memory": cast(SimilarMemory | None, row.get("similar_memory")),
+        "source_session_id": str(row.get("source_session_id") or ""),
+        "source_turn_id": str(row.get("source_turn_id") or ""),
     }
 
 

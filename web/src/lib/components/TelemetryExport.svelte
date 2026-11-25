@@ -157,11 +157,11 @@
     if (!status) return "Never run";
     if (status === "ok") return "Last run ok";
     if (status === "telemetry_credential_missing")
-      return "Last run refused: the credential variable is unset";
-    if (status === "telemetry_destination_disabled") return "Last run refused: collector off";
+      return "Last run refused: the credential variable is unset. Set it where Raiker runs, then choose Deliver now.";
+    if (status === "telemetry_destination_disabled") return "Last run refused: collector off. Turn it on to deliver again.";
     if (status.startsWith("telemetry_rejected_"))
       return `Last run refused by the collector (${status.slice("telemetry_rejected_".length)})`;
-    if (status.includes("fetch_failed")) return "Last run could not reach the collector";
+    if (status.includes("fetch_failed")) return "Last run could not reach the collector. Nothing left this machine; check that it is running, then choose Deliver now.";
     if (status.includes("http_error"))
       return `Last run was rejected (${status.slice(status.lastIndexOf("_") + 1)})`;
     return "Last run did not complete";

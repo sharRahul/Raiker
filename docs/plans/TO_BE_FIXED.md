@@ -1857,9 +1857,12 @@ embedding space and keeps it current in the background. Still open:
   policy), so the owner's "any available cloud model" through Ollama and every
   search-by-meaning path (Threads, Library, goal noticing) are still covered by
   stand-in embedders only.
-* **Older live specs from the FIXED-1482 re-run** (`b9`, `gcr` pinning,
-  `memory-restart-provider-composer`, `round-2026-09-04`, `round-2026-09-15`)
-  were not rewritten this round; the 2026-11-17 notes above still describe them.
+* ~~**Older live specs from the FIXED-1482 re-run**~~ Checked 2026-11-25:
+  `memory-restart-provider-composer` and `round-2026-09-15` were rewritten
+  (FIXED-1489, RT-1125-05), the `gcr` *pinning repeatedly* case is gone,
+  `round-2026-09-04`'s collector case passes with a stand-in (FIXED-1551) and
+  `b9` skips without its workspace. Only `round-2026-09-04`'s MCP case still
+  fails, on the home-folder interpreter limit below.
 * **Merging adjacent key-figure blocks** (the *three-block limit is guidance*
   note above) was considered and not done: Library pins name a block by its
   index in the stored answer, so merging blocks at render time would move
@@ -1896,7 +1899,8 @@ Run record: [WEB_APP_LIVE_TEST](../architecture/WEB_APP_LIVE_TEST.md#result--202
   2026-11-25 the failure says why: [FIXED-1545](FIXED_ITEMS.md#fixed-1545--an-mcp-program-in-the-home-folder-read-as-missing-with-no-reason)): the
   sandbox does not mount the home folder, by design. `round-2026-09-04`'s MCP
   case needs a host whose Python is outside the home folder.
-* **`b9` live spec** still needs a git repository workspace (`RAIKER_LIVE_WORKSPACE`).
+* **`b9` live spec** still needs a git repository workspace (`RAIKER_LIVE_WORKSPACE`);
+  since 2026-11-25 it skips by name without one ([FIXED-1551](FIXED_ITEMS.md#fixed-1551--the-otlp-live-case-failed-wherever-no-collector-was-running)).
 * ~~**Three parallel Python shards exhausted this host's 7.6 GB `/tmp`**~~ Closed 2026-11-25:
   [Testing](TESTING.md#test-levels-and-release-decision) now says how to run shards locally (pytest
   temp folders) and failed by the hundred; run shards one at a time or with
@@ -1929,7 +1933,10 @@ FIXED-1526 to FIXED-1529.
 * **Memory store is off on a fresh account.** FIXED-1531 makes that visible on
   the card; RU-11 in the ready-to-use plan makes keeping a memory one choice in
   first run, so the first *remember this* works.
-* **A project with no folder builds in Raiker's own data folder.** RU-J4's project
+* **A project with no folder builds in Raiker's own data folder.** *Reduced
+  2026-11-25:* a project turn's command that names no folder now runs in the
+  project ([FIXED-1549](FIXED_ITEMS.md#fixed-1549--a-projects-command-with-no-folder-ran-at-the-workspace-root));
+  a name-only project's folder is still `.raiker/projects/<name>`. RU-J4's project
   was created from Projects with a name only; Build then worked in the
   workspace root, wrote `pricing.py` beside `.raiker/`, and **Apply to project**
   was blocked by `.raiker · protected path`. Creating a project for Build should
@@ -1962,7 +1969,9 @@ FIXED-1526 to FIXED-1529.
   `provider_quota_exhausted:http_402`; Raiker said the account has no credit or
   quota left, which is correct. A cloud-model turn needs the owner's Ollama
   account to have quota.
-* **The OTLP collector live spec needs a collector.** `round-2026-09-04`'s
+* ~~**The OTLP collector live spec needs a collector.**~~ Closed 2026-11-25
+  ([FIXED-1551](FIXED_ITEMS.md#fixed-1551--the-otlp-live-case-failed-wherever-no-collector-was-running)):
+  the case starts its own stand-in collector. `round-2026-09-04`'s
   *a collector receives governed events* waits for *event(s) delivered* from
   `http://127.0.0.1:4318`; with nothing listening there it fails. Run it with a
   local OpenTelemetry collector.

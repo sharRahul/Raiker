@@ -238,7 +238,7 @@ export class SourceInspector {
         text:
           e instanceof ApiError && e.status === 404
             ? `“${label}” is no longer kept in this conversation, so it cannot be downloaded.`
-            : `Could not download “${label}”.`,
+            : `Could not download “${label}”. It is still kept in this conversation; try Download again.`,
       };
     }
   };

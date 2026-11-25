@@ -1,5 +1,17 @@
 # Fixed items
 
+## FIXED-1551 — The OTLP live case failed wherever no collector was running
+
+**Severity: Low. Area: Testing / live specs. Status: Fixed 2026-11-25.** `round-2026-09-04-priority-live`'s *a collector receives governed events* waited for *event(s) delivered* from `http://127.0.0.1:4318` and failed on any host without an OpenTelemetry collector (RT-1125-06), which says nothing about Raiker. The case now starts a stand-in collector on that port for its own run — or uses a real one already there — and checks the stand-in received the delivery. `b9-repository-code-map-live` now skips, naming `RAIKER_LIVE_WORKSPACE`, instead of failing when the host's workspace folder is not given. Evidence: RT-1125-09 (the OTLP case passed live).
+
+## FIXED-1550 — Ten more errors stopped without a next step
+
+**Severity: Low. Area: UI copy (QUI-G06). Status: Fixed 2026-11-25.** Pinning and unpinning an answer, copying it, saving a chart or diagram as an image, a repository connection or worktree that never reached Raiker (*Could not reach Raiker.*), opening a memory's source, opening a source folder, downloading an attached file, every conversation command (*Could not pin this thread.*) and continuing a parked turn (*The turn could not continue (409).*) each stopped at what failed. Each now says what it left unchanged and one next step; the collector's *could not reach*, *collector off* and *credential variable is unset* lines say what to do too. Evidence: `conversationCommands.test.ts`, `ChatView.continuation.test.ts`, `TelemetryExport.test.ts` and the AnswerBlock, RepoConnector, Memory, Brain and Build view suites.
+
+## FIXED-1549 — A project's command with no folder ran at the workspace root
+
+**Severity: Medium. Area: Build / commands (RU-21). Status: Fixed 2026-11-25.** In RU-J4 a project's Build turn ran `python3 -m unittest` with no working folder, so the native backend took its disposable copy from the workspace root — beside `.raiker/`, without the files Build had just written to the project — rather than from the project the turn was bound to. A command that names no folder in a project turn now runs in the bound project root's copy; a command that names a folder is unchanged, and the copy never includes `.raiker` or the project's siblings. Evidence: `tests/test_command_backends.py::test_a_command_with_no_folder_runs_in_the_bound_project`.
+
 ## FIXED-1548 — A sentence the model invented was offered to keep as a memory
 
 **Severity: Medium. Area: Chat / memory. Status: Fixed 2026-11-25.** Found live on 2026-11-25 (RT-1125-08): after *Rahul's dentist is Dr. Okafor*, Gemma 3 1B answered *Dr. Okafor is known for their meticulous attention to detail.* — invented — and the new Keep / Not this strip (FIXED-1539) offered that sentence beside the owner's own, one click from becoming a memory. The observer files both roles with provenance by design, for review in Memory › Suggestions. Proposals now carry `source_role`, and the strip under an answer offers only the owner's own words; the model's sentences wait in Suggestions, marked as Raiker's. Evidence: `web/src/lib/components/TurnMemoryProposals.test.ts` (*does not offer a sentence the model wrote*), `tests/test_memory_proposal_source.py`.
@@ -2069,6 +2081,9 @@ file you can open. The two capture sets that remain — `screenshots/pages/` and
 
 | ID | Severity | Area | Status |
 |---|---|---|---|
+| [FIXED-1551](#fixed-1551--the-otlp-live-case-failed-wherever-no-collector-was-running) | Low | Testing / live specs | Fixed 2026-11-25 |
+| [FIXED-1550](#fixed-1550--ten-more-errors-stopped-without-a-next-step) | Low | UI copy (QUI-G06) | Fixed 2026-11-25 |
+| [FIXED-1549](#fixed-1549--a-projects-command-with-no-folder-ran-at-the-workspace-root) | Medium | Build / commands (RU-21) | Fixed 2026-11-25 |
 | [FIXED-1548](#fixed-1548--a-sentence-the-model-invented-was-offered-to-keep-as-a-memory) | Medium | Chat / memory | Fixed 2026-11-25 |
 | [FIXED-1547](#fixed-1547--an-ollama-model-spilling-to-the-cpu-was-not-said) | Medium | Models / Ollama | Fixed 2026-11-25 |
 | [FIXED-1546](#fixed-1546--sign-in-recovery-and-command-failures-gave-no-next-step) | Low | UI copy (QUI-G06) | Fixed 2026-11-25 |

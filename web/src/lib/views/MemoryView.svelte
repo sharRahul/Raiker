@@ -369,7 +369,7 @@
         attachment_id: "",
         truncated: false,
       };
-      actionError = "Could not reach Raiker to open this memory's source.";
+      actionError = "Could not reach Raiker to open this memory's source. The memory is unchanged. Check that Raiker is still running, then open the source again.";
     } finally {
       sourceLoading = false;
     }

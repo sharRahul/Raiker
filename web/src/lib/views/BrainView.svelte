@@ -578,7 +578,7 @@
     }
     catch {
       if (seq !== sourceSeq) return;
-      sourceError = "Could not open that folder. It may have been moved, or its access revoked.";
+      sourceError = "Could not open that folder. It may have been moved, or its access revoked. Nothing was added; choose Refresh, then pick the folder again.";
     }
     finally { if (seq === sourceSeq) sourceBusy = false; }
   }

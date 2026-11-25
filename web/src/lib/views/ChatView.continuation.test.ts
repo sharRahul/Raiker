@@ -243,7 +243,7 @@ describe("ChatView — cross-tab approval continuation (BUG-24)", () => {
     await parkATurn();
 
     expect(
-      await screen.findByText("The turn could not continue (suspended_turn_unreadable)."),
+      await screen.findByText("The turn could not continue (suspended_turn_unreadable). It is still waiting here; answer its approval again, or start a new turn."),
     ).toBeInTheDocument();
   });
 

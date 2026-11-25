@@ -438,6 +438,36 @@ def test_a_command_runs_in_the_session_copy_never_in_the_project(tmp_path: Path)
     assert key
 
 
+def test_a_command_with_no_folder_runs_in_the_bound_project(tmp_path: Path) -> None:
+    """RU-21 — a project turn's bare command runs in the project, not the root."""
+    workspace = tmp_path / "ws"
+    project = workspace / ".raiker" / "projects" / "pricing"
+    project.mkdir(parents=True)
+    (project / "pricing.py").write_text("RATE = 0.1\n", encoding="utf-8")
+    (workspace / "stray.txt").write_text("not the project\n", encoding="utf-8")
+    directory = _installed_runner(tmp_path)
+    driver = NativeSandboxDriver(workspace, helper_root=directory, run_probe=_probe_reply())
+    registry = TaskWorkspaceRegistry(tmp_path / "copies")
+    launched: list[Path] = []
+
+    def fake_runner(req: Any, argv: list[str], cwd: Path, *_args: Any, **_kwargs: Any) -> Any:
+        launched.append(Path(cwd))
+        return object()
+
+    backend = NativeSandboxBackend(
+        driver=driver, proof=driver.probe(), workspaces=registry, runner=fake_runner
+    )
+    asked = request(workspace)
+    registry.bind(asked.owner_principal_id, asked.session_id, project)
+    backend.start(asked)
+
+    [(_, _, copy)] = registry.entries(asked.owner_principal_id)
+    assert copy.source == project.resolve()
+    assert (copy.root / "pricing.py").exists()
+    assert not (copy.root / "stray.txt").exists()
+    assert launched == [copy.root]
+
+
 def test_the_receipt_separates_this_run_from_the_host_measurement(tmp_path: Path) -> None:
     """Two claims, kept apart.
 

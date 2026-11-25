@@ -849,6 +849,13 @@ class NativeSandboxBackend:
         if cwd != root and root not in cwd.parents:
             raise CommandBackendError("command_cwd_outside_workspace")
         owner, session = request.owner_principal_id, request.session_id
+        bound = self.workspaces.bound_root(owner, session)
+        if cwd == root and bound is not None and root in bound.resolve().parents:
+            # RU-21 — a command that names no folder in a project turn runs in
+            # the project, not the workspace root beside `.raiker`. Without
+            # this a project's `python3 -m unittest` took a copy of the whole
+            # workspace and could not see the files Build had just written.
+            cwd = bound.resolve()
         try:
             _, workspace = self.workspaces.acquire(
                 owner, session, self.workspaces.scope_for(owner, session, cwd)

@@ -52,8 +52,8 @@ describe("the command set", () => {
   });
 
   it("reports a failure the same way with or without a status", () => {
-    expect(commandFailure("pin")).toBe("Could not pin this thread.");
-    expect(commandFailure("pin", 409)).toBe("Could not pin this thread (409).");
+    expect(commandFailure("pin")).toBe("Could not pin this thread. Nothing changed; try again.");
+    expect(commandFailure("pin", 409)).toBe("Could not pin this thread (409). Nothing changed; try again.");
   });
 });
 

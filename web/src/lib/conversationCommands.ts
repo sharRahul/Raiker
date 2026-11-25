@@ -66,7 +66,9 @@ export function command(id: CommandId): ConversationCommand {
 /** The sentence a surface shows when a command did not take. */
 export function commandFailure(id: CommandId, status?: number): string {
   const what = COMMANDS[id].gerund;
-  return status === undefined ? `Could not ${what}.` : `Could not ${what} (${status}).`;
+  return status === undefined
+    ? `Could not ${what}. Nothing changed; try again.`
+    : `Could not ${what} (${status}). Nothing changed; try again.`;
 }
 
 /** What archiving takes away, said before it is done rather than after. */

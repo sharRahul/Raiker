@@ -2073,7 +2073,7 @@
     turn.resumeNote = null;
     turn.error =
       error instanceof ApiError
-        ? `The turn could not continue (${code ?? error.status}).`
+        ? `The turn could not continue (${code ?? error.status}). It is still waiting here; answer its approval again, or start a new turn.`
         : `The turn did not continue. It is still waiting here. ${NOT_ANSWERING}`;
   }
 

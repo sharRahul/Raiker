@@ -49,7 +49,7 @@
     try {
       say(await onpin());
     } catch {
-      say(pinned ? "Could not unpin: try again" : "Could not pin: try again");
+      say(pinned ? "Could not unpin. It is still in the Library; try again." : "Could not pin. Nothing was added to the Library; try again.");
     } finally {
       pinning = false;
     }
@@ -93,7 +93,7 @@
       await navigator.clipboard.writeText(text);
       say("Copied");
     } catch {
-      say("Could not copy: the browser did not allow it");
+      say("Could not copy: the browser did not allow it. Select the text and copy it instead.");
     }
   }
 
@@ -112,7 +112,7 @@
       const surface = getComputedStyle(document.documentElement).getPropertyValue("--surface").trim() || "white";
       downloadBlob(await chartPng(svg, surface), blockFilename(part, "png"));
     } catch {
-      say(isChart ? "Could not make an image of this chart" : "Could not make an image of this diagram");
+      say(isChart ? "Could not make an image of this chart. Nothing was saved; download it as CSV instead." : "Could not make an image of this diagram. Nothing was saved; try again.");
     }
   }
 </script>

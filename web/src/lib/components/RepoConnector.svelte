@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { failure } from "../errorCopy";
+  import { NOT_ANSWERING, failure } from "../errorCopy";
   /**
    * Connect the Build workspace to a repository: a folder already inside this
    * Raiker workspace, or a GitHub `owner/repo` coordinate.
@@ -160,7 +160,7 @@
   }
 
   function connectError(e: unknown): string {
-    if (!(e instanceof ApiError)) return "Could not reach Raiker.";
+    if (!(e instanceof ApiError)) return NOT_ANSWERING;
     switch (e.reasonCode) {
       case "repo_outside_workspace":
         return "That folder is outside this Raiker workspace, so it was refused.";
@@ -207,7 +207,7 @@
   }
 
   function worktreeError(e: unknown): string {
-    if (!(e instanceof ApiError)) return "Could not reach Raiker.";
+    if (!(e instanceof ApiError)) return NOT_ANSWERING;
     switch (e.reasonCode) {
       case "branch_exists":
         return "A branch with that name already exists. Pick another name.";

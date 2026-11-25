@@ -112,6 +112,9 @@ Build or Projects asks for its folder (or makes one under `~/Raiker Projects`);
 Build never works in Raiker's own data folder.
 *Done when* RU-J4 applies its change to the project folder with **Apply to
 project**.
+*Progress 2026-11-25:* a project turn's command with no folder runs in the
+project's copy, not the workspace root ([FIXED-1549](FIXED_ITEMS.md#fixed-1549--a-projects-command-with-no-folder-ran-at-the-workspace-root));
+asking for (or making) a folder outside `.raiker` is open.
 
 **RU-22 · Build runs the declared checks itself. P1, M.** When the model has
 finished, Build runs the project's declared checks in the sandbox (asking like

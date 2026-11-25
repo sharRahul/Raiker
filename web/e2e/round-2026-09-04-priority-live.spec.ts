@@ -5,6 +5,7 @@
  * owner does, on the surface they do it on, and what the screen says afterwards.
  * Each block is written so it can fail for exactly one reason.
  */
+import { createServer, type Server } from "node:http";
 import { expect, test, type Page } from "@playwright/test";
 import { capture } from "./capture";
 import { setPermission, signInAsOwner } from "./hosted-provider";
@@ -48,8 +49,38 @@ async function openShareOrExport(page: Page): Promise<void> {
   if ((await fold.getAttribute("open")) === null) await fold.locator("summary").click();
 }
 
+/**
+ * A stand-in OpenTelemetry collector on 4318 for the host to deliver to.
+ *
+ * The case needs something listening (2026-11-25 round: with nothing there it
+ * failed on *event(s) delivered*). When a real collector already holds the port
+ * it is used instead, so the case never shadows one the owner runs.
+ */
+async function standInCollector(): Promise<{ server: Server | null; received: () => number }> {
+  let count = 0;
+  const server = createServer((request, response) => {
+    request.resume();
+    request.on("end", () => {
+      count += 1;
+      response.writeHead(200, { "content-type": "application/json" });
+      response.end("{}");
+    });
+  });
+  const listening = await new Promise<boolean>((resolve) => {
+    server.once("error", () => resolve(false));
+    server.listen(4318, "127.0.0.1", () => resolve(true));
+  });
+  return { server: listening ? server : null, received: () => count };
+}
+
 test("a collector receives governed events, metadata only (backlog #18)", async ({ page }) => {
   test.setTimeout(180_000);
+  const collector = await standInCollector();
+  test.info().annotations.push({
+    type: "collector",
+    description: collector.server ? "stand-in on 127.0.0.1:4318" : "an existing collector on 4318",
+  });
+  try {
   await signInAsOwner(page, BASE);
   await page.goto(`${BASE}/#/observe?tab=overview`);
   await page.waitForLoadState("networkidle");
@@ -91,6 +122,10 @@ test("a collector receives governed events, metadata only (backlog #18)", async 
   await expect(page.getByText(/event\(s\) delivered/)).toBeVisible({ timeout: 60_000 });
 
   await capture(page, "../../docs/plans/screenshots/working/backlog-18-otlp-collector.png");
+  if (collector.server) expect(collector.received()).toBeGreaterThan(0);
+  } finally {
+    await new Promise<void>((resolve) => (collector.server ? collector.server.close(() => resolve()) : resolve()));
+  }
 });
 
 test("a connected MCP server says what each of its tools takes (backlog #16, MCP half)", async ({

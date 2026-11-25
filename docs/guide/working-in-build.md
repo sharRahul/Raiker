@@ -688,8 +688,9 @@ approval, so putting the same text back later asks again.
 
 The global file is in Settings › Personalisation › **Global RAIKER.md**, which
 shows its path in your data folder and can create a short starter file. Only
-those two files are read: a `RAIKER.md` in a subfolder, `AGENTS.md` or
-`CLAUDE.md` are not. A file must be plain UTF-8 text of at most 8,192 bytes and
+those two files are read, and a `RAIKER.md` in a subfolder is not. A project
+with no `RAIKER.md` uses its `AGENTS.md`, or else its `CLAUDE.md`, the same way:
+reviewed before Build uses it. A file must be plain UTF-8 text of at most 8,192 bytes and
 4,000 characters, and must not be a link; anything else is shown as *Not read*
 with the reason. The design is in
 [RAIKER.md instructions](../architecture/RAIKER_MD_INSTRUCTIONS.md).

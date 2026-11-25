@@ -61,6 +61,23 @@ def test_only_the_exact_name_counts(tmp_path: Path) -> None:
     (tmp_path / "AGENTS.md").write_text("no alias", encoding="utf-8")
     assert raiker_md.read_instruction_file(tmp_path).state == "absent"
 
+def test_a_project_root_falls_back_to_agents_md_then_claude_md(tmp_path: Path) -> None:
+    (tmp_path / "CLAUDE.md").write_text("Claude rules", encoding="utf-8")
+    read = raiker_md.read_instruction_file(tmp_path, raiker_md.PROJECT_FILENAMES)
+    assert (read.state, read.name, read.text) == ("read", "CLAUDE.md", "Claude rules")
+    (tmp_path / "AGENTS.md").write_text("Agent rules", encoding="utf-8")
+    read = raiker_md.read_instruction_file(tmp_path, raiker_md.PROJECT_FILENAMES)
+    assert (read.name, read.text) == ("AGENTS.md", "Agent rules")
+    (tmp_path / "RAIKER.md").write_text("Raiker rules", encoding="utf-8")
+    read = raiker_md.read_instruction_file(tmp_path, raiker_md.PROJECT_FILENAMES)
+    assert (read.name, read.text) == ("RAIKER.md", "Raiker rules")
+
+
+def test_the_global_file_never_reads_another_agents_name(tmp_path: Path) -> None:
+    (tmp_path / "AGENTS.md").write_text("Agent rules", encoding="utf-8")
+    assert raiker_md.read_instruction_file(tmp_path).state == "absent"
+
+
 
 @posix_only
 def test_a_symlink_is_refused_not_followed(tmp_path: Path) -> None:

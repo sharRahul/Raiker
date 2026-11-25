@@ -7,7 +7,9 @@ In short:
 * Two files only: the account's global file under the data folder
   (``.raiker/user-instructions/<user id>/RAIKER.md``) and the project root's
   ``RAIKER.md``. A ``RAIKER.md`` in a subdirectory is never read, and no
-  ``AGENTS.md``/``CLAUDE.md`` alias, import or ``@file`` expansion exists.
+  import or ``@file`` expansion exists. A project root with no ``RAIKER.md``
+  is read for ``AGENTS.md``, then ``CLAUDE.md`` (RU-16), under the same
+  review: one file per project, the first name present, never merged.
 * A project uses file instructions only after the owner turns them on for it.
 * Discovering a file does not approve it. The owner reviews the exact bytes
   (their SHA-256 and this module's projection version); a changed file needs a
@@ -35,6 +37,8 @@ from typing import Any, Final, Literal
 from raiker.context.redaction import redact_text
 
 FILENAME: Final = "RAIKER.md"
+#: A project root's names, in order. The first present is the project's file.
+PROJECT_FILENAMES: Final = (FILENAME, "AGENTS.md", "CLAUDE.md")
 #: Bumped when what the model is shown for the same bytes changes (the
 #: redactor's projection or the wrapper). A review binds to it, so a new
 #: projection is reviewed again rather than trusted on the old approval.
@@ -93,6 +97,7 @@ class FileRead:
     text: str = ""
     digest: str = ""
     raw_bytes: int = 0
+    name: str = FILENAME
 
 
 @dataclass(frozen=True)
@@ -170,15 +175,16 @@ def _is_link_or_reparse(info: os.stat_result) -> bool:
     return bool(attributes & reparse)
 
 
-def _exact_name_present(directory: Path) -> bool:
-    """Only the exact name ``RAIKER.md`` counts, also on a case-insensitive disk."""
+def _first_name_present(directory: Path, names: tuple[str, ...]) -> str | None:
+    """Only an exact name counts, also on a case-insensitive disk."""
     try:
-        return FILENAME in os.listdir(directory)
+        entries = set(os.listdir(directory))
     except OSError:
-        return False
+        return None
+    return next((name for name in names if name in entries), None)
 
 
-def read_instruction_file(directory: Path) -> FileRead:
+def read_instruction_file(directory: Path, names: tuple[str, ...] = (FILENAME,)) -> FileRead:
     """Read ``directory/RAIKER.md`` whole, or say why not.
 
     Resolve-then-open alone is not enough (a link swapped in between would be
@@ -193,9 +199,14 @@ def read_instruction_file(directory: Path) -> FileRead:
         return FileRead("unreadable")
     if _is_link_or_reparse(directory_info) or not stat.S_ISDIR(directory_info.st_mode):
         return FileRead("unsafe")
-    if not _exact_name_present(directory):
+    name = _first_name_present(directory, names)
+    if name is None:
         return FileRead("absent")
-    path = directory / FILENAME
+    read = _read_pinned(directory / name)
+    return FileRead(read.state, read.text, read.digest, read.raw_bytes, name)
+
+
+def _read_pinned(path: Path) -> FileRead:
     try:
         entry = os.lstat(path)
     except FileNotFoundError:
@@ -376,7 +387,7 @@ def _source(
     *,
     path: str = "",
 ) -> InstructionSource:
-    label = "Global RAIKER.md" if scope == GLOBAL_SCOPE else FILENAME
+    label = "Global RAIKER.md" if scope == GLOBAL_SCOPE else read.name
     reviewed_digest = str(review.get("digest") or "") if review else ""
     reviewed_at = str(review.get("reviewed_at") or "") if review else ""
     disabled = bool(review and int(review.get("disabled") or 0))
@@ -445,7 +456,12 @@ def project_source(
             reviewed_digest=str(review.get("digest") or "") if review else "",
         )
     root_id = f"{root.kind}:{root.root_id}:{project_id}"
-    return _source(PROJECT_SCOPE, read_instruction_file(Path(root.path)), review, root_id)
+    read = read_instruction_file(Path(root.path), PROJECT_FILENAMES)
+    if read.name != FILENAME:
+        # A review binds to the file's name too: AGENTS.md approved, then a
+        # RAIKER.md added with the same bytes, is a different instruction file.
+        root_id = f"{root_id}:{read.name}"
+    return _source(PROJECT_SCOPE, read, review, root_id)
 
 
 def status_for_project(
@@ -493,13 +509,15 @@ def review(
         if root.path is None or root.missing:
             raise InstructionFileError("instruction_file_root_unavailable")
         directory = Path(root.path)
-    read = read_instruction_file(directory)
+    read = read_instruction_file(directory, PROJECT_FILENAMES if project is not None else (FILENAME,))
     if read.state != "read":
         raise InstructionFileError(f"instruction_file_{read.state}")
     if not digest or read.digest != digest:
         raise InstructionFileError("instruction_file_changed_since_preview")
     project_id = str(project.get("project_id") or "") if project is not None else ""
     root_id = _root_id_for(store, workspace_root, owner, project)
+    if read.name != FILENAME:
+        root_id = f"{root_id}:{read.name}"
     _save_review(store, user_id, scope, project_id, root_id=root_id, digest=read.digest, disabled=False)
     if project is None:
         return global_source(store, workspace_root, user_id)

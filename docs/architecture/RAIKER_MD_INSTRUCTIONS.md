@@ -71,7 +71,10 @@ grants are checked through `resolve_project_root`. Unknown owner mappings fail
 closed; no unfiltered project lookup or selected-repository fallback. No files
 are implicitly read from parent directories outside the granted project.
 
-No automatic aliases for AGENTS.md/CLAUDE.md/GEMINI.md, imports, @file expansion,
+A project root with no `RAIKER.md` is read for `AGENTS.md`, then `CLAUDE.md`
+(RU-16, 2026-11-25): the first name present is the project's one file, under the
+same pinned read and review, and its name is part of what a review binds to. The
+global file has no alias. No GEMINI.md, `.cursor/rules`, imports, @file expansion,
 network fetches, executable directives, environment expansion or frontmatter.
 Remote-only/rootless projects cannot acquire local repository rules by guessing.
 

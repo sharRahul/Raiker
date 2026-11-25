@@ -230,6 +230,9 @@ MCP; every call enters the same gateway, approvals and audit.
 and `.cursor/rules` as RAIKER.md does — reviewed by digest before use — and
 import memories and conversations from ChatGPT and Claude exports, and Hermes
 Agent's `MEMORY.md`/`USER.md`, as suggestions to review.
+*Progress 2026-11-25:* a project root's `AGENTS.md` or `CLAUDE.md` is read
+when it has no `RAIKER.md` ([FIXED-1536](FIXED_ITEMS.md#fixed-1536--a-projects-agentsmd-or-claudemd-was-ignored)); `.cursor/rules` and the
+exports are open.
 
 **RU-17 · Move Raiker to another machine. P1, M.** An encrypted export of
 workspace, settings and personas, imported by first run's *I have a backup*;

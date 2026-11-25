@@ -1,5 +1,9 @@
 # Fixed items
 
+## FIXED-1536 — A project's AGENTS.md or CLAUDE.md was ignored
+
+**Severity: Medium. Area: Build / instructions. Status: Fixed 2026-11-25.** A project with an `AGENTS.md` or `CLAUDE.md` (written for Codex, Cursor, Hermes Agent or Claude Code) and no `RAIKER.md` gave Build nothing; the owner had to copy the file. A project root with no `RAIKER.md` is now read for `AGENTS.md`, then `CLAUDE.md`, with the same pinned read, size limits and review; the first name present is the project's one file, its name is bound into the review, and the global file has no alias. This is the instruction-file half of RU-16; importing ChatGPT and Claude memory exports is still open. Evidence: `tests/test_raiker_md.py::test_a_project_root_falls_back_to_agents_md_then_claude_md`, `::test_the_global_file_never_reads_another_agents_name`.
+
 ## FIXED-1535 — A question was proposed as a project memory
 
 **Severity: Low. Area: Memory / observer. Status: Fixed 2026-11-24 (found in regular use).** After RU-J3, Memory › Suggestions held *"This is our household budget in pounds. Which three categories grew…"* as a deferred `project` memory: the passage's first sentence matched the `is_a` rule, so the owner's whole question was filed as a fact. The completed-turn observer no longer proposes an owner's passage that asks a question or gives Raiker an instruction (*Which…*, *Work out…*, *Can you…*); statements are proposed as before. Evidence: `tests/test_memory_forget_suppression.py::test_a_question_is_not_proposed_as_a_memory`, `::test_an_instruction_is_not_proposed_as_a_memory`.
@@ -2017,6 +2021,8 @@ file you can open. The two capture sets that remain — `screenshots/pages/` and
 
 | ID | Severity | Area | Status |
 |---|---|---|---|
+| [FIXED-1536](#fixed-1536--a-projects-agentsmd-or-claudemd-was-ignored) | Medium | Build / instructions | Fixed 2026-11-25 |
+| [FIXED-1535](#fixed-1535--a-question-was-proposed-as-a-project-memory) | Low | Memory / observer | Fixed 2026-11-24 |
 | [FIXED-01](#fixed-01--model-connection-showed-a-raw-reason-code-with-no-way-to-act-on-it) | High | Models | Fixed |
 | [FIXED-02](#fixed-02--context-meter-showed-0--nan-nan-token-counts-stripped-from-the-audit-log) | High | Chat / API redaction | Fixed |
 | [FIXED-03](#fixed-03--no-token-or-cost-accounting-models-showed-a-meaningless-percentage) | Medium | Models / Chat / Build | Fixed |

@@ -767,8 +767,17 @@ class McpConnectorExecutor:
         command = [str(part) for part in action.arguments.get("command", [])]
         ctx.command = command
         server_id = self._resolve_server_id(action, principal_id, command)
-        on_host = self._owner_registered(server_id, principal_id)
-        reason = self._validate_owner_command(command) if on_host else self._validate_command(command)
+        stored = self._owner_command(action, principal_id)
+        on_host = stored is not None
+        if on_host:
+            # Only the command the owner registered ever runs on the host: an
+            # action naming that server with any other argv is refused, never
+            # run with the owner's access.
+            if command != stored:
+                return self._fail(action.action_id, "mcp_command_mismatch")
+            reason = self._validate_owner_command(command)
+        else:
+            reason = self._validate_command(command)
         if reason is not None:
             return self._fail(action.action_id, reason)
         # DEC-15 step 2 — the secrets the owner gave this server, and only
@@ -1081,6 +1090,25 @@ class McpConnectorExecutor:
                 if row is not None:
                     return str(row["server_id"])
         return None
+
+    def _owner_command(self, action: GovernedAction, principal_id: str) -> list[str] | None:
+        """The stored argv of an owner-registered stdio server this action names by id.
+
+        Only an explicit ``server_id`` counts (never the name or command-stem
+        fallback), and only a stdio row with no template — one written by the
+        human-only ``create_local_mcp_server`` path.
+        """
+        server_id = str(action.arguments.get("server_id", "")).strip()
+        if not server_id:
+            return None
+        row = self._store.get_mcp_server(server_id, principal_id)
+        if row is None or str(row.get("transport") or "stdio") != "stdio":
+            return None
+        if str(row.get("template") or "").strip():
+            return None
+        raw = row.get("command")
+        command = [str(part) for part in raw] if isinstance(raw, list) else []
+        return command or None
 
     def _owner_registered(self, server_id: str | None, principal_id: str) -> bool:
         """MCP-HOST — a profile the owner added runs as the owner.

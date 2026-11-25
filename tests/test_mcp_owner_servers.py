@@ -151,3 +151,29 @@ def test_an_owner_server_sees_who_the_user_is_but_no_provider_key() -> None:
     assert "ANTHROPIC_API_KEY" not in env
     # A sandboxed server's environment is unchanged.
     assert "USERNAME" not in mcp_executor.mcp_stdio_env({"USERNAME": "owner"})
+
+
+def test_an_action_cannot_run_another_command_under_an_owner_servers_name(
+    tmp_path: Path, client: TestClient, headers: dict[str, str]
+) -> None:
+    """Only the command the owner registered runs on the host (security review)."""
+    from types import SimpleNamespace
+
+    from raiker.storage.sqlite import SQLiteStore
+
+    created = client.post(
+        "/api/mcp/servers/local", json={"name": "trusted", "command": "uvx", "args": ["some-server"]}, headers=headers
+    ).json()
+    store = SQLiteStore(tmp_path / "ws")
+    owner = str(store._rows("SELECT principal_id FROM mcp_servers LIMIT 1", ())[0]["principal_id"])  # noqa: SLF001
+    executor = McpConnectorExecutor(tmp_path / "ws", store)
+    action = SimpleNamespace(
+        action_id="act_x",
+        arguments={"server_id": created["server_id"], "command": [sys.executable, "-c", "print(1)"]},
+    )
+    ctx = mcp_executor._SessionCtx(  # noqa: SLF001
+        operation="mcp_connect", tool_name="", tool_arguments={}, transport="stdio", started_at=""
+    )
+    result = executor._execute_stdio(action, owner, ctx, [], 5)  # type: ignore[arg-type]  # noqa: SLF001
+    assert result.ok is False and result.reason_code == "mcp_command_mismatch"
+    assert executor._owner_command(action, owner) == ["uvx", "some-server"]  # type: ignore[arg-type]  # noqa: SLF001

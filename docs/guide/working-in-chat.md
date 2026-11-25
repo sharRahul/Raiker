@@ -319,8 +319,10 @@ with **Save** and **Dismiss**. Save keeps your own words as a memory, through
 the same review Memory's Suggestions use (secret-like text is never kept);
 Dismiss keeps nothing.
 
-**When Raiker proposes a memory from an answer**, the answer is followed by
-*Remember: "…"* with **Keep** and **Not this**. Nothing is stored until you press
+**When something you wrote reads like a fact worth keeping**, the answer is
+followed by *Remember: "…"* with **Keep** and **Not this**. Only your own words
+are offered here; a sentence Raiker wrote waits in Memory › Suggestions, marked
+as Raiker's. Nothing is stored until you press
 Keep, under the same rules as Memory › Suggestions, where the same proposal
 waits if you leave it; Not this turns it down.
 

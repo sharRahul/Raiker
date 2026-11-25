@@ -1,5 +1,9 @@
 # Fixed items
 
+## FIXED-1537 — Permissions was grouped in six headings an owner had to learn
+
+**Severity: Low. Area: Permissions / UI. Status: Fixed 2026-11-25.** Permissions grouped its rows under *Files and code*, *Web and research*, *Messages and services*, *Memory*, *Schedules* and *Advanced (System and runtimes)*, so a command permission, a model provider, a plugin and a push were all "System". It now leads with RU-06's ten families — Files, Commands, Web, Messages and calendar, Memory, Git and GitHub, Models, Money, Devices and home, Other agents and plugins — each with one line on what it allows above its list; **Advanced** stays last and holds the account's approval mode and what the page does not decide. Scheduled routines are filed under Commands, reminders under Messages and calendar. Enforcement and the registry are unchanged; only the headings moved. Evidence: `web/src/lib/capabilityModel.test.ts` (*the ten permission families (RU-06)*: every one of the 67 backend capabilities lands in exactly one family with a summary), `web/src/lib/views/CapabilitiesView.test.ts`; five live specs renamed to the new headings.
+
 ## FIXED-1536 — A project's AGENTS.md or CLAUDE.md was ignored
 
 **Severity: Medium. Area: Build / instructions. Status: Fixed 2026-11-25.** A project with an `AGENTS.md` or `CLAUDE.md` (written for Codex, Cursor, Hermes Agent or Claude Code) and no `RAIKER.md` gave Build nothing; the owner had to copy the file. A project root with no `RAIKER.md` is now read for `AGENTS.md`, then `CLAUDE.md`, with the same pinned read, size limits and review; the first name present is the project's one file, its name is bound into the review, and the global file has no alias. This is the instruction-file half of RU-16; importing ChatGPT and Claude memory exports is still open. Evidence: `tests/test_raiker_md.py::test_a_project_root_falls_back_to_agents_md_then_claude_md`, `::test_the_global_file_never_reads_another_agents_name`.
@@ -2021,6 +2025,7 @@ file you can open. The two capture sets that remain — `screenshots/pages/` and
 
 | ID | Severity | Area | Status |
 |---|---|---|---|
+| [FIXED-1537](#fixed-1537--permissions-was-grouped-in-six-headings-an-owner-had-to-learn) | Low | Permissions / UI | Fixed 2026-11-25 |
 | [FIXED-1536](#fixed-1536--a-projects-agentsmd-or-claudemd-was-ignored) | Medium | Build / instructions | Fixed 2026-11-25 |
 | [FIXED-1535](#fixed-1535--a-question-was-proposed-as-a-project-memory) | Low | Memory / observer | Fixed 2026-11-24 |
 | [FIXED-01](#fixed-01--model-connection-showed-a-raw-reason-code-with-no-way-to-act-on-it) | High | Models | Fixed |

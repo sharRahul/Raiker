@@ -144,7 +144,7 @@ const SURFACES: Surface[] = [
   // Permissions
   { name: "permissions-change", route: "capabilities", steps: [clickIn("main", /^Change$/)] },
   { name: "permissions-turn-on-build", route: "capabilities", steps: [click(/What this turns on/)] },
-  { name: "permissions-files", route: "capabilities", steps: [click(/Files and code/)] },
+  { name: "permissions-files", route: "capabilities", steps: [click(/^Files \d/)] },
   { name: "permissions-advanced", route: "capabilities", steps: [click(/^Advanced/)] },
   // Approvals
   { name: "approvals-history", route: "approvals", steps: [click("History", "tab")] },

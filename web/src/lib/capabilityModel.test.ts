@@ -412,24 +412,108 @@ describe("task groups (UX-PERM-01)", () => {
 
   it("files a permission where an owner looks for it", async () => {
     const { capabilityTaskGroup } = await import("./capabilityModel");
-    expect(capabilityTaskGroup("file_write_execution")).toBe("Files and code");
-    expect(capabilityTaskGroup("git_push_execution")).toBe("Files and code");
-    expect(capabilityTaskGroup("web_fetch")).toBe("Web and research");
-    expect(capabilityTaskGroup("external_channel_runtime")).toBe("Messages and services");
-    expect(capabilityTaskGroup("connector_slack_runtime")).toBe("Messages and services");
+    expect(capabilityTaskGroup("file_write_execution")).toBe("Files");
+    expect(capabilityTaskGroup("git_push_execution")).toBe("Git and GitHub");
+    expect(capabilityTaskGroup("web_fetch")).toBe("Web");
+    expect(capabilityTaskGroup("external_channel_runtime")).toBe("Messages and calendar");
+    expect(capabilityTaskGroup("connector_slack_runtime")).toBe("Messages and calendar");
     expect(capabilityTaskGroup("memory_forget_execution")).toBe("Memory");
-    expect(capabilityTaskGroup("scheduled_routines")).toBe("Schedules");
-    expect(capabilityTaskGroup("reminder_runtime")).toBe("Schedules");
-    expect(capabilityTaskGroup("shell_execution")).toBe("System and runtimes");
-    expect(capabilityTaskGroup("something_new")).toBe("System and runtimes");
+    expect(capabilityTaskGroup("scheduled_routines")).toBe("Commands");
+    expect(capabilityTaskGroup("reminder_runtime")).toBe("Messages and calendar");
+    expect(capabilityTaskGroup("shell_execution")).toBe("Commands");
+    expect(capabilityTaskGroup("something_new")).toBe("Other agents and plugins");
   });
 
   it("keeps the technical domains as the advanced grouping", async () => {
     const { groupGates } = await import("./capabilityModel");
     const gate = (capability: string) => ({ capability }) as never;
     const gates = [gate("shell_execution"), gate("web_fetch")];
-    expect(groupGates(gates, "task").map((group) => group.domain)).toEqual(["Web and research", "System and runtimes"]);
+    expect(groupGates(gates, "task").map((group) => group.domain)).toEqual(["Commands", "Web"]);
     expect(groupGates(gates, "domain").map((group) => group.domain)).toEqual(["Execution", "Network"]);
+  });
+});
+
+describe("the ten permission families (RU-06)", () => {
+  it("files every capability the backend reports under exactly one family with a summary", async () => {
+    const { capabilityTaskGroup, CAPABILITY_TASK_GROUP_ORDER, CAPABILITY_FAMILY_SUMMARY } = await import("./capabilityModel");
+    expect(CAPABILITY_TASK_GROUP_ORDER).toHaveLength(10);
+    const all = [
+      "admin_mutation",
+      "advisor_model_runtime",
+      "approval_execution_relay",
+      "audit_export",
+      "calendar_runtime",
+      "cctv_runtime",
+      "channel_approval_relay",
+      "checkpoint_restore_execution",
+      "cloud_execution_cap",
+      "code_map_indexing",
+      "connector_gcal_runtime",
+      "connector_github_runtime",
+      "connector_gmail_runtime",
+      "connector_outlook_runtime",
+      "connector_slack_runtime",
+      "dashboard",
+      "desktop_ui",
+      "email_runtime",
+      "external_channel_runtime",
+      "external_channels",
+      "file_write_execution",
+      "finance_runtime",
+      "git_fetch_execution",
+      "git_push_execution",
+      "git_write_execution",
+      "graph_codemap_indexing",
+      "graph_codemap_planning",
+      "graph_indexing_runtime",
+      "hardware_operator_runtime",
+      "home_security_runtime",
+      "host_network_code_execution",
+      "hosted_model_runtime",
+      "image_generation",
+      "investment_runtime",
+      "language_intelligence",
+      "mcp_builder_runtime",
+      "mcp_connector_runtime",
+      "medical_runtime",
+      "memory_forget_execution",
+      "memory_write_execution",
+      "model_provider_runtime",
+      "multi_agent_teams",
+      "patch_apply_execution",
+      "plugin_execution",
+      "plugin_execution_cap",
+      "plugin_install",
+      "plugin_revocation_cap",
+      "plugin_runtime_cap",
+      "pregnancy_baby_runtime",
+      "private_network_model_runtime",
+      "process_execution",
+      "project_assignment_runtime",
+      "reminder_runtime",
+      "remote_execution",
+      "remote_execution_cap",
+      "role_mutation",
+      "scheduled_routines",
+      "semantic_memory_review_queue",
+      "semantic_memory_runtime",
+      "semantic_memory_writes",
+      "shell_execution",
+      "subagents",
+      "task_management_runtime",
+      "telemetry_export",
+      "vector_embedding_runtime",
+      "web_fetch",
+      "web_ui",
+    ];
+    for (const capability of all) {
+      const family = capabilityTaskGroup(capability);
+      expect(CAPABILITY_TASK_GROUP_ORDER).toContain(family);
+      expect(CAPABILITY_FAMILY_SUMMARY[family]).toBeTruthy();
+    }
+    expect(capabilityTaskGroup("finance_runtime")).toBe("Money");
+    expect(capabilityTaskGroup("cctv_runtime")).toBe("Devices and home");
+    expect(capabilityTaskGroup("mcp_connector_runtime")).toBe("Other agents and plugins");
   });
 });
 

@@ -65,7 +65,7 @@ test("every Permissions summary moves when one decision is confirmed", async ({ 
   const rail = page.getByRole("navigation", { name: "Permission categories" });
   await rail.waitFor({ timeout: 60_000 });
 
-  await rail.getByRole("button", { name: /^Web and research/ }).click();
+  await rail.getByRole("button", { name: /^Web \d/ }).click();
   const row = page.getByRole("option", { name: /^Web fetch / }).first();
   await row.click();
   const card = page.getByRole("article", { name: "Web fetch" });

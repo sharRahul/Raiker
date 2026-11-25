@@ -41,9 +41,13 @@ permission, and a goal this runtime reports nothing for is left out rather than
 called impossible. **Change** opens the row that decides it.
 
 Below it the page is a list and a detail. The rail on the left chooses a
-category — **Overview**, then what each permission is for (**Files and code**,
-**Web and research**, **Messages and services**, **Memory**, **Schedules**) and
-**Advanced**, which holds **System and runtimes**. The middle list shows each
+category — **Overview**, then ten families of what each permission is for
+(**Files**, **Commands**, **Web**, **Messages and calendar**, **Memory**,
+**Git and GitHub**, **Models**, **Money**, **Devices and home**, **Other agents
+and plugins**), each with one line on what it allows, and **Advanced**, which
+holds the account's approval mode and what this page does not decide. Scheduled
+routines are under **Commands**, reminders under **Messages and calendar**. A
+family with nothing this build can change is not listed. The middle list shows each
 permission in the category with what it is set to and, when it is set to
 **Automatic**, **Needs review**; the detail on the right is the one place each
 permission is changed. Search matches tool name, identifier, description or

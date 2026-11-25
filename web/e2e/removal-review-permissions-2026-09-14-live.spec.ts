@@ -55,7 +55,7 @@ test("Permissions leads with posture and actions, and keeps the table as evidenc
   const main = page.getByRole("main");
   await expect(main.getByText(/^\d+ of \d+ permissions are available to Raiker on this account/)).toBeVisible();
   await expect(page.getByRole("combobox", { name: "Permission status" })).toHaveCount(0);
-  await expect(rail.getByRole("button", { name: /^Files and code \d+$/ })).toBeVisible();
+  await expect(rail.getByRole("button", { name: /^Files \d+$/ })).toBeVisible();
   await capture(page, `${SHOTS}/permissions-overhauled.png`);
 
   // REM-PERM-03 — a closed row answers both questions; its detail explains
@@ -90,15 +90,15 @@ test("Permissions leads with posture and actions, and keeps the table as evidenc
   await capture(page, `${SHOTS}/permissions-not-decided-here.png`, reference);
 
   // Git is one group, not three: a branch, a commit, a push and the account the
-  // push authenticates to sit together under Files and code.
-  await rail.getByRole("button", { name: /^Files and code/ }).click();
-  const files = page.getByRole("listbox", { name: "Files and code permissions" });
+  // push authenticates to sit together under Git and GitHub (RU-06).
+  await rail.getByRole("button", { name: /^Git and GitHub/ }).click();
+  const files = page.getByRole("listbox", { name: "Git and GitHub permissions" });
   for (const label of ["Git writes", "Git push", "GitHub connector"]) {
     await expect(files.getByRole("option", { name: new RegExp(`^${label} `) })).toBeVisible();
   }
   await capture(page, `${SHOTS}/permissions-git-grouped.png`, files);
   // And nothing is left in a fallback bucket whose name means "nobody filed this".
-  await expect(rail.getByRole("button", { name: /Other/ })).toHaveCount(0);
+  await expect(rail.getByRole("button", { name: /^Other tools/ })).toHaveCount(0);
 
   // Search filters the list.
   await page.getByRole("searchbox", { name: "Search permissions" }).fill("Git push");

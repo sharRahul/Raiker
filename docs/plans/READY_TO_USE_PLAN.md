@@ -128,6 +128,8 @@ plugins — each with one line on what it allows and its current setting. The
 per-capability rows stay under each family.
 *Done when* every capability belongs to exactly one family (unit test) and the
 surface sweep passes.
+*Progress 2026-11-25:* the families, their lines and the unit test shipped
+([FIXED-1537](FIXED_ITEMS.md#fixed-1537--permissions-was-grouped-in-six-headings-an-owner-had-to-learn)); the live surface sweep is not re-run.
 
 **RU-07 · Three postures. P1, M.** Permissions opens on **Ask first** (today's
 baseline), **Work in the sandbox** (edits and commands *inside the disposable

@@ -85,7 +85,7 @@ describe("CapabilitiesView — what each switch actually decides", () => {
   it("asks two questions instead of showing two parallel systems", async () => {
     stubFetch({ "GET /api/capability-gates": GATES });
     render(CapabilitiesView);
-    await openCategory(/Advanced/);
+    await openCategory(/^Commands/);
     await fireEvent.click(screen.getByRole("option", { name: /Shell commands/ }));
 
     const pane = detail("Shell commands");
@@ -99,7 +99,7 @@ describe("CapabilitiesView — what each switch actually decides", () => {
   it("shows each permission's policy as text on its row, with no control on the row", async () => {
     stubFetch({ "GET /api/capability-gates": GATES });
     render(CapabilitiesView);
-    await openCategory(/Web and research/);
+    await openCategory(/^Web/);
     const row = screen.getByRole("option", { name: /Web fetch/ });
     expect(row).toHaveTextContent(/On · /);
     expect(within(row).queryByRole("button")).toBeNull();
@@ -166,23 +166,23 @@ describe("CapabilitiesView (QUI-L06)", () => {
     const labels = rail()
       .getAllByRole("button")
       .map((button) => button.textContent?.replace(/\s+/g, " ").trim());
-    expect(labels).toEqual(["Overview", "Web and research 1", "Advanced 1"]);
+    expect(labels).toEqual(["Overview", "Commands 1", "Web 1", "Advanced"]);
     expect(rail().getByRole("button", { name: /Overview/ })).toHaveAttribute("aria-current", "page");
     // A capability with no executor, a fail-closed domain and an inherent
     // read-only surface are not tools: no row anywhere.
-    await openCategory(/Advanced/);
+    await openCategory(/^Commands/);
     expect(screen.queryByText("Finance")).toBeNull();
     expect(screen.queryByText("Medical")).toBeNull();
     expect(screen.queryByText("Web dashboard")).toBeNull();
   });
 
   it("puts the category in the address so a link opens it", async () => {
-    window.location.hash = "#/capabilities?category=web-and-research";
+    window.location.hash = "#/capabilities?category=web";
     stubFetch({ "GET /api/capability-gates": GATES });
     render(CapabilitiesView);
     expect(await screen.findByRole("option", { name: /Web fetch/ })).toBeInTheDocument();
-    await openCategory(/Advanced/);
-    expect(window.location.hash).toBe("#/capabilities?category=advanced");
+    await openCategory(/^Commands/);
+    expect(window.location.hash).toBe("#/capabilities?category=commands");
   });
 
   it("offers the technical grouping from the overflow menu", async () => {
@@ -198,7 +198,7 @@ describe("CapabilitiesView (QUI-L06)", () => {
   it("loads the whole matrix in a single gates request (no per-capability fan-out)", async () => {
     const mock = stubFetch({ "GET /api/capability-gates": GATES });
     render(CapabilitiesView, { principal: "prin_owner" });
-    await openCategory(/Advanced/);
+    await openCategory(/^Commands/);
     expect(
       mock.mock.calls.filter(([u]) => String(u).includes("/api/capability-modes/")),
     ).toHaveLength(0);
@@ -214,7 +214,7 @@ describe("CapabilitiesView (QUI-L06)", () => {
       },
     });
     render(CapabilitiesView, { principal: "prin_owner" });
-    await openCategory(/Advanced/);
+    await openCategory(/^Commands/);
     const group = detail("Shell commands").getByRole("group", { name: /shell commands/i });
     await fireEvent.click(within(group).getByRole("button", { name: "Never" }));
     await waitFor(() => expect(screen.getByText(/is now set to “Never”/i)).toBeInTheDocument());
@@ -236,7 +236,7 @@ describe("CapabilitiesView (QUI-L06)", () => {
     });
     vi.stubGlobal("fetch", mock);
     render(CapabilitiesView, { principal: "prin_owner" });
-    await openCategory(/Advanced/);
+    await openCategory(/^Commands/);
     const group = detail("Shell commands").getByRole("group", { name: /shell commands/i });
     expect(within(group).getByRole("button", { name: "Ask me", pressed: true })).toBeInTheDocument();
     mock.mockClear();
@@ -264,7 +264,7 @@ describe("CapabilitiesView (QUI-L06)", () => {
   it("requires the step-up dialog to loosen a mode (allow)", async () => {
     stubFetch({ "GET /api/capability-gates": GATES });
     render(CapabilitiesView, { principal: "prin_owner" });
-    await openCategory(/Advanced/);
+    await openCategory(/^Commands/);
     const group = detail("Shell commands").getByRole("group", { name: /shell commands/i });
     await fireEvent.click(within(group).getByRole("button", { name: "Allow" }));
     await waitFor(() => expect(screen.getByRole("dialog")).toBeInTheDocument());
@@ -279,7 +279,7 @@ describe("CapabilitiesView (QUI-L06)", () => {
       ],
     });
     render(CapabilitiesView, { principal: "prin_owner" });
-    await openCategory(/Advanced/);
+    await openCategory(/^Commands/);
     await fireEvent.input(screen.getByRole("searchbox", { name: "Search permissions" }), {
       target: { value: "shell" },
     });
@@ -310,7 +310,7 @@ describe("Permissions — summaries, shortcuts and review", () => {
     const goals = await screen.findByRole("region", { name: "What Raiker can do for you" });
     await fireEvent.click(within(goals).getAllByRole("button", { name: /Change: .*commands/i })[0]);
     expect(await screen.findByRole("article", { name: "Shell commands" })).toBeInTheDocument();
-    expect(rail().getByRole("button", { name: /Advanced/ })).toHaveAttribute("aria-current", "page");
+    expect(rail().getByRole("button", { name: /^Commands/ })).toHaveAttribute("aria-current", "page");
     await waitFor(() =>
       expect(screen.getByRole("article", { name: "Shell commands" }).contains(document.activeElement)).toBe(true),
     );
@@ -319,8 +319,8 @@ describe("Permissions — summaries, shortcuts and review", () => {
   it("marks what needs review on the rail, the row and the detail", async () => {
     stubFetch({ "GET /api/capability-gates": AUTO_GATES });
     render(CapabilitiesView, { principal: "prin_owner" });
-    expect(await screen.findByRole("button", { name: /Advanced 1 to review/ })).toBeInTheDocument();
-    await openCategory(/Advanced/);
+    expect(await screen.findByRole("button", { name: /Commands 1 to review/ })).toBeInTheDocument();
+    await openCategory(/^Commands/);
     expect(screen.getByRole("option", { name: /Shell commands/ })).toHaveTextContent("Needs review");
     expect(detail("Shell commands").getByRole("note")).toHaveTextContent(/Needs review/);
   });
@@ -335,7 +335,7 @@ describe("Permissions — summaries, shortcuts and review", () => {
       },
     });
     render(CapabilitiesView, { principal: "prin_owner" });
-    await openCategory(/Advanced/);
+    await openCategory(/^Commands/);
     expect(screen.getByRole("option", { name: /Shell commands/ })).toHaveTextContent("On · Automatic");
     const board = detail("Shell commands").getByRole("group", { name: /when Raiker wants to use Shell commands/i });
     await fireEvent.click(within(board).getByRole("button", { name: "Never" }));
@@ -359,7 +359,7 @@ describe("Permissions — summaries, shortcuts and review", () => {
       ],
     });
     render(CapabilitiesView, { principal: "prin_owner" });
-    await openCategory(/Web and research/);
+    await openCategory(/^Web/);
     const note = detail("Web fetch").getByRole("note");
     expect(note).toHaveTextContent(/is not available right now/);
     expect(note.textContent).not.toMatch(/runs automatically, without asking you/);
@@ -370,7 +370,7 @@ describe("Permissions — summaries, shortcuts and review", () => {
       "GET /api/capability-gates": [makeGate({ ...SHELL_GATE, decision_mode: "supervise" })],
     });
     render(CapabilitiesView, { principal: "prin_owner" });
-    await openCategory(/Advanced/);
+    await openCategory(/^Commands/);
     expect(screen.getByRole("option", { name: /Shell commands/ })).toHaveTextContent("On · Unknown");
     expect(detail("Shell commands").getByText("When Raiker wants to use it")).toBeInTheDocument();
     expect(detail("Shell commands").getByText(/does not recognise this setting/i)).toBeInTheDocument();
@@ -385,7 +385,7 @@ describe("Permissions — Select several", () => {
   }
   const TWO = [
     makeGate({ ...SHELL_GATE, decision_mode: "auto" }),
-    makeGate({ ...SHELL_GATE, capability: "telemetry_export", decision_mode: "auto" }),
+    makeGate({ ...SHELL_GATE, capability: "process_execution", decision_mode: "auto" }),
   ];
 
   it("names what a partly refused bulk change actually did", async () => {
@@ -396,15 +396,15 @@ describe("Permissions — Select several", () => {
         capability: "shell_execution",
         decision_mode: "ask",
       },
-      "POST /api/capability-modes/telemetry_export/ask": {
+      "POST /api/capability-modes/process_execution/ask": {
         __status: 409,
         detail: { reason_code: "capability_change_refused" },
       },
     });
     render(CapabilitiesView, { principal: "prin_owner" });
-    await selectSeveral(/Advanced/);
+    await selectSeveral(/^Commands/);
     await fireEvent.click(screen.getByRole("checkbox", { name: "Select Shell commands" }));
-    await fireEvent.click(screen.getByRole("checkbox", { name: /^Select Telemetry/ }));
+    await fireEvent.click(screen.getByRole("checkbox", { name: /^Select (?!Shell)/ }));
     const bulk = within(screen.getByRole("toolbar", { name: "Bulk capability actions" }));
     await fireEvent.click(bulk.getByRole("button", { name: "Ask me" }));
     const notice = await screen.findByRole("status");
@@ -417,8 +417,8 @@ describe("Permissions — Select several", () => {
       "GET /api/capability-gates": [TWO[0], { ...TWO[1], can_current_principal_change: false }],
     });
     render(CapabilitiesView);
-    await selectSeveral(/Advanced/);
-    expect(screen.getByRole("checkbox", { name: /^Select Telemetry/ })).toBeDisabled();
+    await selectSeveral(/^Commands/);
+    expect(screen.getByRole("checkbox", { name: /^Select (?!Shell)/ })).toBeDisabled();
     await fireEvent.click(screen.getByRole("button", { name: "Select all" }));
     expect(screen.getByText("1 selected")).toBeInTheDocument();
   });
@@ -426,16 +426,16 @@ describe("Permissions — Select several", () => {
   it("locks selection until a bulk update settles", async () => {
     const fetchMock = stubFetch({ "GET /api/capability-gates": TWO });
     render(CapabilitiesView);
-    await selectSeveral(/Advanced/);
+    await selectSeveral(/^Commands/);
     await fireEvent.click(screen.getByRole("checkbox", { name: "Select Shell commands" }));
     let finish!: (response: Response) => void;
     fetchMock.mockImplementationOnce(() => new Promise<Response>(resolve => { finish = resolve; }));
     const bulk = within(screen.getByRole("toolbar", { name: "Bulk capability actions" }));
     await fireEvent.click(bulk.getByRole("button", { name: "Never" }));
-    expect(screen.getByRole("checkbox", { name: /^Select Telemetry/ })).toBeDisabled();
+    expect(screen.getByRole("checkbox", { name: /^Select (?!Shell)/ })).toBeDisabled();
     expect(screen.getByRole("button", { name: "Refresh capabilities" })).toBeDisabled();
     finish({ ok: true, status: 200, json: async () => ({ ok: true }) } as Response);
-    await waitFor(() => expect(screen.getByRole("checkbox", { name: /^Select Telemetry/ })).toBeEnabled());
+    await waitFor(() => expect(screen.getByRole("checkbox", { name: /^Select (?!Shell)/ })).toBeEnabled());
     expect(screen.getByRole("checkbox", { name: "Select Shell commands" })).not.toBeChecked();
   });
 
@@ -443,7 +443,7 @@ describe("Permissions — Select several", () => {
     const routes = { "GET /api/capability-gates": TWO };
     stubFetch(routes);
     render(CapabilitiesView);
-    await selectSeveral(/Advanced/);
+    await selectSeveral(/^Commands/);
     await fireEvent.click(screen.getByRole("checkbox", { name: "Select Shell commands" }));
     expect(screen.getByText("1 selected")).toBeInTheDocument();
     routes["GET /api/capability-gates"] = TWO.map(gate => ({ ...gate, can_current_principal_change: false }));
@@ -471,7 +471,7 @@ it("names the host-network capability and says where code runs on this machine",
     ],
   });
   render(CapabilitiesView);
-  await openCategory(/Advanced/);
+  await openCategory(/^Commands/);
   expect(await screen.findByRole("option", { name: /Code with host-network risk/ })).toBeInTheDocument();
   expect(await screen.findByTestId("network-boundary")).toHaveTextContent(
     /native sandbox is unavailable.*commands are refused/,

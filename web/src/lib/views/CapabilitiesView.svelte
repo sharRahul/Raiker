@@ -25,6 +25,7 @@
     enableableTargets,
     capabilityGroup,
     groupGates,
+    CAPABILITY_FAMILY_SUMMARY,
     type RegistryGrouping,
     isAvailable,
     isDecisionMode,
@@ -118,11 +119,10 @@
    */
   const OVERVIEW_ID = "overview";
   const ADVANCED_ID = "advanced";
-  const ADVANCED_GROUP = "System and runtimes";
+  // RU-06 — the ten families hold every permission; Advanced holds the
+  // account-wide approval mode and the read-only notes, after them.
   function slug(group: string): string {
-    return group === ADVANCED_GROUP && grouping === "task"
-      ? ADVANCED_ID
-      : group.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+    return group.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
   }
   function categoryFromHash(): string {
     if (typeof window === "undefined") return OVERVIEW_ID;
@@ -204,13 +204,15 @@
     { id: OVERVIEW_ID, label: "Overview", count: 0, review: 0 },
     ...groups.map((group) => ({
       id: slug(group.domain),
-      label: slug(group.domain) === ADVANCED_ID ? "Advanced" : group.domain,
+      label: group.domain,
       count: group.gates.length,
       review: group.gates.filter((gate) =>
         attention.some((item) => item.capability === gate.capability),
       ).length,
     })),
+    ...(grouping === "task" ? [{ id: ADVANCED_ID, label: "Advanced", count: 0, review: 0 }] : []),
   ]);
+  const categoryGroup = $derived(groups.find((group) => slug(group.domain) === category)?.domain ?? "");
   const categoryGates = $derived(
     groups.find((group) => slug(group.domain) === category)?.gates ?? [],
   );
@@ -861,6 +863,10 @@
             <ApprovalModeControl placement="down" />
           </section>
         {/if}
+        {#if grouping === "task" && categoryGroup && categoryGroup in CAPABILITY_FAMILY_SUMMARY}
+          <p class="family-summary">{CAPABILITY_FAMILY_SUMMARY[categoryGroup as keyof typeof CAPABILITY_FAMILY_SUMMARY]}</p>
+        {/if}
+        {#if category !== ADVANCED_ID}
         <ListDetail
           items={categoryGates}
           key={(gate) => gate.capability}
@@ -897,6 +903,7 @@
             />
           {/snippet}
         </ListDetail>
+        {/if}
       {/if}
 
       {#if category === ADVANCED_ID && !bulkMode}
@@ -1169,6 +1176,11 @@
   }
   .cap-label {
     font-weight: 600;
+  }
+  .family-summary {
+    margin: 0 0 var(--space-3);
+    color: var(--text-2);
+    font-size: var(--text-sm);
   }
   .cap-summary {
     color: var(--text-3);

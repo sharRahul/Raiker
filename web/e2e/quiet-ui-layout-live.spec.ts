@@ -118,9 +118,9 @@ test("RT-QUI-20 — Permissions: categories beside one permission at a time", as
   await expect(page.getByRole("region", { name: "Common permissions" })).toHaveCount(0);
   await capture(page, `${SHOTS}/20-permissions-overview.png`);
 
-  await rail.getByRole("button", { name: /^Web and research/ }).click();
+  await rail.getByRole("button", { name: /^Web \d/ }).click();
   await expect(page).toHaveURL(/category=web-and-research/);
-  const rows = page.getByRole("listbox", { name: /Web and research permissions/ });
+  const rows = page.getByRole("listbox", { name: /^Web permissions/ });
   await expect(rows.getByRole("option").first()).toBeVisible();
   // A row is text; the four-way choice is in the detail, once.
   await expect(rows.getByRole("button")).toHaveCount(0);

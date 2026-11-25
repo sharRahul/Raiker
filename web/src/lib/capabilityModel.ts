@@ -498,37 +498,52 @@ export function groupByDomain(gates: CapabilityGate[]): { domain: string; gates:
  * about enforcement or the registry changes, only the headings over it.
  */
 export const CAPABILITY_TASK_GROUP_ORDER = [
-  "Files and code",
-  "Web and research",
-  "Messages and services",
+  "Files",
+  "Commands",
+  "Web",
+  "Messages and calendar",
   "Memory",
-  // QUI-L06 — what runs on its own at a time the owner chose.
-  "Schedules",
-  "System and runtimes",
+  "Git and GitHub",
+  "Models",
+  "Money",
+  "Devices and home",
+  "Other agents and plugins",
 ] as const;
 
 type TaskGroup = (typeof CAPABILITY_TASK_GROUP_ORDER)[number];
 
-/** Where each technical domain lands when no capability says otherwise. */
-const TASK_GROUP_OF_DOMAIN: Record<string, TaskGroup> = {
-  Workspace: "Files and code",
-  Git: "Files and code",
-  Execution: "System and runtimes",
-  Network: "Web and research",
-  Models: "System and runtimes",
-  Connectors: "Messages and services",
-  MCP: "Messages and services",
-  Automation: "System and runtimes",
-  "Other tools": "System and runtimes",
+/**
+ * RU-06 (2026-11-25) — ten families an owner recognises, each with one line on
+ * what it allows. Schedules (QUI-L06) are filed under Commands: a routine is
+ * Raiker running something on its own, and reminders sit with the calendar.
+ */
+export const CAPABILITY_FAMILY_SUMMARY: Record<TaskGroup, string> = {
+  Files: "Read, change and restore files in your projects.",
+  Commands: "Run programs, tests and scheduled routines in the command sandbox.",
+  Web: "Read web pages and send prompts to online image services.",
+  "Messages and calendar": "Read and send mail, chat messages and calendar events.",
+  Memory: "Remember, recall and forget what you tell Raiker.",
+  "Git and GitHub": "Commit, fetch and push, and use your GitHub account.",
+  Models: "Which model providers Raiker may send a conversation to.",
+  Money: "Read finances and investments. Raiker never pays for you.",
+  "Devices and home": "Cameras, home security and hardware on your network.",
+  "Other agents and plugins": "Helper agents, MCP servers and plugins you install.",
 };
 
-/**
- * Capabilities whose domain is the wrong answer to "what is this for". Memory
- * lived under Workspace because it writes this machine's database; an owner
- * looks for it under Memory. A channel lived under Network because it reaches
- * out; an owner looks for it beside email and calendar. Exports and the task
- * and project bookkeeping are about running Raiker, not about the owner's files.
- */
+/** Where each technical domain lands when no capability says otherwise. */
+const TASK_GROUP_OF_DOMAIN: Record<string, TaskGroup> = {
+  Workspace: "Files",
+  Git: "Git and GitHub",
+  Execution: "Commands",
+  Network: "Web",
+  Models: "Models",
+  Connectors: "Messages and calendar",
+  MCP: "Other agents and plugins",
+  Automation: "Commands",
+  "Other tools": "Other agents and plugins",
+};
+
+/** Capabilities whose domain is the wrong answer to "what is this for". */
 const TASK_GROUP_OVERRIDES: Record<string, TaskGroup> = {
   memory_write_execution: "Memory",
   memory_forget_execution: "Memory",
@@ -537,19 +552,39 @@ const TASK_GROUP_OVERRIDES: Record<string, TaskGroup> = {
   semantic_memory_runtime: "Memory",
   vector_embedding_runtime: "Memory",
   graph_indexing_runtime: "Memory",
-  scheduled_routines: "Schedules",
-  reminder_runtime: "Schedules",
-  external_channel_runtime: "Messages and services",
-  channel_approval_relay: "Messages and services",
-  telemetry_export: "System and runtimes",
-  audit_export: "System and runtimes",
-  task_management_runtime: "System and runtimes",
-  project_assignment_runtime: "System and runtimes",
+  scheduled_routines: "Commands",
+  reminder_runtime: "Messages and calendar",
+  external_channel_runtime: "Messages and calendar",
+  external_channels: "Messages and calendar",
+  channel_approval_relay: "Messages and calendar",
+  subagents: "Other agents and plugins",
+  multi_agent_teams: "Other agents and plugins",
+  plugin_install: "Other agents and plugins",
+  plugin_execution: "Other agents and plugins",
+  plugin_execution_cap: "Other agents and plugins",
+  plugin_revocation_cap: "Other agents and plugins",
+  plugin_runtime_cap: "Other agents and plugins",
+  plugin_sandboxed_runtime_cap: "Other agents and plugins",
+  plugin_sandbox_image_pull_cap: "Other agents and plugins",
+  remote_execution: "Commands",
+  finance_runtime: "Money",
+  investment_runtime: "Money",
+  cctv_runtime: "Devices and home",
+  home_security_runtime: "Devices and home",
+  hardware_operator_runtime: "Devices and home",
+  telemetry_export: "Web",
+  audit_export: "Files",
+  task_management_runtime: "Files",
+  project_assignment_runtime: "Files",
 };
 
-/** The task group one capability is listed under. Never hidden: an unknown one is System. */
-export function capabilityTaskGroup(capability: string): string {
-  return TASK_GROUP_OVERRIDES[capability] ?? TASK_GROUP_OF_DOMAIN[capabilityDomain(capability)] ?? "System and runtimes";
+/** The family one capability is listed under. Never hidden: an unknown one is Other. */
+export function capabilityTaskGroup(capability: string): TaskGroup {
+  return (
+    TASK_GROUP_OVERRIDES[capability] ??
+    TASK_GROUP_OF_DOMAIN[capabilityDomain(capability)] ??
+    "Other agents and plugins"
+  );
 }
 
 /** Two ways to head the same registry. */

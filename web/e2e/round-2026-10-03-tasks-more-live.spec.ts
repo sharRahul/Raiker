@@ -162,11 +162,14 @@ test("Permissions leads with what each permission is for", async ({ page }) => {
   const order = await registry.locator(".phase-head label").allTextContents();
   const names = order.map((text) => text.trim());
   expect(names).toEqual([
-    "Files and code",
-    "Web and research",
-    "Messages and services",
+    "Files",
+    "Commands",
+    "Web",
+    "Messages and calendar",
     "Memory",
-    "System and runtimes",
+    "Git and GitHub",
+    "Models",
+    "Other agents and plugins",
   ]);
   await capture(page, join(SHOTS, "06-permissions-by-task.png"), registry.locator(".registry-heading").locator(".."));
   await registry.getByRole("button", { name: "Technical area (advanced)" }).click();

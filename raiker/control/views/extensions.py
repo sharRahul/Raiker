@@ -182,6 +182,11 @@ class McpServerView(View):
     # DEC-15 step 2 — the secret names this local server is started with from
     # the vault, and only this server. Never the values.
     vault_env: tuple[str, ...] = ()
+    # MCP-HOST — `owner`: added by its command, runs as the owner outside the
+    # command sandbox; `sandbox`: everything else. `call_mode` is this server's
+    # own standing answer for its accepted tools: `ask` or `allow`.
+    runs_as: Literal["owner", "sandbox"] = "sandbox"
+    call_mode: Literal["ask", "allow"] = "ask"
 
 
 @dataclass(frozen=True)

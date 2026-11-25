@@ -99,6 +99,29 @@
   const connectorBlocked = $derived(
     blocks.some((block) => block.reason.startsWith("The MCP connector")),
   );
+  /** MCP-HOST — whether Raiker may call this server's accepted tools right now. */
+  function reachable(server: McpServer): boolean {
+    if (agentAccess === null || !agentAccess.gate_enabled || agentAccess.decision_mode === "deny") return false;
+    return server.call_mode === "allow" || agentAccess.reason_code === "" || agentAccess.reason_code === null;
+  }
+
+  async function setCallMode(server: McpServer, allow: boolean) {
+    busy = `mode:${server.server_id}`;
+    error = null;
+    notice = null;
+    try {
+      await api.setMcpServerCallMode(server.server_id, allow ? "allow" : "ask");
+      notice = allow
+        ? `Raiker may use the tools you accepted on “${server.name}” without asking. A new or changed tool still waits for you.`
+        : `Raiker asks again before using “${server.name}”, as your MCP permission says.`;
+      await load();
+    } catch (e) {
+      error = connectionFailure(`Could not change how Raiker uses “${server.name}”`, "Its setting is unchanged.", "Choose Refresh servers, then try again.", e);
+    } finally {
+      busy = null;
+    }
+  }
+
   const accessBlock = $derived.by(() => {
     if (agentAccess === null || agentAccess.callable) return null;
     if (agentAccess.reason_code === "mcp_gate_disabled") {
@@ -118,8 +141,8 @@
       text:
         `Connected MCP tools are withheld from every turn: the MCP decision mode is ` +
         `“${agentAccess.decision_mode}”, which holds a tool call for a decision that a running turn ` +
-        "cannot wait for. Set it to Always allow (or Let Raiker decide with a low-risk floor) to let " +
-        "the agent call them.",
+        "cannot wait for. Turn on “Use its accepted tools without asking” on a server you trust, or set " +
+        "the mode to Always allow (or Let Raiker decide with a low-risk floor) for every server.",
       action: "Change the decision mode in",
     };
   });
@@ -802,16 +825,26 @@
             <!-- The one thing the card could not previously say: whether the
                  agent can actually call these. -->
             {#if s.status === "connected" && s.monitor_state === "active"}
-              <span class="reach" class:ok={agentAccess?.callable === true}>
-                {agentAccess?.callable === true
-                  ? "Callable by Raiker"
-                  : "Not callable yet — see above"}
+              <span class="reach" class:ok={reachable(s)}>
+                {reachable(s) ? "Callable by Raiker" : "Not callable yet — see above"}
               </span>
             {/if}
           {:else}
             <span class="muted">Run Test to discover this server's tools.</span>
           {/if}
         </div>
+        {#if s.tools.length}
+          <label class="call-mode">
+            <input
+              type="checkbox"
+              checked={s.call_mode === "allow"}
+              disabled={busy === `mode:${s.server_id}`}
+              onchange={(e) => setCallMode(s, (e.currentTarget as HTMLInputElement).checked)}
+            />
+            Use its accepted tools without asking
+            <span class="muted">— like an allow rule in Claude Code, or approval mode in Codex. New or changed tools still wait for you.</span>
+          </label>
+        {/if}
         <!-- DEC-15 step 10 — what the server added or changed since the owner
              accepted it. Held tools are never offered to the model; the
              server's sentence is labelled as the server's. -->
@@ -982,6 +1015,8 @@
 </details>
 
 <style>
+  .call-mode { display: flex; align-items: baseline; gap: 0.45rem; flex-wrap: wrap; margin-top: var(--space-2); font-size: var(--text-sm); color: var(--text-1); }
+  .call-mode .muted { font-size: var(--text-xs); }
   .local { margin-top: var(--space-5); }
   .local-h { font-size: var(--text-md); margin: 0 0 var(--space-2); }
   .local-scope { margin: 0 0 var(--space-3); color: var(--text-2); font-size: var(--text-sm); line-height: 1.5; max-width: var(--prose-measure); }

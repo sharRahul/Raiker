@@ -20813,6 +20813,51 @@
         "title": "McpAgentAccess",
         "type": "object"
       },
+      "McpCallModeRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "mode": {
+            "enum": [
+              "ask",
+              "allow"
+            ],
+            "title": "Mode",
+            "type": "string"
+          }
+        },
+        "required": [
+          "mode"
+        ],
+        "title": "McpCallModeRequest",
+        "type": "object"
+      },
+      "McpCallModeSet": {
+        "properties": {
+          "call_mode": {
+            "enum": [
+              "ask",
+              "allow"
+            ],
+            "title": "Call Mode",
+            "type": "string"
+          },
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          },
+          "server_id": {
+            "title": "Server Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "ok",
+          "server_id",
+          "call_mode"
+        ],
+        "title": "McpCallModeSet",
+        "type": "object"
+      },
       "McpContainment": {
         "description": "A pause, kill or resume, and the monitor state it left the connection in.",
         "properties": {
@@ -21271,6 +21316,15 @@
             "default": null,
             "title": "Auth Ref"
           },
+          "call_mode": {
+            "default": "ask",
+            "enum": [
+              "ask",
+              "allow"
+            ],
+            "title": "Call Mode",
+            "type": "string"
+          },
           "command": {
             "items": {
               "type": "string"
@@ -21384,6 +21438,15 @@
               "none"
             ],
             "title": "Purpose From",
+            "type": "string"
+          },
+          "runs_as": {
+            "default": "sandbox",
+            "enum": [
+              "owner",
+              "sandbox"
+            ],
+            "title": "Runs As",
             "type": "string"
           },
           "scope": {
@@ -50445,6 +50508,56 @@
           }
         },
         "summary": "Rename Mcp Server"
+      }
+    },
+    "/api/mcp/servers/{server_id}/call-mode": {
+      "put": {
+        "description": "MCP-HOST — `allow` lets this server's accepted tools be used without asking.",
+        "operationId": "set_mcp_server_call_mode_api_mcp_servers__server_id__call_mode_put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "server_id",
+            "required": true,
+            "schema": {
+              "title": "Server Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/McpCallModeRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/McpCallModeSet"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Set Mcp Server Call Mode"
       }
     },
     "/api/mcp/servers/{server_id}/connect": {

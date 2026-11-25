@@ -422,6 +422,9 @@ export const api = {
   mcpSessions: (serverId: string) => contract.listMcpSessions(serverId),
   mcpFindings: (serverId: string) => contract.listMcpFindings(serverId),
   pauseMcpServer: (serverId: string) => contract.pauseMcpServer(serverId),
+  // MCP-HOST — this server's accepted tools: ask (follow the decision mode) or allow.
+  setMcpServerCallMode: (serverId: string, mode: "ask" | "allow") =>
+    contract.setMcpServerCallMode(serverId, { mode }),
   resumeMcpServer: (serverId: string) => contract.resumeMcpServer(serverId),
   // §13.2 item 6 — `shown` is each declaration's fingerprint as the page
   // rendered it; a tool reworded since is refused 409 `mcp_tool_changed`.

@@ -929,6 +929,12 @@ class CreateRemoteMcpServerRequest(StrictRequest):
     auth_ref: str | None = None
 
 
+class McpCallModeRequest(StrictRequest):
+    # MCP-HOST — this server's own answer for its accepted tools: `ask` (they
+    # follow the MCP decision mode) or `allow` (used without asking).
+    mode: Literal["ask", "allow"]
+
+
 class ContainMcpServerRequest(StrictRequest):
     # Optional redacted reason for a pause/kill of a monitored MCP connection
     # (Phase C). The reason is human-readable copy shown back to the owner — it

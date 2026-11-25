@@ -107,6 +107,8 @@ class ExtensionService:
                 name=str(row["name"]),
                 command=tuple(str(part) for part in row.get("command", [])),
                 template=row.get("template"),
+                runs_as="owner" if str(row.get("runs_as") or "") == "owner" else "sandbox",
+                call_mode="allow" if str(row.get("call_mode") or "") == "allow" else "ask",
                 transport=str(row.get("transport", "stdio")),
                 status=str(row.get("status", "created")),
                 created_at=str(row.get("created_at", "")),
@@ -131,6 +133,7 @@ class ExtensionService:
                     endpoint_url=row.get("endpoint_url"),
                     auth_ref=row.get("auth_ref"),
                     template=row.get("template"),
+                    runs_as=str(row.get("runs_as") or "sandbox"),
                     tool_count=(
                         int(row.get("tool_count", 0) or 0)
                         if row.get("last_connected_at")
@@ -953,6 +956,7 @@ def mcp_scope(
     auth_ref: str | None,
     template: str | None,
     tool_count: int | None,
+    runs_as: str = "sandbox",
 ) -> McpScope:
     """UX-MCP-02 — what a server can reach, from the code that decides it.
 
@@ -1007,7 +1011,7 @@ def mcp_scope(
         # MCP-HOST — a server the owner registered runs with the host
         # environment (who the user is, the desktop); one Raiker generated
         # keeps the sandbox's.
-        "environment": sorted(mcp_stdio_env() if template else mcp_host_env()),
+        "environment": sorted(mcp_host_env() if runs_as == "owner" else mcp_stdio_env()),
         "granted_environment": list(allowed_mcp_env_names()),
         "token_reference": None,
         "working_folder": "workspace",

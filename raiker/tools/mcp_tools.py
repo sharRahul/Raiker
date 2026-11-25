@@ -220,6 +220,12 @@ class McpToolService:
             return False, "mcp_withheld_auto"
         return True, ""
 
+    def _server_allows(self, row: dict[str, Any]) -> bool:
+        """MCP-HOST — this server's own standing allow, which a DENY mode still overrides."""
+        from raiker.runtime.authority.decision_modes import DecisionMode
+
+        return str(row.get("call_mode") or "ask") == "allow" and self._mode() != DecisionMode.DENY
+
     # ── Discovery ────────────────────────────────────────────────────────
     def available_servers(self) -> list[dict[str, Any]]:
         """Owner-scoped servers whose tools may be offered this turn.
@@ -229,8 +235,9 @@ class McpToolService:
         for a server that never completed a handshake, and for one whose
         connection the monitor paused or killed.
         """
-        if not self._principal_id or not self.callable_now()[0]:
+        if not self._principal_id or not self.gate_enabled():
             return []
+        everyone = self.callable_now()[0]
         try:
             rows = self._store.list_mcp_servers(self._principal_id)
         except Exception:  # noqa: BLE001 — a broken read offers nothing
@@ -238,7 +245,11 @@ class McpToolService:
         return [
             row
             for row in rows
-            if str(row.get("status")) == _CONNECTED_STATUS
+            # MCP-HOST — the decision mode admits every server, or the owner
+            # said this server's accepted tools may be used without asking
+            # (unless the mode denies MCP altogether).
+            if (everyone or self._server_allows(row))
+            and str(row.get("status")) == _CONNECTED_STATUS
             and str(row.get("monitor_state") or _ACTIVE_MONITOR_STATE) == _ACTIVE_MONITOR_STATE
             and row.get("tools")
         ]
@@ -315,16 +326,17 @@ class McpToolService:
                 "mcp_denied_by_decision_mode",
                 "MCP tool call denied by the owner's decision mode.",
             )
-        if mode == DecisionMode.ASK or (
+        withheld = mode == DecisionMode.ASK or (
             mode == DecisionMode.AUTO and auto_requires_approval(_CALL_RISK)
-        ):
+        )
+        server = self._find_server(server_name)
+        if withheld and (server is None or not self._server_allows(server)):
             return _denied(
                 f"mcp_withheld_{mode.value}",
                 "MCP tool call withheld: running a tool on a registered MCP server needs a "
-                "standing owner decision — raise the mcp_connector_runtime decision mode to allow.",
+                "standing owner decision — raise the mcp_connector_runtime decision mode, or "
+                "let this server's accepted tools be used without asking on its card.",
             )
-
-        server = self._find_server(server_name)
         if server is None:
             return _failed(
                 "mcp_server_not_available",
@@ -446,7 +458,11 @@ def mcp_agent_access(
     service = McpToolService(workspace_root, store, principal_id=principal_id)
     gate_enabled = service.gate_enabled()
     callable_now, reason = service.callable_now()
-    specs = service.tool_specs() if callable_now else []
+    # MCP-HOST — a server the owner allows is callable whatever the mode says
+    # for the rest; the reason stays, because the other servers still wait.
+    specs = service.tool_specs() if gate_enabled else []
+    if specs and not callable_now:
+        callable_now = True
     connected = 0
     if gate_enabled:
         try:

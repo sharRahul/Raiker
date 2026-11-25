@@ -177,3 +177,37 @@ def test_an_action_cannot_run_another_command_under_an_owner_servers_name(
     result = executor._execute_stdio(action, owner, ctx, [], 5)  # type: ignore[arg-type]  # noqa: SLF001
     assert result.ok is False and result.reason_code == "mcp_command_mismatch"
     assert executor._owner_command(action, owner) == ["uvx", "some-server"]  # type: ignore[arg-type]  # noqa: SLF001
+
+
+@pytest.mark.parametrize(("mode", "call_mode", "offered"), [
+    ("ask", "ask", False),
+    ("ask", "allow", True),
+    ("deny", "allow", False),
+    ("allow", "ask", True),
+])
+def test_a_server_the_owner_allows_is_offered_while_others_still_ask(
+    tmp_path: Path, mode: str, call_mode: str, offered: bool
+) -> None:
+    """MCP-HOST — Codex's per-server approval mode, Claude Code's per-server allow rule."""
+    from raiker.contracts.ids import new_id
+    from raiker.storage.sqlite import SQLiteStore
+    from raiker.tools.mcp_tools import mcp_tool_specs
+    from tests.test_mcp_agent_tools import _CAP, _OWNER, _enable_gate, bootstrap_owner
+
+    ws = tmp_path / "ws"
+    ws.mkdir()
+    bootstrap_owner("owner", "Owner", workspace_root=ws)
+    store = SQLiteStore(ws)
+    ctrl = _enable_gate(ws, store)
+    assert ctrl.set_capability_decision_mode(_CAP, mode, _OWNER, "test").ok
+    for name, own_mode in (("trusted", call_mode), ("other", "ask")):
+        server_id = new_id("mcp_")
+        store.create_mcp_server(
+            server_id=server_id, principal_id=_OWNER, name=name, command=["uvx", name],
+            status="connected", last_connected_at="2026-11-25T00:00:00Z", tools=["look"],
+            tool_schemas=[{"name": "look", "description": "Look", "inputSchema": {"type": "object"}}],
+        )
+        store.set_mcp_server_call_mode(server_id, _OWNER, own_mode)
+    names = {spec.name for spec in mcp_tool_specs(ws, store, _OWNER)}
+    assert ("mcp__trusted__look" in names) is offered
+    assert ("mcp__other__look" in names) is (mode == "allow")

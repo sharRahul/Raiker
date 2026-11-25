@@ -1104,7 +1104,7 @@ class McpConnectorExecutor:
         row = self._store.get_mcp_server(server_id, principal_id)
         if row is None or str(row.get("transport") or "stdio") != "stdio":
             return None
-        if str(row.get("template") or "").strip():
+        if str(row.get("runs_as") or "sandbox") != "owner" or str(row.get("template") or "").strip():
             return None
         raw = row.get("command")
         command = [str(part) for part in raw] if isinstance(raw, list) else []
@@ -1121,7 +1121,7 @@ class McpConnectorExecutor:
         if not server_id:
             return False
         row = self._store.get_mcp_server(server_id, principal_id)
-        return row is not None and not str(row.get("template") or "").strip()
+        return row is not None and str(row.get("runs_as") or "sandbox") == "owner"
 
     def _validate_owner_command(self, command: list[str]) -> str | None:
         return McpConnectorExecutor.validate_owner_command(command)

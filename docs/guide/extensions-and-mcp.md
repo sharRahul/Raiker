@@ -374,6 +374,14 @@ sandbox:
 Servers Raiker generates from a template (the developer example) still run in
 the command sandbox.
 
+**Use its accepted tools without asking.** Each server's card has this switch.
+The MCP permission's decision mode applies to every server, and its default,
+*Ask*, keeps their tools away from a running turn. Turning the switch on for one
+server you trust lets Raiker call the tools you accepted on it, without changing
+the mode for the others — Codex keeps an approval mode per server and Claude
+Code an allow rule per server for the same reason. A new or changed tool still
+waits for your review, and *Deny* still refuses every MCP call.
+
 ### On Windows, with WSL2 chosen
 
 With **WSL2** chosen as the command sandbox (Settings › Advanced), MCP servers

@@ -61,6 +61,12 @@ class McpServerSecrets(TypedDict):
     updated_at: NotRequired[str | None]
 
 
+class McpCallModeSet(TypedDict):
+    ok: bool
+    server_id: str
+    call_mode: Literal["ask", "allow"]
+
+
 class McpContainment(TypedDict):
     """A pause, kill or resume, and the monitor state it left the connection in."""
 

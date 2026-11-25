@@ -749,6 +749,7 @@ class RuntimeControlService:
             transport="stdio",
             status="created",
         )
+        self._store.mark_mcp_server_owner_run(server_id, principal.principal_id)
         for variable, value in (env or {}).items():
             stored = self.set_mcp_server_secret(acting_principal_id, server_id, variable, value)
             if not stored.ok:
@@ -2117,6 +2118,37 @@ class RuntimeControlService:
         return ControlResult(
             ok=True, data={"server_id": server_id, "monitor_state": new_state}
         )
+
+    def set_mcp_server_call_mode(
+        self, acting_principal_id: str | None, server_id: str, mode: str
+    ) -> ControlResult:
+        """MCP-HOST — whether this server's accepted tools may be used without asking.
+
+        Codex keeps an approval mode per MCP server and per tool; Claude Code an
+        allow rule per server. Here it is one owner answer per server, human-only
+        and audited. It covers the tools the owner accepted: a new or changed
+        tool is still held until reviewed, and a ``deny`` decision mode for MCP
+        still refuses every call.
+        """
+        principal, err = resolve_local_principal(self._workspace_root, acting_principal_id)
+        if principal is None:
+            return ControlResult(ok=False, reason_code=err or "principal_not_resolved")
+        if principal.principal_type != PrincipalType.HUMAN:
+            return ControlResult(ok=False, reason_code="not_authorized_human")
+        if mode not in {"ask", "allow"}:
+            return ControlResult(ok=False, reason_code="mcp_call_mode_invalid")
+        if not self._store.set_mcp_server_call_mode(server_id, principal.principal_id, mode):
+            return ControlResult(ok=False, reason_code=f"unknown_mcp_server:{server_id}")
+        self._writer.append(
+            make_event(
+                session_id="mcp",
+                turn_id=None,
+                event_type="mcp_call_mode_changed",
+                actor="control_service",
+                payload={"server_id": server_id, "call_mode": mode},
+            )
+        )
+        return ControlResult(ok=True, data={"server_id": server_id, "call_mode": mode})
 
     def pause_mcp_server(
         self, acting_principal_id: str | None, server_id: str, reason: str | None = None

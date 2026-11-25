@@ -271,6 +271,33 @@ class ExtensionStore:
             )
             return cursor.rowcount > 0
 
+    def mark_mcp_server_owner_run(self: SQLiteStore, server_id: str, principal_id: str) -> bool:
+        """MCP-HOST — the one write that makes a server run as the owner.
+
+        Called only by the human-only ``create_local_mcp_server`` path; every
+        other row (a template, a remote, one recorded from a session) stays
+        ``sandbox``.
+        """
+        with self.connect() as connection:
+            cursor = connection.execute(
+                "UPDATE mcp_servers SET runs_as = 'owner' WHERE server_id = ? AND principal_id = ?",
+                (server_id, principal_id),
+            )
+            return cursor.rowcount == 1
+
+    def set_mcp_server_call_mode(
+        self: SQLiteStore, server_id: str, principal_id: str, mode: str
+    ) -> bool:
+        """MCP-HOST — ``ask`` or ``allow`` for one owner-scoped server."""
+        if mode not in {"ask", "allow"}:
+            raise ValueError("mcp_call_mode_invalid")
+        with self.connect() as connection:
+            cursor = connection.execute(
+                "UPDATE mcp_servers SET call_mode = ? WHERE server_id = ? AND principal_id = ?",
+                (mode, server_id, principal_id),
+            )
+            return cursor.rowcount == 1
+
     def delete_mcp_server(
         self: SQLiteStore, server_id: str, principal_id: str, expected_name: str | None = None
     ) -> bool:

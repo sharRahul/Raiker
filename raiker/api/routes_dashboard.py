@@ -36,6 +36,7 @@ from raiker.api.schemas import (
     CreateProjectRequest,
     CreateRemoteMcpServerRequest,
     ExportSessionRequest,
+    McpCallModeRequest,
     McpServerSecretRequest,
     ModelCatalogueRefreshRequest,
     ModelConnectionRequest,
@@ -86,6 +87,7 @@ from raiker.api.wire.execution import (
 )
 from raiker.api.wire.mcp import (
     LocalMcpServerCreated,
+    McpCallModeSet,
     McpContainment,
     McpResumed,
     McpServerConnected,
@@ -681,6 +683,25 @@ async def remove_mcp_server_secret(
 
 
 # ── Containment: kill switch + revocable pause + findings/notifications ───────
+@router.put("/api/mcp/servers/{server_id}/call-mode")
+async def set_mcp_server_call_mode(
+    server_id: str,
+    body: McpCallModeRequest,
+    request: Request,
+    auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+) -> dict[str, Any]:
+    """MCP-HOST — `allow` lets this server's accepted tools be used without asking."""
+    answer = cast(
+        McpCallModeSet,
+        _mcp_result(
+            _service(request).control.set_mcp_server_call_mode(
+                auth_data[0].principal_id, server_id, body.mode
+            )
+        ),
+    )
+    return serialize_dto(answer)
+
+
 @router.post("/api/mcp/servers/{server_id}/pause")
 async def pause_mcp_server(
     server_id: str,

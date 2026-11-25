@@ -327,6 +327,7 @@ EVENT_TYPES = {
     # An owner added or removed an MCP connection profile (local or remote). The
     # payload is redacted metadata only (name, transport, host) — never a token.
     "mcp_connection_added",
+    "mcp_call_mode_changed",
     "mcp_connection_removed",
     # DEC-15 step 10 — the owner accepted tools a server held for review. The
     # payload names the server and the tools, never their descriptions.

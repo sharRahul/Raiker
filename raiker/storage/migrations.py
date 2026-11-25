@@ -5157,6 +5157,15 @@ CREATE TABLE IF NOT EXISTS instruction_file_reviews (
 );
 """
 
+MCP_CALL_MODE_MIGRATION_ID = "RAIKER-2135-mcp-server-call-mode"
+#: MCP-HOST — per server, whether its accepted tools may be called without a
+#: standing decision mode: ``ask`` (the default) or ``allow``, as Codex keeps an
+#: approval mode per server and Claude Code an allow rule per MCP server.
+MCP_CALL_MODE_SQL = """
+ALTER TABLE mcp_servers ADD COLUMN call_mode TEXT NOT NULL DEFAULT 'ask';
+ALTER TABLE mcp_servers ADD COLUMN runs_as TEXT NOT NULL DEFAULT 'sandbox';
+"""
+
 PERSONAS_MIGRATION_ID = "RAIKER-2134-personas"
 #: ADR-0005 — composer personas. Owner data under the account; the ceiling is
 #: a JSON list of tool families (NULL inherits the turn's tools).
@@ -5452,6 +5461,7 @@ MIGRATIONS: tuple[MigrationStep, ...] = (
     Migration(CONNECTOR_POLICIES_MIGRATION_ID, CONNECTOR_POLICIES_SQL),
     Migration(INSTRUCTION_FILES_MIGRATION_ID, INSTRUCTION_FILES_SQL),
     Migration(PERSONAS_MIGRATION_ID, PERSONAS_SQL),
+    Migration(MCP_CALL_MODE_MIGRATION_ID, MCP_CALL_MODE_SQL),
 )
 
 #: DEC-17 step 8 — how far along the registry this build is, as one number.

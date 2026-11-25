@@ -4066,6 +4066,16 @@ export type McpAgentAccess = {
   connected_servers: number;
 };
 
+export type McpCallModeRequest = {
+  mode: "ask" | "allow";
+};
+
+export type McpCallModeSet = {
+  ok: boolean;
+  server_id: string;
+  call_mode: "ask" | "allow";
+};
+
 /** A pause, kill or resume, and the monitor state it left the connection in. */
 export type McpContainment = {
   ok: boolean;
@@ -4183,6 +4193,8 @@ export type McpServerView = {
   purpose_from: "plugin" | "server" | "none";
   pending_tools: PendingTool[];
   vault_env: string[];
+  runs_as: "owner" | "sandbox";
+  call_mode: "ask" | "allow";
 };
 
 /** Owner-scoped, redacted monitor row for one MCP connection session. */
@@ -8090,6 +8102,8 @@ export const contract = {
     call<McpServerDeleted>("DELETE", withQuery(`/api/mcp/servers/${encodeURIComponent(serverId)}`, query)),
   renameMcpServer: (serverId: string, body: RenameMcpServerRequest) =>
     call<McpServerRenamed>("PUT", `/api/mcp/servers/${encodeURIComponent(serverId)}`, { body }),
+  setMcpServerCallMode: (serverId: string, body: McpCallModeRequest) =>
+    call<McpCallModeSet>("PUT", `/api/mcp/servers/${encodeURIComponent(serverId)}/call-mode`, { body }),
   connectMcpServer: (serverId: string) =>
     call<McpServerConnected>("POST", `/api/mcp/servers/${encodeURIComponent(serverId)}/connect`),
   listMcpFindings: (serverId: string) =>

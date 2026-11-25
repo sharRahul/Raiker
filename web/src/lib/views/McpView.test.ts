@@ -47,6 +47,8 @@ function server(partial: Partial<McpServer> = {}): McpServer {
     name: "echo-server",
     command: ["python", ".raiker/mcp/servers/echo.py"],
     template: "python-stdio-echo",
+    runs_as: "sandbox",
+    call_mode: "ask",
     transport: "stdio",
     status: "connected",
     created_at: "2026-07-17T00:00:00Z",
@@ -547,6 +549,23 @@ describe("McpView — servers a plugin offers", () => {
         fetchMock.mock.calls.some(([url]) => String(url).endsWith("/api/mcp/servers/remote")),
       ).toBe(true),
     );
+  });
+
+  it("lets one trusted server's accepted tools be used without asking (MCP-HOST)", async () => {
+    const fetchMock = stubFetch({
+      "GET /api/mcp/servers": [server()],
+      "GET /api/mcp/offers": [],
+      "GET /api/capability-gates": ENABLED_GATES,
+      ...monitorRoutes(access({ callable: false, reason_code: "mcp_withheld_ask", decision_mode: "ask" })),
+      "PUT /api/mcp/servers/mcp_1/call-mode": { ok: true, server_id: "mcp_1", call_mode: "allow" },
+    });
+    render(McpView);
+    await fireEvent.click(await screen.findByRole("checkbox", { name: /Use its accepted tools without asking/ }));
+    await waitFor(() => {
+      const call = fetchMock.mock.calls.find(([url]) => String(url).endsWith("/api/mcp/servers/mcp_1/call-mode"));
+      expect(call).toBeTruthy();
+      expect(JSON.parse(String(call![1]!.body))).toEqual({ mode: "allow" });
+    });
   });
 
   it("adds a server on this computer by its command, as Claude Desktop does (MCP-HOST)", async () => {

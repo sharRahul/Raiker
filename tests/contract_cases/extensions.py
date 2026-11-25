@@ -796,6 +796,7 @@ CASES: Cases = {
         "/secrets/WEATHER_KEY", {"value": "contract-value"}
     ),
     ("DELETE", "/api/mcp/servers/{server_id}/secrets/{name}"): _mcp_secret,
+    ("PUT", "/api/mcp/servers/{server_id}/call-mode"): _on_mcp("/call-mode", {"mode": "allow"}),
     ("POST", "/api/mcp/servers/{server_id}/pause"): _on_mcp("/pause", {"reason": "contract"}),
     ("POST", "/api/mcp/servers/{server_id}/kill"): _on_mcp("/kill", {"reason": "contract"}),
     ("POST", "/api/mcp/servers/{server_id}/resume"): _on_mcp("/resume"),

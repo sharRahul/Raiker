@@ -32,14 +32,39 @@ def _settings_path(workspace_root: str | Path) -> Path:
     return internal_io_path(Path(workspace_root) / ".raiker" / "command-sandbox.json")
 
 
-def load_windows_backend(workspace_root: str | Path) -> WindowsBackend:
-    """The owner's choice; the account when unset or unreadable."""
+def stored_windows_backend(workspace_root: str | Path) -> WindowsBackend | None:
+    """The owner's explicit choice, or None when they have not made one."""
     try:
         value = json.loads(_settings_path(workspace_root).read_text(encoding="utf-8"))
         choice = value.get("windows_backend")
     except (OSError, ValueError, AttributeError):
-        return DEFAULT_WINDOWS_BACKEND
-    return choice if choice in WINDOWS_BACKENDS else DEFAULT_WINDOWS_BACKEND
+        return None
+    return choice if choice in WINDOWS_BACKENDS else None
+
+
+def load_windows_backend(workspace_root: str | Path) -> WindowsBackend:
+    """The owner's choice; when unset, WSL2 if it is set up, else the account.
+
+    The restricted account refuses to run anything until its isolation gaps
+    close, so an owner who set WSL2 up (or whose machine already had it) but
+    never opened the setting had every command refused. An unset choice now
+    follows what is actually usable; an explicit one is always kept.
+    """
+    stored = stored_windows_backend(workspace_root)
+    if stored is not None:
+        return stored
+    return "wsl" if _wsl_configured(workspace_root) else DEFAULT_WINDOWS_BACKEND
+
+
+def _wsl_configured(workspace_root: str | Path) -> bool:
+    if os.name != "nt":
+        return False
+    try:
+        from raiker.execution.commands.backends.native import NativeSandboxDriver
+
+        return NativeSandboxDriver(Path(workspace_root)).wsl_base() is not None
+    except Exception:  # noqa: BLE001 — an unreadable status keeps the default
+        return False
 
 
 def save_windows_backend(workspace_root: str | Path, choice: str) -> WindowsBackend:

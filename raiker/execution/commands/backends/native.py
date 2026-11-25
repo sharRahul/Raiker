@@ -335,9 +335,15 @@ class NativeSandboxDriver:
         """Whether the owner chose WSL2 for commands (Windows only)."""
         if not _on_windows():
             return False
-        from raiker.execution.commands.sandbox_backend import load_windows_backend  # noqa: PLC0415
+        from raiker.execution.commands.sandbox_backend import (
+            stored_windows_backend,  # noqa: PLC0415
+        )
 
-        return load_windows_backend(self.workspace_root) == "wsl"
+        stored = stored_windows_backend(self.workspace_root)
+        if stored is not None:
+            return stored == "wsl"
+        # Unset: WSL2 when it is set up (sandbox_backend.load_windows_backend).
+        return self.wsl_base() is not None
 
     def probe(self, *, for_programs: bool = False) -> NativeSandboxProof:
         """Measure the boundary commands run in.

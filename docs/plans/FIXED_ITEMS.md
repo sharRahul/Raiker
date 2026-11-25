@@ -1,5 +1,9 @@
 # Fixed items
 
+## FIXED-1563 — Windows refused every command until the owner found the sandbox setting
+
+**Severity: Medium. Area: Sandbox / Windows. Status: Fixed 2026-11-25.** The Windows command sandbox defaulted to the restricted account, which the runner refuses until its isolation gaps close, so on the test PC — where Raiker's WSL2 distribution was already set up and fully enforced — every command and generated MCP server was refused with `native_sandbox_account_profile_isolation_unavailable` until the owner opened Settings › Advanced and chose WSL2. An unset choice now follows what is usable: WSL2 when its distribution reports configured, the account otherwise; an explicit choice is always kept, either way. The driver resolves it through its own status read, so the answer is the same one the probe and launch use. Evidence: `tests/test_command_sandbox_backend.py` (*an unset choice uses WSL when it is set up*, and the account cases now choose the account explicitly).
+
 ## FIXED-1562 — A trusted MCP server could only be used by allowing every server
 
 **Severity: High. Area: MCP / permissions (MCP-HOST). Status: Fixed 2026-11-25.** Connected MCP tools follow one decision mode for the whole MCP permission, and its default, *Ask*, withholds them from every turn (a running turn cannot park on an MCP call). So using one server meant setting *Always allow* for all of them. Codex keeps `approval_mode` per server and per tool, and Claude Code an allow rule per MCP server. Each server now has its own **Use its accepted tools without asking** (`PUT /api/mcp/servers/{id}/call-mode`, human-only, recorded as `mcp_call_mode_changed`; stored as `call_mode`). A server set to allow has its accepted tools offered and callable while the mode stays *Ask* for the rest; a new or changed tool is still held, and *Deny* still refuses every call. The same migration adds `runs_as`, set to `owner` only by the human-only add path, so a row recorded from a session can never become one that runs as the owner (the hardening the FIXED-1561 security review asked for). The server card's *Callable by Raiker* is now per server. Evidence: `tests/test_mcp_owner_servers.py` (per-server allow under ask, deny and allow modes), `McpView.test.ts`.
@@ -2125,6 +2129,7 @@ file you can open. The two capture sets that remain — `screenshots/pages/` and
 
 | ID | Severity | Area | Status |
 |---|---|---|---|
+| [FIXED-1563](#fixed-1563--windows-refused-every-command-until-the-owner-found-the-sandbox-setting) | Medium | Sandbox / Windows | Fixed 2026-11-25 |
 | [FIXED-1562](#fixed-1562--a-trusted-mcp-server-could-only-be-used-by-allowing-every-server) | High | MCP / permissions (MCP-HOST) | Fixed 2026-11-25 |
 | [FIXED-1561](#fixed-1561--an-owner-could-not-add-a-local-mcp-server-and-none-could-drive-an-application) | High | MCP / design (MCP-HOST) | Fixed 2026-11-25 |
 | [FIXED-1560](#fixed-1560--with-wsl2-chosen-mcp-servers-and-hooks-still-had-no-boundary-on-windows) | High | Sandbox / Windows | Fixed 2026-11-25 |

@@ -40,7 +40,13 @@ WSL_REPORT = {
 ACCOUNT_REPORT = {**WSL_REPORT, "boundary": "restricted_account"}
 
 
-def test_the_choice_defaults_to_the_account_and_refuses_anything_else(tmp_path: Path) -> None:
+def test_the_choice_defaults_to_the_account_and_refuses_anything_else(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from raiker.execution.commands import sandbox_backend
+
+    # Without WSL2 set up, an unset choice is the account.
+    monkeypatch.setattr(sandbox_backend, "_wsl_configured", lambda _root: False)
     assert load_windows_backend(tmp_path) == "account"
     assert save_windows_backend(tmp_path, "wsl") == "wsl"
     assert load_windows_backend(tmp_path) == "wsl"
@@ -97,11 +103,30 @@ def test_with_wsl_chosen_commands_and_programs_both_measure_wsl(
     native_backend._ACCOUNT_BASE_CACHE.clear()
 
 
+def test_an_unset_choice_uses_wsl_when_it_is_set_up(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The account refuses everything until its gaps close, so an owner who
+    never opened the setting gets the boundary that works; an explicit choice
+    is always kept."""
+    from raiker.execution.commands import sandbox_backend
+
+    monkeypatch.setattr(sandbox_backend.os, "name", "nt")
+    seen: list[list[str]] = []
+    driver = _driver(tmp_path, monkeypatch, seen, ACCOUNT_REPORT)
+    assert sandbox_backend.stored_windows_backend(driver.workspace_root) is None
+    assert sandbox_backend.load_windows_backend(driver.workspace_root) == "wsl"
+    save_windows_backend(driver.workspace_root, "account")
+    assert sandbox_backend.load_windows_backend(driver.workspace_root) == "account"
+    native_backend._ACCOUNT_BASE_CACHE.clear()
+
+
 def test_with_the_account_chosen_programs_stay_on_the_account(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     seen: list[list[str]] = []
     driver = _driver(tmp_path, monkeypatch, seen, ACCOUNT_REPORT)
+    save_windows_backend(driver.workspace_root, "account")
     programs = driver.probe(for_programs=True)
     assert programs.boundary == "restricted_account"
     assert "--boundary" not in next(a for a in seen if "--probe" in a)
@@ -212,6 +237,7 @@ def test_with_the_account_chosen_nothing_asks_wsl(
 ) -> None:
     seen: list[list[str]] = []
     driver = _driver(tmp_path, monkeypatch, seen, ACCOUNT_REPORT)
+    save_windows_backend(driver.workspace_root, "account")
     assert driver.probe().boundary == "restricted_account"
     assert driver.copy_base() == tmp_path / "account-copies"
     assert not any("--wsl-status" in argv or "--boundary" in argv for argv in seen)
@@ -343,6 +369,7 @@ def test_the_account_requires_its_loopback_filter(
 ) -> None:
     """A host set up before the WFP loopback filter refuses until setup runs again."""
     driver = _driver(tmp_path, monkeypatch, [], ACCOUNT_REPORT)
+    save_windows_backend(driver.workspace_root, "account")
     observations = ACCOUNT_REPORT["observations"]
     observations["loopback"] = "unenforced"  # type: ignore[index]
     try:

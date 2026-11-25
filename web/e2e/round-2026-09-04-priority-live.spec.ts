@@ -112,7 +112,7 @@ test("a collector receives governed events, metadata only (backlog #18)", async 
   }
 
   // Metadata only until the owner says otherwise, said on the card.
-  await expect(page.getByText("Metadata only")).toBeVisible();
+  await expect(page.getByText("Metadata only").filter({ visible: true }).first()).toBeVisible();
 
   await page.getByRole("button", { name: "Deliver now" }).click();
   await expect(page.getByText(/event\(s\) delivered/)).toBeVisible({ timeout: 60_000 });

@@ -303,7 +303,7 @@
      scoped to that file — so a heading given the same class here inherited
      nothing and rendered a size larger than its siblings. Matched rather than
      hoisted: one component owning one heading is the smaller change. */
-  .otlp .section-h { font-size: var(--text-md); margin: 0 0 var(--space-3); }
+  .otlp .section-h { font-size: var(--text-md); margin: var(--space-5) 0 var(--space-3); }
   .otlp p { margin: 0 0 var(--space-3); color: var(--text-2); max-width: 68ch; }
   .list { list-style: none; margin: 0 0 var(--space-3); padding: 0; display: grid; gap: var(--space-3); }
   .list li { border: 1px solid var(--border); border-radius: var(--r-md); padding: var(--space-3); display: grid; gap: 0.35rem; }

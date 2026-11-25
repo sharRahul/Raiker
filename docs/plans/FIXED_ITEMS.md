@@ -1,5 +1,9 @@
 # Fixed items
 
+## FIXED-1555 — The telemetry heading sat against the support-bundle button
+
+**Severity: Low. Area: Diagnostics / layout. Status: Fixed 2026-11-25.** Found in RT-1125-09's capture: in Diagnostics › Share or export, *Can I see this outside Raiker?* started directly under **Build support bundle**, with no space between two different subjects. The heading now has the section gap above it (`--space-5`), as the other sections do. The OTLP live case's *Metadata only* check also reads the visible badge only, so it passes on a workspace that already has a collector. Evidence: RT-1125-09's second capture.
+
 ## FIXED-1554 — Not verified did not say how to verify
 
 **Severity: Low. Area: Build / outcome (RU-22). Status: Fixed 2026-11-25.** In RU-J4 the model ran `python3 -m unittest test_pricing -v` where the project declared `python3 -m unittest -q`, and the outcome read *Not verified* with each check *not run after the last change* and nothing on what would count. When a declared check did not run after the last change, the card now adds *To verify, ask Build to run each check exactly as written; a different form of the same command does not count.* The claim itself is unchanged: only the runtime's own records can raise it. Build running the checks itself is still open. Evidence: `web/src/lib/components/BuildOutcome.test.ts` (*says how to verify…*, *does not repeat the advice…*); the Impeccable detector reports nothing on the card.
@@ -2093,6 +2097,7 @@ file you can open. The two capture sets that remain — `screenshots/pages/` and
 
 | ID | Severity | Area | Status |
 |---|---|---|---|
+| [FIXED-1555](#fixed-1555--the-telemetry-heading-sat-against-the-support-bundle-button) | Low | Diagnostics / layout | Fixed 2026-11-25 |
 | [FIXED-1554](#fixed-1554--not-verified-did-not-say-how-to-verify) | Low | Build / outcome (RU-22) | Fixed 2026-11-25 |
 | [FIXED-1553](#fixed-1553--nine-more-errors-said-what-failed-and-nothing-else) | Low | UI copy (QUI-G06) | Fixed 2026-11-25 |
 | [FIXED-1552](#fixed-1552--there-was-no-raiker-doctor) | Low | Health / CLI (RU-08) | Fixed 2026-11-25 |

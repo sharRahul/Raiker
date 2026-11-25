@@ -39,6 +39,8 @@ the agent: the owner enters them through **Add model** (BUG-287/290).
 | RT-1125-05 | `removal-review-permissions-2026-09-14-live.spec.ts` and `round-2026-09-15-typed-and-authority-live.spec.ts` on a fresh host | FIXED-1537, FIXED-1528 drift | Passed, 10 of 10 after the specs moved to *Commands* and checked the Build acknowledgement |
 | RT-1125-06 | `round-2026-09-04-priority-live.spec.ts` | — | 2 of 3 passed; the OTLP case needs a collector on `127.0.0.1:4318` ([open](../plans/TO_BE_FIXED.md#2026-11-25-round--found-not-fixed)) |
 | RT-1125-08 | Local `gemma3:1b` switched on in **Select models…**, chosen for the turn; *Rahul's dentist is Dr. Okafor* | FIXED-1539, FIXED-1548 | Passed: the answer carried *Remember: “Rahul's dentist is Dr. Okafor”* with **Keep** → *Kept. Open Memory*. Found: the model's invented *Dr. Okafor is known for … attention to detail* was offered too; **Not this** removed it, and since FIXED-1548 only the owner's words are offered |
+| RT-1125-09 | `round-2026-09-04-priority-live.spec.ts` on a fresh host on port 8765, with the spec's stand-in collector | FIXED-1551, FIXED-1555 | Passed: *Local collector: 5 event(s) delivered.* and the stand-in received them; the heading gap was fixed from this capture. The MCP case still fails on the home-folder interpreter (`mcp_command_not_found`, known) |
+| RT-1125-10 | `raiker doctor` on the Windows test PC | FIXED-1552 | Passed: ten lines, *Ready: every mandatory requirement is met.*, exit 0 |
 | RT-1125-07 | Mocked end-to-end suite (`npm run test:e2e:mocked`) after each UI change | all | Passed, 28 of 28 |
 
 Not re-run live this round: the command grant on an approval card (FIXED-1540),

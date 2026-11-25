@@ -121,6 +121,7 @@ finished, Build runs the project's declared checks in the sandbox (asking like
 any command) so the outcome is *Verified* or says what failed, whatever command
 form the model chose.
 *Done when* RU-J4 ends *Verified*.
+*Progress 2026-11-25:* the outcome says what would verify it ([FIXED-1554](FIXED_ITEMS.md#fixed-1554--not-verified-did-not-say-how-to-verify)); Build running the checks itself is open.
 
 ### C. Permissions: strict, and easy to use
 

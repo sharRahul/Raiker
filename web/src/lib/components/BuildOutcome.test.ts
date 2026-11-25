@@ -53,6 +53,29 @@ describe("BuildOutcome", () => {
     expect(screen.getByText(/failed \(exit 1\)/)).toBeInTheDocument();
   });
 
+  it("says how to verify when a declared check did not run after the change (RU-22)", async () => {
+    stubFetch({
+      [ROUTE]: outcome({
+        outcome: "completed_unverified",
+        checks: [{ command: "python3 -m unittest -q", result: "not_run", exit_code: null, run_id: null }],
+      }),
+    });
+    render(BuildOutcome, { sessionId: "sess_1", turnId: "turn_1" });
+    expect(await screen.findByTestId("build-outcome-next")).toHaveTextContent(/exactly as written/);
+  });
+
+  it("does not repeat the advice once every check passed", async () => {
+    stubFetch({
+      [ROUTE]: outcome({
+        outcome: "completed_verified",
+        checks: [{ command: "pytest -q", result: "passed", exit_code: 0, run_id: "cmd_1" }],
+      }),
+    });
+    render(BuildOutcome, { sessionId: "sess_1", turnId: "turn_1" });
+    await screen.findByText("Verified");
+    expect(screen.queryByTestId("build-outcome-next")).toBeNull();
+  });
+
   it("asks for checks when none are declared, rather than implying success", async () => {
     stubFetch({ [ROUTE]: outcome({ outcome: "completed_unverified", reason: "No checks are declared." }) });
     render(BuildOutcome, { sessionId: "sess_1", turnId: "turn_1" });

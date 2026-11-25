@@ -1,5 +1,9 @@
 # Fixed items
 
+## FIXED-1554 — Not verified did not say how to verify
+
+**Severity: Low. Area: Build / outcome (RU-22). Status: Fixed 2026-11-25.** In RU-J4 the model ran `python3 -m unittest test_pricing -v` where the project declared `python3 -m unittest -q`, and the outcome read *Not verified* with each check *not run after the last change* and nothing on what would count. When a declared check did not run after the last change, the card now adds *To verify, ask Build to run each check exactly as written; a different form of the same command does not count.* The claim itself is unchanged: only the runtime's own records can raise it. Build running the checks itself is still open. Evidence: `web/src/lib/components/BuildOutcome.test.ts` (*says how to verify…*, *does not repeat the advice…*); the Impeccable detector reports nothing on the card.
+
 ## FIXED-1553 — Nine more errors said what failed and nothing else
 
 **Severity: Low. Area: UI copy (QUI-G06). Status: Fixed 2026-11-25.** A file Build's explorer could not show or read, a source a citation could not resolve, the file Library failing to load, an import that did not complete, a retried index, a host action, discarding a credentialed worker's quarantined changes and an approval mode that did not save each stopped at what failed. Each now says what stayed as it was and one next step (*The previous mode still applies; choose it again.*). Evidence: `ApprovalModeControl.test.ts` and the component suites.
@@ -2089,6 +2093,7 @@ file you can open. The two capture sets that remain — `screenshots/pages/` and
 
 | ID | Severity | Area | Status |
 |---|---|---|---|
+| [FIXED-1554](#fixed-1554--not-verified-did-not-say-how-to-verify) | Low | Build / outcome (RU-22) | Fixed 2026-11-25 |
 | [FIXED-1553](#fixed-1553--nine-more-errors-said-what-failed-and-nothing-else) | Low | UI copy (QUI-G06) | Fixed 2026-11-25 |
 | [FIXED-1552](#fixed-1552--there-was-no-raiker-doctor) | Low | Health / CLI (RU-08) | Fixed 2026-11-25 |
 | [FIXED-1551](#fixed-1551--the-otlp-live-case-failed-wherever-no-collector-was-running) | Low | Testing / live specs | Fixed 2026-11-25 |

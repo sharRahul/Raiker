@@ -89,6 +89,13 @@
           </li>
         {/each}
       </ul>
+      {#if outcome.checks.some((check) => check.result === "not_run" || check.result === "ran_before_change")}
+        <!-- RU-22 — say what makes the claim stronger, not only that it is weak:
+             a check counts only when run exactly as written after the change. -->
+        <p class="hint" data-testid="build-outcome-next">
+          To verify, ask Build to run each check exactly as written; a different form of the same command does not count.
+        </p>
+      {/if}
     {:else if outcome.writes > 0}
       <p class="hint">Add checks to this project's context so a change can be verified.</p>
     {/if}

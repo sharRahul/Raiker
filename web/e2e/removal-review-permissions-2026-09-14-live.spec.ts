@@ -60,7 +60,7 @@ test("Permissions leads with posture and actions, and keeps the table as evidenc
 
   // REM-PERM-03 — a closed row answers both questions; its detail explains
   // itself in one shape.
-  await rail.getByRole("button", { name: /^Advanced/ }).click();
+  await rail.getByRole("button", { name: /^Commands/ }).click();
   const shellRow = page.getByRole("option", { name: /^Shell commands / }).first();
   await expect(shellRow).toHaveAccessibleName(/^Shell commands (On|Off) · (Ask me|Allow|Automatic|Never)$/);
   await shellRow.click();
@@ -70,13 +70,11 @@ test("Permissions leads with posture and actions, and keeps the table as evidenc
   await expect(shell.getByText(/Raiker (may|cannot) use this on this account/)).toBeVisible();
   await capture(page, `${SHOTS}/permissions-row-detail.png`, shell);
 
-  // REM-PERM-01 — the read-only authority table is evidence, below the list
-  // of controls it summarises.
-  const list = page.getByRole("listbox", { name: "Advanced permissions" });
+  // REM-PERM-01 — the read-only authority table is evidence, under Advanced
+  // after the ten families (RU-06), not beside the controls.
+  await rail.getByRole("button", { name: /^Advanced/ }).click();
   const authority = page.getByText("How your permissions apply", { exact: true });
-  const listBox = await list.boundingBox();
-  const authorityBox = await authority.boundingBox();
-  expect(authorityBox!.y).toBeGreaterThan(listBox!.y);
+  await expect(authority).toBeVisible();
   await authority.click();
   await expect(page.getByRole("heading", { name: /Owner sets the boundary/ })).toBeVisible();
 

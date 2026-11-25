@@ -138,6 +138,9 @@ test("a fresh account starts with the local baseline, and Build is one decision"
   await expect(preset.getByText("Rewind the workspace to a checkpoint")).toBeVisible();
   await capture(page, `${SHOTS}/permissions-build-preset.png`, preset);
 
+  // FIXED-1528 — the preset includes commands, so it asks for an acknowledgement first.
+  const ack = preset.getByRole("checkbox", { name: /I understand Build can run commands/ });
+  if (await ack.isVisible().catch(() => false)) await ack.check();
   await preset.getByRole("button", { name: /^Turn on \d/ }).click();
   // Gone once every row in it is on, because at that point it is a button that
   // would do nothing.

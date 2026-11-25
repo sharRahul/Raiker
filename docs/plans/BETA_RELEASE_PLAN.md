@@ -68,7 +68,7 @@ plugins that need network, and unverified integrations are **Not in beta** or
 
 | # | Area | Beta decision | P0 items left |
 |---|---|---|---|
-| 1 | Native sandbox & security | Ship limited — execution only where measured | Windows ACL/profile gaps, safe promotion, fail-closed audit |
+| 1 | Native sandbox & security | Ship limited — execution only where measured (Windows: WSL2 by default when set up) | Windows account ACL/profile gaps, safe promotion, fail-closed audit |
 | 2 | Desktop installation & updates | Ship | Fresh PC installation, update/rollback and exact-candidate evidence |
 | 3 | AI models & local inference | Ship | Live llama.cpp CI evidence, failure-mode tests |
 | 4 | Core autonomous agent | Ship | Restart-recovery scenario, honest-completion tests |
@@ -100,8 +100,13 @@ incomplete*). What exists:
 - macOS uses a Seatbelt profile plus a sandbox-account pool. Hosted runner
   checks have passed (SB-2); owner-hardware qualification waits for beta.2.
   `RLIMIT_AS` is not enforced by XNU, so the footprint supervisor replaces it.
-- Plugins and local MCP stdio servers run in the native sandbox and are refused
-  on hosts without an enforced boundary.
+- Plugins, hooks and MCP servers Raiker generates run in the native sandbox and
+  are refused on hosts without an enforced boundary. **Since 2026-11-25** an MCP
+  server the owner adds by its command runs as the owner, outside the command
+  sandbox, as Claude Code and Codex run one, governed by per-tool acceptance,
+  the decision mode or a per-server allow, approvals and audit (FIXED-1561,
+  FIXED-1562). On Windows, WSL2 is used by itself when it is set up and the
+  owner never chose (FIXED-1563).
 - Disposable per-session project copies with reviewed Apply are wired in.
 
 | ID | Item | State | P | Effort | Work left |
@@ -389,7 +394,7 @@ The composer microphone has three states (*Set up voice*, *Dictate*,
 | PL-1 | Install, configure, remove supported integrations | 🟡 | P0 | M | A **supported list** for beta: GitHub, email (IMAP/SMTP), calendar (CalDAV), web search, local MCP stdio. Each gets one live install → use → revoke → remove run. **2026-11-08:** Gmail, Google Calendar and Outlook connect by browser sign-in; Outlook is a new governed read connector ([FIXED-1347](FIXED_ITEMS.md#fixed-1347--there-was-no-way-to-read-outlook-mail-or-calendar)); GitHub's own App is one click from Advanced |
 | PL-2 | Grants, revocation, audit | ✅ | — | — | Governance suite |
 | PL-3 | OAuth and credential storage | 🟡 | P0 | S | Vault encryption and expiry checks are tested; a provider 401 marks the local credential `reauth_required` so it is not retried. Still required: expired-token and owner-revoked-token live checks for GitHub on the release candidate. Provider-specific OAuth revoke endpoints are not claimed until Raiker has registered clients. **2026-11-08:** Gmail, Google Calendar and Outlook sign in in the owner's browser with PKCE, a single-use state, a loopback-only redirect and vault-kept tokens that renew themselves ([FIXED-1346](FIXED_ITEMS.md#fixed-1346--gmail-calendar-and-outlook-now-sign-in-in-the-owners-browser)). Still required: one live sign-in per provider with the owner's registered clients |
-| PL-4 | Plugins and MCP cannot bypass the sandbox | ✅ | — | — | **2026-11-08:** `tests/test_mcp_adversarial_server.py` starts a hostile local MCP server the way Raiker does; its loopback (fixed port) and internet connections, home and project reads, write outside its folder and a child process's write all fail on this Windows 11 host's enforced boundary, and a host without one refuses to start it. The Windows dynamic-port loopback range stays the documented limit (TO_BE_FIXED, *Network mediation*) |
+| PL-4 | Plugins and MCP cannot bypass the sandbox | ✅ | — | — | **2026-11-25 (design change, owner-directed):** an MCP server the *owner* adds by its command runs as the owner by design (FIXED-1561); only the stored command ever runs that way, and generated and plugin-offered servers keep the sandbox. **2026-11-08:** `tests/test_mcp_adversarial_server.py` starts a hostile local MCP server the way Raiker does; its loopback (fixed port) and internet connections, home and project reads, write outside its folder and a child process's write all fail on this Windows 11 host's enforced boundary, and a host without one refuses to start it. The Windows dynamic-port loopback range stays the documented limit (TO_BE_FIXED, *Network mediation*) |
 | PL-5 | Supported vs experimental | 🟡 | P0 | S | Every connector has a `support_level` and is **Experimental** by default; the Add list shows the label and an experimental install asks once more (2026-11-07, FIXED-1315, RT-BETA-04). MCP servers carry their source instead, *Raiker sample*, *From a plugin* or *Added by you* with *Raiker has not reviewed this server* (2026-11-08, FIXED-1359, RT-MCP-PL5-01). Still required: live evidence to promote the supported beta list |
 
 **UI / UX.** The Extensions page has two sections, *Supported* and
@@ -542,6 +547,7 @@ product refusing it, rather than delaying the date.
 
 ## Changelog
 
+- **2026-11-25** — Done: Build runs declared checks itself (BD-1 evidence path, FIXED-1558) and projects get their own folder (FIXED-1559); local Ollama through its own API with a sized context (MD-1/MD-2, FIXED-1556); owner-added MCP servers run as the owner with a per-server allow (PL-4 note, FIXED-1561, FIXED-1562); Windows uses WSL2 by itself when set up (SB-1 workaround, FIXED-1563); `raiker doctor` (FIXED-1552); twenty-nine error messages finished (UX, FIXED-1544, FIXED-1550, FIXED-1553). Pending for the beta: SB-1's account gaps, SB-5/SB-6, the published-build journeys (§10), the release itself (§2).
 - **2026-11-08** — Connectors: browser sign-in for Gmail, Google Calendar and Outlook (FIXED-1346), a governed Outlook read connector (FIXED-1347), and a one-click GitHub App registration link.
 - **2026-11-08** — MD-1: Anthropic, OpenAI, OpenRouter, Ollama and LM Studio each completed a live tool-using Chat turn with the owner's keys, entered through the UI. GPT-5 was unusable before FIXED-1343; output limits were measured and set (FIXED-1344).
 - **2026-11-08** — Owner moved signing (a real certificate and an Apple Developer ID), fresh-VM installs, macOS hardware and the AMD GPU run to beta.2: IN-3, IN-5 and SB-2 are now ⏭, and so is the AMD half of MD-2.

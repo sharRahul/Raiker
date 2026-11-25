@@ -39,6 +39,46 @@ something simpler.
 | **Regular use on Linux (2026-11-16):** a first Build turn wrote code but could not run its tests — *Set up for Build* did not include commands, and `run_command`'s grant has no screen. Fixed for the preset (FIXED-1528); the grant remains (RU-07). | [Regular-use journeys](TESTING.md#regular-use-journeys), [TO_BE_FIXED](TO_BE_FIXED.md#2026-11-16-regular-use--found-not-fixed) |
 | Hosted models, local Ollama models and search by meaning pass live; search by meaning needed three hidden steps. | [Live record 2026-11-19](../architecture/WEB_APP_LIVE_TEST.md#result--2026-11-19-personas-local-ollama-search-by-meaning-and-native-decks) |
 
+## Status — 2026-11-25
+
+What is done and what is left, item by item. *Done* means shipped and tested;
+*partly done* names the slice that shipped; the live journey on a published
+build is still owed for every item (the regular-use journeys in
+[TESTING.md](TESTING.md#regular-use-journeys)).
+
+| Item | State | Done | Left |
+|---|---|---|---|
+| RU-01 Publish pre-releases | Open | — | Publish `0.9.0-beta.N` from green `main`; clean-machine installs |
+| RU-02 Update in place | Open | — | Update channel, Roll back, data kept across both |
+| RU-03 Windows sandbox without WSL2 | Partly done | WSL2 is used by itself when it is set up and the owner never chose ([FIXED-1563](FIXED_ITEMS.md#fixed-1563--windows-refused-every-command-until-the-owner-found-the-sandbox-setting)); commands, hooks and generated MCP servers run there on the distribution's `python3`/`node` ([FIXED-1560](FIXED_ITEMS.md#fixed-1560--with-wsl2-chosen-mcp-servers-and-hooks-still-had-no-boundary-on-windows)); a source checkout's Linux runner is documented in Troubleshooting | The restricted-account boundary stays refused until its four gaps close (per-account profile reset, explicit descendant ACLs, explicit allows below denied roots, loopback-port approximation); its setup in Raiker's first run |
+| RU-04 Linux and macOS | Partly done | Linux Bubblewrap enforced (2026-11-16 journeys) | Setup step naming the package; macOS account setup behind one prompt |
+| RU-05 WSL2 and MXC options | Partly done | WSL2 is available and measured | MXC probe result |
+| RU-06 Ten families | Partly done | Families, lines and the unit test ([FIXED-1537](FIXED_ITEMS.md#fixed-1537--permissions-was-grouped-in-six-headings-an-owner-had-to-learn)) | Live surface sweep |
+| RU-07 Three postures | Partly done | Per-conversation command grant on the approval card ([FIXED-1540](FIXED_ITEMS.md#fixed-1540--a-command-could-not-be-allowed-for-a-conversation-from-any-screen)); per-MCP-server *use without asking* ([FIXED-1562](FIXED_ITEMS.md#fixed-1562--a-trusted-mcp-server-could-only-be-used-by-allowing-every-server)) | The three postures and their mapping |
+| RU-08 Health | Partly done | `raiker doctor` with each fix ([FIXED-1552](FIXED_ITEMS.md#fixed-1552--there-was-no-raiker-doctor)) | The Health page; sandbox, backups, embedding, voice, updates, always-on facts |
+| RU-09 Four-step first run | Partly done | Model step says which models suit numbers and code ([FIXED-1538](FIXED_ITEMS.md#fixed-1538--first-run-did-not-say-which-models-suit-numbers-and-code)) | *This machine* and *Posture* steps |
+| RU-10 Keep or skip under the answer | Done | [FIXED-1539](FIXED_ITEMS.md#fixed-1539--a-memory-raiker-proposed-could-only-be-kept-from-memory), owner's words only ([FIXED-1548](FIXED_ITEMS.md#fixed-1548--a-sentence-the-model-invented-was-offered-to-keep-as-a-memory)); RT-1125-08 | — |
+| RU-11 Memory as a summary | Open | — | *What Raiker knows about you*, one switch, *Find by meaning* |
+| RU-12 Remembers its own work | Open | — | Lessons proposed after a task |
+| RU-13 Always-on host | Open | — | User service on each platform; delivery with the window closed |
+| RU-14 Pause and Resume a running step | Open | — | Park a turn at the next safe boundary, freeze a command, resume |
+| RU-15 Raiker as an MCP server | Open | — | — |
+| RU-16 Import another agent's setup | Partly done | `AGENTS.md`/`CLAUDE.md`/`.cursorrules` ([FIXED-1536](FIXED_ITEMS.md#fixed-1536--a-projects-agentsmd-or-claudemd-was-ignored), [FIXED-1542](FIXED_ITEMS.md#fixed-1542--a-projects-cursorrules-was-ignored)), Hermes and Markdown memory ([FIXED-1541](FIXED_ITEMS.md#fixed-1541--another-agents-markdown-memory-could-not-be-imported)), Claude Desktop / Cursor `mcpServers` paste ([FIXED-1561](FIXED_ITEMS.md#fixed-1561--an-owner-could-not-add-a-local-mcp-server-and-none-could-drive-an-application)) | ChatGPT and Claude conversation exports; the `.cursor/rules` folder |
+| RU-17 Move to another machine | Open | — | Encrypted export and first-run import |
+| RU-21 A project for Build has a folder | Done | Bare commands run in the project ([FIXED-1549](FIXED_ITEMS.md#fixed-1549--a-projects-command-with-no-folder-ran-at-the-workspace-root)); **Create project** makes `~/Raiker Projects/<name>` ([FIXED-1559](FIXED_ITEMS.md#fixed-1559--a-new-project-had-no-folder-outside-raikers-data)); RT-1125-11 | RU-J4 on a published build |
+| RU-22 Build runs declared checks | Done | The runtime proposes each declared check the model did not run ([FIXED-1558](FIXED_ITEMS.md#fixed-1558--build-left-declared-checks-to-the-model)); the card says what verifies ([FIXED-1554](FIXED_ITEMS.md#fixed-1554--not-verified-did-not-say-how-to-verify)) | RU-J4 ending *Verified* live |
+
+**Also done on 2026-11-25, outside the RU list:** MCP servers the owner adds run
+as the owner, outside the command sandbox, as in Claude Code and Codex, so they
+can drive applications on Windows too (FIXED-1561); a local Ollama is reached
+through its own API with a context sized to the request (FIXED-1556); an
+interpreter a toolchain manager installed in the home folder is reachable,
+read-only, when it holds no credential (FIXED-1557).
+
+**Still pending, beyond the open items above:** an MCP call cannot be asked about
+mid-turn (it is allowed per server or held); Ollama Cloud models need the owner's
+own quota; the published-build live journeys RU-J1 to RU-J5.
+
 ## What the reference agents do
 
 Reviewed 2026-11-16 from each product's own documentation where it is public,
@@ -278,6 +318,8 @@ chat. Release qualification still requires a live run on the published build.
 
 ## Changelog
 
+- **2026-11-25** — Status table added. RU-10, RU-21 and RU-22 done; RU-03,
+  RU-07, RU-08 and RU-16 advanced; MCP servers the owner adds run as the owner.
 - **2026-11-16** — Opened from the reference review. Rewritten the same day
   with the owner's direction: a native Windows sandbox without WSL2 (the
   restricted-account boundary, matching Codex's `elevated` design), strict but

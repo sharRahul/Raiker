@@ -1873,6 +1873,13 @@ export type CreateGoalRequest = {
   steps?: GoalStepInput[];
 };
 
+export type CreateLocalMcpServerRequest = {
+  name: string;
+  command: string;
+  args?: string[];
+  env?: Record<string, string>;
+};
+
 export type CreateMcpServerRequest = {
   name: string;
   template: string;
@@ -1884,13 +1891,6 @@ export type CreateProjectRequest = {
   attach_path?: string | null;
   attach_writable?: boolean;
   create_folder?: boolean;
-};
-
-export type CreateLocalMcpServerRequest = {
-  name: string;
-  command: string;
-  args?: string[];
-  env?: Record<string, string>;
 };
 
 export type CreateRemoteMcpServerRequest = {
@@ -3921,6 +3921,14 @@ export type LlamaUpdateCheck = {
   published_at: string | null;
 };
 
+export type LocalMcpServerCreated = {
+  ok: boolean;
+  server_id: string;
+  name: string;
+  transport: "stdio";
+  runs_as: "owner";
+};
+
 export type LocalModelDeployRequest = {
   profile_id?: string | null;
   install_if_missing?: boolean;
@@ -5821,14 +5829,6 @@ export type RemoteAccessView = {
   suspensions: number;
   start_outcome: string | null;
   start_message: string | null;
-};
-
-export type LocalMcpServerCreated = {
-  ok: boolean;
-  server_id: string;
-  name: string;
-  transport: "stdio";
-  runs_as: "owner";
 };
 
 export type RemoteMcpServerCreated = {

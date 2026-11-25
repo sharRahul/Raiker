@@ -10,7 +10,7 @@ from __future__ import annotations
 import pytest
 
 from raiker.control.dashboard_parts.extensions import _mcp_provenance, mcp_scope
-from raiker.runtime.executors.mcp import mcp_stdio_env
+from raiker.runtime.executors.mcp import mcp_host_env, mcp_stdio_env
 
 
 def test_a_local_server_is_said_to_get_exactly_the_environment_it_is_started_with(
@@ -23,8 +23,13 @@ def test_a_local_server_is_said_to_get_exactly_the_environment_it_is_started_wit
         transport="stdio", endpoint_url=None, auth_ref=None, template=None, tool_count=None
     )
 
-    assert scope["environment"] == sorted(mcp_stdio_env())
+    # MCP-HOST — a server the owner registered runs with the host environment.
+    assert scope["environment"] == sorted(mcp_host_env())
     assert "ANTHROPIC_API_KEY" not in scope["environment"]
+    generated = mcp_scope(
+        transport="stdio", endpoint_url=None, auth_ref=None, template="python-stdio-echo", tool_count=None
+    )
+    assert generated["environment"] == sorted(mcp_stdio_env())
     assert scope["granted_environment"] == []
     # Nothing confines a local process's network or writes; the preview says so.
     assert scope["runs_on"] == "this_machine"

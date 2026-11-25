@@ -12,7 +12,7 @@
     MemoryIntegrity,
     SecurityHealth,
   } from "../apiTypes";
-  import type { RecoveryRowView } from "../generated/apiContract";
+  import type { RecoveryRowView, SetupSystemReadiness } from "../generated/apiContract";
   import { humanize, relativeTime } from "../format";
 
   let diag = $state<Diagnostics | null>(null);
@@ -208,12 +208,43 @@
     }
   }
 
+  /**
+   * RU-08 — this machine's readiness, the same local checks first run and
+   * `raiker doctor` read, each with the fix beside it. Measured on the host;
+   * nothing leaves the machine. Problems first, so a fix is never below a tick.
+   */
+  let machine = $state<SetupSystemReadiness | null>(null);
+  let machineError = $state(false);
+  const STATE_ORDER: Record<string, number> = { fail: 0, warn: 1, info: 2, pass: 3 };
+  const machineChecks = $derived(
+    [...(machine?.checks ?? [])].sort((a, b) => STATE_ORDER[a.state] - STATE_ORDER[b.state]),
+  );
+  async function loadMachine() {
+    try {
+      const answer = await api.setupSystem();
+      if (!answer || !Array.isArray(answer.checks)) throw new Error("unexpected_shape");
+      machine = answer;
+      machineError = false;
+    } catch {
+      machine = null;
+      machineError = true;
+    }
+  }
+  function machineBadge(state: string): "blocked" | "approval-required" | "implemented" | "idle" {
+    if (state === "fail") return "blocked";
+    if (state === "warn") return "approval-required";
+    if (state === "pass") return "implemented";
+    return "idle";
+  }
+  const MACHINE_LABEL: Record<string, string> = { fail: "needs a fix", warn: "check", info: "info", pass: "ok" };
+
   onMount(load);
   onMount(loadRecovery);
+  onMount(loadMachine);
 </script>
 
 <div class="head-row">
-  <button type="button" class="btn btn-ghost btn-sm" onclick={load} aria-label="Refresh health">
+  <button type="button" class="btn btn-ghost btn-sm" onclick={() => { void load(); void loadMachine(); }} aria-label="Refresh health">
     <Icon name="refresh" size="sm" />
     Refresh
   </button>
@@ -225,6 +256,39 @@
   <PageState state="loading" title="Reading Raiker's health…" />
 {:else}
   <div class="grid">
+    <section class="card" aria-labelledby="diag-machine-h" data-testid="machine-readiness">
+      <h2 id="diag-machine-h">This machine</h2>
+      <p class="sub">
+        The checks first run makes, measured here and sent nowhere. The same list prints with
+        <code class="mono">raiker doctor</code>.
+      </p>
+      {#if machineError}
+        <p class="sub" role="status">This machine's checks could not be read. Press Refresh.</p>
+      {:else if machine === null}
+        <p class="sub" role="status">Checking this machine…</p>
+      {:else}
+        <p class="sub">
+          {machine.ready
+            ? "Every mandatory requirement is met."
+            : `Not ready: ${machine.blocking.length} mandatory requirement${machine.blocking.length === 1 ? " is" : "s are"} not met.`}
+        </p>
+        <ul class="monitor machine">
+          {#each machineChecks as check (check.id)}
+            <li>
+              <Badge variant={machineBadge(check.state)} label={MACHINE_LABEL[check.state]} />
+              <div class="machine-check">
+                <span class="monitor-code">{check.label}</span>
+                <span class="machine-detail">{check.detail}</span>
+                {#if check.remedy && check.state !== "pass"}
+                  <span class="machine-fix">{check.remedy}</span>
+                {/if}
+              </div>
+            </li>
+          {/each}
+        </ul>
+      {/if}
+    </section>
+
     <section class="card" aria-labelledby="diag-monitor-h">
       <h2 id="diag-monitor-h">Self-monitoring</h2>
       <p class="sub">Redacted health transitions recorded by Raiker's own monitors.</p>
@@ -517,6 +581,9 @@
     font-size: var(--text-xs);
     white-space: nowrap;
   }
+  .machine-check { display: flex; flex-direction: column; gap: 0.1rem; min-width: 0; flex: 1; }
+  .machine-detail { color: var(--text-2); font-size: var(--text-xs); overflow-wrap: anywhere; }
+  .machine-fix { color: var(--text-2); font-size: var(--text-xs); }
   .recovery details { border-top: 1px solid var(--border); padding: 0.4rem 0; }
   .recovery summary { cursor: pointer; font-weight: 600; font-size: var(--text-sm); }
   .recovery summary:focus-visible { outline: 3px solid var(--focus-ring); outline-offset: 2px; }

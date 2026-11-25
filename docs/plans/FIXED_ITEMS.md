@@ -1,5 +1,13 @@
 # Fixed items
 
+## FIXED-1565 — Health, in detail snapped shut after it was opened
+
+**Severity: Low. Area: Observability / UI. Status: Fixed 2026-11-25.** Observability's *Health, in detail* disclosure was rendered with a one-way `open={repairOpen}`, so whenever the page re-read its health the element went back to closed: an owner who opened it lost it a few seconds later, and a live spec found the card it had just asserted on hidden. The disclosure now binds its own open state; the `repair=indexes` link still opens it. Evidence: `web/e2e/ru-08-health-live.spec.ts` (RT-HEALTH-01) failed on a hidden card before the fix and passes after; `web/src/lib/views/ObserveView.test.ts`.
+
+## FIXED-1564 — The Health page did not show this machine's readiness
+
+**Severity: Low. Area: Health / UI (RU-08). Status: Fixed 2026-11-25.** `raiker doctor` printed first run's machine checks with their fixes (FIXED-1552), but no page did: an owner had to reopen the wizard or a terminal to learn why first run stopped. Observability → *Health, in detail* now opens on **This machine** — the same `GET /api/setup/system` checks, measured on the host and sent nowhere, problems first, each with its fix beside a `warn` or failure and a line saying whether every mandatory requirement is met. A failed read says so in the card and leaves the rest of the page. Evidence: `web/src/lib/views/DiagnosticsView.test.ts` (*lists this machine's checks with each fix, problems first (RU-08)*); live RT-HEALTH-01 on the Windows test PC ([live test](../architecture/WEB_APP_LIVE_TEST.md#result--2026-11-25-health-this-machine)).
+
 ## FIXED-1563 — Windows refused every command until the owner found the sandbox setting
 
 **Severity: Medium. Area: Sandbox / Windows. Status: Fixed 2026-11-25.** The Windows command sandbox defaulted to the restricted account, which the runner refuses until its isolation gaps close, so on the test PC — where Raiker's WSL2 distribution was already set up and fully enforced — every command and generated MCP server was refused with `native_sandbox_account_profile_isolation_unavailable` until the owner opened Settings › Advanced and chose WSL2. An unset choice now follows what is usable: WSL2 when its distribution reports configured, the account otherwise; an explicit choice is always kept, either way. The driver resolves it through its own status read, so the answer is the same one the probe and launch use. Evidence: `tests/test_command_sandbox_backend.py` (*an unset choice uses WSL when it is set up*, and the account cases now choose the account explicitly).
@@ -2129,6 +2137,8 @@ file you can open. The two capture sets that remain — `screenshots/pages/` and
 
 | ID | Severity | Area | Status |
 |---|---|---|---|
+| [FIXED-1565](#fixed-1565--health-in-detail-snapped-shut-after-it-was-opened) | Low | Observability / UI | Fixed 2026-11-25 |
+| [FIXED-1564](#fixed-1564--the-health-page-did-not-show-this-machines-readiness) | Low | Health / UI (RU-08) | Fixed 2026-11-25 |
 | [FIXED-1563](#fixed-1563--windows-refused-every-command-until-the-owner-found-the-sandbox-setting) | Medium | Sandbox / Windows | Fixed 2026-11-25 |
 | [FIXED-1562](#fixed-1562--a-trusted-mcp-server-could-only-be-used-by-allowing-every-server) | High | MCP / permissions (MCP-HOST) | Fixed 2026-11-25 |
 | [FIXED-1561](#fixed-1561--an-owner-could-not-add-a-local-mcp-server-and-none-could-drive-an-application) | High | MCP / design (MCP-HOST) | Fixed 2026-11-25 |

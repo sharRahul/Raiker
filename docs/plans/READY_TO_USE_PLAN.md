@@ -55,7 +55,7 @@ build is still owed for every item (the regular-use journeys in
 | RU-05 WSL2 and MXC options | Partly done | WSL2 is available and measured | MXC probe result |
 | RU-06 Ten families | Partly done | Families, lines and the unit test ([FIXED-1537](FIXED_ITEMS.md#fixed-1537--permissions-was-grouped-in-six-headings-an-owner-had-to-learn)) | Live surface sweep |
 | RU-07 Three postures | Partly done | Per-conversation command grant on the approval card ([FIXED-1540](FIXED_ITEMS.md#fixed-1540--a-command-could-not-be-allowed-for-a-conversation-from-any-screen)); per-MCP-server *use without asking* ([FIXED-1562](FIXED_ITEMS.md#fixed-1562--a-trusted-mcp-server-could-only-be-used-by-allowing-every-server)) | The three postures and their mapping |
-| RU-08 Health | Partly done | `raiker doctor` with each fix ([FIXED-1552](FIXED_ITEMS.md#fixed-1552--there-was-no-raiker-doctor)) | The Health page; sandbox, backups, embedding, voice, updates, always-on facts |
+| RU-08 Health | Partly done | `raiker doctor` with each fix ([FIXED-1552](FIXED_ITEMS.md#fixed-1552--there-was-no-raiker-doctor)); **This machine** on Observability → *Health, in detail* ([FIXED-1564](FIXED_ITEMS.md#fixed-1564--the-health-page-did-not-show-this-machines-readiness)) | Sandbox, backups, embedding, voice, updates and always-on facts, each with the page that fixes it |
 | RU-09 Four-step first run | Partly done | Model step says which models suit numbers and code ([FIXED-1538](FIXED_ITEMS.md#fixed-1538--first-run-did-not-say-which-models-suit-numbers-and-code)) | *This machine* and *Posture* steps |
 | RU-10 Keep or skip under the answer | Done | [FIXED-1539](FIXED_ITEMS.md#fixed-1539--a-memory-raiker-proposed-could-only-be-kept-from-memory), owner's words only ([FIXED-1548](FIXED_ITEMS.md#fixed-1548--a-sentence-the-model-invented-was-offered-to-keep-as-a-memory)); RT-1125-08 | — |
 | RU-11 Memory as a summary | Open | — | *What Raiker knows about you*, one switch, *Find by meaning* |
@@ -197,8 +197,9 @@ and backups, embedding model, voice, updates, disk and memory, always-on host.
 after.
 *Progress 2026-11-25:* `raiker doctor` prints first run's machine checks with
 their fixes ([FIXED-1552](FIXED_ITEMS.md#fixed-1552--there-was-no-raiker-doctor));
-the command sandbox, backups, embedding model, voice, updates and always-on
-facts, and the Health page, are open.
+Observability → *Health, in detail* opens on the same checks as **This
+machine** ([FIXED-1564](FIXED_ITEMS.md#fixed-1564--the-health-page-did-not-show-this-machines-readiness)); the command sandbox, backups, embedding model, voice,
+updates and always-on facts are open.
 
 **RU-09 · Four-step first run. P0, M.** *Account* → *Model* → *This machine*
 (command sandbox, local embedding model, backups, always-on) → *Posture*.

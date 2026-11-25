@@ -351,4 +351,28 @@ describe("DiagnosticsView — if Raiker stops in the middle", () => {
     const card = await screen.findByTestId("recovery-matrix");
     await waitFor(() => expect(card).toHaveTextContent("could not be read"));
   });
+
+  it("lists this machine's checks with each fix, problems first (RU-08)", async () => {
+    stubFetch({
+      "GET /api/diagnostics": DIAGNOSTICS,
+      "GET /api/security/health": [],
+      "GET /api/setup/system": {
+        ready: false,
+        blocking: ["memory"],
+        checks: [
+          { id: "os", label: "Operating system", state: "pass", detail: "Windows 11", remedy: "", mandatory: true, data: {} },
+          { id: "memory", label: "Memory", state: "fail", detail: "3.0 GB", remedy: "Raiker needs at least 4 GB of memory.", mandatory: true, data: {} },
+        ],
+        recommended_local_model: {},
+        locations: {},
+      },
+    });
+    render(DiagnosticsView);
+    const card = await screen.findByTestId("machine-readiness");
+    await waitFor(() => expect(card).toHaveTextContent(/1 mandatory requirement is not met/));
+    expect(card).toHaveTextContent("Raiker needs at least 4 GB of memory.");
+    const rows = card.querySelectorAll("li");
+    expect(rows[0]).toHaveTextContent("Memory");
+    expect(rows[1]).toHaveTextContent("Operating system");
+  });
 });

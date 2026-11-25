@@ -195,6 +195,13 @@
     return () => window.removeEventListener("hashchange", follow);
   });
   const repairOpen = $derived(address.includes("repair=indexes"));
+  // The disclosure keeps the owner's own open/closed choice. A one-way
+  // `open={repairOpen}` was re-applied whenever the page re-read its health,
+  // so "Health, in detail" snapped shut seconds after it was opened.
+  let healthDetailOpen = $state(false);
+  $effect(() => {
+    if (repairOpen) healthDetailOpen = true;
+  });
   // A repair made in the detail below changes what the attention list above
   // reports; re-read rather than keep saying the index is damaged.
   $effect(() => {
@@ -477,7 +484,7 @@
            a healthy install does not have to scroll past them. What its
            failures mean for the owner is already in the attention list above,
            read from the same records. -->
-      <details class="fold specialist" open={repairOpen} id="runtime-health-detail">
+      <details class="fold specialist" bind:open={healthDetailOpen} id="runtime-health-detail">
         <summary>
           <span class="fold-title">Health, in detail</span>
           <span class="fold-meta">Readiness checks, memory integrity, restarts</span>

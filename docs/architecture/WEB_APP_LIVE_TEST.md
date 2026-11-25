@@ -21,6 +21,18 @@ PR #106: the **user-owned fallback sequence** and **prompt caching + normalised
 cache-hit metrics**.
 
 
+## Result — 2026-11-25 (Health: this machine)
+
+Against a fresh throwaway workspace on the Windows test PC (`raiker-web
+--workspace <scratch> --port 8765 --no-browser`, no model or key). Spec:
+`web/e2e/ru-08-health-live.spec.ts`, **1/1** after FIXED-1565; the first runs
+failed because *Health, in detail* closed itself after being opened, which is
+how that bug was found. The capture `ru-08-this-machine-card.png` was inspected.
+
+| Case | Check | Result |
+|---|---|---|
+| RT-HEALTH-01 | Observability → *Health, in detail* opens on **This machine**: *Every mandatory requirement is met.*, then each check (graphics, credential protection, runtimes, installation, operating system, architecture, memory, processor, free storage, network) with its detail and, for anything not `ok`, its fix; the disclosure stays open | ✅ after FIXED-1565 |
+
 ## Result — 2026-11-25 (Permissions families, first-run model note, local and cloud Ollama)
 
 Windows 11 test PC (RTX 4080 SUPER 16 GB), a source host

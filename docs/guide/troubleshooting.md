@@ -12,7 +12,8 @@ credential protection, local model runtimes and this installation — one per
 line, with the fix beside anything marked `warn` or `FAIL`. It contacts nothing
 and changes nothing, and exits 1 when a mandatory requirement is not met.
 `raiker doctor --json` prints the full report; `--workspace` checks another
-data folder.
+data folder. The same checks, problems first, open **Observability → Health, in
+detail** under **This machine**.
 
 ## Connecting a model
 

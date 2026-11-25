@@ -1954,6 +1954,9 @@ FIXED-1526 to FIXED-1529.
   a context that fits (for example through Ollama's native `/api/chat` with
   `options.num_ctx` sized from the model and free VRAM), or say on the model's
   card that it will not fit and how to set `OLLAMA_CONTEXT_LENGTH`.
+  *2026-11-25:* the server check now says so with the fix
+  ([FIXED-1547](FIXED_ITEMS.md#fixed-1547--an-ollama-model-spilling-to-the-cpu-was-not-said));
+  requesting a smaller context is still open.
 * **Ollama Cloud answered HTTP 402.** `gpt-oss:20b-cloud`, connected through
   **Add model › On this computer › Ollama**, refused the first turn with
   `provider_quota_exhausted:http_402`; Raiker said the account has no credit or

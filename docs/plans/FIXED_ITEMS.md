@@ -1,5 +1,9 @@
 # Fixed items
 
+## FIXED-1547 — An Ollama model spilling to the CPU was not said
+
+**Severity: Medium. Area: Models / Ollama. Status: Fixed 2026-11-25.** Found in this round's live run: Ollama 0.40 loaded `qwen3.5:9b` at 262,144 tokens of context, 15 GB on a 16 GB card, 8 % on the CPU, and a one-line answer took minutes, while Models' server check said nothing. The check now reads Ollama's `/api/ps` (`size` against `size_vram`) for the loaded model, loopback only, and when more than 5 % of it is outside the GPU advises: *N % of this model is running on the CPU, so answers are slow. Ollama loaded it with more context than the graphics card holds (… tokens); set OLLAMA_CONTEXT_LENGTH lower (for example 32768) and restart Ollama.* Raiker still cannot request a smaller context through Ollama's OpenAI-compatible route; that stays open. Evidence: `tests/test_server_check.py::test_an_ollama_model_spilling_to_the_cpu_is_said_with_its_fix`.
+
 ## FIXED-1546 — Sign-in, recovery and command failures gave no next step
 
 **Severity: Low. Area: UI copy (QUI-G06). Status: Fixed 2026-11-25.** The lock screen answered a failed sign-in with *Authentication failed.* and a failed recovery with *Password recovery failed.*, and Build's command pane with *Command request failed*, none with a next step. They now read *Sign-in failed. Check the username and password, then try again.* (still generic by design: it never confirms whether the username exists), *Password recovery failed. Your password is unchanged. Check the recovery code, then try again.* and *The command request was not sent, so nothing ran. Try again.* Evidence: `web/src/lib/views/LoginView.test.ts`, `web/src/App.test.ts`, and `round-2026-10-02-contract-live.spec.ts` updated to the new words.
@@ -2061,6 +2065,7 @@ file you can open. The two capture sets that remain — `screenshots/pages/` and
 
 | ID | Severity | Area | Status |
 |---|---|---|---|
+| [FIXED-1547](#fixed-1547--an-ollama-model-spilling-to-the-cpu-was-not-said) | Medium | Models / Ollama | Fixed 2026-11-25 |
 | [FIXED-1546](#fixed-1546--sign-in-recovery-and-command-failures-gave-no-next-step) | Low | UI copy (QUI-G06) | Fixed 2026-11-25 |
 | [FIXED-1545](#fixed-1545--an-mcp-program-in-the-home-folder-read-as-missing-with-no-reason) | Low | MCP / copy | Fixed 2026-11-25 |
 | [FIXED-1544](#fixed-1544--nine-more-errors-said-could-not-and-stopped) | Low | UI copy (QUI-G06) | Fixed 2026-11-25 |

@@ -3472,6 +3472,13 @@ async def check_model_server(
     context = await asyncio.to_thread(
         server_check.serving_context, profile.provider, effective_endpoint(profile, connection), model
     )
+    cpu_share = (
+        await asyncio.to_thread(
+            server_check.ollama_cpu_share, effective_endpoint(profile, connection), model
+        )
+        if profile.provider == "ollama"
+        else None
+    )
     answer: ServerCheck = {
         "ok": True,
         "profile_id": profile.profile_id,
@@ -3479,7 +3486,7 @@ async def check_model_server(
         "tool_calling": verdict,
         "reason_code": reason,
         "context_tokens": context,
-        "advice": server_check.advice(profile.provider, verdict, context),
+        "advice": server_check.advice(profile.provider, verdict, context, cpu_share),
     }
     return serialize_dto(answer)
 

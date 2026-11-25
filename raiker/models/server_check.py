@@ -132,7 +132,30 @@ def serving_context(provider: str, endpoint: str, model: str, *, timeout: float 
     return None
 
 
-def advice(provider: str, verdict: str, context: int | None) -> list[str]:
+#: A loaded model with more than this share of its memory outside the GPU is
+#: slow enough to say so (2026-11-25: 8 % on the CPU took minutes per answer).
+CPU_SHARE_WARNING = 0.05
+
+
+def ollama_cpu_share(endpoint: str, model: str, *, timeout: float = 3.0) -> float | None:
+    """How much of a loaded Ollama model is outside the GPU, 0.0–1.0, when it says."""
+    from raiker.models.local_service import service_root
+
+    root = service_root(endpoint)
+    if root is None:
+        return None
+    with contextlib.suppress(httpx.HTTPError, ValueError, TypeError, KeyError), httpx.Client(
+        timeout=timeout, trust_env=False, follow_redirects=False
+    ) as client:
+        for entry in client.get(f"{root}/api/ps").json().get("models", []):
+            if entry.get("name") == model or entry.get("model") == model:
+                size = int(entry.get("size") or 0)
+                vram = int(entry.get("size_vram") or 0)
+                return max(0.0, (size - vram) / size) if size > 0 else None
+    return None
+
+
+def advice(provider: str, verdict: str, context: int | None, cpu_share: float | None = None) -> list[str]:
     notes: list[str] = []
     if verdict == "refused":
         notes.append(_REFUSED_ADVICE.get(provider, _GENERIC_REFUSED))
@@ -154,5 +177,12 @@ def advice(provider: str, verdict: str, context: int | None) -> list[str]:
         notes.append(
             f"The server is serving {context:,} tokens of context; Raiker's instructions and tools "
             f"need room, so {setting} — at least {MIN_CONTEXT_TOKENS:,}."
+        )
+    if provider == "ollama" and cpu_share is not None and cpu_share > CPU_SHARE_WARNING:
+        notes.append(
+            f"{cpu_share:.0%} of this model is running on the CPU, so answers are slow. "
+            "Ollama loaded it with more context than the graphics card holds"
+            + (f" ({context:,} tokens)" if context else "")
+            + "; set OLLAMA_CONTEXT_LENGTH lower (for example 32768) and restart Ollama."
         )
     return notes

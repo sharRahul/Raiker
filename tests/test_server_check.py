@@ -114,3 +114,26 @@ def test_an_off_machine_endpoint_is_never_probed_for_context(monkeypatch: pytest
     assert server_check.serving_context("openai-compatible", "https://gpu.example.com/v1", "m") is None
     assert server_check.serving_context("openai-compatible", "http://192.168.1.20:8000/v1", "m") is None
     assert client.urls == []
+
+
+def test_an_ollama_model_spilling_to_the_cpu_is_said_with_its_fix(monkeypatch: pytest.MonkeyPatch) -> None:
+    # 2026-11-25 — qwen3.5:9b loaded at 262,144 tokens: 15 GB, 8 % on the CPU.
+    gib = 1024**3
+    client = _Client(
+        {
+            "http://127.0.0.1:11434/api/ps": {
+                "models": [
+                    {"name": "qwen3.5:9b", "context_length": 262144, "size": 15 * gib, "size_vram": int(13.8 * gib)},
+                    {"name": "gemma3:1b", "context_length": 32768, "size": gib, "size_vram": gib},
+                ]
+            }
+        }
+    )
+    monkeypatch.setattr(server_check.httpx, "Client", client)
+    share = server_check.ollama_cpu_share("http://127.0.0.1:11434/v1", "qwen3.5:9b")
+    assert share is not None and 0.07 < share < 0.09
+    assert server_check.ollama_cpu_share("http://127.0.0.1:11434/v1", "gemma3:1b") == 0.0
+    note = server_check.advice("ollama", "works", 262144, share)[-1]
+    assert "running on the CPU" in note and "OLLAMA_CONTEXT_LENGTH" in note and "262,144" in note
+    assert server_check.advice("ollama", "works", 32768, 0.0) == []
+    assert server_check.ollama_cpu_share("https://ollama.example.com/v1", "qwen3.5:9b") is None

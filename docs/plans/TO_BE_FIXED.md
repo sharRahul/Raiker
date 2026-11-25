@@ -1941,3 +1941,26 @@ FIXED-1526 to FIXED-1529.
   last change. Build should run the declared checks itself once the model has
   finished (asking, as any command does). RU-22.
 
+## 2026-11-25 round — found, not fixed
+
+* **A local Ollama model loads at its full context and spills to the CPU.** On
+  the Windows test PC (RTX 4080 SUPER, 16 GB) Ollama 0.40.17 loaded
+  `qwen3.5:9b` for a Chat turn at 262,144 tokens of context: 15 GB, split
+  8 %/92 % CPU/GPU, and a one-sentence answer was still *Writing the answer…*
+  after two minutes. Raiker talks to Ollama through its OpenAI-compatible
+  `/v1` route, which takes no `num_ctx`, so Ollama's own default applied (no
+  `OLLAMA_CONTEXT_LENGTH` is set). *Stop safely* then waits for that model call
+  to finish, because the next safe boundary is after it. Raiker should ask for
+  a context that fits (for example through Ollama's native `/api/chat` with
+  `options.num_ctx` sized from the model and free VRAM), or say on the model's
+  card that it will not fit and how to set `OLLAMA_CONTEXT_LENGTH`.
+* **Ollama Cloud answered HTTP 402.** `gpt-oss:20b-cloud`, connected through
+  **Add model › On this computer › Ollama**, refused the first turn with
+  `provider_quota_exhausted:http_402`; Raiker said the account has no credit or
+  quota left, which is correct. A cloud-model turn needs the owner's Ollama
+  account to have quota.
+* **The OTLP collector live spec needs a collector.** `round-2026-09-04`'s
+  *a collector receives governed events* waits for *event(s) delivered* from
+  `http://127.0.0.1:4318`; with nothing listening there it fails. Run it with a
+  local OpenTelemetry collector.
+

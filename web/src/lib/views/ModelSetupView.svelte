@@ -694,6 +694,12 @@
         </div>
       {/if}
       {#if !profilesLoading && !unconfirmed && allProvidersOpen}
+        <!-- 2026-11-16 regular use — a small model twice misread a budget
+             table. Say which models suit numbers and code before the choice. -->
+        <p class="note model-fit">
+          For sums, tables and code, choose a larger model. Small, fast models answer quickly but can
+          misread a table or a total; you can change the default any time in Models.
+        </p>
         <ProviderMatrix
           {profiles}
           {chatProfiles}
@@ -704,12 +710,6 @@
           onselectable={(counts) => (selectableCounts = counts)}
           openPickerFor={pickerRequest}
         />
-        <!-- 2026-11-16 regular use — a small model twice misread a budget
-             table. Say which models suit numbers and code before the choice. -->
-        <p class="note model-fit">
-          For sums, tables and code, choose a larger model. Small, fast models answer quickly but can
-          misread a table or a total; you can change the default any time in Models.
-        </p>
       {/if}
       {#if picked !== null}
         <p class="picked" role="status">

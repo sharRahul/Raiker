@@ -52,7 +52,7 @@ export class RecallLedger {
       await api.forgetMemory(memory.memory_id);
       this.notice = "Forgotten.";
     } catch {
-      this.notice = "Could not forget that memory.";
+      this.notice = "That memory was not forgotten. Raiker still recalls it. Try again, or forget it in Memory.";
     }
     const session = this.session();
     if (session !== null) await this.refresh(session);
@@ -65,7 +65,7 @@ export class RecallLedger {
       await api.editMemory(memory.memory_id, text);
       this.notice = "Corrected.";
     } catch {
-      this.notice = "Could not correct that memory.";
+      this.notice = "That memory was not corrected. The old wording is still kept. Try again, or edit it in Memory.";
     }
     const session = this.session();
     if (session !== null) await this.refresh(session);

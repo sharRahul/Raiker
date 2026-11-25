@@ -1,5 +1,9 @@
 # Fixed items
 
+## FIXED-1544 — Nine more errors said Could not and stopped
+
+**Severity: Low. Area: UI copy (QUI-G06). Status: Fixed 2026-11-25.** Nine more errors stopped at *Could not …*: forgetting and correcting a recalled memory from Chat's memory strip, opening and downloading an attached file in the source inspector, a provider sign-in in Models, and in Settings › Security starting a reset, saving the vault key, setting up two-step sign-in and updating the policy. Each now says what was left unchanged and one next step. Evidence: the web unit suite and `svelte-check`; copy in `chat/recallLedger.svelte.ts`, `chat/sourceInspector.svelte.ts`, `ModelsView.svelte` and `settings/SecurityLogin.svelte`.
+
 ## FIXED-1543 — Ten more errors said Could not and stopped
 
 **Severity: Low. Area: UI copy (QUI-G06). Status: Fixed 2026-11-25.** Ten more errors read *Could not …* with nothing on what it affected or what to do: granting a source folder (two), storing a source file, adding a source, creating a user account, undoing a memory import, and in Settings › Security the local scan, the health check, the breach-list check, changing the password and signing out other devices. Each now names what failed, what that left unchanged and one next step, with the status code only through `failure()` where an `ApiError` is in hand. Evidence: the web unit suite (2,942 passed) and `svelte-check`; the copy is in `BrainView.svelte`, `LoginView.svelte`, `MemoryView.svelte` and `settings/SecurityLogin.svelte`.
@@ -2049,6 +2053,7 @@ file you can open. The two capture sets that remain — `screenshots/pages/` and
 
 | ID | Severity | Area | Status |
 |---|---|---|---|
+| [FIXED-1544](#fixed-1544--nine-more-errors-said-could-not-and-stopped) | Low | UI copy (QUI-G06) | Fixed 2026-11-25 |
 | [FIXED-1543](#fixed-1543--ten-more-errors-said-could-not-and-stopped) | Low | UI copy (QUI-G06) | Fixed 2026-11-25 |
 | [FIXED-1542](#fixed-1542--a-projects-cursorrules-was-ignored) | Low | Build / instructions | Fixed 2026-11-25 |
 | [FIXED-1541](#fixed-1541--another-agents-markdown-memory-could-not-be-imported) | Low | Memory / import | Fixed 2026-11-25 |

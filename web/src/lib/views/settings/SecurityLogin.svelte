@@ -320,7 +320,7 @@
       freshPassword = "";
       freshCode = "";
     } catch (e) {
-      notice = { kind: "error", text: freshError(e, "Could not start the reset.") };
+      notice = { kind: "error", text: freshError(e, "The reset did not start. Nothing was changed. Try again.") };
     }
   }
 
@@ -370,7 +370,7 @@
         kind: "error",
         text: invalid
           ? "That is not a valid Fernet key. Use “Generate key” or a 44-character URL-safe base64 key — a plain passphrase will not work."
-          : message(e, "Could not save the vault key."),
+          : message(e, "The vault key was not saved. The vault is unchanged. Check the key, then save it again."),
       };
     } finally {
       setToken(control);
@@ -404,7 +404,7 @@
       enrollUri = provisioning_uri;
       backupCodes = [...backup_codes];
     } catch (e) {
-      notice = { kind: "error", text: message(e, "Could not start MFA enrollment.") };
+      notice = { kind: "error", text: message(e, "Two-step sign-in was not set up. Sign-in still uses your password only. Try again.") };
     }
   }
 
@@ -439,7 +439,7 @@
       });
       requireMfaForVault = next;
     } catch (e) {
-      notice = { kind: "error", text: message(e, "Could not update the policy.") };
+      notice = { kind: "error", text: message(e, "The policy was not updated. The previous one still applies. Try again.") };
     }
   }
 

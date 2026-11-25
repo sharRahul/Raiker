@@ -516,8 +516,8 @@
         signInGuidance !== null
           ? null
           : refusal.status !== null
-            ? `Could not connect (${refusal.status}${refusal.reasonCode ? `: ${refusal.reasonCode}` : ""})`
-            : "Could not connect";
+            ? `Sign-in did not connect (${refusal.status}${refusal.reasonCode ? `: ${refusal.reasonCode}` : ""}). No account was added. Try signing in again.`
+            : "Sign-in did not connect. No account was added. Check that Raiker is running, then try again.";
     } finally {
       signInSaving = false;
     }

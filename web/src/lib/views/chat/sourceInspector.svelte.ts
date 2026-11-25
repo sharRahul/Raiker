@@ -106,7 +106,7 @@ export class SourceInspector {
       this.previewError =
         e instanceof ApiError && e.status === 404
           ? "This file is no longer available in this conversation."
-          : "Could not open this file.";
+          : "This file did not open. It is still attached to the conversation. Choose it again.";
     } finally {
       if (this.inspecting?.attachmentId === attachmentId) this.previewLoading = false;
     }
@@ -265,7 +265,7 @@ export class SourceInspector {
           ? "This file is no longer kept in this conversation, so it cannot be downloaded."
           : e instanceof ApiError && e.status === 403
             ? "This account is not permitted to download this file."
-            : "Could not download this file.";
+            : "This file did not download. It is still kept in this conversation. Choose Download again.";
     }
   };
 }

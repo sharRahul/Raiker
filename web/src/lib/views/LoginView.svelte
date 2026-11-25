@@ -185,9 +185,9 @@
         return "Too many attempts in the last minute. Wait a minute, then try again.";
       }
       // Generic by design: never confirm whether the username exists.
-      return e.message.includes("Request failed") ? "Authentication failed." : e.message;
+      return e.message.includes("Request failed") ? "Sign-in failed. Check the username and password, then try again." : e.message;
     }
-    return "Authentication failed.";
+    return "Sign-in failed. Check the username and password, then try again.";
   }
 
   async function switchMode() {
@@ -231,7 +231,7 @@
       await tick();
       document.getElementById("password")?.focus();
     } catch {
-      error = "Password recovery failed.";
+      error = "Password recovery failed. Your password is unchanged. Check the recovery code, then try again.";
     } finally {
       busy = false;
     }

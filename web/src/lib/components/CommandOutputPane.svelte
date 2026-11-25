@@ -50,7 +50,7 @@
 
   function reason(exc: unknown): string {
     if (exc instanceof ApiError) return humanize(exc.reasonCode ?? "command_request_failed");
-    return exc instanceof Error ? exc.message : "Command request failed";
+    return exc instanceof Error ? exc.message : "The command request was not sent, so nothing ran. Try again.";
   }
 
   /**

@@ -203,7 +203,7 @@ test("MFA shows its recovery codes once, and one recovers the password from the 
 
   // A recovery code works once.
   await recover(backup[0], OWNER_CREDENTIALS.password);
-  await expect(lock.getByText("Password recovery failed.")).toBeVisible({ timeout: 30_000 });
+  await expect(lock.getByText(/^Password recovery failed\./)).toBeVisible({ timeout: 30_000 });
 
   // The next one puts the round's password back, and the account unlocks with
   // it and the authenticator's code.

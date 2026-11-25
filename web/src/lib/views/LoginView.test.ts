@@ -142,7 +142,7 @@ describe("LoginView", () => {
     render(LoginView, { props: { onAuthenticated } });
     await fillCredentials();
     await fireEvent.click(screen.getByRole("button", { name: "Unlock Raiker" }));
-    expect(await screen.findByRole("alert")).toHaveTextContent("Authentication failed.");
+    expect(await screen.findByRole("alert")).toHaveTextContent("Sign-in failed. Check the username and password, then try again.");
   });
 
   it("says when sign-in was refused for too many attempts, not that the password was wrong", async () => {

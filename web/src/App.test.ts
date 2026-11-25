@@ -296,7 +296,7 @@ describe("App shell", () => {
     render(App);
     await signIn();
     await waitFor(() => {
-      expect(screen.getByRole("alert")).toHaveTextContent(/authentication failed/i);
+      expect(screen.getByRole("alert")).toHaveTextContent(/sign-in failed/i);
     });
   });
 

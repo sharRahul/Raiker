@@ -848,8 +848,8 @@ for (const width of [390, 1440]) {
     await page.goto("http://127.0.0.1:8765/#/capabilities");
     const rail = page.getByRole("navigation", { name: "Permission categories" });
     await expect(rail.getByRole("button", { name: /^Overview/ })).toHaveAttribute("aria-current", "page");
-    await rail.getByRole("button", { name: /^Advanced/ }).click();
-    const list = page.getByRole("listbox", { name: /Advanced permissions/ });
+    await rail.getByRole("button", { name: /^Commands/ }).click();
+    const list = page.getByRole("listbox", { name: /Commands permissions/ });
     await expect(list.getByRole("option", { name: /Shell commands/i })).toBeVisible();
     // The row is text; the choice and Turn on are in the detail.
     await list.getByRole("option", { name: /Shell commands/i }).click();

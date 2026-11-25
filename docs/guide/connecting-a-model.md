@@ -411,6 +411,14 @@ server on this machine. Under 32,768 tokens the check says which setting raises
 it (`OLLAMA_CONTEXT_LENGTH`, llama.cpp `-c`, vLLM `--max-model-len`). Nothing on
 the server is changed.
 
+The opposite also happens. A recent Ollama loads a model at its *largest*
+context when nothing says otherwise — `qwen3.5:9b` at 262,144 tokens took 15 GB
+and ran mostly on the CPU of a 16 GB graphics card, so one short answer took
+minutes. If `ollama ps` shows a model split between CPU and GPU, set
+`OLLAMA_CONTEXT_LENGTH` (for example `32768`) for the Ollama service and restart
+it. Raiker reaches Ollama through its OpenAI-compatible route, which cannot ask
+for a smaller context itself.
+
 ### Context window override
 
 When a provider does not say how much context a model has, or says something

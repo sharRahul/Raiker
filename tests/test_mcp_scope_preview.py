@@ -20,7 +20,8 @@ def test_a_local_server_is_said_to_get_exactly_the_environment_it_is_started_wit
     monkeypatch.delenv("RAIKER_MCP_ENV_ALLOWLIST", raising=False)
 
     scope = mcp_scope(
-        transport="stdio", endpoint_url=None, auth_ref=None, template=None, tool_count=None
+        transport="stdio", endpoint_url=None, auth_ref=None, template=None, tool_count=None,
+        runs_as="owner",
     )
 
     # MCP-HOST — a server the owner registered runs with the host environment.

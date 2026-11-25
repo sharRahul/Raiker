@@ -1220,7 +1220,8 @@ Found or left open in it:
   still forwards); and specs that sort an empty Approvals queue find no sort.
   The mocked suite and `quiet-ui-polish-live` are updated (related to
   BUG-248).
-* **A Python test is sensitive to a loaded machine.**
+* ~~**A Python test is sensitive to a loaded machine.**~~ Closed 2026-11-25:
+  three more runs on the Windows test PC passed; not reproduced since 2026-11-14.
   `test_background_execution.py::test_a_foreground_run_holds_no_lease_and_is_never_swept`
   failed once in a four-worker local run and passes alone; CI runs each shard
   serially. 2026-11-14: it passed six times in parallel once the native runner
@@ -1265,7 +1266,11 @@ and [03, QUI-H04](QUIET_UI_PLAN.md#status-2).
   answering it; `qui-a08-diagrams-and-fixes` and `bug-305-306-2026-09-20`
   dismiss any native dialog as a safety net. Moving the leave guard to the
   in-app dialog needs navigation to wait on an async answer.
-* **One approvals test is load-sensitive.**
+* ~~**One approvals test is load-sensitive.**~~ Closed 2026-11-25: on the
+  Windows test PC it fails every time, alone, with
+  `target_not_executed:native_sandbox_artifact_missing` until
+  `scripts/build_native_runner.py` is run — the host, not load (as the
+  2026-11-14 triage of the same test found); CI builds the runner and passes it.
   `tests/test_api_approvals.py::TestApprovalsResolve::test_approved_shell_executes_once_with_bounded_evidence`
   failed once in a full local shard under load and passes alone and in its
   file. Not reproduced in CI.

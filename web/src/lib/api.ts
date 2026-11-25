@@ -937,6 +937,8 @@ export const api = {
   memories: (scope?: string, includeInactive = false) =>
     contract.listMemories(includeInactive ? { scope, include_inactive: true } : { scope }),
   memoryProposals: () => contract.listMemoryProposals(),
+  // RU-07 — the per-conversation command grant, from a command's approval card.
+  putSessionCommandGrant: contract.putSessionCommandGrant,
   memoryRelationshipProposals: () => contract.getMemoryRelationshipProposals(),
   scanMemoryRelationships: () => contract.postMemoryRelationshipProposalsScan(),
   decideMemoryRelationshipProposal: (

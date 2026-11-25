@@ -34,6 +34,7 @@
   import { humanize } from "../format";
   import { watchLayout } from "../layoutWatch";
   import Icon from "./Icon.svelte";
+  import { GRANT_TIMEOUT_SECONDS, GRANT_TTL_MINUTES, grantableCommand } from "../commandGrant";
 
   /** How often pending approvals are re-read while the tab is visible. */
   const POLL_MS = 5000;
@@ -177,6 +178,28 @@
     }
   }
 
+  /** RU-07 — the command, as exact words, when it can be allowed for the conversation. */
+  const grantWords = $derived(current === null ? null : grantableCommand(current));
+
+  async function allowInConversation() {
+    if (current === null || grantWords === null || busy) return;
+    busy = true;
+    failure = null;
+    try {
+      await api.putSessionCommandGrant(current.session_id, {
+        commands: [grantWords],
+        timeout_seconds: GRANT_TIMEOUT_SECONDS,
+        ttl_minutes: GRANT_TTL_MINUTES,
+      });
+    } catch (error) {
+      failure = describeFailure("It was not allowed for this conversation", "Nothing changed.", "Choose again, or Allow once.", error);
+      busy = false;
+      return;
+    }
+    busy = false;
+    await decide(true);
+  }
+
   function later() {
     if (current === null) return;
     deferred = [...deferred, current.approval_id];
@@ -301,11 +324,26 @@
         <button type="button" disabled={busy} onclick={() => void decide(false)}>Decline</button>
         <button type="button" class="quiet" onclick={review}>Details</button>
       </div>
+      {#if grantWords !== null}
+        <!-- RU-07 — this exact command, in the sandbox, for this conversation
+             for eight hours; revocable, and nothing else is widened. -->
+        <button type="button" class="quiet grant" disabled={busy} onclick={() => void allowInConversation()}>
+          Allow <code>{grantWords.join(" ")}</code> in this conversation
+        </button>
+      {/if}
     {/if}
   </section>
 {/if}
 
 <style>
+  .grant {
+    justify-self: start;
+    font-size: var(--text-xs);
+  }
+  .grant code {
+    font-family: var(--font-mono);
+    overflow-wrap: anywhere;
+  }
   .approval-prompt {
     position: fixed;
     right: 20px;

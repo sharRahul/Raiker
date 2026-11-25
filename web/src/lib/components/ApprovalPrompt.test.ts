@@ -258,3 +258,39 @@ it("leaves the screen when the owner navigates to Approvals, and returns after",
   window.dispatchEvent(new HashChangeEvent("hashchange"));
   expect(await screen.findByText("Approval needed")).toBeTruthy();
 });
+
+it("allows an exact command for this conversation, then approves this one (RU-07)", async () => {
+  vi.spyOn(api, "approvals").mockResolvedValue([
+    approval({ tool_name: "shell", capability: "shell_execution", target: "python3 -m unittest -q" }),
+  ]);
+  const grant = vi.spyOn(api, "putSessionCommandGrant").mockResolvedValue({
+    session_id: "sess_1",
+    commands: [["python3", "-m", "unittest", "-q"]],
+    expires_at: "2026-11-25T08:00:00Z",
+    revocable: true,
+  });
+  const resolve = vi.spyOn(api, "resolveApproval").mockResolvedValue({
+    ok: true,
+    approval_id: "ap_1",
+    status: "approved",
+    executes_action: true,
+  } as never);
+  render(ApprovalPrompt);
+
+  await fireEvent.click(await screen.findByRole("button", { name: /Allow python3 -m unittest -q in this conversation/ }));
+  await waitFor(() => expect(resolve).toHaveBeenCalled());
+  expect(grant).toHaveBeenCalledWith("sess_1", {
+    commands: [["python3", "-m", "unittest", "-q"]],
+    timeout_seconds: 300,
+    ttl_minutes: 480,
+  });
+});
+
+it("offers no conversation grant for a command a shell would reinterpret", async () => {
+  vi.spyOn(api, "approvals").mockResolvedValue([
+    approval({ tool_name: "shell", capability: "shell_execution", target: "rm -rf build && ls" }),
+  ]);
+  render(ApprovalPrompt);
+  expect(await screen.findByRole("button", { name: /Allow once/ })).toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: /in this conversation/ })).toBeNull();
+});

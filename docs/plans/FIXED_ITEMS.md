@@ -1,5 +1,9 @@
 # Fixed items
 
+## FIXED-1540 — A command could not be allowed for a conversation from any screen
+
+**Severity: Medium. Area: Approvals / commands. Status: Fixed 2026-11-25.** `run_command` runs only under a per-conversation command grant, and the grant was reachable through `PUT /api/sessions/{id}/command-grant` alone, so Build asked again for every `python3 -m unittest` (RU-07). The floating approval card now offers **Allow `<command>` in this conversation** when the command reads back as exact plain words — no quoting, shell operators, globbing, variables, redaction or truncation. It records that one argv for eight hours (300-second run limit) and approves the run in hand; nothing else is widened. Evidence: `web/src/lib/commandGrant.test.ts`, `web/src/lib/components/ApprovalPrompt.test.ts` (*allows an exact command for this conversation…*, *offers no conversation grant for a command a shell would reinterpret*).
+
 ## FIXED-1539 — A memory Raiker proposed could only be kept from Memory
 
 **Severity: Medium. Area: Chat / memory. Status: Fixed 2026-11-25.** A memory Raiker proposed from a completed answer waited in Memory › Suggestions, so keeping it meant leaving the conversation (RU-10). A proposal now carries the conversation and turn it came from (`source_session_id`, `source_turn_id` on `GET /api/memory/proposals`), and the answer that proposed it shows *Remember: "…"* with **Keep** and **Not this**. Nothing is stored until Keep, through the same decision route and rules as Suggestions; Not this rejects it; one read serves every answer on screen. Evidence: `web/src/lib/components/TurnMemoryProposals.test.ts`, `tests/test_memory_proposal_source.py`.
@@ -2033,6 +2037,7 @@ file you can open. The two capture sets that remain — `screenshots/pages/` and
 
 | ID | Severity | Area | Status |
 |---|---|---|---|
+| [FIXED-1540](#fixed-1540--a-command-could-not-be-allowed-for-a-conversation-from-any-screen) | Medium | Approvals / commands | Fixed 2026-11-25 |
 | [FIXED-1539](#fixed-1539--a-memory-raiker-proposed-could-only-be-kept-from-memory) | Medium | Chat / memory | Fixed 2026-11-25 |
 | [FIXED-1538](#fixed-1538--first-run-did-not-say-which-models-suit-numbers-and-code) | Low | First run / models | Fixed 2026-11-25 |
 | [FIXED-1537](#fixed-1537--permissions-was-grouped-in-six-headings-an-owner-had-to-learn) | Low | Permissions / UI | Fixed 2026-11-25 |

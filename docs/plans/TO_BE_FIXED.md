@@ -1897,7 +1897,8 @@ Found using Raiker as an owner on Linux with real prompts
 ([regular-use journeys](TESTING.md#regular-use-journeys)); fixed items are
 FIXED-1526 to FIXED-1529.
 
-* **`run_command`'s command grant has no screen.** The grant is
+* ~~**`run_command`'s command grant has no screen.**~~ Closed 2026-11-25
+  ([FIXED-1540](FIXED_ITEMS.md#fixed-1540--a-command-could-not-be-allowed-for-a-conversation-from-any-screen)): the approval card offers it. The grant is
   `PUT /api/sessions/{id}/command-grant` only. Since FIXED-1533 a turn without a
   grant is not offered `run_command`, so Build uses `shell` and asks per command;
   a standing grant for one conversation (*Allow `python3 -m unittest` here*) is

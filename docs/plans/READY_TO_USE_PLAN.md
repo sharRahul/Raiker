@@ -140,7 +140,7 @@ step-up; customising one is said. The posture falls back to *Ask first* when
 the sandbox probe is not fully enforced.
 Show the per-conversation command grant on the command's approval card
 (*Allow `python3 -m unittest` for this conversation*), so `run_command` is
-reachable without the API.
+reachable without the API. *Shipped 2026-11-25 ([FIXED-1540](FIXED_ITEMS.md#fixed-1540--a-command-could-not-be-allowed-for-a-conversation-from-any-screen)); the three postures are open.*
 *Done when* the posture → mode mapping is unit-tested and a Build journey in
 **Work in the sandbox** asks only for `git push`.
 

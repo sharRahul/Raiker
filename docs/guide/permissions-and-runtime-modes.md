@@ -646,6 +646,12 @@ record-only decision reads **Allow once (record only)**. An unanswered approval
 expires after the time limit in **Settings → Security** (30 minutes by default)
 and never runs on its own.
 
+A command whose words are plain (no quoting, `&&`, `|`, `*` or `$`) also offers,
+on the floating card, **Allow `python3 -m unittest` in this conversation**. It
+approves this run and lets that exact command run again in the sandbox for this
+conversation for eight hours without asking; nothing else is widened, and
+`DELETE /api/sessions/{id}/command-grant` (or the grant's expiry) ends it.
+
 - **Approve and execute once.** A proposed file change (`write_file`,
   `edit_file`, `apply_patch`) is carried out, once, when both the
   `approval_execution_relay` capability and the target's own capability

@@ -152,6 +152,10 @@ readiness fact with the page that fixes it: model, command sandbox, encryption
 and backups, embedding model, voice, updates, disk and memory, always-on host.
 *Done when* a fresh machine shows exactly what first run fixes, and nothing
 after.
+*Progress 2026-11-25:* `raiker doctor` prints first run's machine checks with
+their fixes ([FIXED-1552](FIXED_ITEMS.md#fixed-1552--there-was-no-raiker-doctor));
+the command sandbox, backups, embedding model, voice, updates and always-on
+facts, and the Health page, are open.
 
 **RU-09 · Four-step first run. P0, M.** *Account* → *Model* → *This machine*
 (command sandbox, local embedding model, backups, always-on) → *Posture*.

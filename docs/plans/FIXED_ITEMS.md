@@ -1,5 +1,13 @@
 # Fixed items
 
+## FIXED-1553 — Nine more errors said what failed and nothing else
+
+**Severity: Low. Area: UI copy (QUI-G06). Status: Fixed 2026-11-25.** A file Build's explorer could not show or read, a source a citation could not resolve, the file Library failing to load, an import that did not complete, a retried index, a host action, discarding a credentialed worker's quarantined changes and an approval mode that did not save each stopped at what failed. Each now says what stayed as it was and one next step (*The previous mode still applies; choose it again.*). Evidence: `ApprovalModeControl.test.ts` and the component suites.
+
+## FIXED-1552 — There was no raiker doctor
+
+**Severity: Low. Area: Health / CLI (RU-08). Status: Fixed 2026-11-25.** RU-08 asks for one page *and `raiker doctor`* listing each readiness fact with its fix; neither existed, so an owner whose first run stopped had to reopen the wizard to read why. `raiker doctor` now prints first run's own machine checks (`system_readiness`) one per line — `ok`, `warn`, `FAIL` or `info` — with the fix beside each warning or failure, contacts nothing, and exits 1 when a mandatory requirement is not met; `--json` prints the wizard's report and `--workspace` checks another data folder. The Health page and the sandbox, backup, embedding, voice, update and always-on facts are still open. Evidence: `tests/test_cli_doctor.py`; run on the Windows test PC (*Ready: every mandatory requirement is met.*); [Troubleshooting](../guide/troubleshooting.md#check-this-machine-first).
+
 ## FIXED-1551 — The OTLP live case failed wherever no collector was running
 
 **Severity: Low. Area: Testing / live specs. Status: Fixed 2026-11-25.** `round-2026-09-04-priority-live`'s *a collector receives governed events* waited for *event(s) delivered* from `http://127.0.0.1:4318` and failed on any host without an OpenTelemetry collector (RT-1125-06), which says nothing about Raiker. The case now starts a stand-in collector on that port for its own run — or uses a real one already there — and checks the stand-in received the delivery. `b9-repository-code-map-live` now skips, naming `RAIKER_LIVE_WORKSPACE`, instead of failing when the host's workspace folder is not given. Evidence: RT-1125-09 (the OTLP case passed live).
@@ -2081,6 +2089,8 @@ file you can open. The two capture sets that remain — `screenshots/pages/` and
 
 | ID | Severity | Area | Status |
 |---|---|---|---|
+| [FIXED-1553](#fixed-1553--nine-more-errors-said-what-failed-and-nothing-else) | Low | UI copy (QUI-G06) | Fixed 2026-11-25 |
+| [FIXED-1552](#fixed-1552--there-was-no-raiker-doctor) | Low | Health / CLI (RU-08) | Fixed 2026-11-25 |
 | [FIXED-1551](#fixed-1551--the-otlp-live-case-failed-wherever-no-collector-was-running) | Low | Testing / live specs | Fixed 2026-11-25 |
 | [FIXED-1550](#fixed-1550--ten-more-errors-stopped-without-a-next-step) | Low | UI copy (QUI-G06) | Fixed 2026-11-25 |
 | [FIXED-1549](#fixed-1549--a-projects-command-with-no-folder-ran-at-the-workspace-root) | Medium | Build / commands (RU-21) | Fixed 2026-11-25 |

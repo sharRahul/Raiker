@@ -33,8 +33,47 @@ def _use_utf8_output() -> None:
             continue
 
 
+_MARK = {"pass": "ok  ", "warn": "warn", "fail": "FAIL", "info": "info"}
+
+
+def doctor(argv: list[str]) -> int:
+    """RU-08 — ``raiker doctor``: what this machine can do, and what to fix.
+
+    The same local checks the first-run wizard reads (:func:`system_readiness`),
+    printed one per line with the fix beside anything that is not passing. It
+    contacts nothing and changes nothing; it exits 1 when a mandatory
+    requirement is not met, so a script can stop on it.
+    """
+    parser = argparse.ArgumentParser(
+        prog="raiker doctor", description="Check this machine and say what to fix."
+    )
+    parser.add_argument("--workspace", default=".", help="Raiker's data folder to check.")
+    parser.add_argument("--json", action="store_true", help="Print the checks as JSON.")
+    args = parser.parse_args(argv)
+    from raiker.app.system_check import system_readiness
+
+    report = system_readiness(Path(args.workspace).resolve())
+    if args.json:
+        import json
+
+        print(json.dumps(report, indent=2, default=str))
+        return 0 if report["ready"] else 1
+    for check in report["checks"]:
+        print(f"[{_MARK.get(check['state'], check['state'])}] {check['label']}: {check['detail']}")
+        if check.get("remedy") and check["state"] in {"warn", "fail"}:
+            print(f"       Fix: {check['remedy']}")
+    if report["ready"]:
+        print("Ready: every mandatory requirement is met.")
+        return 0
+    print("Not ready: fix the lines marked FAIL, then run raiker doctor again.")
+    return 1
+
+
 def main(argv: list[str] | None = None) -> int:
     _use_utf8_output()
+    arguments = list(sys.argv[1:] if argv is None else argv)
+    if arguments[:1] == ["doctor"]:
+        return doctor(arguments[1:])
     parser = argparse.ArgumentParser(prog="raiker", description="Open the Raiker terminal client.")
     parser.add_argument(
         "--workspace", default=".", help="Workspace root for local Phase 1 runtime state."
@@ -44,7 +83,7 @@ def main(argv: list[str] | None = None) -> int:
         default=None,
         help="Submit one prompt through the terminal client path and exit.",
     )
-    args = parser.parse_args(argv)
+    args = parser.parse_args(arguments)
     return run_terminal_client(workspace_root=Path(args.workspace), prompt=args.prompt)
 
 

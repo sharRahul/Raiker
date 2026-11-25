@@ -221,7 +221,10 @@ and are compatible with it:
 
 # To be fixed
 
-## Live specs that predate the Permissions redesign
+## ~~Live specs that predate the Permissions redesign~~
+
+**Closed 2026-11-25.** No live spec asserts the old layout (the 2026-11-17 entry
+below); RT-1125-05 re-ran the last two that moved, 10 of 10. Kept for the record.
 
 Found on 2026-11-02 while running the real-model journeys (BETA_RELEASE_PLAN,
 run record). About twenty live specs, including `model-connection-anthropic-live`
@@ -1975,4 +1978,13 @@ FIXED-1526 to FIXED-1529.
   *a collector receives governed events* waits for *event(s) delivered* from
   `http://127.0.0.1:4318`; with nothing listening there it fails. Run it with a
   local OpenTelemetry collector.
-
+* **Chat search's threshold is the embedding model's, not Raiker's.** Measured
+  2026-11-25 with the `nomic-embed-text-v2-moe` Ollama model on the Windows test
+  PC: *Japan holiday* scores 0.38 against *Kyoto flights…* and 0.51 against a
+  Tokyo trip, unrelated chats 0.05–0.16 (query prefix on both sides; the
+  document prefix lowers every score by about 0.1). Conversation search's fixed
+  0.6 (`raiker/context/meaning_search.py`) therefore finds nothing with this
+  model, while the built-in `nomic-embed-text` v1.5 scored the Kyoto chat 0.62.
+  The Library's relative rule (FIXED-1525) has the right shape but its 0.52
+  floor is v1.5's too. A per-model floor, or a floor read from the score spread,
+  is needed before either search moves; not changed this round.

@@ -74,7 +74,7 @@
       open = false;
     } catch {
       mode = previous;
-      error = "Approval mode was not saved.";
+      error = "Approval mode was not saved. The previous mode still applies; choose it again.";
     } finally {
       busy = false;
     }

@@ -158,7 +158,7 @@
       notice =
         error instanceof ApiError && error.reasonCode === "not_registered"
           ? "Raiker is not registered to start in the background, so nothing would start it again. Register it first, or quit and start it yourself."
-          : "That action could not be carried out.";
+          : "That action could not be carried out. Raiker is still running as it was; try again.";
     } finally {
       busy = false;
     }

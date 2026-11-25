@@ -118,7 +118,7 @@
     not_authorized: "This account cannot read the source this came from.",
   };
   const sourceNote = $derived(
-    source === null ? "" : (SOURCE_STATUS_TEXT[source.status] ?? "This source could not be resolved."),
+    source === null ? "" : (SOURCE_STATUS_TEXT[source.status] ?? "This source could not be resolved. The answer is unchanged; open the source from its conversation instead."),
   );
 
   // How the passage on screen was located. Each phrasing states exactly what

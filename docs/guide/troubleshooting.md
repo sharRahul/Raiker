@@ -4,6 +4,16 @@ Raiker refuses with a **named reason code** rather than failing vaguely. Each
 one has a specific fix. Since the Models sign-in dialog now prints the fix
 alongside the code, this table is the complete reference.
 
+## Check this machine first
+
+`raiker doctor` prints the same local checks first run reads — operating
+system, architecture, memory, processor, graphics, free storage, network route,
+credential protection, local model runtimes and this installation — one per
+line, with the fix beside anything marked `warn` or `FAIL`. It contacts nothing
+and changes nothing, and exits 1 when a mandatory requirement is not met.
+`raiker doctor --json` prints the full report; `--workspace` checks another
+data folder.
+
 ## Connecting a model
 
 Three codes that used to block a first-time setup no longer occur when you

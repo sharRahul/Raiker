@@ -93,7 +93,7 @@
       files = list.files;
       error = null;
     } catch {
-      error = "The library could not be read.";
+      error = "The library could not be read. Your files are unchanged; reload the page to read it again.";
     } finally {
       loading = false;
     }
@@ -150,7 +150,7 @@
       await load();
       onLibraryChange?.();
     } catch {
-      error = "The import could not be completed.";
+      error = "The import could not be completed. Check the library for a partial import, then choose the file again.";
     } finally {
       importing = false;
     }
@@ -176,7 +176,7 @@
       await load();
       onLibraryChange?.();
     } catch {
-      error = "Indexing could not be retried.";
+      error = "Indexing could not be retried. The file is still in the library; choose Retry again.";
     } finally {
       busyFileId = null;
     }

@@ -134,14 +134,14 @@
     try {
       const view = await api.readCodeRepoFile(repoId, entry.relative_path, sessionId);
       if (!view.readable) {
-        fileNotice = NOTICES[view.reason_code] ?? "This file could not be shown.";
+        fileNotice = NOTICES[view.reason_code] ?? "This file could not be shown. It is unchanged; open it in your editor instead.";
         return;
       }
       fileText = view.text;
       fileTruncated = view.truncated;
     } catch (e) {
       const code = e instanceof ApiError ? String(e.reasonCode ?? "") : "";
-      fileNotice = NOTICES[code] ?? "This file could not be read.";
+      fileNotice = NOTICES[code] ?? "This file could not be read. It is unchanged; choose it again, or open it in your editor.";
     } finally {
       fileLoading = false;
     }

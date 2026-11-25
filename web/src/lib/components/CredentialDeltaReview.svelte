@@ -23,7 +23,7 @@
       await api.discardCredentialDelta(runId, crypto.randomUUID());
       delta = null;
       message = "Credentialed worker changes discarded.";
-    } catch { message = "The quarantined changes could not be discarded."; }
+    } catch { message = "The quarantined changes could not be discarded. They are still held apart from your files; choose Discard again."; }
     finally { busy = false; }
   }
 

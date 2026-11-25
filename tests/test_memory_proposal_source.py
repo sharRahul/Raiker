@@ -13,8 +13,10 @@ def test_a_proposal_names_its_conversation_and_turn() -> None:
             "decision": "deferred",
             "source_session_id": "sess_1",
             "source_turn_id": "turn_1",
+            "source_role": "assistant",
         }
     )
+    assert wire["source_role"] == "assistant"
     assert wire["source_session_id"] == "sess_1"
     assert wire["source_turn_id"] == "turn_1"
 

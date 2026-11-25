@@ -46,7 +46,14 @@
       const all = await readProposals();
       if (!live) return;
       proposals = all.filter(
-        (item) => item.source_session_id === sessionId && item.source_turn_id === turnId && item.decision === "deferred",
+        (item) =>
+          item.source_session_id === sessionId &&
+          item.source_turn_id === turnId &&
+          item.decision === "deferred" &&
+          // Only the owner's own words are offered here. A sentence the model
+          // wrote may be invented; it waits in Memory › Suggestions, marked as
+          // Raiker's, for a deliberate review.
+          item.source_role !== "assistant",
       );
     };
     void look();

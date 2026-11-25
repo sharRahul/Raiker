@@ -22483,6 +22483,10 @@
             "title": "Source Event Id",
             "type": "string"
           },
+          "source_role": {
+            "title": "Source Role",
+            "type": "string"
+          },
           "source_session_id": {
             "title": "Source Session Id",
             "type": "string"
@@ -22508,7 +22512,8 @@
           "created_at",
           "similar_memory",
           "source_session_id",
-          "source_turn_id"
+          "source_turn_id",
+          "source_role"
         ],
         "title": "MemoryProposal",
         "type": "object"

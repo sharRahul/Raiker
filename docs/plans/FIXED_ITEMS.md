@@ -1,5 +1,9 @@
 # Fixed items
 
+## FIXED-1548 — A sentence the model invented was offered to keep as a memory
+
+**Severity: Medium. Area: Chat / memory. Status: Fixed 2026-11-25.** Found live on 2026-11-25 (RT-1125-08): after *Rahul's dentist is Dr. Okafor*, Gemma 3 1B answered *Dr. Okafor is known for their meticulous attention to detail.* — invented — and the new Keep / Not this strip (FIXED-1539) offered that sentence beside the owner's own, one click from becoming a memory. The observer files both roles with provenance by design, for review in Memory › Suggestions. Proposals now carry `source_role`, and the strip under an answer offers only the owner's own words; the model's sentences wait in Suggestions, marked as Raiker's. Evidence: `web/src/lib/components/TurnMemoryProposals.test.ts` (*does not offer a sentence the model wrote*), `tests/test_memory_proposal_source.py`.
+
 ## FIXED-1547 — An Ollama model spilling to the CPU was not said
 
 **Severity: Medium. Area: Models / Ollama. Status: Fixed 2026-11-25.** Found in this round's live run: Ollama 0.40 loaded `qwen3.5:9b` at 262,144 tokens of context, 15 GB on a 16 GB card, 8 % on the CPU, and a one-line answer took minutes, while Models' server check said nothing. The check now reads Ollama's `/api/ps` (`size` against `size_vram`) for the loaded model, loopback only, and when more than 5 % of it is outside the GPU advises: *N % of this model is running on the CPU, so answers are slow. Ollama loaded it with more context than the graphics card holds (… tokens); set OLLAMA_CONTEXT_LENGTH lower (for example 32768) and restart Ollama.* Raiker still cannot request a smaller context through Ollama's OpenAI-compatible route; that stays open. Evidence: `tests/test_server_check.py::test_an_ollama_model_spilling_to_the_cpu_is_said_with_its_fix`.
@@ -2065,6 +2069,7 @@ file you can open. The two capture sets that remain — `screenshots/pages/` and
 
 | ID | Severity | Area | Status |
 |---|---|---|---|
+| [FIXED-1548](#fixed-1548--a-sentence-the-model-invented-was-offered-to-keep-as-a-memory) | Medium | Chat / memory | Fixed 2026-11-25 |
 | [FIXED-1547](#fixed-1547--an-ollama-model-spilling-to-the-cpu-was-not-said) | Medium | Models / Ollama | Fixed 2026-11-25 |
 | [FIXED-1546](#fixed-1546--sign-in-recovery-and-command-failures-gave-no-next-step) | Low | UI copy (QUI-G06) | Fixed 2026-11-25 |
 | [FIXED-1545](#fixed-1545--an-mcp-program-in-the-home-folder-read-as-missing-with-no-reason) | Low | MCP / copy | Fixed 2026-11-25 |

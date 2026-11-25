@@ -40,6 +40,8 @@ class MemoryProposal(TypedDict):
     #: or an import.
     source_session_id: str
     source_turn_id: str
+    #: ``user`` or ``assistant`` for a proposal from a turn; empty otherwise.
+    source_role: str
 
 
 class MemoryRelationshipProposal(TypedDict):
@@ -381,6 +383,7 @@ def memory_proposal(row: dict[str, Any]) -> MemoryProposal:
         "similar_memory": cast(SimilarMemory | None, row.get("similar_memory")),
         "source_session_id": str(row.get("source_session_id") or ""),
         "source_turn_id": str(row.get("source_turn_id") or ""),
+        "source_role": str(row.get("source_role") or ""),
     }
 
 

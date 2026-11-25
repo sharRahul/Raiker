@@ -16,6 +16,7 @@ const proposal = (over: Record<string, unknown> = {}) => ({
   similar_memory: null,
   source_session_id: "sess_1",
   source_turn_id: "turn_1",
+  source_role: "user",
   ...over,
 });
 
@@ -47,6 +48,13 @@ describe("TurnMemoryProposals (RU-10)", () => {
     expect(await screen.findByText(/Kept\./)).toBeInTheDocument();
     const decision = calls.find((call) => call.url.endsWith("/memcand_1/decision"));
     expect(decision?.body).toMatchObject({ decision: "approved", expected_decision: "deferred" });
+  });
+
+  it("does not offer a sentence the model wrote", async () => {
+    stub([proposal({ candidate_id: "memcand_9", source_role: "assistant", text: "Dr. Okafor is meticulous" })]);
+    render(TurnMemoryProposals, { sessionId: "sess_1", turnId: "turn_1" });
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(screen.queryByText(/Dr. Okafor is meticulous/)).toBeNull();
   });
 
   it("Not this rejects it and the offer goes away", async () => {

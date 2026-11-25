@@ -4390,6 +4390,7 @@ export type MemoryProposal = {
   similar_memory: SimilarMemory | null;
   source_session_id: string;
   source_turn_id: string;
+  source_role: string;
 };
 
 /** What a purge removes, and the id the owner must send back to confirm it. */

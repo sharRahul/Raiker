@@ -90,7 +90,7 @@ still set.
 | **Turn on** is missing entirely | Deferred capability — no governed executor exists | Nothing to do. The deferred set is named in [Capabilities with no enable path](permissions-and-runtime-modes.md#capabilities-with-no-enable-path) |
 | `Confirm change` stays greyed out | Reason, confirmation token, or threat-model tick missing | The confirmation token is **any phrase you type** — it records intent, it is not a credential |
 | `disabled_by_capability_gate` from an API call | Gate off for your account | Permissions → find the capability → Turn on |
-| Windows: `native_sandbox_account_profile_isolation_unavailable` | Commands are set to the restricted-account sandbox, which stays off until its isolation gaps are closed | Choose **WSL2** in Settings › Advanced › Command sandbox (it sets up its own distribution). MCP servers and hooks on Windows wait for the account sandbox |
+| Windows: `native_sandbox_account_profile_isolation_unavailable` | Commands are set to the restricted-account sandbox, which stays off until its isolation gaps are closed | Choose **WSL2** in Settings › Advanced › Command sandbox (it sets up its own distribution). Commands, MCP servers and hooks then all run there, on the distribution's own `python3` and `node` |
 | Windows: `native_sandbox_wsl_runner_missing` (source checkout) | The Linux runner that WSL2 uses is not in `raiker/native/wsl-x86_64/` | In a WSL distribution with Rust's `x86_64-unknown-linux-musl` target: `cargo build --release -p raiker-command-runner --target x86_64-unknown-linux-musl` in `native/`, then on Windows `python scripts/build_native_runner.py --wsl --from <that file>` |
 
 ## Chat and turns

@@ -5,9 +5,13 @@ Windows toolchains. WSL2 runs Linux toolchains under the same Bubblewrap and
 seccomp boundary Linux uses, inside Raiker's own distribution. The owner picks
 one in Settings › Runtime; every later command reads it at launch.
 
-Only *commands* follow the choice. Command hooks, MCP servers and plugin code
-run Windows interpreters, so they stay on the restricted account whichever is
-chosen. On other platforms the setting is stored but has no effect.
+Commands *and* programs follow the choice. With WSL2 chosen, command hooks,
+MCP servers and plugin code run the distribution's own interpreter (`python3`,
+`node`, installed by its setup) inside the same boundary; with the account
+chosen they run Windows interpreters there. (Until 2026-11-25 programs stayed
+on the account whatever was chosen, and the account is off until its isolation
+gaps close, so a Windows owner had an enforced boundary no program could use.)
+On other platforms the setting is stored but has no effect.
 """
 
 from __future__ import annotations

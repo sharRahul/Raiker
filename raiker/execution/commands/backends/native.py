@@ -342,12 +342,15 @@ class NativeSandboxDriver:
     def probe(self, *, for_programs: bool = False) -> NativeSandboxProof:
         """Measure the boundary commands run in.
 
-        With WSL2 chosen, commands run in Raiker's distribution, so that is
-        what is measured. Hooks, MCP servers and plugin code run Windows
-        interpreters and stay on the account: ``for_programs`` measures that.
+        With WSL2 chosen, commands *and* programs (hooks, MCP servers,
+        plugin code) run in Raiker's distribution, so that is what is measured.
+        Programs used to stay on the restricted account, which the runner keeps
+        off until its isolation gaps close; that left a Windows owner with a
+        fully enforced boundary that no program was allowed to use. A program
+        in WSL2 runs the distribution's own interpreter (``python3``, ``node``).
         """
         checked_at = utc_now()
-        boundary_flag = ["--boundary", "wsl"] if self.uses_wsl() and not for_programs else []
+        boundary_flag = ["--boundary", "wsl"] if self.uses_wsl() else []
         binary, reason = self.locate()
         if binary is None:
             return NativeSandboxProof(False, reason, "none", checked_at)
@@ -1029,7 +1032,7 @@ class ScratchRun:
     """
 
     def __init__(self, root: Path, binary: Path, folder: Path, label: str, memory_bytes: int,
-                 timeout_seconds: float) -> None:
+                 timeout_seconds: float, wsl_pin: str | None = None) -> None:
         self.folder = folder
         self._root = root
         self._binary = binary
@@ -1037,6 +1040,9 @@ class ScratchRun:
         self._memory_bytes = memory_bytes
         self._deadline = max(1, int(timeout_seconds) + 5)
         self._policies: list[Path] = []
+        #: Set when the program runs in Raiker's WSL2 distribution: the runner
+        #: hands the run to the Linux runner whose digest this pins.
+        self.wsl_pin = wsl_pin
 
     def command(
         self,
@@ -1067,10 +1073,12 @@ class ScratchRun:
             "max_processes": max_processes,
             "max_memory_bytes": self._memory_bytes,
             "toolchain_paths": [
-                *(toolchain_mounts(argv[0], self.folder) if argv else []),
+                *(toolchain_mounts(argv[0], self.folder) if argv and self.wsl_pin is None else []),
                 *(str(path) for path in read_only),
             ],
         }
+        if self.wsl_pin is not None:
+            document["wsl_runner_sha256"] = self.wsl_pin
         policies = internal_io_path(self._root / ".raiker" / "command-policies")
         policies.mkdir(parents=True, exist_ok=True)
         policy_path = policies / f"{self.folder.name}-{len(self._policies)}.json"
@@ -1110,12 +1118,20 @@ def scratch_run(
     binary, reason = driver.locate()
     if binary is None:
         raise CommandBackendError(reason or "native_sandbox_artifact_missing")
-    # Programs run Windows interpreters, so never in the WSL distribution.
-    base = driver.account_base() or TaskWorkspaceRegistry.for_workspace(root).base
+    # With WSL2 chosen a program runs in the distribution, on its interpreter;
+    # otherwise on the account (Windows, macOS) or beside the workspace.
+    wsl_pin: str | None = None
+    if driver.uses_wsl():
+        wsl_pin, reason = driver.wsl_execution_pin()
+        if wsl_pin is None:
+            raise CommandBackendError(reason or "native_sandbox_wsl_unconfigured")
+        base = driver.wsl_base() or TaskWorkspaceRegistry.for_workspace(root).base
+    else:
+        base = driver.account_base() or TaskWorkspaceRegistry.for_workspace(root).base
     base.mkdir(parents=True, exist_ok=True)
     folder = base / f"{label}_{secrets.token_hex(8)}"
     folder.mkdir()
-    run = ScratchRun(root, binary, folder, label, memory_bytes, timeout_seconds)
+    run = ScratchRun(root, binary, folder, label, memory_bytes, timeout_seconds, wsl_pin)
     try:
         yield run
     finally:

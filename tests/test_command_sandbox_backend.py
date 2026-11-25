@@ -1,8 +1,9 @@
 """Windows: the owner chooses the account or WSL2 for sandboxed commands.
 
-Only commands follow the choice; hooks, MCP servers and plugins run Windows
-interpreters and stay on the account. Choosing WSL2 before it is set up fails
-closed: the probe measures WSL2 and commands refuse.
+Commands and programs (hooks, MCP servers, plugins) follow the choice: with
+WSL2 chosen a program runs the distribution's own interpreter, because the
+restricted account stays off until its isolation gaps close. Choosing WSL2
+before it is set up fails closed: the probe measures WSL2 and both refuse.
 """
 
 from __future__ import annotations
@@ -75,7 +76,7 @@ def _driver(
     )
 
 
-def test_with_wsl_chosen_commands_measure_wsl_and_programs_stay_on_the_account(
+def test_with_wsl_chosen_commands_and_programs_both_measure_wsl(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     seen: list[list[str]] = []
@@ -88,12 +89,45 @@ def test_with_wsl_chosen_commands_measure_wsl_and_programs_stay_on_the_account(
 
     seen.clear()
     programs = driver.probe(for_programs=True)
-    assert programs.boundary == "restricted_account"
-    assert "--boundary" not in next(a for a in seen if "--probe" in a)
+    assert programs.boundary == "wsl_bubblewrap" and programs.available
+    assert next(a for a in seen if "--probe" in a)[-2:] == ["--boundary", "wsl"]
 
     assert driver.copy_base() == tmp_path / "wsl-copies"
     assert driver.account_base() == tmp_path / "account-copies"
     native_backend._ACCOUNT_BASE_CACHE.clear()
+
+
+def test_with_the_account_chosen_programs_stay_on_the_account(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    seen: list[list[str]] = []
+    driver = _driver(tmp_path, monkeypatch, seen, ACCOUNT_REPORT)
+    programs = driver.probe(for_programs=True)
+    assert programs.boundary == "restricted_account"
+    assert "--boundary" not in next(a for a in seen if "--probe" in a)
+    native_backend._ACCOUNT_BASE_CACHE.clear()
+
+
+def test_a_wsl_program_run_pins_the_linux_runner_and_mounts_nothing(tmp_path: Path) -> None:
+    run = native_backend.ScratchRun(
+        tmp_path, tmp_path / "runner.exe", tmp_path / "scratch", "mcp", 1 << 20, 10, wsl_pin="a" * 64
+    )
+    (tmp_path / "scratch").mkdir()
+    argv = run.command(["python3", "server.py"])
+    document = json.loads(Path(argv[2]).read_text(encoding="utf-8"))
+    assert document["wsl_runner_sha256"] == "a" * 64
+    assert document["toolchain_paths"] == []
+    assert argv[-2:] == ["python3", "server.py"]
+
+
+@pytest.mark.parametrize(
+    ("windows", "linux"),
+    [("C:\\Python313\\python.exe", "python3"), ("python", "python3"), ("node.exe", "node"), ("py", "python3")],
+)
+def test_a_windows_interpreter_is_named_as_the_distribution_names_it(windows: str, linux: str) -> None:
+    from raiker.execution.commands.sandboxed_program import linux_interpreter
+
+    assert linux_interpreter(windows) == linux
 
 
 def test_wsl_requires_seccomp_and_no_windows_interop(

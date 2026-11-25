@@ -344,6 +344,15 @@ decision, not a permission one: a deferred tool is refused by nothing and reache
 in one call. The **Context** panel in either composer says how many are sent and
 how many are on request.
 
+### On Windows, with WSL2 chosen
+
+With **WSL2** chosen as the command sandbox (Settings › Advanced), MCP servers
+and hooks run in Raiker's own WSL2 distribution under the same boundary as
+commands, on the distribution's `python3` and `node` (setup installs both; the
+sandbox status lists them). A server written for Windows is started by name:
+`C:\Python313\python.exe server.py` runs as `python3 server.py`. A server
+that needs a Windows-only program waits for the account sandbox.
+
 ### A server whose Python or Node is in your home folder
 
 The sandbox never sees your home folder, which holds keys, tokens and mail. An

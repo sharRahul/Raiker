@@ -1980,14 +1980,16 @@ FIXED-1526 to FIXED-1529.
   account boundary. With the runner built in WSL Ubuntu
   (`cargo build --release -p raiker-command-runner --target x86_64-unknown-linux-musl`,
   installed with `scripts/build_native_runner.py --wsl --from <file>`) and WSL2
-  chosen, Build's commands run sandboxed (RT-1125-14). MCP stdio servers and
-  hooks run Windows interpreters, which only the restricted-account boundary
-  can hold; the runner refuses that boundary
+  chosen, Build's commands run sandboxed (RT-1125-14). *Programs fixed the same
+  day* ([FIXED-1560](FIXED_ITEMS.md#fixed-1560--with-wsl2-chosen-mcp-servers-and-hooks-still-had-no-boundary-on-windows)):
+  with WSL2 chosen, MCP servers and hooks run the distribution's own Python and
+  Node in the same boundary (RT-1125-15). Still open: the restricted-account
+  boundary itself, which the runner refuses
   (`native_sandbox_account_profile_isolation_unavailable`) until the four gaps
   in the [release blocker](#release-blocker-native-sandbox-migration-incomplete)
-  are closed — per-account profile reset, explicit descendant ACLs, explicit
-  allows below denied drive roots, and the loopback-port approximation. That is
-  security engineering in the Rust runner of its own (RU-03), not a setting.
+  close — per-account profile reset, explicit descendant ACLs, explicit allows
+  below denied drive roots, and the loopback-port approximation (RU-03). Until
+  then a Windows owner who needs Windows-only toolchains has no boundary.
 * **Ollama Cloud answered HTTP 402.** `gpt-oss:20b-cloud`, connected through
   **Add model › On this computer › Ollama**, refused the first turn with
   `provider_quota_exhausted:http_402`; Raiker said the account has no credit or

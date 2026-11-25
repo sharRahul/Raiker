@@ -1,5 +1,9 @@
 # Fixed items
 
+## FIXED-1560 — With WSL2 chosen, MCP servers and hooks still had no boundary on Windows
+
+**Severity: High. Area: Sandbox / Windows. Status: Fixed 2026-11-25.** On Windows, commands followed the owner's boundary choice but hooks, MCP servers and plugin code always used the restricted account, on the grounds that they run Windows interpreters. The runner refuses that account until its four isolation gaps close, so a Windows owner with a fully enforced WSL2 boundary (every observation enforced on the test PC, RT-1125-14) could run no program at all: the MCP Test read *native_sandbox_required*. The design was wrong, not the setting: an enforced boundary was left unused. With WSL2 chosen, programs now run in Raiker's distribution like commands — the probe measures WSL2 for them, the scratch folder is in the distribution's copy base, the policy pins the Linux runner's digest so the Windows runner hands the run to it, and the interpreter is named as the distribution names it (`C:\Python313\python.exe` → `python3`, `node.exe` → `node`). WSL setup installs `python3` and `nodejs` beside Bubblewrap, best-effort, and `--wsl-status` reports `program_interpreters`. With the account chosen nothing changes. Evidence: `tests/test_command_sandbox_backend.py` (*commands and programs both measure WSL*, *a WSL program run pins the Linux runner and mounts nothing*, the interpreter names), RT-1125-15.
+
 ## FIXED-1559 — A new project had no folder outside Raiker's data
 
 **Severity: Medium. Area: Projects / Build (RU-21). Status: Fixed 2026-11-25.** **Create project** made `.raiker/projects/<slug>` inside Raiker's own data folder, which the owner could not easily open and Apply treated as protected territory (RU-J4). Of the two options — keep managed folders and migrate later, or give each project a real folder — the second was taken without a migration: **Create project** now makes `~/Raiker Projects/<name>` (or under `RAIKER_PROJECTS_HOME`), named by the server from the project's name, never adopting an existing folder (`Pricing 2` …), and attaches it as the project's writable root through the same governed attach path as **Attach existing folder**. Projects made before keep their managed folder and work unchanged, so nothing has to move. The API keeps its old default; `create_folder: true` asks for the new one. Evidence: `tests/test_project_folder.py`, `web/src/lib/views/ProjectsView.test.ts`.
@@ -2113,6 +2117,7 @@ file you can open. The two capture sets that remain — `screenshots/pages/` and
 
 | ID | Severity | Area | Status |
 |---|---|---|---|
+| [FIXED-1560](#fixed-1560--with-wsl2-chosen-mcp-servers-and-hooks-still-had-no-boundary-on-windows) | High | Sandbox / Windows | Fixed 2026-11-25 |
 | [FIXED-1559](#fixed-1559--a-new-project-had-no-folder-outside-raikers-data) | Medium | Projects / Build (RU-21) | Fixed 2026-11-25 |
 | [FIXED-1558](#fixed-1558--build-left-declared-checks-to-the-model) | Medium | Build / verification (RU-22) | Fixed 2026-11-25 |
 | [FIXED-1557](#fixed-1557--an-interpreter-a-toolchain-manager-installed-could-not-run-in-the-sandbox) | Medium | MCP / sandbox | Fixed 2026-11-25 |

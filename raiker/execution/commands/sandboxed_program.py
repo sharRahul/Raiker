@@ -132,6 +132,22 @@ def sandbox_interpreter(name: str, search_path: str, workspace: Path) -> Path:
     raise FileNotFoundError(name)
 
 
+#: Windows interpreter names and what the distribution calls them.
+_LINUX_NAMES = {"python": "python3", "py": "python3", "pip": "pip3"}
+
+
+def linux_interpreter(name: str) -> str:
+    """The distribution's interpreter for *name* (`C:\\Python313\\python.exe` → `python3`).
+
+    Only the program's name crosses into WSL2: a Windows path means nothing
+    there, and the distribution's own install is the one its boundary holds.
+    """
+    base = name.replace("\\", "/").rsplit("/", 1)[-1]
+    if base.lower().endswith(".exe"):
+        base = base[:-4]
+    return _LINUX_NAMES.get(base.lower(), base)
+
+
 def _in_user_toolchain(candidate: Path, found: Path, workspace: Path) -> bool:
     """Both names inside one reachable install of a toolchain manager's store."""
     from raiker.execution.commands.user_toolchains import reachable_prefix
@@ -196,9 +212,13 @@ def run_bounded(
     from raiker.execution.commands.backends.native import scratch_run
 
     root = Path(workspace).resolve()
-    interpreter = sandbox_interpreter(command[0], env.get("PATH", ""), root)
     with scratch_run(root, label, timeout_seconds=timeout) as run:
-        interpreter = _reachable_interpreter(interpreter, run.folder.parent)
+        if run.wsl_pin is not None:
+            # Raiker's WSL2 distribution: its own interpreter, by name.
+            interpreter: Path | str = linux_interpreter(command[0])
+        else:
+            found = sandbox_interpreter(command[0], env.get("PATH", ""), root)
+            interpreter = _reachable_interpreter(found, run.folder.parent)
         folder, args = stage_program_folder(root, command[1:], run.folder / "program")
         argv = run.command([str(interpreter), *args], cwd=folder)
         return _drain_bounded(

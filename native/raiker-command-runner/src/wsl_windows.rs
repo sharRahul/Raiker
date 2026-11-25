@@ -111,6 +111,10 @@ pub fn status() -> Value {
         )
         .is_ok();
     let bubblewrap = present && in_distro("root", "test -x /usr/bin/bwrap", None).is_ok();
+    // Hooks, MCP servers and plugin code run the distribution's own
+    // interpreters; setup installs them, and their absence is said, not fatal.
+    let python3 = present && in_distro("root", "test -x /usr/bin/python3", None).is_ok();
+    let node = present && in_distro("root", "test -x /usr/bin/node", None).is_ok();
     let runner_sha256 = if runner {
         in_distro("root", &format!("/usr/bin/sha256sum {LINUX_RUNNER}"), None)
             .ok()
@@ -132,6 +136,7 @@ pub fn status() -> Value {
         "runner_installed": runner,
         "runner_sha256": runner_sha256,
         "bubblewrap_present": bubblewrap,
+        "program_interpreters": { "python3": python3, "node": node },
     })
 }
 
@@ -173,6 +178,7 @@ pub fn setup(rootfs: Option<&Path>, linux_runner: &Path) -> Result<Value, String
          chmod 0700 {LINUX_COPIES} {LINUX_POLICIES}\n\
          install -o root -g root -m 0644 /dev/null /etc/fstab\n\
          command -v bwrap >/dev/null 2>&1 || (apt-get update -qq && apt-get install -y -qq bubblewrap) >/dev/null 2>&1 || true\n\
+         (command -v python3 && command -v node) >/dev/null 2>&1 || (apt-get update -qq && DEBIAN_FRONTEND=noninteractive apt-get install -y -qq python3 nodejs) >/dev/null 2>&1 || true\n\
          cat > /etc/wsl.conf <<'RAIKER_WSL_CONF'\n{}RAIKER_WSL_CONF\n",
         wsl_paths::wsl_conf()
     );

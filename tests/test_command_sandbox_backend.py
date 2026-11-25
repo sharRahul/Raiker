@@ -111,12 +111,14 @@ def test_an_unset_choice_uses_wsl_when_it_is_set_up(
     is always kept."""
     from raiker.execution.commands import sandbox_backend
 
-    monkeypatch.setattr(sandbox_backend.os, "name", "nt")
     seen: list[list[str]] = []
     driver = _driver(tmp_path, monkeypatch, seen, ACCOUNT_REPORT)
     assert sandbox_backend.stored_windows_backend(driver.workspace_root) is None
+    assert driver.uses_wsl() is True
+    monkeypatch.setattr(sandbox_backend, "_wsl_configured", lambda _root: True)
     assert sandbox_backend.load_windows_backend(driver.workspace_root) == "wsl"
     save_windows_backend(driver.workspace_root, "account")
+    assert driver.uses_wsl() is False
     assert sandbox_backend.load_windows_backend(driver.workspace_root) == "account"
     native_backend._ACCOUNT_BASE_CACHE.clear()
 

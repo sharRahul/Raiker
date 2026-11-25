@@ -57,11 +57,11 @@ def load_windows_backend(workspace_root: str | Path) -> WindowsBackend:
 
 
 def _wsl_configured(workspace_root: str | Path) -> bool:
-    if os.name != "nt":
-        return False
     try:
-        from raiker.execution.commands.backends.native import NativeSandboxDriver
+        from raiker.execution.commands.backends.native import NativeSandboxDriver, _on_windows
 
+        if not _on_windows():
+            return False
         return NativeSandboxDriver(Path(workspace_root)).wsl_base() is not None
     except Exception:  # noqa: BLE001 — an unreadable status keeps the default
         return False

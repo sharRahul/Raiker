@@ -1,5 +1,9 @@
 # Fixed items
 
+## FIXED-1538 — First run did not say which models suit numbers and code
+
+**Severity: Low. Area: First run / models. Status: Fixed 2026-11-25.** In regular use Haiku 4.5 ranked a budget category by percentage when asked "in pounds" and once summed £100 + £40 + £10 as £200. That is the model, not the product, but first run let the owner pick a default with nothing said about fit. The Model step now says, beside the providers, *For sums, tables and code, choose a larger model. Small, fast models answer quickly but can misread a table or a total; you can change the default any time in Models.* Evidence: `web/src/lib/views/ModelSetupView.test.ts` (*opens the providers when the recommendation asks for a model*).
+
 ## FIXED-1537 — Permissions was grouped in six headings an owner had to learn
 
 **Severity: Low. Area: Permissions / UI. Status: Fixed 2026-11-25.** Permissions grouped its rows under *Files and code*, *Web and research*, *Messages and services*, *Memory*, *Schedules* and *Advanced (System and runtimes)*, so a command permission, a model provider, a plugin and a push were all "System". It now leads with RU-06's ten families — Files, Commands, Web, Messages and calendar, Memory, Git and GitHub, Models, Money, Devices and home, Other agents and plugins — each with one line on what it allows above its list; **Advanced** stays last and holds the account's approval mode and what the page does not decide. Scheduled routines are filed under Commands, reminders under Messages and calendar. Enforcement and the registry are unchanged; only the headings moved. Evidence: `web/src/lib/capabilityModel.test.ts` (*the ten permission families (RU-06)*: every one of the 67 backend capabilities lands in exactly one family with a summary), `web/src/lib/views/CapabilitiesView.test.ts`; five live specs renamed to the new headings.
@@ -2025,6 +2029,7 @@ file you can open. The two capture sets that remain — `screenshots/pages/` and
 
 | ID | Severity | Area | Status |
 |---|---|---|---|
+| [FIXED-1538](#fixed-1538--first-run-did-not-say-which-models-suit-numbers-and-code) | Low | First run / models | Fixed 2026-11-25 |
 | [FIXED-1537](#fixed-1537--permissions-was-grouped-in-six-headings-an-owner-had-to-learn) | Low | Permissions / UI | Fixed 2026-11-25 |
 | [FIXED-1536](#fixed-1536--a-projects-agentsmd-or-claudemd-was-ignored) | Medium | Build / instructions | Fixed 2026-11-25 |
 | [FIXED-1535](#fixed-1535--a-question-was-proposed-as-a-project-memory) | Low | Memory / observer | Fixed 2026-11-24 |

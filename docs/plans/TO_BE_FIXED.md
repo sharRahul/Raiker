@@ -1902,7 +1902,8 @@ FIXED-1526 to FIXED-1529.
   grant is not offered `run_command`, so Build uses `shell` and asks per command;
   a standing grant for one conversation (*Allow `python3 -m unittest` here*) is
   still not reachable from the UI. RU-07 in the ready-to-use plan.
-* **Small models misread tables.** Haiku 4.5 twice ranked a category by
+* ~~**Small models misread tables.**~~ Closed 2026-11-25
+  ([FIXED-1538](FIXED_ITEMS.md#fixed-1538--first-run-did-not-say-which-models-suit-numbers-and-code)). Haiku 4.5 twice ranked a category by
   percentage when asked "in pounds" (leaving out Groceries, the third-largest
   rise), and once
   summed £100 + £40 + £10 as £200. This is the model, not the product; the

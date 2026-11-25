@@ -190,6 +190,17 @@ Any required failure, block, unsupported advertised capability or missing
 evidence is NO-GO or NOT ASSESSED. Rerun the failed scenario and affected
 dependencies after every fix.
 
+**Running the Python suite locally.** CI splits it into three shards
+(`python scripts/test_shard.py`). Run them one at a time on a workstation, or
+give each its own `--basetemp` on a disk with room: three shards in parallel
+filled a 7.6 GB `/tmp` with pytest's temporary folders on 2026-11-19 and failed
+by the hundred. Tests that run real shell, plugin and MCP processes need the
+native sandbox runner (`python scripts/build_native_runner.py`) and a host that
+enforces it; without it they fail with `native_sandbox_artifact_missing` or
+`native_sandbox_required`, which is the host, not the change. Before pushing a
+change to the web UI, also run `npm run test:e2e:mocked` in `web/`: CI runs it,
+and the unit suite does not cover the same selectors.
+
 ## Evidence retention and maintenance
 
 **Where evidence lives (2026-11-16).** Screenshots and run evidence are not kept

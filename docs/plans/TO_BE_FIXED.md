@@ -1897,7 +1897,8 @@ Run record: [WEB_APP_LIVE_TEST](../architecture/WEB_APP_LIVE_TEST.md#result--202
   sandbox does not mount the home folder, by design. `round-2026-09-04`'s MCP
   case needs a host whose Python is outside the home folder.
 * **`b9` live spec** still needs a git repository workspace (`RAIKER_LIVE_WORKSPACE`).
-* **Three parallel Python shards exhausted this host's 7.6 GB `/tmp`** (pytest
+* ~~**Three parallel Python shards exhausted this host's 7.6 GB `/tmp`**~~ Closed 2026-11-25:
+  [Testing](TESTING.md#test-levels-and-release-decision) now says how to run shards locally (pytest
   temp folders) and failed by the hundred; run shards one at a time or with
   `--basetemp` on disk. CI's runners are unaffected.
 

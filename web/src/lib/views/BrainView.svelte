@@ -596,7 +596,7 @@
     }
     catch (error) {
       if (seq !== sourceSeq) return;
-      sourceError = error instanceof ApiError ? "Choose a file or folder inside one of the places listed above. Nothing outside them is readable." : "Could not add this source.";
+      sourceError = error instanceof ApiError ? "Choose a file or folder inside one of the places listed above. Nothing outside them is readable." : failure("This source was not added", "Nothing new is readable.", "Try again.", error);
     }
     finally { if (seq === sourceSeq) sourceBusy = false; }
   }
@@ -635,7 +635,7 @@
     } catch (error) {
       sourceError = error instanceof ApiError
         ? grantMessage(error.reasonCode)
-        : "Could not grant that folder.";
+        : failure("That folder was not granted", "Raiker cannot read it yet.", "Check the path, then grant it again.", error);
     } finally { sourceBusy = false; }
   }
   function grantMessage(reason: string | null): string {
@@ -643,7 +643,7 @@
     if (reason === "brain_grant_not_found") return "There is no folder at that path on this machine.";
     if (reason === "brain_grant_not_a_directory") return "That path is a file. Grant the folder that holds it, then pick the file inside.";
     if (reason === "brain_grant_is_runtime_directory") return "That is Raiker's own runtime folder. Its documents are already listed above.";
-    return "Could not grant that folder.";
+    return "That folder was not granted. Raiker cannot read it yet. Check the path, then grant it again.";
   }
   async function revokeFolder(rootId: string) {
     const seq = ++sourceSeq;
@@ -686,7 +686,7 @@
         ? "Raiker reads text documents and source files. That file type is not one of them."
         : error instanceof ApiError && error.reasonCode === "brain_upload_too_large"
           ? "That file is larger than 5 MB. Grant its folder instead, and Raiker will read it where it is."
-          : "Could not store that file.";
+          : failure("That file was not stored", "It is not in your sources.", "Choose it again, or grant its folder instead.", error);
     } finally { sourceBusy = false; }
   }
   async function removeSource(path: string) { try { await api.removeBrainSource(path); await load(); } catch { sourceError = "This source was not removed and is still indexed. Reload this page and choose Remove again."; } }

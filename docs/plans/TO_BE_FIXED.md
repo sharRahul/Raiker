@@ -983,7 +983,8 @@ These parts of the same items are not done:
   *Could not X*, without what it affected and a next step (eleven more moved
   2026-11-14, [FIXED-1445](FIXED_ITEMS.md#fixed-1445--ten-more-error-messages-gave-a-status-code-and-no-next-step-qui-g06),
   twenty on 2026-11-15, [FIXED-1461](FIXED_ITEMS.md#fixed-1461--twenty-more-error-messages-gave-a-status-code-and-no-next-step-qui-g06),
-  and twenty-two on 2026-11-16, [FIXED-1483](FIXED_ITEMS.md#fixed-1483--twenty-two-more-error-messages-gave-no-effect-or-next-step-qui-g06)).
+  and twenty-two on 2026-11-16, [FIXED-1483](FIXED_ITEMS.md#fixed-1483--twenty-two-more-error-messages-gave-no-effect-or-next-step-qui-g06);
+  ten on 2026-11-25, [FIXED-1543](FIXED_ITEMS.md#fixed-1543--ten-more-errors-said-could-not-and-stopped)).
   QUI-G01's budgets all fit and are a failing check since 2026-11-15
   ([FIXED-1460](FIXED_ITEMS.md#fixed-1460--tasks-ran-9-px-past-one-screen-and-the-size-budgets-were-only-a-report-qui-g01)). The pattern and the
   helper are in `web/src/lib/errorCopy.ts`; the ones on Stop, steer, continuing,

@@ -315,7 +315,7 @@
       importNotice = `Undid the import: forgot ${result.removed} record${result.removed === 1 ? "" : "s"}.${kept}`;
       await load();
     } catch (e) {
-      actionError = e instanceof ApiError && e.status === 409 ? "That import was already undone." : "Could not undo that import.";
+      actionError = e instanceof ApiError && e.status === 409 ? "That import was already undone." : failure("That import was not undone", "Its records are still stored.", "Refresh Memory, then undo it again.", e);
     }
   }
   async function applyImport(skipDuplicates = true) {

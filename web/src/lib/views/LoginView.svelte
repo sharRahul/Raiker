@@ -303,7 +303,7 @@
     } catch (e) {
       error = e instanceof ApiError && e.status === 409
         ? "That instance name is already in use on this device."
-        : "Could not create the user account.";
+        : "The user account was not created. Nothing was set up on this device. Check the name and password, then try again.";
     } finally {
       busy = false;
     }

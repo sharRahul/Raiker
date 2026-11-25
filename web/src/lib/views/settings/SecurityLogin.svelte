@@ -225,12 +225,12 @@
 
   async function scanSecurity() {
     try { findings = await api.scanSecurity(); }
-    catch (e) { notice = { kind: "error", text: message(e, "Could not run the local security scan.") }; }
+    catch (e) { notice = { kind: "error", text: message(e, "The local security scan did not run. Nothing was checked. Run it again.") }; }
   }
 
   async function checkHealth() {
     try { health = await api.checkSecurityHealth(); findings = await api.securityFindings(); }
-    catch (e) { notice = { kind: "error", text: message(e, "Could not run the health check.") }; }
+    catch (e) { notice = { kind: "error", text: message(e, "The health check did not run. Nothing was checked. Run it again.") }; }
   }
 
   async function verifyCredential(provider: string) {
@@ -244,7 +244,7 @@
     try {
       findings = await api.checkPasswordBreach(breachPassword, breachOptIn);
       breachPassword = "";
-    } catch (e) { notice = { kind: "error", text: message(e, "Could not check the breach corpus.") }; }
+    } catch (e) { notice = { kind: "error", text: message(e, "The breach list was not checked. Your password is unchanged. Check again.") }; }
   }
 
   async function loadSessions() {
@@ -265,7 +265,7 @@
       notice = { kind: "ok", text: "Password changed. Other sessions were signed out." };
       await loadSessions();
     } catch (e) {
-      notice = { kind: "error", text: message(e, "Could not change password.") };
+      notice = { kind: "error", text: message(e, "Your password was not changed. The old one still signs you in. Check both fields, then try again.") };
     }
   }
 
@@ -291,7 +291,7 @@
       notice = { kind: "ok", text: answer.revoked === 1 ? "1 other device was signed out." : `${answer.revoked} other devices were signed out.` };
       await loadSessions();
     } catch (e) {
-      notice = { kind: "error", text: message(e, "Could not sign out the other devices.") };
+      notice = { kind: "error", text: message(e, "The other devices were not signed out. They may still be signed in. Try again.") };
     }
   }
 

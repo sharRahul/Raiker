@@ -1,5 +1,9 @@
 # Fixed items
 
+## FIXED-1543 — Ten more errors said Could not and stopped
+
+**Severity: Low. Area: UI copy (QUI-G06). Status: Fixed 2026-11-25.** Ten more errors read *Could not …* with nothing on what it affected or what to do: granting a source folder (two), storing a source file, adding a source, creating a user account, undoing a memory import, and in Settings › Security the local scan, the health check, the breach-list check, changing the password and signing out other devices. Each now names what failed, what that left unchanged and one next step, with the status code only through `failure()` where an `ApiError` is in hand. Evidence: the web unit suite (2,942 passed) and `svelte-check`; the copy is in `BrainView.svelte`, `LoginView.svelte`, `MemoryView.svelte` and `settings/SecurityLogin.svelte`.
+
 ## FIXED-1542 — A project's .cursorrules was ignored
 
 **Severity: Low. Area: Build / instructions. Status: Fixed 2026-11-25.** A project set up for Cursor keeps its rules in `.cursorrules`, which Build ignored after FIXED-1536 added `AGENTS.md` and `CLAUDE.md`. `.cursorrules` is now the last name a project root is read for, under the same review; the multi-file `.cursor/rules` folder is still not read, because a project has one instruction file. Evidence: `tests/test_raiker_md.py::test_cursorrules_is_the_last_fallback`.
@@ -2045,6 +2049,7 @@ file you can open. The two capture sets that remain — `screenshots/pages/` and
 
 | ID | Severity | Area | Status |
 |---|---|---|---|
+| [FIXED-1543](#fixed-1543--ten-more-errors-said-could-not-and-stopped) | Low | UI copy (QUI-G06) | Fixed 2026-11-25 |
 | [FIXED-1542](#fixed-1542--a-projects-cursorrules-was-ignored) | Low | Build / instructions | Fixed 2026-11-25 |
 | [FIXED-1541](#fixed-1541--another-agents-markdown-memory-could-not-be-imported) | Low | Memory / import | Fixed 2026-11-25 |
 | [FIXED-1540](#fixed-1540--a-command-could-not-be-allowed-for-a-conversation-from-any-screen) | Medium | Approvals / commands | Fixed 2026-11-25 |

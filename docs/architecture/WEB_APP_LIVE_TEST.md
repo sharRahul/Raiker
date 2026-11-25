@@ -21,6 +21,29 @@ PR #106: the **user-owned fallback sequence** and **prompt caching + normalised
 cache-hit metrics**.
 
 
+## Result — 2026-11-25 (Permissions families, first-run model note, local and cloud Ollama)
+
+Windows 11 test PC (RTX 4080 SUPER 16 GB), a source host
+`python -m raiker.api.serve --port 8799` on a fresh workspace with the SPA built
+from this round's `main`, driven in the desktop app's built-in browser; a second
+fresh host on port 8765 for the Playwright live specs. Ollama 0.40.17 was running
+locally with its own signed-in cloud models. Provider keys were not entered by
+the agent: the owner enters them through **Add model** (BUG-287/290).
+
+| # | Case | Covers | Result |
+|---|---|---|---|
+| RT-1125-01 | **Permissions** opens on the ten families; *Commands* lists 7 rows with its line *Run programs, tests and scheduled routines in the command sandbox.*; **Advanced** holds the approval mode, *Not decided here (11)* and *How your permissions apply* | FIXED-1537 | Passed |
+| RT-1125-02 | **Add model › On this computer › Ollama**, `GPT oss:20B Cloud` switched on and selected (*Ready · confirmed just now*); a budget question in Chat | — | Blocked by the provider: `provider_quota_exhausted:http_402`, said as *the account has no credit or quota left* |
+| RT-1125-03 | First run's **Model** step, **Other options**: *For sums, tables and code, choose a larger model…* sits under the recommendation, above the providers | FIXED-1538 | Passed (after moving it above the list) |
+| RT-1125-04 | Local `qwen3.5:9b` chosen in first run; a one-line Chat turn; **Stop safely** | FIXED-1547 | Found: Ollama loaded 262,144 tokens of context, 8 % on the CPU, still writing after 2 min; Stop ended the turn at the next boundary with *Stopped at your request…* and **Continue from last step** |
+| RT-1125-05 | `removal-review-permissions-2026-09-14-live.spec.ts` and `round-2026-09-15-typed-and-authority-live.spec.ts` on a fresh host | FIXED-1537, FIXED-1528 drift | Passed, 10 of 10 after the specs moved to *Commands* and checked the Build acknowledgement |
+| RT-1125-06 | `round-2026-09-04-priority-live.spec.ts` | — | 2 of 3 passed; the OTLP case needs a collector on `127.0.0.1:4318` ([open](../plans/TO_BE_FIXED.md#2026-11-25-round--found-not-fixed)) |
+| RT-1125-07 | Mocked end-to-end suite (`npm run test:e2e:mocked`) after each UI change | all | Passed, 28 of 28 |
+
+Not re-run live this round: Keep/Not this under an answer (FIXED-1539) and the
+command grant on an approval card (FIXED-1540) — both need a completed turn on a
+model that answers in seconds; they are covered by component tests.
+
 ## Result — 2026-11-16 (Regular-use journeys on Linux)
 
 Raiker used the way its owner uses it: ordinary requests, the product's own

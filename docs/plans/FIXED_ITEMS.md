@@ -1,5 +1,9 @@
 # Fixed items
 
+## FIXED-1545 — An MCP program in the home folder read as missing with no reason
+
+**Severity: Low. Area: MCP / copy. Status: Fixed 2026-11-25.** An MCP server whose program lives in the home folder (a uv-managed Python, a user-level Node) failed its Test with *its program was not found*, although the owner could run it in a terminal. The sandbox does not mount the home folder, by design, so the program really is absent there. MCP's check and the control service now say so: the program was not found inside the sandbox, which does not see the home folder, and to install it outside the home folder and point the server there. The boundary is unchanged. Evidence: `web/src/lib/views/McpView.svelte`'s check copy and `raiker/control/service.py`'s reason words; the MCP view and service tests pass.
+
 ## FIXED-1544 — Nine more errors said Could not and stopped
 
 **Severity: Low. Area: UI copy (QUI-G06). Status: Fixed 2026-11-25.** Nine more errors stopped at *Could not …*: forgetting and correcting a recalled memory from Chat's memory strip, opening and downloading an attached file in the source inspector, a provider sign-in in Models, and in Settings › Security starting a reset, saving the vault key, setting up two-step sign-in and updating the policy. Each now says what was left unchanged and one next step. Evidence: the web unit suite and `svelte-check`; copy in `chat/recallLedger.svelte.ts`, `chat/sourceInspector.svelte.ts`, `ModelsView.svelte` and `settings/SecurityLogin.svelte`.
@@ -2053,6 +2057,7 @@ file you can open. The two capture sets that remain — `screenshots/pages/` and
 
 | ID | Severity | Area | Status |
 |---|---|---|---|
+| [FIXED-1545](#fixed-1545--an-mcp-program-in-the-home-folder-read-as-missing-with-no-reason) | Low | MCP / copy | Fixed 2026-11-25 |
 | [FIXED-1544](#fixed-1544--nine-more-errors-said-could-not-and-stopped) | Low | UI copy (QUI-G06) | Fixed 2026-11-25 |
 | [FIXED-1543](#fixed-1543--ten-more-errors-said-could-not-and-stopped) | Low | UI copy (QUI-G06) | Fixed 2026-11-25 |
 | [FIXED-1542](#fixed-1542--a-projects-cursorrules-was-ignored) | Low | Build / instructions | Fixed 2026-11-25 |

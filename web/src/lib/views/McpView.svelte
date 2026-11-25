@@ -154,7 +154,8 @@
       mcp_initialize_failed: "the server did not complete its handshake",
       mcp_list_tools_failed: "the server did not list its tools",
       mcp_spawn_failed: "its program could not be started",
-      mcp_command_not_found: "its program was not found",
+      mcp_command_not_found:
+        "its program was not found inside the sandbox, which does not see your home folder — install the program outside it (for example a system Python or Node) and point the server there",
       mcp_command_not_allowlisted: "its command is not one Raiker runs",
       mcp_session_timeout: "it did not answer in time",
       mcp_response_too_large: "it answered with more than Raiker reads",

@@ -1892,7 +1892,8 @@ Run record: [WEB_APP_LIVE_TEST](../architecture/WEB_APP_LIVE_TEST.md#result--202
   models (`qwen2.5:0.5b`) were run.
 * **Managed llama.cpp embedding entry** still needs its SHA-256 and size
   recorded from the publisher (huggingface.co is reachable from this host now).
-* **MCP Test on a uv-managed interpreter** fails `mcp_command_not_found`: the
+* **MCP Test on a uv-managed interpreter** fails `mcp_command_not_found` (since
+  2026-11-25 the failure says why: [FIXED-1545](FIXED_ITEMS.md#fixed-1545--an-mcp-program-in-the-home-folder-read-as-missing-with-no-reason)): the
   sandbox does not mount the home folder, by design. `round-2026-09-04`'s MCP
   case needs a host whose Python is outside the home folder.
 * **`b9` live spec** still needs a git repository workspace (`RAIKER_LIVE_WORKSPACE`).

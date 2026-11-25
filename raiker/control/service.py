@@ -75,7 +75,10 @@ _MCP_CHECK_WORDS: dict[str, str] = {
     "mcp_initialize_failed": "the server did not complete its handshake",
     "mcp_list_tools_failed": "the server did not list its tools",
     "mcp_spawn_failed": "the server's program could not be started",
-    "mcp_command_not_found": "the server's program was not found",
+    "mcp_command_not_found": (
+        "the server's program was not found inside the sandbox, which does not see "
+        "your home folder; install it outside the home folder and point the server there"
+    ),
     "mcp_command_not_allowlisted": "the server's command is not one Raiker runs",
     "mcp_session_timeout": "the server did not answer in time",
     "mcp_response_too_large": "the server answered with more than Raiker reads",

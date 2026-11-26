@@ -21,6 +21,18 @@ PR #106: the **user-owned fallback sequence** and **prompt caching + normalised
 cache-hit metrics**.
 
 
+## Result — 2026-11-26 (Permissions families sweep)
+
+Against the throwaway host of *Health: this machine*. Spec:
+`web/e2e/ru-06-permissions-sweep-live.spec.ts`, **2/2** (1440 and 390 pixels).
+This runtime lists eight of the ten families; *Money* and *Devices and home*
+have no permission here and are not shown, which the spec allows. Sixteen
+captures in `output/playwright/screenshots/working/ru-06/` were inspected.
+
+| Case | Check | Result |
+|---|---|---|
+| RT-PERM-SWEEP-01 | Each listed family opens on its one-line summary and at least one row; every row has a label that is not a capability id; nothing overflows horizontally; no console error — at 1440 and 390 px | ✅ — a touch screen's sticky `:hover` on the family rail was guarded with `@media (hover: hover)` on the way |
+
 ## Result — 2026-11-26 (First run: this machine and posture)
 
 A second host on a workspace nothing had touched (`raiker-web --workspace

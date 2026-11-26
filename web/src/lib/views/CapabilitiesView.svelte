@@ -1121,9 +1121,12 @@
     text-align: left;
     cursor: pointer;
   }
-  .category:hover {
-    background: var(--sunken);
-    color: var(--text-1);
+  /* A touch screen keeps :hover on the last tapped item; only a pointer hovers. */
+  @media (hover: hover) {
+    .category:hover {
+      background: var(--sunken);
+      color: var(--text-1);
+    }
   }
   .category[aria-current="page"] {
     background: var(--accent-soft);

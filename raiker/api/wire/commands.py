@@ -205,6 +205,12 @@ class CommandSandboxView(TypedDict):
     #: The setup command for this install, with the bundled Linux runner's
     #: path; None when this install carries no Linux runner.
     wsl_setup_command: str | None
+    #: Off Windows: whether this system's own boundary is present (Bubblewrap on
+    #: Linux). None where Raiker cannot tell from here (macOS, Windows).
+    native_ready: bool | None
+    #: Off Windows, when it is not: the one command that installs it here, for
+    #: this distribution's package manager; None when unknown.
+    native_install_command: str | None
 
 
 class CommandEgressView(TypedDict):

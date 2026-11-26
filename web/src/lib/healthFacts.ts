@@ -43,7 +43,19 @@ const UNREAD = "Could not be read.";
 function sandboxFact(view: CommandSandboxView | null): HealthFact {
   const base = { id: "sandbox", label: "Command sandbox", href: "#/settings?tab=advanced&kind=runtime", linkLabel: "Command sandbox" };
   if (view === null) return { ...base, state: "unknown", detail: UNREAD };
-  if (!view.applies) return { ...base, state: "ok", detail: "This system's own sandbox runs commands." };
+  if (!view.applies) {
+    if (view.native_ready === false) {
+      return {
+        ...base,
+        state: "fail",
+        detail: view.native_install_command
+          ? `Bubblewrap is not installed. Run: ${view.native_install_command}`
+          : "Bubblewrap is not installed; install the bubblewrap package.",
+      };
+    }
+    if (view.native_ready === null) return { ...base, state: "info", detail: "This system's own sandbox runs commands." };
+    return { ...base, state: "ok", detail: "Bubblewrap runs commands." };
+  }
   if (view.windows_backend === "wsl") {
     return view.wsl_configured
       ? { ...base, state: "ok", detail: "Commands run in Raiker's WSL2 distribution." }

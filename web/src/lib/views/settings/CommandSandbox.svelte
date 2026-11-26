@@ -98,6 +98,26 @@
   onMount(() => void load());
 </script>
 
+{#if view && !view.applies && view.native_ready === false}
+  <!-- RU-04 — Linux without Bubblewrap: name the one package that fixes it. -->
+  <section class="settings-card" aria-label="Command sandbox">
+    <div class="card-heading"><h3>Command sandbox</h3></div>
+    <p class="notice notice-error">
+      Bubblewrap is not installed, so sandboxed commands are refused on this machine.
+    </p>
+    {#if view.native_install_command}
+      <p>Install it, then reload this page:</p>
+      <pre class="mono"><code>{view.native_install_command}</code></pre>
+    {:else}
+      <p>Install the <code class="mono">bubblewrap</code> package with your distribution's package manager, then reload this page.</p>
+    {/if}
+  </section>
+{:else if view && !view.applies && view.native_ready === true}
+  <section class="settings-card" aria-label="Command sandbox">
+    <div class="card-heading"><h3>Command sandbox</h3></div>
+    <p class="notice notice-ok">Bubblewrap is installed; sandboxed commands run in it.</p>
+  </section>
+{/if}
 {#if view?.applies}
   <section class="settings-card" aria-label="Command sandbox">
     <div class="card-heading"><h3>Command sandbox</h3></div>

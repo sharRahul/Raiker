@@ -17,6 +17,15 @@ detail** under **This machine**, followed by **Set up by first run**: the
 command sandbox, backups, search by meaning, voice, updates and the always-on
 host, each with a link to the page that fixes it.
 
+### Commands refused on Linux
+
+Linux runs sandboxed commands in Bubblewrap. When `bwrap` is not installed,
+**Observability → Health, in detail** and **Settings → Advanced → Runtime**
+say so and show the one command that installs it for your distribution — for
+example `sudo apt install bubblewrap` on Ubuntu and Debian, `sudo dnf install
+bubblewrap` on Fedora — and *Work in the sandbox* stays unavailable on
+Permissions until it is installed.
+
 ## Connecting a model
 
 Three codes that used to block a first-time setup no longer occur when you

@@ -36,11 +36,13 @@ describe("postures (RU-07)", () => {
   });
 
   it("offers Work in the sandbox only while the sandbox is enforced", () => {
-    const view = { windows_backend: "wsl", applies: true, wsl_configured: true, wsl_missing: [], wsl_setup_command: null };
+    const view = { windows_backend: "wsl", applies: true, wsl_configured: true, wsl_missing: [], wsl_setup_command: null, native_ready: null, native_install_command: null };
     expect(sandboxEnforced(view)).toBe(true);
     expect(sandboxEnforced({ ...view, wsl_configured: false })).toBe(false);
     expect(sandboxEnforced({ ...view, windows_backend: "account" })).toBe(false);
-    expect(sandboxEnforced({ ...view, applies: false })).toBe(true);
+    expect(sandboxEnforced({ ...view, applies: false, native_ready: true })).toBe(true);
+    expect(sandboxEnforced({ ...view, applies: false, native_ready: false })).toBe(false);
+    expect(sandboxEnforced({ ...view, applies: false, native_ready: null })).toBe(false);
     expect(sandboxEnforced(null)).toBe(false);
   });
 });

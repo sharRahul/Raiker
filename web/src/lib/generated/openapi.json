@@ -7081,6 +7081,28 @@
             "title": "Applies",
             "type": "boolean"
           },
+          "native_install_command": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Native Install Command"
+          },
+          "native_ready": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Native Ready"
+          },
           "windows_backend": {
             "title": "Windows Backend",
             "type": "string"
@@ -7113,7 +7135,9 @@
           "applies",
           "wsl_configured",
           "wsl_missing",
-          "wsl_setup_command"
+          "wsl_setup_command",
+          "native_ready",
+          "native_install_command"
         ],
         "title": "CommandSandboxView",
         "type": "object"

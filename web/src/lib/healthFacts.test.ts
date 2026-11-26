@@ -15,7 +15,7 @@ describe("healthFacts (RU-08)", () => {
   });
 
   it("calls a WSL2 sandbox that is chosen but not set up a failure, and a set-up one ok", () => {
-    const view = { windows_backend: "wsl", applies: true, wsl_configured: false, wsl_missing: ["python3"], wsl_setup_command: null };
+    const view = { windows_backend: "wsl", applies: true, wsl_configured: false, wsl_missing: ["python3"], wsl_setup_command: null, native_ready: null, native_install_command: null };
     expect(healthFacts({ ...none, sandbox: view }, NOW)[0]).toMatchObject({ state: "fail", detail: expect.stringContaining("python3") });
     expect(healthFacts({ ...none, sandbox: { ...view, wsl_configured: true } }, NOW)[0].state).toBe("ok");
     expect(healthFacts({ ...none, sandbox: { ...view, windows_backend: "account" } }, NOW)[0].state).toBe("fail");
@@ -33,5 +33,11 @@ describe("healthFacts (RU-08)", () => {
   it("says recall matches words only when no embedding model is set", () => {
     const memory = { retrieval: null, embedding_providers: [], unindexed_memories: 0, unindexed_file_chunks: 0 } as never;
     expect(healthFacts({ ...none, memory }, NOW)[2]).toMatchObject({ state: "warn", detail: expect.stringContaining("words only") });
+  });
+
+  it("names the Bubblewrap package on Linux when it is missing (RU-04)", () => {
+    const view = { windows_backend: "account", applies: false, wsl_configured: false, wsl_missing: [], wsl_setup_command: null, native_ready: false, native_install_command: "sudo dnf install bubblewrap" };
+    expect(healthFacts({ ...none, sandbox: view }, NOW)[0]).toMatchObject({ state: "fail", detail: expect.stringContaining("sudo dnf install bubblewrap") });
+    expect(healthFacts({ ...none, sandbox: { ...view, native_ready: true } }, NOW)[0].state).toBe("ok");
   });
 });

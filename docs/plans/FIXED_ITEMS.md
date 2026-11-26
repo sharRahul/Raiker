@@ -1,5 +1,9 @@
 # Fixed items
 
+## FIXED-1570 — Linux without Bubblewrap was reported as sandboxed
+
+**Severity: Medium. Area: Sandbox / Linux (RU-04). Status: Fixed 2026-11-26.** Off Windows, `/api/command-sandbox` reported only that the Windows choice did not apply, so Health said *This system's own sandbox runs commands* and *Work in the sandbox* was offered on a Linux machine with no `bwrap`, where every sandboxed command is refused. The view now carries `native_ready` (Bubblewrap on `PATH` on Linux; `null` on macOS and Windows, where Raiker cannot tell from here) and `native_install_command`, the install line for the distribution named by `/etc/os-release` `ID` or `ID_LIKE` (apt, dnf, pacman, zypper, apk). Health marks a missing Bubblewrap *needs a fix* with that command, **Settings → Advanced → Runtime** shows it, and the sandbox posture stays closed until it is installed. Evidence: `tests/test_bubblewrap_install_hint.py`, `web/src/lib/healthFacts.test.ts`, `web/src/lib/postures.test.ts`, `web/src/lib/views/settings/CommandSandbox.test.ts`. Not verified on a Linux machine in this run.
+
 ## FIXED-1569 — A project's .cursor/rules folder was ignored
 
 **Severity: Low. Area: Build / instructions (RU-16). Status: Fixed 2026-11-26.** Cursor keeps a project's rules as several `.mdc` files in `.cursor/rules`; Raiker read only the older single-file `.cursorrules`, so a Cursor project gave Build no instructions. A project root with none of `RAIKER.md`, `AGENTS.md`, `CLAUDE.md` or `.cursorrules` is now read for `.cursor/rules`: each `.mdc`/`.md` file directly in it, read pinned like any instruction file, joined in name order under its name, held together to one file's 8,192-byte and 4,000-character limits, and reviewed by one digest over every name and its bytes before Build uses it. A link or a refused file refuses the folder; the global file never reads it. Evidence: `tests/test_raiker_md.py::test_the_cursor_rules_folder_is_read_as_one_source_after_every_file`, `::test_the_cursor_rules_folder_fits_one_files_limits`, `::test_the_global_file_never_reads_the_cursor_rules_folder`.
@@ -2153,6 +2157,7 @@ file you can open. The two capture sets that remain — `screenshots/pages/` and
 
 | ID | Severity | Area | Status |
 |---|---|---|---|
+| [FIXED-1570](#fixed-1570--linux-without-bubblewrap-was-reported-as-sandboxed) | Medium | Sandbox / Linux (RU-04) | Fixed 2026-11-26 |
 | [FIXED-1569](#fixed-1569--a-projects-cursorrules-folder-was-ignored) | Low | Build / instructions (RU-16) | Fixed 2026-11-26 |
 | [FIXED-1568](#fixed-1568--healths-this-machine-card-was-a-long-ragged-column) | Low | Health / UI (RU-08) | Fixed 2026-11-26 |
 | [FIXED-1567](#fixed-1567--permissions-had-no-posture-only-sixty-rows-to-set-one-by-one) | Medium | Permissions / UI (RU-07) | Fixed 2026-11-26 |

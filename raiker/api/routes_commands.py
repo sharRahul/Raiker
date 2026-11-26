@@ -290,6 +290,52 @@ _WSL_REQUIREMENTS = (
 )
 
 
+#: The package manager command that installs Bubblewrap, by os-release ID.
+_BUBBLEWRAP_INSTALL = {
+    "debian": "sudo apt install bubblewrap",
+    "ubuntu": "sudo apt install bubblewrap",
+    "fedora": "sudo dnf install bubblewrap",
+    "rhel": "sudo dnf install bubblewrap",
+    "centos": "sudo dnf install bubblewrap",
+    "arch": "sudo pacman -S bubblewrap",
+    "opensuse": "sudo zypper install bubblewrap",
+    "suse": "sudo zypper install bubblewrap",
+    "alpine": "sudo apk add bubblewrap",
+}
+
+
+def bubblewrap_install_command(os_release: str) -> str | None:
+    """RU-04 — the install line for this distribution, from ``/etc/os-release``.
+
+    ``ID`` first, then each ``ID_LIKE`` family; ``None`` when none is known.
+    """
+    fields: dict[str, str] = {}
+    for line in os_release.splitlines():
+        key, sep, value = line.partition("=")
+        if sep:
+            fields[key.strip()] = value.strip().strip('"').lower()
+    for candidate in [fields.get("ID", ""), *fields.get("ID_LIKE", "").split()]:
+        family = candidate.split("-")[0]
+        if family in _BUBBLEWRAP_INSTALL:
+            return _BUBBLEWRAP_INSTALL[family]
+    return None
+
+
+def _native_readiness() -> tuple[bool | None, str | None]:
+    import shutil  # noqa: PLC0415
+    import sys  # noqa: PLC0415
+
+    if not sys.platform.startswith("linux"):
+        return None, None
+    if shutil.which("bwrap") is not None:
+        return True, None
+    try:
+        release = Path("/etc/os-release").read_text(encoding="utf-8")
+    except OSError:
+        release = ""
+    return False, bubblewrap_install_command(release)
+
+
 def _sandbox_view(request: Request, choice: str) -> CommandSandboxView:
     import sys  # noqa: PLC0415
 
@@ -306,6 +352,7 @@ def _sandbox_view(request: Request, choice: str) -> CommandSandboxView:
         else None
     )
     configured = bool(status and status.get("configured") is True)
+    native_ready, native_install = _native_readiness()
     missing = (
         []
         if configured or not applies
@@ -317,6 +364,8 @@ def _sandbox_view(request: Request, choice: str) -> CommandSandboxView:
         "wsl_configured": configured,
         "wsl_missing": missing,
         "wsl_setup_command": setup,
+        "native_ready": native_ready,
+        "native_install_command": native_install,
     }
 
 

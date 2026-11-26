@@ -112,6 +112,6 @@ export function currentPosture(gates: CapabilityGate[]): PostureId | "custom" {
  */
 export function sandboxEnforced(view: CommandSandboxView | null): boolean {
   if (view === null) return false;
-  if (!view.applies) return true;
+  if (!view.applies) return view.native_ready === true;
   return view.windows_backend === "wsl" && view.wsl_configured;
 }

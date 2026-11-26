@@ -11,6 +11,8 @@ const windows = {
   wsl_configured: false,
   wsl_missing: ["distribution_present", "runner_installed"],
   wsl_setup_command: '"C:\\Raiker\\raiker-command-runner.exe" --setup-wsl --linux-runner "x" --rootfs <rootfs.tar>',
+  native_ready: null as boolean | null,
+  native_install_command: null as string | null,
 };
 
 it("chooses WSL2 for commands and says what is still missing", async () => {
@@ -30,7 +32,7 @@ it("chooses WSL2 for commands and says what is still missing", async () => {
 });
 
 it("is not shown where the choice does not apply", async () => {
-  const load = vi.spyOn(api, "commandSandbox").mockResolvedValue({ ...windows, applies: false });
+  const load = vi.spyOn(api, "commandSandbox").mockResolvedValue({ ...windows, applies: false, native_ready: null });
   render(CommandSandbox);
 
   await waitFor(() => expect(load).toHaveBeenCalled());
@@ -83,4 +85,22 @@ it("removes WSL2 only after the owner confirms in the shared dialog", async () =
   await fireEvent.click(button);
   await waitFor(() => expect(remove).toHaveBeenCalled());
   expect(await screen.findByText("WSL2 removed. Commands run as the sandbox account.")).toBeInTheDocument();
+});
+
+it("names the package that installs Bubblewrap on Linux when it is missing (RU-04)", async () => {
+  vi.spyOn(api, "commandSandbox").mockResolvedValue({
+    ...windows,
+    applies: false,
+    native_ready: false,
+    native_install_command: "sudo apt install bubblewrap",
+  });
+  render(CommandSandbox);
+  expect(await screen.findByText(/Bubblewrap is not installed/)).toBeInTheDocument();
+  expect(screen.getByText("sudo apt install bubblewrap")).toBeInTheDocument();
+});
+
+it("says Bubblewrap is in use on Linux when it is installed (RU-04)", async () => {
+  vi.spyOn(api, "commandSandbox").mockResolvedValue({ ...windows, applies: false, native_ready: true });
+  render(CommandSandbox);
+  expect(await screen.findByText(/Bubblewrap is installed/)).toBeInTheDocument();
 });

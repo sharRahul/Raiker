@@ -1418,6 +1418,8 @@ export type CommandSandboxView = {
   wsl_configured: boolean;
   wsl_missing: string[];
   wsl_setup_command: string | null;
+  native_ready: boolean | null;
+  native_install_command: string | null;
 };
 
 export type CommandStopRequested = {

@@ -13,7 +13,9 @@ line, with the fix beside anything marked `warn` or `FAIL`. It contacts nothing
 and changes nothing, and exits 1 when a mandatory requirement is not met.
 `raiker doctor --json` prints the full report; `--workspace` checks another
 data folder. The same checks, problems first, open **Observability → Health, in
-detail** under **This machine**.
+detail** under **This machine**, followed by **Set up by first run**: the
+command sandbox, backups, search by meaning, voice, updates and the always-on
+host, each with a link to the page that fixes it.
 
 ## Connecting a model
 

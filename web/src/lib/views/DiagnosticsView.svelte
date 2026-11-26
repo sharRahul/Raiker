@@ -14,6 +14,7 @@
   } from "../apiTypes";
   import type { RecoveryRowView, SetupSystemReadiness } from "../generated/apiContract";
   import { humanize, relativeTime } from "../format";
+  import { healthFacts, type HealthFact } from "../healthFacts";
 
   let diag = $state<Diagnostics | null>(null);
   let loadError = $state<string | null>(null);
@@ -236,15 +237,36 @@
     if (state === "pass") return "implemented";
     return "idle";
   }
-  const MACHINE_LABEL: Record<string, string> = { fail: "needs a fix", warn: "check", info: "info", pass: "ok" };
+  const MACHINE_LABEL: Record<string, string> = { fail: "needs a fix", warn: "check", info: "info", pass: "ok", ok: "ok", unknown: "not read" };
+
+  /** RU-08 — what first run sets up, each with the page that fixes it. */
+  let facts = $state<HealthFact[] | null>(null);
+  async function loadFacts() {
+    const read = <T,>(p: Promise<T>) => p.then((v) => v, () => null);
+    const [sandbox, backups, memory, voice, update, host] = await Promise.all([
+      read(api.commandSandbox()),
+      read(api.backups()),
+      read(api.memorySettings()),
+      read(api.voiceStatus()),
+      read(api.hostUpdate()),
+      read(api.host()),
+    ]);
+    facts = healthFacts({ sandbox, backups, memory, voice, update, host });
+  }
+  const FACT_ORDER: Record<string, number> = { fail: 0, warn: 1, unknown: 2, info: 3, ok: 4 };
+  const sortedFacts = $derived([...(facts ?? [])].sort((a, b) => FACT_ORDER[a.state] - FACT_ORDER[b.state]));
+  function factBadge(state: string): "blocked" | "approval-required" | "implemented" | "idle" {
+    return machineBadge(state === "ok" ? "pass" : state === "unknown" ? "info" : state);
+  }
 
   onMount(load);
   onMount(loadRecovery);
   onMount(loadMachine);
+  onMount(loadFacts);
 </script>
 
 <div class="head-row">
-  <button type="button" class="btn btn-ghost btn-sm" onclick={() => { void load(); void loadMachine(); }} aria-label="Refresh health">
+  <button type="button" class="btn btn-ghost btn-sm" onclick={() => { void load(); void loadMachine(); void loadFacts(); }} aria-label="Refresh health">
     <Icon name="refresh" size="sm" />
     Refresh
   </button>
@@ -281,6 +303,25 @@
                 <span class="machine-detail">{check.detail}</span>
                 {#if check.remedy && check.state !== "pass"}
                   <span class="machine-fix">{check.remedy}</span>
+                {/if}
+              </div>
+            </li>
+          {/each}
+        </ul>
+      {/if}
+      <h3 class="machine-sub">Set up by first run</h3>
+      {#if facts === null}
+        <p class="sub" role="status">Reading what first run set up…</p>
+      {:else}
+        <ul class="monitor machine" data-testid="health-facts">
+          {#each sortedFacts as fact (fact.id)}
+            <li>
+              <Badge variant={factBadge(fact.state)} label={MACHINE_LABEL[fact.state]} />
+              <div class="machine-check">
+                <span class="monitor-code">{fact.label}</span>
+                <span class="machine-detail">{fact.detail}</span>
+                {#if fact.state !== "ok"}
+                  <a class="machine-fix" href={fact.href}>Open {fact.linkLabel}</a>
                 {/if}
               </div>
             </li>
@@ -584,6 +625,8 @@
   .machine-check { display: flex; flex-direction: column; gap: 0.1rem; min-width: 0; flex: 1; }
   .machine-detail { color: var(--text-2); font-size: var(--text-xs); overflow-wrap: anywhere; }
   .machine-fix { color: var(--text-2); font-size: var(--text-xs); }
+  a.machine-fix { color: var(--accent, var(--text-1)); }
+  .machine-sub { font-size: var(--text-sm); font-weight: 600; margin: 0.9rem 0 0.4rem; }
   .recovery details { border-top: 1px solid var(--border); padding: 0.4rem 0; }
   .recovery summary { cursor: pointer; font-weight: 600; font-size: var(--text-sm); }
   .recovery summary:focus-visible { outline: 3px solid var(--focus-ring); outline-offset: 2px; }

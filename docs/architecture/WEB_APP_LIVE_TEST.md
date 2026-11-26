@@ -1,5 +1,43 @@
 # Web App Live Test — model backends
 
+## Result — 2026-11-26 Windows readiness and workflow review
+
+Source run on Windows build 26300.10075, isolated workspaces, Chromium at
+1440 × 1000. This is not clean-machine or published-installer qualification.
+
+| Case | Result | Evidence |
+|---|---|---|
+| RT-POSTURE-01/02 | Passed, including final enforcement refinement (48.6 s) | Ask first → Read-only → Ask first through the real permission routes; missing or failed proof disables the sandbox posture |
+| RT-HEALTH-01/03 | Passed (43.5 s) | Model, disk/memory and first-run facts with their fix links |
+| RT-FIRSTRUN-01/02 | Passed (7.0 s) | Separate fresh workspace: This machine facts and Read-only applied from Posture |
+| RT-WIN-BOUNDARY-01 | WSL2 probe passed | relay, workspace_write, escape_write, masked_read, egress, descendant_reaped, seccomp and windows_interop all enforced |
+| RT-WIN-BOUNDARY-02 | Production refused as required | Account status: four isolation gaps; logon denials absent on all four accounts |
+| RT-WIN-BOUNDARY-03 | Native regression suite passed outside the tool sandbox | 57 runner unit tests, six protocol vectors and Windows integration suites; diagnostic descendant-ACL attack confirms the known leak |
+
+Artifacts are local under `output/`: `ready-wsl-proof.json`,
+`ready-native-windows.log`, `ready-final-live.log` and
+`playwright/screenshots/working/ru-07-*.png`, `ru-08-this-machine-card.png`,
+`ru-09-*.png`. Screenshots were visually inspected; these local captures are
+not installer release evidence. The initial restricted-tool run could not
+reach account ACLs or the host's loopback listener; it was superseded by the
+unrestricted-tool run.
+
+The review found [FIXED-1575](../plans/FIXED_ITEMS.md#fixed-1575--the-sandbox-posture-trusted-installation-instead-of-enforcement):
+installation alone enabled the sandbox posture. The API now supplies native
+probe enforcement, and both posture pickers require it. The six current
+workflows were retained after [review](../plans/TESTING.md#github-workflow-review--2026-11-26);
+two stale GitHub records with deleted YAML files were disabled.
+
+Open: RU-03's native account containment fixes and elevated attack
+qualification, RU-05's MXC adapter and probe, RU-07's real WSL2 Build journey
+asking only for `git push`, and RU-09's first useful answer in under ten
+minutes on clean Windows and Linux machines. The existing development PC
+cannot stand in for the clean-machine requirement. MXC's current
+[README](https://github.com/microsoft/mxc) describes an SDK and executor,
+not a Raiker adapter; no `wxc-exec` is installed here. Its current telemetry
+policy also needs review before adoption. No plan document was deleted:
+each still owns requirements or open evidence gates.
+
 > A repeatable procedure + results matrix for exercising the Raiker web app
 > against a real model backend. One round was run against **hosted Anthropic
 > (Haiku 4.5)**; the same steps apply to every other backend (see the matrix).

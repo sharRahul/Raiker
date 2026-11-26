@@ -111,7 +111,7 @@ export function currentPosture(gates: CapabilityGate[]): PostureId | "custom" {
  * be offered. Unread is not enforced.
  */
 export function sandboxEnforced(view: CommandSandboxView | null): boolean {
-  if (view === null || typeof view.applies !== "boolean") return false;
+  if (view === null || view.enforced !== true || typeof view.applies !== "boolean") return false;
   if (!view.applies) return view.native_ready === true;
   return view.windows_backend === "wsl" && view.wsl_configured;
 }

@@ -1,5 +1,32 @@
 # Fixed items
 
+## FIXED-1576 — GitHub retained two active workflows after their files were removed
+
+**Severity: Low. Area: CI / maintenance. Status: Fixed 2026-11-26.**
+GitHub listed eight active workflows although `main` contains six YAML files.
+The removed `apply-general-assistant-identity.yml` (355739032) and
+`model-provider-diagnostics.yml` (311508176) records are now
+`disabled_manually`. GitHub exposes disabling, not deletion of a workflow
+record; historical runs were retained. The six current workflows remain
+active, each with a distinct qualification purpose. See the
+[workflow review](TESTING.md#github-workflow-review--2026-11-26).
+
+## FIXED-1575 — The sandbox posture trusted installation instead of enforcement
+
+**Severity: High. Area: Permissions / first run (RU-07). Status: Fixed 2026-11-26.**
+The posture picker enabled *Work in the sandbox* from WSL2's configured flag
+or the presence of `bwrap`. Neither proves that containment works. The
+command-sandbox response now reports `enforced` from Raiker's native probe,
+which validates every mandatory observation. Both first run and Permissions
+require that measurement before offering the posture; an older response
+without it fails closed. Installation guidance stays separate. Command
+execution continues to probe independently at launch.
+
+Evidence: the new backend regression (`tests/test_posture_sandbox_proof.py`)
+and posture regression failed before the change and pass after it; 63 focused
+UI tests pass. Windows live results are recorded in
+[WEB_APP_LIVE_TEST](../architecture/WEB_APP_LIVE_TEST.md#result--2026-11-26-windows-readiness-and-workflow-review).
+
 ## FIXED-1574 — Health did not say whether a model answers or the disk is filling
 
 **Severity: Medium. Area: Health / UI (RU-08). Status: Fixed 2026-11-26.** RU-08's *Set up by first run* list covered the sandbox, backups, embedding, voice, updates and always-on host but not the two facts that stop Raiker answering at all: whether a model is chosen, and whether this machine has the memory and free storage first run measured. An owner with no model learned it from a Chat that would not answer. The list now opens with **Model** (from `GET /api/models`: *needs a fix* with **Open Models** when no model is chosen or no provider is connected, otherwise the model that answers) and **Disk and memory** (the `memory` and `storage` rows of `GET /api/setup/system`, the worse of the two, with first run's remedy beside a problem and **Open This machine**, which opens *Health, in detail*). A fact that could not be read says *not read*. First run's own list is unchanged — it asks these questions in its own steps. Evidence: `web/src/lib/healthFacts.test.ts` (three new cases); live RT-HEALTH-03 on a fresh Linux workspace (*Model — needs a fix*, *Disk and memory — check: 7.5 GB free*).
@@ -2174,6 +2201,8 @@ file you can open. The two capture sets that remain — `screenshots/pages/` and
 | ID | Severity | Area | Status |
 |---|---|---|---|
 | [FIXED-1574](#fixed-1574--health-did-not-say-whether-a-model-answers-or-the-disk-is-filling) | Medium | Health / UI (RU-08) | Fixed 2026-11-26 |
+| [FIXED-1575](#fixed-1575--the-sandbox-posture-trusted-installation-instead-of-enforcement) | High | Permissions / first run (RU-07) | Fixed 2026-11-26 |
+| [FIXED-1576](#fixed-1576--github-retained-two-active-workflows-after-their-files-were-removed) | Low | CI / maintenance | Fixed 2026-11-26 |
 | [FIXED-1573](#fixed-1573--health-called-word-only-recall-search-by-meaning--done) | Medium | Health (RU-08) | Fixed 2026-11-26 |
 | [FIXED-1572](#fixed-1572--chatgpt-and-claude-conversation-exports-could-not-be-imported) | Low | Memory / import (RU-16) | Fixed 2026-11-26 |
 | [FIXED-1571](#fixed-1571--first-run-set-up-the-device-but-not-the-machine-and-never-asked-for-a-posture) | Medium | First run (RU-09) | Fixed 2026-11-26 |

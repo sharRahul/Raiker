@@ -322,6 +322,15 @@ chat. Release qualification still requires a live run on the published build.
 
 ## Changelog
 
+- **2026-11-26 (Windows review)** — The posture now requires measured
+  enforcement ([FIXED-1575](FIXED_ITEMS.md#fixed-1575--the-sandbox-posture-trusted-installation-instead-of-enforcement)).
+  WSL2's eight probe observations pass on the Windows development PC; the
+  native account remains refused and its logon denials are absent. The six
+  current workflows were retained; two stale GitHub records were disabled
+  ([review](TESTING.md#github-workflow-review--2026-11-26)). RU-03, RU-05,
+  RU-07 and RU-09 remain open as recorded in the
+  [live report](../architecture/WEB_APP_LIVE_TEST.md#result--2026-11-26-windows-readiness-and-workflow-review).
+
 - **2026-11-26 (later)** — RU-08's model and disk-and-memory facts shipped
   ([FIXED-1574](FIXED_ITEMS.md#fixed-1574--health-did-not-say-whether-a-model-answers-or-the-disk-is-filling)).
   RU-03's four runner gaps, RU-05's MXC probe and RU-07's WSL2 sign-off need

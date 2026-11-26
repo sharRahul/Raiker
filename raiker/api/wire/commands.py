@@ -211,6 +211,8 @@ class CommandSandboxView(TypedDict):
     #: Off Windows, when it is not: the one command that installs it here, for
     #: this distribution's package manager; None when unknown.
     native_install_command: str | None
+    #: True only when the native probe measures every mandatory observation.
+    enforced: NotRequired[bool]
 
 
 class CommandEgressView(TypedDict):

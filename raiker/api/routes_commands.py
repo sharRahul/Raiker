@@ -366,6 +366,7 @@ def _sandbox_view(request: Request, choice: str) -> CommandSandboxView:
         "wsl_setup_command": setup,
         "native_ready": native_ready,
         "native_install_command": native_install,
+        "enforced": driver.probe().available,
     }
 
 

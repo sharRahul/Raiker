@@ -1420,6 +1420,7 @@ export type CommandSandboxView = {
   wsl_setup_command: string | null;
   native_ready: boolean | null;
   native_install_command: string | null;
+  enforced?: boolean;
 };
 
 export type CommandStopRequested = {

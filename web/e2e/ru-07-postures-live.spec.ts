@@ -34,6 +34,8 @@ test("RT-POSTURE-01/02 — postures read, apply Read-only, and return to Ask fir
   // RT-POSTURE-01 — a fresh workspace has no enforced sandbox, so that posture is closed.
   const sandboxNote = panel.getByText(/stays on Ask first/);
   const sandboxRadio = panel.getByRole("radio", { name: /Work in the sandbox/ });
+  const readiness = await (await page.request.get(`${BASE}/api/command-sandbox`)).json();
+  if (readiness.enforced !== true) await expect(sandboxRadio).toBeDisabled();
   if (await sandboxNote.isVisible()) await expect(sandboxRadio).toBeDisabled();
   await page.screenshot({ path: capturePath(join(SHOTS, "ru-07-postures.png")) });
 

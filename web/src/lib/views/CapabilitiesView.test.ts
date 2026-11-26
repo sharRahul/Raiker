@@ -515,7 +515,7 @@ describe("CapabilitiesView — posture by goal", () => {
   it("applies a posture one capability at a time through the mode routes (RU-07)", async () => {
     const fetchMock = stubFetch({
       "GET /api/capability-gates": GATES,
-      "GET /api/command-sandbox": { windows_backend: "wsl", applies: true, wsl_configured: true, wsl_missing: [], wsl_setup_command: null, native_ready: null, native_install_command: null },
+      "GET /api/command-sandbox": { windows_backend: "wsl", applies: true, wsl_configured: true, wsl_missing: [], wsl_setup_command: null, native_ready: null, native_install_command: null, enforced: true },
       "POST /api/capability-modes/shell_execution/allow": { capability: "shell_execution", decision_mode: "allow" },
     });
     render(CapabilitiesView);

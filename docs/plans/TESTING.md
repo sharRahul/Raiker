@@ -1,5 +1,24 @@
 # Raiker testing and real-user qualification
 
+## GitHub workflow review — 2026-11-26
+
+Reviewed the six source workflows and GitHub's workflow inventory. None of
+the six is stale; retain their distinct gates:
+
+| Workflow | Purpose |
+|---|---|
+| CI | Python, Ruff/security lint, Mypy, native boundaries, web and desktop checks, licensing and restart faults |
+| Data safety drills | Named credential, encryption, backup and recovery release evidence |
+| Desktop package | Platform installers and installed-app qualification |
+| llama.cpp engine | Cross-platform engine tests and real install/inference, including scheduled upstream checks |
+| Personal Windows voice | Installed Windows voice package, real speech and onboarding evidence |
+| Release | Deliberate publication and release evidence; manual trigger is intentional |
+
+GitHub also retained two active records whose source files were already
+deleted: *Apply general assistant identity* and *Model provider diagnostics*.
+Both are now disabled ([FIXED-1576](FIXED_ITEMS.md#fixed-1576--github-retained-two-active-workflows-after-their-files-were-removed)).
+No current test gate or historical run was deleted.
+
 ## Authority and purpose
 
 This is the single testing plan for Raiker. It replaces the former release

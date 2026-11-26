@@ -7081,6 +7081,10 @@
             "title": "Applies",
             "type": "boolean"
           },
+          "enforced": {
+            "title": "Enforced",
+            "type": "boolean"
+          },
           "native_install_command": {
             "anyOf": [
               {

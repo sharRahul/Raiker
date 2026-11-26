@@ -1,5 +1,9 @@
 # Fixed items
 
+## FIXED-1571 — First run set up the device but not the machine, and never asked for a posture
+
+**Severity: Medium. Area: First run (RU-09). Status: Fixed 2026-11-26.** RU-09's first run is *Account → Model → This machine → Posture*. *This device* listed only hardware, so an owner left first run with commands refused for want of a sandbox and no backup, learning it later; *How I'll ask* named one fixed profile with a link away. *This device* now ends with **Set up on this machine** — command sandbox, search by meaning, backups and always-on host, from the same facts Health reads, each with its state word and a **Set up** link that opens the page in a new tab; every one can be left, and Health keeps listing them. *How I'll ask* now offers the three postures, **Ask first** selected; another one is applied on **Continue** through the same per-capability mode route Permissions uses, a refused change is named without holding first run up, and **Work in the sandbox** is offered only once the sandbox is enforced. Evidence: `web/src/lib/views/ModelSetupView.test.ts` (*states where model requests go…* now asserts the posture choice; *applies a posture chosen in first run through the mode routes (RU-09)*); live RT-FIRSTRUN-01/02 on a fresh workspace, where Read-only chosen in first run read *Now: Read-only.* on Permissions afterwards. The ten-minute first-answer journey on Windows and Linux is still to be timed.
+
 ## FIXED-1570 — Linux without Bubblewrap was reported as sandboxed
 
 **Severity: Medium. Area: Sandbox / Linux (RU-04). Status: Fixed 2026-11-26.** Off Windows, `/api/command-sandbox` reported only that the Windows choice did not apply, so Health said *This system's own sandbox runs commands* and *Work in the sandbox* was offered on a Linux machine with no `bwrap`, where every sandboxed command is refused. The view now carries `native_ready` (Bubblewrap on `PATH` on Linux; `null` on macOS and Windows, where Raiker cannot tell from here) and `native_install_command`, the install line for the distribution named by `/etc/os-release` `ID` or `ID_LIKE` (apt, dnf, pacman, zypper, apk). Health marks a missing Bubblewrap *needs a fix* with that command, **Settings → Advanced → Runtime** shows it, and the sandbox posture stays closed until it is installed. Evidence: `tests/test_bubblewrap_install_hint.py`, `web/src/lib/healthFacts.test.ts`, `web/src/lib/postures.test.ts`, `web/src/lib/views/settings/CommandSandbox.test.ts`. Not verified on a Linux machine in this run.
@@ -2157,6 +2161,7 @@ file you can open. The two capture sets that remain — `screenshots/pages/` and
 
 | ID | Severity | Area | Status |
 |---|---|---|---|
+| [FIXED-1571](#fixed-1571--first-run-set-up-the-device-but-not-the-machine-and-never-asked-for-a-posture) | Medium | First run (RU-09) | Fixed 2026-11-26 |
 | [FIXED-1570](#fixed-1570--linux-without-bubblewrap-was-reported-as-sandboxed) | Medium | Sandbox / Linux (RU-04) | Fixed 2026-11-26 |
 | [FIXED-1569](#fixed-1569--a-projects-cursorrules-folder-was-ignored) | Low | Build / instructions (RU-16) | Fixed 2026-11-26 |
 | [FIXED-1568](#fixed-1568--healths-this-machine-card-was-a-long-ragged-column) | Low | Health / UI (RU-08) | Fixed 2026-11-26 |

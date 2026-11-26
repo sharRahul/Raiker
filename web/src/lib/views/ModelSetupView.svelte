@@ -50,6 +50,9 @@
     saveOwnerName,
   } from "../setupConversation";
   import { handOffToChat } from "../chatHandoff";
+  import { healthFacts, type HealthFact } from "../healthFacts";
+  import { POSTURES, postureChanges, sandboxEnforced, type PostureId } from "../postures";
+  import type { CommandSandboxView } from "../generated/apiContract";
   import { STARTERS } from "../starters";
   import ProviderMatrix from "../components/ProviderMatrix.svelte";
   import Icon from "../components/Icon.svelte";
@@ -225,7 +228,41 @@
    * Permissions still governs what Raiker may do. BUG-345 removed *Local only*,
    * which nothing enforced, so continuing records the acknowledgement only.
    */
+  /*
+   * RU-09 — *Posture*. The owner picks how much Raiker asks; Ask first is
+   * selected and changes nothing. Any other is applied on Continue through the
+   * same per-capability mode route Permissions uses, and a refusal is said
+   * without holding first run up — Permissions can finish it.
+   */
+  let posture = $state<PostureId>("ask");
+  let postureNote = $state("");
+  async function applyChosenPosture(): Promise<void> {
+    postureNote = "";
+    if (posture === "ask") return;
+    const label = POSTURES.find((p) => p.id === posture)?.label ?? posture;
+    try {
+      const gates = await api.capabilityGates();
+      let failed = 0;
+      for (const change of postureChanges(posture, gates)) {
+        try {
+          await api.setCapabilityDecisionMode(change.capability, change.to, `Posture “${label}” chosen in first run`, change.from);
+        } catch {
+          failed += 1;
+        }
+      }
+      if (failed > 0) postureNote = `${failed} permission${failed === 1 ? " was" : "s were"} not changed; finish in Permissions.`;
+    } catch {
+      postureNote = "The posture could not be applied; choose it again in Permissions.";
+    }
+  }
+
   async function acknowledgePrivacy() {
+    busy = true;
+    try {
+      await applyChosenPosture();
+    } finally {
+      busy = false;
+    }
     await save({ status: "in_progress", stage: after("privacy"), privacy_mode: PRIVACY_STATEMENT.mode });
   }
 
@@ -426,7 +463,31 @@
     systemError = "";
     try { system = await api.setupSystem(); }
     catch { systemError = "This device could not be checked. You can continue and check again from Diagnostics."; }
+    void loadSetupFacts();
   }
+
+  /*
+   * RU-09 — *This machine*: what first run sets up beyond the device, each
+   * with the page that does it. Every one can be skipped; Health keeps
+   * listing what is left.
+   */
+  let setupFacts = $state<HealthFact[] | null>(null);
+  let sandboxView = $state<CommandSandboxView | null>(null);
+  const FIRST_RUN_FACTS = ["sandbox", "embedding", "backups", "always-on"];
+  async function loadSetupFacts() {
+    const read = <T,>(p: Promise<T>) => p.then((v) => v, () => null);
+    const [sandbox, backups, memory, host] = await Promise.all([
+      read(api.commandSandbox()),
+      read(api.backups()),
+      read(api.memorySettings()),
+      read(api.host()),
+    ]);
+    sandboxView = sandbox;
+    setupFacts = healthFacts({ sandbox, backups, memory, voice: null, update: null, host }).filter((f) =>
+      FIRST_RUN_FACTS.includes(f.id),
+    );
+  }
+  const FACT_WORD: Record<string, string> = { ok: "Done", fail: "Needs setup", warn: "Recommended", info: "Optional", unknown: "Not read" };
 
   /*
    * DIST-06 — Check. Every mandatory component from inside the running host,
@@ -584,6 +645,28 @@
         {#if !system.ready}
           <p class="error" role="alert">This device does not meet a requirement above. Raiker may not work correctly until it is fixed.</p>
         {/if}
+        <div class="setup-facts" data-testid="first-run-facts">
+          <p class="eyebrow">Set up on this machine</p>
+          {#if setupFacts === null}
+            <p class="note" role="status">Checking…</p>
+          {:else}
+            <ul>
+              {#each setupFacts as fact (fact.id)}
+                <li data-state={fact.state}>
+                  <div>
+                    <strong>{fact.label}</strong>
+                    <span class="fact-state">{FACT_WORD[fact.state]}</span>
+                    <span class="fact-detail">{fact.detail}</span>
+                  </div>
+                  {#if fact.state !== "ok"}
+                    <a class="quiet fact-link" href={fact.href} target="_blank" rel="noopener">Set up</a>
+                  {/if}
+                </li>
+              {/each}
+            </ul>
+            <p class="note">Each is optional here. What is left stays listed on Health.</p>
+          {/if}
+        </div>
       {/if}
       <div class="actions">
         <button class="quiet" onclick={() => save({ stage: before("system") })}>Back</button>
@@ -741,10 +824,20 @@
       <!-- QUI-W04 — how Raiker will ask, and where data goes. No connection
            requests here: services are connected when a task needs them. -->
       <h2 id="setup-title" class="raiker-line">{ASK_LINE}</h2>
-      <div class="card ask-card">
+      <div class="card ask-card" data-testid="first-run-posture">
         <p class="eyebrow">How I'll ask</p>
         <p>{PROFILE_LINE}</p>
-        <p class="card-foot"><strong>Standard</strong> · <a href="#/capabilities">Change</a></p>
+        <div class="posture-choices" role="radiogroup" aria-label="How much Raiker asks">
+          {#each POSTURES as option (option.id)}
+            {@const blocked = option.id === "sandbox" && !sandboxEnforced(sandboxView)}
+            <label class="posture-choice">
+              <input type="radio" name="first-run-posture" value={option.id} bind:group={posture} disabled={blocked || busy} />
+              <span><strong>{option.label}</strong> — {blocked ? "available once the command sandbox is set up." : option.summary}</span>
+            </label>
+          {/each}
+        </div>
+        <p class="card-foot">Change it any time in <a href="#/capabilities">Permissions</a>.</p>
+        {#if postureNote}<p class="note" role="status">{postureNote}</p>{/if}
       </div>
       <div class="card ask-card">
         <!-- FIRST-07 / BUG-345 — one statement about where content travels. -->
@@ -907,6 +1000,16 @@
   /* Recommended is one sentence with a reason, not a card competing with the
      matrix below it: the point is that most owners need read no further. */
   .recommended .choose { justify-self: start; margin-top: var(--space-2); }
+  .setup-facts ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 0; }
+  .setup-facts li { display: flex; justify-content: space-between; align-items: center; gap: var(--space-3); padding: var(--space-2) 0; border-top: 1px solid var(--neutral-border); }
+  .setup-facts li:first-child { border-top: 0; }
+  .setup-facts li > div { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.1rem var(--space-2); }
+  .setup-facts .fact-state { font-size: var(--text-xs); color: var(--text-3); }
+  .setup-facts li[data-state="fail"] .fact-state { color: var(--danger, var(--text-1)); }
+  .setup-facts .fact-detail { flex-basis: 100%; font-size: var(--text-xs); color: var(--text-2); }
+  .fact-link { white-space: nowrap; }
+  .posture-choices { display: grid; gap: var(--space-2); }
+  .posture-choice { display: flex; gap: var(--space-2); align-items: baseline; font-size: var(--text-sm); }
   .recommended { display: grid; gap: .25rem; padding: var(--space-4); border: 1px solid var(--accent-border); border-radius: var(--r-lg); background: var(--accent-soft); }
   .optional { display: grid; gap: var(--space-2); padding-top: var(--space-3); border-top: 1px solid var(--border); }
   label { display: grid; gap: var(--space-2); max-width: 36rem; color: var(--text-1); } input { padding: .75rem .9rem; border: 1px solid var(--neutral-border); border-radius: var(--r-md); background: var(--surface); color: var(--text-1); }

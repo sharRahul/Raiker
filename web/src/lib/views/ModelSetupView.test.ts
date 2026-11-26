@@ -601,7 +601,10 @@ describe("first-run setup", () => {
     // QUI-W04 — how Raiker will ask, and where data goes; no connection requests.
     expect(await screen.findByRole("heading", { name: "Here is how I'll work for you." })).toBeInTheDocument();
     expect(screen.getByText(/I'll ask before I send, delete, pay or share anything/)).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Change" })).toHaveAttribute("href", "#/capabilities");
+    expect(screen.getByRole("link", { name: "Permissions" })).toHaveAttribute("href", "#/capabilities");
+    // RU-09 — the posture choice; Ask first is chosen and changes nothing.
+    expect(screen.getByRole("radio", { name: /Ask first/ })).toBeChecked();
+    expect(screen.getByRole("radio", { name: /Work in the sandbox/ })).toBeDisabled();
     expect(screen.queryByRole("button", { name: /Connect/i })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /Local only/i })).not.toBeInTheDocument();
     expect(screen.getByText(/Nothing reaches a provider you have not set up/)).toBeInTheDocument();
@@ -986,5 +989,22 @@ describe("the Model step with connected providers", () => {
     expect(await screen.findByRole("button", { name: "Decide later" })).toBeEnabled();
     expect(screen.queryByText("Choose a default model to continue to Privacy")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Continue" })).not.toBeInTheDocument();
+  });
+
+  it("applies a posture chosen in first run through the mode routes (RU-09)", async () => {
+    const calls = stubFetch({
+      "GET /api/setup": { ...required, status: "in_progress", stage: "privacy" },
+      "PUT /api/setup": { ...required, status: "in_progress", stage: "permissions", privacy_mode: "balanced" },
+      "GET /api/models": { profiles: [], chat_profiles: [] },
+      "GET /api/capability-gates": [{ capability: "git_push_execution", decision_mode: "ask" }, { capability: "web_fetch", decision_mode: "ask" }],
+      "POST /api/capability-modes/git_push_execution/deny": { capability: "git_push_execution", decision_mode: "deny" },
+    });
+    render(ModelSetupView);
+    await fireEvent.click(await screen.findByRole("radio", { name: /Read-only/ }));
+    await fireEvent.click(screen.getByRole("button", { name: "Continue" }));
+    await waitFor(() =>
+      expect(calls.mock.calls.some(([url]) => String(url).includes("/api/capability-modes/git_push_execution/deny"))).toBe(true),
+    );
+    expect(calls.mock.calls.some(([url]) => String(url).includes("/api/capability-modes/web_fetch"))).toBe(false);
   });
 });

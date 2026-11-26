@@ -42,7 +42,7 @@ const UNREAD = "Could not be read.";
 
 function sandboxFact(view: CommandSandboxView | null): HealthFact {
   const base = { id: "sandbox", label: "Command sandbox", href: "#/settings?tab=advanced&kind=runtime", linkLabel: "Command sandbox" };
-  if (view === null) return { ...base, state: "unknown", detail: UNREAD };
+  if (view === null || typeof view.applies !== "boolean") return { ...base, state: "unknown", detail: UNREAD };
   if (!view.applies) {
     if (view.native_ready === false) {
       return {
@@ -76,7 +76,7 @@ function sandboxFact(view: CommandSandboxView | null): HealthFact {
 
 function backupFact(view: BackupsView | null, now: number): HealthFact {
   const base = { id: "backups", label: "Backups", href: "#/settings?tab=backups", linkLabel: "Backups" };
-  if (view === null) return { ...base, state: "unknown", detail: UNREAD };
+  if (view === null || !Array.isArray(view.backups)) return { ...base, state: "unknown", detail: UNREAD };
   const latest = [...view.backups].sort((a, b) => b.created_at.localeCompare(a.created_at))[0];
   if (!latest) return { ...base, state: "warn", detail: "No backup has been made." };
   const age = Math.floor((now - Date.parse(latest.created_at)) / DAY_MS);
@@ -88,7 +88,7 @@ function backupFact(view: BackupsView | null, now: number): HealthFact {
 
 function embeddingFact(view: MemorySettingsView | null): HealthFact {
   const base = { id: "embedding", label: "Search by meaning", href: "#/memory", linkLabel: "Memory" };
-  if (view === null) return { ...base, state: "unknown", detail: UNREAD };
+  if (view === null || !Array.isArray(view.embedding_providers)) return { ...base, state: "unknown", detail: UNREAD };
   if (view.retrieval === null || view.embedding_providers.length === 0) {
     return { ...base, state: "warn", detail: "No embedding model; recall matches words only." };
   }
@@ -101,7 +101,7 @@ function embeddingFact(view: MemorySettingsView | null): HealthFact {
 
 function voiceFact(view: VoiceStatus | null): HealthFact {
   const base = { id: "voice", label: "Voice", href: "#/settings?tab=voice", linkLabel: "Voice" };
-  if (view === null) return { ...base, state: "unknown", detail: UNREAD };
+  if (view === null || !view.listening) return { ...base, state: "unknown", detail: UNREAD };
   const listening = view.listening.state;
   if (listening === "off") return { ...base, state: "info", detail: "Off. Optional." };
   if (listening === "not_installed") return { ...base, state: "info", detail: "Not installed. Optional." };
@@ -111,7 +111,7 @@ function voiceFact(view: VoiceStatus | null): HealthFact {
 
 function updateFact(view: UpdateStatusView | null): HealthFact {
   const base = { id: "updates", label: "Updates", href: "#/settings?tab=updates", linkLabel: "Updates" };
-  if (view === null) return { ...base, state: "unknown", detail: UNREAD };
+  if (view === null || typeof view.state !== "string") return { ...base, state: "unknown", detail: UNREAD };
   const state: HealthFactState =
     view.state === "up_to_date" ? "ok"
     : view.state === "available" || view.state === "unreachable" ? "warn"
@@ -121,7 +121,7 @@ function updateFact(view: UpdateStatusView | null): HealthFact {
 
 function hostFact(view: HostView | null): HealthFact {
   const base = { id: "always-on", label: "Always-on host", href: "#/settings?tab=updates", linkLabel: "Settings" };
-  if (view === null) return { ...base, state: "unknown", detail: UNREAD };
+  if (view === null || !view.service) return { ...base, state: "unknown", detail: UNREAD };
   if (!view.service.supported) return { ...base, state: "info", detail: "Starting with this computer is not supported here." };
   if (view.paused) return { ...base, state: "warn", detail: "Paused; scheduled work waits." };
   return view.service.registered

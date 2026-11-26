@@ -21,6 +21,19 @@ PR #106: the **user-owned fallback sequence** and **prompt caching + normalised
 cache-hit metrics**.
 
 
+## Result — 2026-11-26 (First run: this machine and posture)
+
+A second host on a workspace nothing had touched (`raiker-web --workspace
+<fresh> --port 8767 --no-browser`, `RAIKER_LIVE_FIRST_RUN_BASE`). Spec:
+`web/e2e/ru-09-first-run-live.spec.ts`, **1/1**. Captures `ru-09-this-machine.png`
+and `ru-09-posture.png` were inspected; the status word was then moved beside
+each label (CSS only, not recaptured).
+
+| Case | Check | Result |
+|---|---|---|
+| RT-FIRSTRUN-01 | *What this computer can run* ends with **Set up on this machine**: Command sandbox *Needs setup*, Backups *Recommended*, Search by meaning *Done*, Always-on host *Optional*, each not-done one with **Set up**, and *What is left stays listed on Health.* | ✅ |
+| RT-FIRSTRUN-02 | *Here is how I'll work for you.* offers the three postures with **Ask first** checked and **Work in the sandbox** disabled (no sandbox yet); choosing **Read-only** and **Continue** applies it — Permissions then reads *Now: Read-only.* | ✅ |
+
 ## Result — 2026-11-26 (Permissions postures)
 
 Same fresh workspace and host as *Health: this machine*. Spec:

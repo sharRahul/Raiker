@@ -61,7 +61,9 @@ try {
   await new Promise(resolve => setTimeout(resolve, 1000));
   let descendant = "indeterminate";
   if (inside.descendant_pid) {
-    try { process.kill(inside.descendant_pid, 0); descendant = "unenforced"; process.kill(inside.descendant_pid); }
+    // Contained output is untrusted, and a PID can be reused. Observe only;
+    // never terminate a process identified by the contained result.
+    try { process.kill(inside.descendant_pid, 0); descendant = "unenforced"; }
     catch (error) { descendant = error.code === "ESRCH" ? "enforced" : "indeterminate"; }
   }
   const observations = {

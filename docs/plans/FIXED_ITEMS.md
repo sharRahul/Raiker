@@ -13,6 +13,9 @@ descendants, host network/loopback refusal and detached descendant reaping.
 The [architecture record](../architecture/NATIVE_SANDBOX_MIGRATION.md#windows-mxc-evaluation-2026-11-26)
 supersedes the old rejection and records the limitations. This closes the
 missing measurement, not production integration or native-account isolation.
+The evaluator only observes descendant PIDs reported by contained output;
+it never terminates them, because that output is untrusted and PIDs can be
+reused. A surviving or unobservable process prevents a passing measurement.
 
 ## FIXED-1576 — GitHub retained two active workflows after their files were removed
 

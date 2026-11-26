@@ -54,7 +54,7 @@ build is still owed for every item (the regular-use journeys in
 | RU-04 Linux and macOS | Partly done | Linux Bubblewrap enforced (2026-11-16 journeys) | Setup step naming the package; macOS account setup behind one prompt |
 | RU-05 WSL2 and MXC options | Partly done | WSL2 is available and measured | MXC probe result |
 | RU-06 Ten families | Partly done | Families, lines and the unit test ([FIXED-1537](FIXED_ITEMS.md#fixed-1537--permissions-was-grouped-in-six-headings-an-owner-had-to-learn)) | Live surface sweep |
-| RU-07 Three postures | Partly done | Per-conversation command grant on the approval card ([FIXED-1540](FIXED_ITEMS.md#fixed-1540--a-command-could-not-be-allowed-for-a-conversation-from-any-screen)); per-MCP-server *use without asking* ([FIXED-1562](FIXED_ITEMS.md#fixed-1562--a-trusted-mcp-server-could-only-be-used-by-allowing-every-server)) | The three postures and their mapping |
+| RU-07 Three postures | Partly done | Per-conversation command grant on the approval card ([FIXED-1540](FIXED_ITEMS.md#fixed-1540--a-command-could-not-be-allowed-for-a-conversation-from-any-screen)); per-MCP-server *use without asking* ([FIXED-1562](FIXED_ITEMS.md#fixed-1562--a-trusted-mcp-server-could-only-be-used-by-allowing-every-server)); the three postures and their unit-tested mapping ([FIXED-1567](FIXED_ITEMS.md#fixed-1567--permissions-had-no-posture-only-sixty-rows-to-set-one-by-one)) | A Build journey in *Work in the sandbox* that asks only for `git push` |
 | RU-08 Health | Partly done | `raiker doctor` with each fix ([FIXED-1552](FIXED_ITEMS.md#fixed-1552--there-was-no-raiker-doctor)); **This machine** on Observability → *Health, in detail* ([FIXED-1564](FIXED_ITEMS.md#fixed-1564--the-health-page-did-not-show-this-machines-readiness)); sandbox, backups, embedding, voice, updates and always-on facts with the page that fixes each ([FIXED-1566](FIXED_ITEMS.md#fixed-1566--health-did-not-say-what-first-run-had-left-unset)) | Model and disk-and-memory facts in the same list; a fresh-machine pass showing exactly what first run fixes |
 | RU-09 Four-step first run | Partly done | Model step says which models suit numbers and code ([FIXED-1538](FIXED_ITEMS.md#fixed-1538--first-run-did-not-say-which-models-suit-numbers-and-code)) | *This machine* and *Posture* steps |
 | RU-10 Keep or skip under the answer | Done | [FIXED-1539](FIXED_ITEMS.md#fixed-1539--a-memory-raiker-proposed-could-only-be-kept-from-memory), owner's words only ([FIXED-1548](FIXED_ITEMS.md#fixed-1548--a-sentence-the-model-invented-was-offered-to-keep-as-a-memory)); RT-1125-08 | — |
@@ -186,7 +186,9 @@ step-up; customising one is said. The posture falls back to *Ask first* when
 the sandbox probe is not fully enforced.
 Show the per-conversation command grant on the command's approval card
 (*Allow `python3 -m unittest` for this conversation*), so `run_command` is
-reachable without the API. *Shipped 2026-11-25 ([FIXED-1540](FIXED_ITEMS.md#fixed-1540--a-command-could-not-be-allowed-for-a-conversation-from-any-screen)); the three postures are open.*
+reachable without the API. *Shipped 2026-11-25 ([FIXED-1540](FIXED_ITEMS.md#fixed-1540--a-command-could-not-be-allowed-for-a-conversation-from-any-screen)). The three postures
+and their mapping shipped 2026-11-26 ([FIXED-1567](FIXED_ITEMS.md#fixed-1567--permissions-had-no-posture-only-sixty-rows-to-set-one-by-one)); the Build journey in
+*Work in the sandbox* is open.*
 *Done when* the posture → mode mapping is unit-tested and a Build journey in
 **Work in the sandbox** asks only for `git push`.
 

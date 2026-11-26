@@ -562,6 +562,24 @@ capability's configuration.
 
 There is no unrestricted mode, by design.
 
+### Postures
+
+**Permissions → Overview** opens on **How much Raiker asks**: three postures,
+each a fixed bundle of the modes above. A posture changes only *whether Raiker
+asks*; it never turns a permission on.
+
+| Posture | What it sets |
+|---|---|
+| **Ask first** | Every permission to **Ask me**. |
+| **Work in the sandbox** | File writes, patches, checkpoint restore, shell commands and processes to **Allow** — they stay inside the disposable copy and the command sandbox. Everything else, including git push, memory, messages and anything that leaves this machine, to **Ask me**. Offered only while the command sandbox is set up and enforced. |
+| **Read-only** | Anything that changes files, memory or git, runs a program, sends a message, installs a plugin, generates an image or exports telemetry to **Never**; everything else to **Ask me**. |
+
+Choosing one lists how many permissions it changes, and which, before
+**Apply**. Each change is the same governed mode change a row makes, recorded
+with the posture's name as its reason and reported one by one; a permission the
+runtime refuses to change is named, and the rest still apply. When the modes
+match none of the three, the page says *Your own mix*.
+
 ### Finding the permissions that need a look
 
 A permission set to **Automatic** acts with nobody in the loop, so its row says

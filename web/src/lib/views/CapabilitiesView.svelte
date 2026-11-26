@@ -40,6 +40,14 @@
   } from "../capabilityModel";
   import { explainReasonCode } from "../reasonCodes";
   import {
+    POSTURES,
+    currentPosture,
+    postureChanges,
+    sandboxEnforced,
+    type PostureId,
+  } from "../postures";
+  import type { CommandSandboxView } from "../generated/apiContract";
+  import {
     BEHAVIOUR_COPY,
     permissionAttention,
     permissionPosture,
@@ -336,8 +344,9 @@
     | { kind: "disable_cap"; capability: string }
     | { kind: "set_mode"; capability: string; mode: DecisionMode };
   let pending = $state<Pending | null>(null);
+  let postureBusy = $state(false);
   let busy = $state(false);
-  const mutationBusy = $derived(bulkBusy || presetBusy || modeBusyCap !== null || busy);
+  const mutationBusy = $derived(bulkBusy || presetBusy || postureBusy || modeBusyCap !== null || busy);
   let dialogError = $state<string | null>(null);
 
   /*
@@ -404,6 +413,50 @@
       await load();
     } finally {
       presetBusy = false;
+    }
+  }
+
+  /*
+   * RU-07 — three postures. A posture sets decision modes only, one
+   * capability at a time through the same route a row's mode control uses, and
+   * reports per capability; it never turns a permission on. *Work in the
+   * sandbox* is offered only while the command sandbox is fully enforced.
+   */
+  let postureChoice = $state<PostureId | null>(null);
+  let sandboxView = $state<CommandSandboxView | null>(null);
+  const sandboxReady = $derived(sandboxEnforced(sandboxView));
+  const activePosture = $derived(currentPosture(effective));
+  const postureDiff = $derived(postureChoice === null ? [] : postureChanges(postureChoice, effective));
+  async function loadSandbox() {
+    try {
+      sandboxView = await api.commandSandbox();
+    } catch {
+      sandboxView = null;
+    }
+  }
+  async function applyPosture() {
+    if (mutationBusy || postureChoice === null || postureDiff.length === 0) return;
+    const label = POSTURES.find((p) => p.id === postureChoice)?.label ?? postureChoice;
+    postureBusy = true;
+    notice = null;
+    const applied: string[] = [];
+    const failed: string[] = [];
+    try {
+      for (const change of postureDiff) {
+        try {
+          await api.setCapabilityDecisionMode(change.capability, change.to, `Posture “${label}” via web UI`, change.from);
+          recordConfirmed(change.capability, change.to);
+          applied.push(change.capability);
+        } catch {
+          failed.push(change.capability);
+        }
+      }
+      const outcome = bulkOutcome(applied, failed);
+      if (outcome !== null) notice = outcome;
+      if (failed.length === 0) postureChoice = null;
+      await load();
+    } finally {
+      postureBusy = false;
     }
   }
 
@@ -657,6 +710,7 @@
   }
 
   onMount(load);
+  onMount(loadSandbox);
   // QUI-P02 acceptance — a change made in another tab, or on an approval card,
   // shows here without a reload. Only another tab's or surface's change: this
   // page re-reads after its own writes already.
@@ -736,6 +790,66 @@
 
     <div class="category-pane">
       {#if category === OVERVIEW_ID}
+        {#if effective.length > 0}
+          <section class="panel posture" aria-labelledby="posture-h" data-testid="postures">
+            <h2 id="posture-h">How much Raiker asks</h2>
+            <p class="preset-lede">
+              {activePosture === "custom"
+                ? "Your own mix: permissions are set one by one below."
+                : `Now: ${POSTURES.find((p) => p.id === activePosture)?.label}.`}
+              A posture changes only whether Raiker asks; it never turns a permission on.
+            </p>
+            <div class="posture-options" role="radiogroup" aria-label="Posture">
+              {#each POSTURES as posture (posture.id)}
+                {@const blocked = posture.id === "sandbox" && !sandboxReady}
+                <label class="posture-option" class:active={activePosture === posture.id}>
+                  <input
+                    type="radio"
+                    name="posture"
+                    value={posture.id}
+                    disabled={blocked || mutationBusy}
+                    checked={(postureChoice ?? activePosture) === posture.id}
+                    onchange={() => (postureChoice = posture.id === activePosture ? null : posture.id)}
+                  />
+                  <span class="posture-name">{posture.label}</span>
+                  <span class="posture-summary">
+                    {blocked
+                      ? "Needs the command sandbox set up and enforced first — until then Raiker stays on Ask first."
+                      : posture.summary}
+                  </span>
+                </label>
+              {/each}
+            </div>
+            {#if postureChoice !== null}
+              <p class="preset-lede" role="status">
+                {postureDiff.length === 0
+                  ? "Nothing to change."
+                  : `This changes ${postureDiff.length} permission${postureDiff.length === 1 ? "" : "s"}: ${(["allow", "ask", "deny"] as const)
+                      .map((mode) => [mode, postureDiff.filter((c) => c.to === mode).length] as const)
+                      .filter(([, n]) => n > 0)
+                      .map(([mode, n]) => `${n} to “${BEHAVIOUR_COPY[mode].label}”`)
+                      .join(", ")}.`}
+              </p>
+              {#if postureDiff.length > 0}
+                <details class="posture-list">
+                  <summary>Which ones</summary>
+                  <ul>
+                    {#each postureDiff as change (change.capability)}
+                      <li>{capabilityLabel(change.capability)} → {BEHAVIOUR_COPY[change.to].label}</li>
+                    {/each}
+                  </ul>
+                </details>
+              {/if}
+              <div class="posture-actions">
+                <button type="button" class="btn btn-primary btn-sm" disabled={mutationBusy || postureDiff.length === 0} onclick={() => void applyPosture()}>
+                  {postureBusy ? "Applying…" : "Apply"}
+                </button>
+                <button type="button" class="btn btn-ghost btn-sm" disabled={postureBusy} onclick={() => (postureChoice = null)}>Cancel</button>
+              </div>
+            {/if}
+          </section>
+        {/if}
+
         {#if goals.some((goal) => goal.verdict !== "not_reported")}
           <!-- UX-PERM-05 — the posture by goal, read-only, in seven plain
                sentences; Change opens the permission that decides it. -->
@@ -1189,6 +1303,25 @@
   /* BUG-239 — the Build preset. Deliberately built from the page's existing
      panel, label and summary vocabulary rather than a banner of its own: it is
      a shortcut through the registry, not a different kind of object. */
+  .posture-options { display: grid; gap: 0.5rem; margin-top: 0.6rem; }
+  .posture-option {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 0.1rem 0.6rem;
+    padding: 0.6rem 0.75rem;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md, 10px);
+    cursor: pointer;
+  }
+  .posture-option.active { border-color: var(--text-2); }
+  .posture-option:has(input:disabled) { cursor: not-allowed; opacity: 0.7; }
+  .posture-option input { grid-row: span 2; align-self: start; margin-top: 0.2rem; }
+  .posture-name { font-weight: 600; font-size: var(--text-sm); }
+  .posture-summary { color: var(--text-2); font-size: var(--text-xs); }
+  .posture-list { font-size: var(--text-xs); color: var(--text-2); margin-top: 0.3rem; }
+  .posture-list summary { cursor: pointer; }
+  .posture-list ul { columns: 2; margin: 0.3rem 0 0; padding-left: 1.1rem; }
+  .posture-actions { display: flex; gap: 0.5rem; margin-top: 0.5rem; }
   .preset-head {
     display: flex;
     justify-content: space-between;

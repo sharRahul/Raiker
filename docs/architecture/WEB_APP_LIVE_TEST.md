@@ -21,6 +21,18 @@ PR #106: the **user-owned fallback sequence** and **prompt caching + normalised
 cache-hit metrics**.
 
 
+## Result — 2026-11-26 (Permissions postures)
+
+Same fresh workspace and host as *Health: this machine*. Spec:
+`web/e2e/ru-07-postures-live.spec.ts`, **1/1**; it resets to *Ask first* first,
+so a rerun does not depend on what an earlier run left. Captures
+`ru-07-postures.png` and `ru-07-read-only.png` were inspected.
+
+| Case | Check | Result |
+|---|---|---|
+| RT-POSTURE-01 | **Permissions → Overview** shows *How much Raiker asks*, *Now: Ask first.*, and **Work in the sandbox** disabled with *Needs the command sandbox set up and enforced first* (no sandbox on a fresh workspace) | ✅ |
+| RT-POSTURE-02 | **Read-only** lists *This changes 21 permissions: 21 to “Never”.*; **Apply** sets them one by one and the panel reads *Now: Read-only.*; **Ask first** then restores them (*Now: Ask first.*) | ✅ after two spec fixes (an escaped pattern, and a name match that also hit the sandbox note) |
+
 ## Result — 2026-11-25 (Health: this machine)
 
 Against a fresh throwaway workspace on the Windows test PC (`raiker-web

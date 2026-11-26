@@ -494,4 +494,39 @@ describe("CapabilitiesView — posture by goal", () => {
     expect(within(goals).queryByText(/edit project files/)).toBeNull();
     expect(within(goals).getAllByRole("button", { name: /Change/ })).toHaveLength(2);
   });
+
+  it("offers the three postures and keeps Work in the sandbox closed until the sandbox is enforced (RU-07)", async () => {
+    stubFetch({
+      "GET /api/capability-gates": GATES,
+      "GET /api/command-sandbox": { windows_backend: "account", applies: true, wsl_configured: false, wsl_missing: [], wsl_setup_command: null },
+    });
+    render(CapabilitiesView);
+    const panel = await screen.findByTestId("postures");
+    expect(panel).toHaveTextContent("Now: Ask first.");
+    await waitFor(() => expect(within(panel).getByRole("radio", { name: /Work in the sandbox/ })).toBeDisabled());
+    expect(panel).toHaveTextContent(/stays on Ask first/);
+    const readOnly = within(panel).getByRole("radio", { name: /Read-only/ });
+    expect(readOnly).toBeEnabled();
+    await fireEvent.click(readOnly);
+    expect(panel).toHaveTextContent(/This changes 1 permission: 1 to “Never”\./);
+    expect(panel).toHaveTextContent(/Shell commands → Never/);
+  });
+
+  it("applies a posture one capability at a time through the mode routes (RU-07)", async () => {
+    const fetchMock = stubFetch({
+      "GET /api/capability-gates": GATES,
+      "GET /api/command-sandbox": { windows_backend: "wsl", applies: true, wsl_configured: true, wsl_missing: [], wsl_setup_command: null },
+      "POST /api/capability-modes/shell_execution/allow": { capability: "shell_execution", decision_mode: "allow" },
+    });
+    render(CapabilitiesView);
+    const panel = await screen.findByTestId("postures");
+    const sandbox = within(panel).getByRole("radio", { name: /Work in the sandbox/ });
+    await waitFor(() => expect(sandbox).toBeEnabled());
+    await fireEvent.click(sandbox);
+    await fireEvent.click(within(panel).getByRole("button", { name: "Apply" }));
+    await waitFor(() =>
+      expect(fetchMock.mock.calls.some(([u, init]) => String(u).includes("/api/capability-modes/shell_execution/allow") && (init as RequestInit | undefined)?.method === "POST")).toBe(true),
+    );
+    expect(fetchMock.mock.calls.filter(([u]) => String(u).includes("/api/capability-modes/") && !String(u).includes("shell_execution"))).toHaveLength(0);
+  });
 });

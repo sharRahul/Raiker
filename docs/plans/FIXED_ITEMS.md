@@ -1,5 +1,9 @@
 # Fixed items
 
+## FIXED-1567 — Permissions had no posture, only sixty rows to set one by one
+
+**Severity: Medium. Area: Permissions / UI (RU-07). Status: Fixed 2026-11-26.** An owner who wanted Raiker to "just work in the sandbox" or to "only read" had to open each row and change its mode, and nothing said which mix they were in. **Permissions → Overview** now opens on **How much Raiker asks** with **Ask first**, **Work in the sandbox** and **Read-only**, each a documented bundle of decision modes (`web/src/lib/postures.ts`): the sandbox posture allows only file writes, patches, checkpoint restore, shell and process execution, and leaves git push, memory, messages and everything that leaves the machine on *Ask me*; Read-only sets every change or outbound act to *Never*. A posture never turns a permission on; it is applied through the same per-capability mode route a row uses, with the posture named as the reason, and reported per capability. **Work in the sandbox** is disabled, saying so, until `/api/command-sandbox` reports the sandbox enforced. The page names the posture the modes match, or *Your own mix*. Evidence: `web/src/lib/postures.test.ts` (the posture → mode mapping, and that the sandbox posture never allows what Read-only does not refuse), `web/src/lib/views/CapabilitiesView.test.ts` (*offers the three postures…*, *applies a posture one capability at a time…*); live RT-POSTURE-01/02 (Read-only applied 21 modes, Ask first restored them). The RU-07 Build journey in *Work in the sandbox* (asks only for `git push`) still needs a host with WSL2 set up.
+
 ## FIXED-1566 — Health did not say what first run had left unset
 
 **Severity: Medium. Area: Health / UI (RU-08). Status: Fixed 2026-11-26.** RU-08 asks Health to list the command sandbox, backups, embedding model, voice, updates and always-on host with the page that fixes each; **This machine** showed only first run's machine checks, so an owner whose commands were refused for want of a sandbox, or who had never made a backup, learned it only from a failure. The card now has **Set up by first run**: six facts read from the endpoints their own settings pages already use (`/api/command-sandbox`, `/api/backups`, `/api/memory/settings`, `/api/voice/status`, `/api/host/update`, `/api/host`), problems first, each not-`ok` fact with **Open …** to the page that fixes it. A backup that is missing, unverified or more than seven days old is a warning; a WSL2 sandbox chosen but not set up, or the refused restricted account, is a failure; voice and the always-on host are optional and only informational; a fact that could not be read says *not read*, never `ok`. Evidence: `web/src/lib/healthFacts.test.ts`; live RT-HEALTH-02 on a fresh workspace (*Command sandbox — needs a fix*, *Backups — No backup has been made.*).
@@ -2141,6 +2145,7 @@ file you can open. The two capture sets that remain — `screenshots/pages/` and
 
 | ID | Severity | Area | Status |
 |---|---|---|---|
+| [FIXED-1567](#fixed-1567--permissions-had-no-posture-only-sixty-rows-to-set-one-by-one) | Medium | Permissions / UI (RU-07) | Fixed 2026-11-26 |
 | [FIXED-1566](#fixed-1566--health-did-not-say-what-first-run-had-left-unset) | Medium | Health / UI (RU-08) | Fixed 2026-11-26 |
 | [FIXED-1565](#fixed-1565--health-in-detail-snapped-shut-after-it-was-opened) | Low | Observability / UI | Fixed 2026-11-25 |
 | [FIXED-1564](#fixed-1564--the-health-page-did-not-show-this-machines-readiness) | Low | Health / UI (RU-08) | Fixed 2026-11-25 |

@@ -1,5 +1,9 @@
 # Fixed items
 
+## FIXED-1574 — Health did not say whether a model answers or the disk is filling
+
+**Severity: Medium. Area: Health / UI (RU-08). Status: Fixed 2026-11-26.** RU-08's *Set up by first run* list covered the sandbox, backups, embedding, voice, updates and always-on host but not the two facts that stop Raiker answering at all: whether a model is chosen, and whether this machine has the memory and free storage first run measured. An owner with no model learned it from a Chat that would not answer. The list now opens with **Model** (from `GET /api/models`: *needs a fix* with **Open Models** when no model is chosen or no provider is connected, otherwise the model that answers) and **Disk and memory** (the `memory` and `storage` rows of `GET /api/setup/system`, the worse of the two, with first run's remedy beside a problem and **Open This machine**, which opens *Health, in detail*). A fact that could not be read says *not read*. First run's own list is unchanged — it asks these questions in its own steps. Evidence: `web/src/lib/healthFacts.test.ts` (three new cases); live RT-HEALTH-03 on a fresh Linux workspace (*Model — needs a fix*, *Disk and memory — check: 7.5 GB free*).
+
 ## FIXED-1573 — Health called word-only recall "Search by meaning — Done"
 
 **Severity: Medium. Area: Health (RU-08). Status: Fixed 2026-11-26.** Health's search-by-meaning fact counted an available embedding model as done, so on a workspace recalling with `raiker-local-hash-v1` it read *local-gguf · everything indexed* while Memory's Recall backend said *matches words, not meaning*. Found while capturing RT-IMPORT-01. The fact now uses Memory's own rule — meaning only when the backend in use is semantic and a question can be embedded — and otherwise warns, naming the model that could build a meaning-based index, with **Open Memory controls**. Evidence: `web/src/lib/healthFacts.test.ts` (*calls lexical recall words-only even when an embedding model is offered*); live RT-HEALTH-02 recaptured (*Search by meaning — check*).
@@ -2169,6 +2173,7 @@ file you can open. The two capture sets that remain — `screenshots/pages/` and
 
 | ID | Severity | Area | Status |
 |---|---|---|---|
+| [FIXED-1574](#fixed-1574--health-did-not-say-whether-a-model-answers-or-the-disk-is-filling) | Medium | Health / UI (RU-08) | Fixed 2026-11-26 |
 | [FIXED-1573](#fixed-1573--health-called-word-only-recall-search-by-meaning--done) | Medium | Health (RU-08) | Fixed 2026-11-26 |
 | [FIXED-1572](#fixed-1572--chatgpt-and-claude-conversation-exports-could-not-be-imported) | Low | Memory / import (RU-16) | Fixed 2026-11-26 |
 | [FIXED-1571](#fixed-1571--first-run-set-up-the-device-but-not-the-machine-and-never-asked-for-a-posture) | Medium | First run (RU-09) | Fixed 2026-11-26 |

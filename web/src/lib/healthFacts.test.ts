@@ -47,4 +47,30 @@ describe("healthFacts (RU-08)", () => {
     const semantic = { retrieval: { backend_id: "n", kind: "local_model", model: "nomic-embed-text", dimensions: 768, semantic: true, reason_code: "", query_embeddable: true }, embedding_providers: [{ model: "nomic-embed-text" }], unindexed_memories: 0, unindexed_file_chunks: 0 } as never;
     expect(healthFacts({ ...none, memory: semantic }, NOW)[2]).toMatchObject({ state: "ok", detail: "nomic-embed-text · everything indexed." });
   });
+
+  it("leads with the model and disk-and-memory facts when they were read", () => {
+    const facts = healthFacts({ ...none, models: null, system: null }, NOW);
+    expect(facts.map((f) => f.id).slice(0, 2)).toEqual(["model", "disk-memory"]);
+    expect(facts[0].state).toBe("unknown");
+    expect(facts[1].state).toBe("unknown");
+  });
+
+  it("fails without a chosen model and names the one that answers", () => {
+    const fact = (current_model: string | null, profiles: unknown[]) =>
+      healthFacts({ ...none, models: { current_model, profiles } as never }, NOW)[0];
+    expect(fact(null, [])).toMatchObject({ state: "fail", detail: expect.stringContaining("No provider") });
+    expect(fact(null, [{}])).toMatchObject({ state: "fail", detail: expect.stringContaining("No model is chosen") });
+    expect(fact("qwen3:8b", [{}])).toMatchObject({ state: "ok", detail: "qwen3:8b answers." });
+  });
+
+  it("takes the worst of memory and free storage, with the remedy beside a problem", () => {
+    const check = (id: string, state: string, detail: string, remedy = "") => ({ id, label: id === "memory" ? "Memory" : "Free storage", state, detail, remedy, mandatory: true, data: {} });
+    const system = (checks: unknown[]) => ({ checks, blocking: [], ready: true }) as never;
+    const fact = (checks: unknown[]) => healthFacts({ ...none, system: system(checks) }, NOW)[0];
+    expect(fact([check("memory", "pass", "16.0 GB"), check("storage", "pass", "120.0 GB free")])).toMatchObject({ state: "ok" });
+    const low = fact([check("memory", "pass", "16.0 GB"), check("storage", "warn", "4.0 GB free", "Free some space.")]);
+    expect(low.state).toBe("warn");
+    expect(low.detail).toContain("Free some space.");
+    expect(fact([check("cpu", "pass", "8 cores")]).state).toBe("unknown");
+  });
 });

@@ -244,7 +244,9 @@
   let facts = $state<HealthFact[] | null>(null);
   async function loadFacts() {
     const read = <T,>(p: Promise<T>) => p.then((v) => v, () => null);
-    const [sandbox, backups, memory, voice, update, host] = await Promise.all([
+    const [models, system, sandbox, backups, memory, voice, update, host] = await Promise.all([
+      read(api.models()),
+      read(api.setupSystem()),
       read(api.commandSandbox()),
       read(api.backups()),
       read(api.memorySettings()),
@@ -252,7 +254,7 @@
       read(api.hostUpdate()),
       read(api.host()),
     ]);
-    facts = healthFacts({ sandbox, backups, memory, voice, update, host });
+    facts = healthFacts({ models, system, sandbox, backups, memory, voice, update, host });
   }
   /** Mandatory machine requirements not met plus first-run facts that fail. */
   const toFix = $derived((machine?.blocking.length ?? 0) + (facts ?? []).filter((f) => f.state === "fail").length);

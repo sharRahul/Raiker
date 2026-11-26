@@ -55,7 +55,7 @@ build is still owed for every item (the regular-use journeys in
 | RU-05 WSL2 and MXC options | Partly done | WSL2 is available and measured | MXC probe result |
 | RU-06 Ten families | Done | Families, lines and the unit test ([FIXED-1537](FIXED_ITEMS.md#fixed-1537--permissions-was-grouped-in-six-headings-an-owner-had-to-learn)); live sweep of every family at 1440 and 390 px (RT-PERM-SWEEP-01, 2026-11-26) | — |
 | RU-07 Three postures | Partly done | Per-conversation command grant on the approval card ([FIXED-1540](FIXED_ITEMS.md#fixed-1540--a-command-could-not-be-allowed-for-a-conversation-from-any-screen)); per-MCP-server *use without asking* ([FIXED-1562](FIXED_ITEMS.md#fixed-1562--a-trusted-mcp-server-could-only-be-used-by-allowing-every-server)); the three postures and their unit-tested mapping ([FIXED-1567](FIXED_ITEMS.md#fixed-1567--permissions-had-no-posture-only-sixty-rows-to-set-one-by-one)) | A Build journey in *Work in the sandbox* that asks only for `git push` |
-| RU-08 Health | Partly done | `raiker doctor` with each fix ([FIXED-1552](FIXED_ITEMS.md#fixed-1552--there-was-no-raiker-doctor)); **This machine** on Observability → *Health, in detail* ([FIXED-1564](FIXED_ITEMS.md#fixed-1564--the-health-page-did-not-show-this-machines-readiness)); sandbox, backups, embedding, voice, updates and always-on facts with the page that fixes each ([FIXED-1566](FIXED_ITEMS.md#fixed-1566--health-did-not-say-what-first-run-had-left-unset)) | Model and disk-and-memory facts in the same list; a fresh-machine pass showing exactly what first run fixes |
+| RU-08 Health | Partly done | `raiker doctor` with each fix ([FIXED-1552](FIXED_ITEMS.md#fixed-1552--there-was-no-raiker-doctor)); **This machine** on Observability → *Health, in detail* ([FIXED-1564](FIXED_ITEMS.md#fixed-1564--the-health-page-did-not-show-this-machines-readiness)); sandbox, backups, embedding, voice, updates and always-on facts with the page that fixes each ([FIXED-1566](FIXED_ITEMS.md#fixed-1566--health-did-not-say-what-first-run-had-left-unset)); model and disk-and-memory facts in the same list ([FIXED-1574](FIXED_ITEMS.md#fixed-1574--health-did-not-say-whether-a-model-answers-or-the-disk-is-filling)) | A fresh-machine pass showing exactly what first run fixes |
 | RU-09 Four-step first run | Partly done | Model step says which models suit numbers and code ([FIXED-1538](FIXED_ITEMS.md#fixed-1538--first-run-did-not-say-which-models-suit-numbers-and-code)) ; *This machine* facts and the *Posture* choice ([FIXED-1571](FIXED_ITEMS.md#fixed-1571--first-run-set-up-the-device-but-not-the-machine-and-never-asked-for-a-posture)) | A timed first useful answer under ten minutes on Windows and Linux |
 | RU-10 Keep or skip under the answer | Done | [FIXED-1539](FIXED_ITEMS.md#fixed-1539--a-memory-raiker-proposed-could-only-be-kept-from-memory), owner's words only ([FIXED-1548](FIXED_ITEMS.md#fixed-1548--a-sentence-the-model-invented-was-offered-to-keep-as-a-memory)); RT-1125-08 | — |
 | RU-11 Memory as a summary | Open | — | *What Raiker knows about you*, one switch, *Find by meaning* |
@@ -322,6 +322,11 @@ chat. Release qualification still requires a live run on the published build.
 
 ## Changelog
 
+- **2026-11-26 (later)** — RU-08's model and disk-and-memory facts shipped
+  ([FIXED-1574](FIXED_ITEMS.md#fixed-1574--health-did-not-say-whether-a-model-answers-or-the-disk-is-filling)).
+  RU-03's four runner gaps, RU-05's MXC probe and RU-07's WSL2 sign-off need
+  the Windows test PC, and RU-09's timed run needs a clean machine; none were
+  claimed from this Linux host.
 - **2026-11-26** — RU-06 and RU-16 done; RU-07's three postures, RU-08's
   first-run facts on Health, RU-09's *This machine* and *Posture* steps and
   RU-04's Linux package line shipped. What is left is in

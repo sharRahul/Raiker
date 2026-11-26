@@ -1,7 +1,7 @@
 /**
  * RU-08 — the readiness facts first run sets up, each with the page that fixes
- * it: command sandbox, backups, embedding model, voice, updates and the
- * always-on host. Every fact is read from an endpoint its own settings page
+ * it: the model, disk and memory, command sandbox, backups, embedding model,
+ * voice, updates and the always-on host. Every fact is read from an endpoint its own settings page
  * already uses; this only turns each answer into one line. A fact that could
  * not be read is `unknown`, never a pass.
  */
@@ -10,6 +10,8 @@ import type {
   CommandSandboxView,
   HostView,
   MemorySettingsView,
+  ModelsView,
+  SetupSystemReadiness,
   UpdateStatusView,
   VoiceStatus,
 } from "./generated/apiContract";
@@ -26,6 +28,9 @@ export type HealthFact = {
 };
 
 export type HealthSources = {
+  /** Optional: callers that have not read them get no model or machine fact. */
+  models?: ModelsView | null;
+  system?: SetupSystemReadiness | null;
   sandbox: CommandSandboxView | null;
   backups: BackupsView | null;
   memory: MemorySettingsView | null;
@@ -141,9 +146,41 @@ function hostFact(view: HostView | null): HealthFact {
     : { ...base, state: "info", detail: "Runs only while Raiker is open. Optional." };
 }
 
-/** The six facts, in the order first run sets them up. */
+function modelFact(view: ModelsView | null): HealthFact {
+  const base = { id: "model", label: "Model", href: "#/models", linkLabel: "Models" };
+  if (view === null || !Array.isArray(view.profiles)) return { ...base, state: "unknown", detail: UNREAD };
+  if (!view.current_model) {
+    return {
+      ...base,
+      state: "fail",
+      detail: view.profiles.length
+        ? "No model is chosen, so Chat cannot answer. Choose one."
+        : "No provider is connected, so Chat cannot answer. Add one.",
+    };
+  }
+  return { ...base, state: "ok", detail: `${view.current_model} answers.` };
+}
+
+function machineFact(view: SetupSystemReadiness | null): HealthFact {
+  // Memory and free storage, as first run measured them on this host.
+  const base = { id: "disk-memory", label: "Disk and memory", href: "#/observe?tab=overview&repair=machine", linkLabel: "This machine" };
+  if (view === null || !Array.isArray(view.checks)) return { ...base, state: "unknown", detail: UNREAD };
+  const rows = view.checks.filter((c) => c.id === "memory" || c.id === "storage");
+  if (!rows.length) return { ...base, state: "unknown", detail: UNREAD };
+  const worst = rows.some((c) => c.state === "fail") ? "fail" : rows.some((c) => c.state === "warn") ? "warn" : "ok";
+  const detail = rows
+    .map((c) => (c.state === "fail" || c.state === "warn") && c.remedy ? `${c.label}: ${c.detail}. ${c.remedy}` : `${c.label}: ${c.detail}`)
+    .join(" · ");
+  return { ...base, state: worst, detail };
+}
+
+/** The facts, in the order first run sets them up. */
 export function healthFacts(sources: HealthSources, now: number = Date.now()): HealthFact[] {
+  const lead: HealthFact[] = [];
+  if (sources.models !== undefined) lead.push(modelFact(sources.models));
+  if (sources.system !== undefined) lead.push(machineFact(sources.system));
   return [
+    ...lead,
     sandboxFact(sources.sandbox),
     backupFact(sources.backups, now),
     embeddingFact(sources.memory),

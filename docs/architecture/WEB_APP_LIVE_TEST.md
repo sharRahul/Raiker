@@ -81,6 +81,7 @@ how that bug was found. The capture `ru-08-this-machine-card.png` was inspected.
 | Case | Check | Result |
 |---|---|---|
 | RT-HEALTH-02 | (2026-11-26, FIXED-1566) Below the machine checks, **Set up by first run** lists Command sandbox, Backups, Search by meaning, Voice, Updates and Always-on host, none *not read*; on the fresh workspace the sandbox reads *needs a fix* with **Open Command sandbox** and Backups *No backup has been made.* with **Open Backups** | ✅ |
+| RT-HEALTH-03 | (2026-11-26, FIXED-1574) **Set up by first run** opens with **Model** and **Disk and memory**; on a fresh Linux workspace with no provider, Model reads *needs a fix* with **Open Models**, and Disk and memory reads *check* with the free-storage remedy and **Open This machine** (`web/e2e/ru-08-health-live.spec.ts`) | ✅ |
 | RT-HEALTH-01 | Observability → *Health, in detail* opens on **This machine**: *Every mandatory requirement is met.*, then each check (graphics, credential protection, runtimes, installation, operating system, architecture, memory, processor, free storage, network) with its detail and, for anything not `ok`, its fix; the disclosure stays open | ✅ after FIXED-1565 |
 
 ## Result — 2026-11-25 (Permissions families, first-run model note, local and cloud Ollama)

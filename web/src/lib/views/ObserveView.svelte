@@ -194,7 +194,7 @@
     window.addEventListener("hashchange", follow);
     return () => window.removeEventListener("hashchange", follow);
   });
-  const repairOpen = $derived(address.includes("repair=indexes"));
+  const repairOpen = $derived(address.includes("repair=indexes") || address.includes("repair=machine"));
   // The disclosure keeps the owner's own open/closed choice. A one-way
   // `open={repairOpen}` was re-applied whenever the page re-read its health,
   // so "Health, in detail" snapped shut seconds after it was opened.

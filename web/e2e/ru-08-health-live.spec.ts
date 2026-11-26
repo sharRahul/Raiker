@@ -33,9 +33,9 @@ test("RT-HEALTH-01 — Diagnostics lists this machine's checks with their fixes"
   await card.getByText(/checks? pass/).click();
   await expect(card).toContainText("Operating system");
   await expect(card).toContainText("Free storage");
-  // RT-HEALTH-02 — what first run sets up, each with the page that fixes it.
+  // RT-HEALTH-02/03 — what first run sets up (RT-HEALTH-03: the model and disk-and-memory facts), each with the page that fixes it.
   const facts = card.getByTestId("health-facts");
-  for (const label of ["Command sandbox", "Backups", "Search by meaning", "Voice", "Updates", "Always-on host"]) {
+  for (const label of ["Model", "Disk and memory", "Command sandbox", "Backups", "Search by meaning", "Voice", "Updates", "Always-on host"]) {
     await expect(facts).toContainText(label, { timeout: 30_000 });
   }
   await expect(facts).not.toContainText("not read");

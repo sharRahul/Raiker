@@ -371,8 +371,10 @@ describe("DiagnosticsView — if Raiker stops in the middle", () => {
     const card = await screen.findByTestId("machine-readiness");
     await waitFor(() => expect(card).toHaveTextContent(/1 mandatory requirement is not met/));
     expect(card).toHaveTextContent("Raiker needs at least 4 GB of memory.");
-    const rows = card.querySelectorAll("li");
-    expect(rows[0]).toHaveTextContent("Memory");
-    expect(rows[1]).toHaveTextContent("Operating system");
+    // Problems are listed; passing checks fold under "N checks pass".
+    const passing = card.querySelector("details.machine-passing");
+    expect(passing).toHaveTextContent("1 check passes");
+    expect(passing).toHaveTextContent("Operating system");
+    expect(passing).not.toHaveTextContent("Memory");
   });
 });

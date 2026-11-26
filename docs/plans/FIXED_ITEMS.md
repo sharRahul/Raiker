@@ -1,5 +1,9 @@
 # Fixed items
 
+## FIXED-1568 — Health's This machine card was a long ragged column
+
+**Severity: Low. Area: Health / UI (RU-08). Status: Fixed 2026-11-26.** **This machine** sat in a third of the grid as an eighteen-row column beside two short cards, every passing check as loud as a failure, badges of four widths pushing labels out of line, and *Ready* in its head while the command sandbox needed a fix. The card now spans the page in two columns — **Set up by first run** and **Machine checks** — with one badge column, a divider per row, each fix link right-aligned, passing checks folded under *N checks pass*, and a head badge counting what needs fixing in both columns. Evidence: `web/src/lib/views/DiagnosticsView.test.ts`; live RT-HEALTH-01/02 captures inspected.
+
 ## FIXED-1567 — Permissions had no posture, only sixty rows to set one by one
 
 **Severity: Medium. Area: Permissions / UI (RU-07). Status: Fixed 2026-11-26.** An owner who wanted Raiker to "just work in the sandbox" or to "only read" had to open each row and change its mode, and nothing said which mix they were in. **Permissions → Overview** now opens on **How much Raiker asks** with **Ask first**, **Work in the sandbox** and **Read-only**, each a documented bundle of decision modes (`web/src/lib/postures.ts`): the sandbox posture allows only file writes, patches, checkpoint restore, shell and process execution, and leaves git push, memory, messages and everything that leaves the machine on *Ask me*; Read-only sets every change or outbound act to *Never*. A posture never turns a permission on; it is applied through the same per-capability mode route a row uses, with the posture named as the reason, and reported per capability. **Work in the sandbox** is disabled, saying so, until `/api/command-sandbox` reports the sandbox enforced. The page names the posture the modes match, or *Your own mix*. Evidence: `web/src/lib/postures.test.ts` (the posture → mode mapping, and that the sandbox posture never allows what Read-only does not refuse), `web/src/lib/views/CapabilitiesView.test.ts` (*offers the three postures…*, *applies a posture one capability at a time…*); live RT-POSTURE-01/02 (Read-only applied 21 modes, Ask first restored them). The RU-07 Build journey in *Work in the sandbox* (asks only for `git push`) still needs a host with WSL2 set up.
@@ -2145,6 +2149,7 @@ file you can open. The two capture sets that remain — `screenshots/pages/` and
 
 | ID | Severity | Area | Status |
 |---|---|---|---|
+| [FIXED-1568](#fixed-1568--healths-this-machine-card-was-a-long-ragged-column) | Low | Health / UI (RU-08) | Fixed 2026-11-26 |
 | [FIXED-1567](#fixed-1567--permissions-had-no-posture-only-sixty-rows-to-set-one-by-one) | Medium | Permissions / UI (RU-07) | Fixed 2026-11-26 |
 | [FIXED-1566](#fixed-1566--health-did-not-say-what-first-run-had-left-unset) | Medium | Health / UI (RU-08) | Fixed 2026-11-26 |
 | [FIXED-1565](#fixed-1565--health-in-detail-snapped-shut-after-it-was-opened) | Low | Observability / UI | Fixed 2026-11-25 |

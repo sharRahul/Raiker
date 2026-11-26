@@ -30,6 +30,7 @@ test("RT-HEALTH-01 — Diagnostics lists this machine's checks with their fixes"
   }
   await expect(card.getByRole("heading", { name: "This machine" })).toBeVisible({ timeout: 60_000 });
   await expect(card).toContainText(/Every mandatory requirement is met|mandatory requirements? (is|are) not met/);
+  await card.getByText(/checks? pass/).click();
   await expect(card).toContainText("Operating system");
   await expect(card).toContainText("Free storage");
   // RT-HEALTH-02 — what first run sets up, each with the page that fixes it.
@@ -40,6 +41,6 @@ test("RT-HEALTH-01 — Diagnostics lists this machine's checks with their fixes"
   await expect(facts).not.toContainText("not read");
   await card.scrollIntoViewIfNeeded();
   await expect(card).toBeVisible();
-  await facts.scrollIntoViewIfNeeded();
+  await card.scrollIntoViewIfNeeded();
   await page.screenshot({ path: capturePath(join(SHOTS, "ru-08-this-machine-card.png")) });
 });

@@ -220,6 +220,7 @@
   const machineChecks = $derived(
     [...(machine?.checks ?? [])].sort((a, b) => STATE_ORDER[a.state] - STATE_ORDER[b.state]),
   );
+  const passedCount = $derived(machineChecks.filter((c) => c.state === "pass").length);
   async function loadMachine() {
     try {
       const answer = await api.setupSystem();
@@ -253,6 +254,8 @@
     ]);
     facts = healthFacts({ sandbox, backups, memory, voice, update, host });
   }
+  /** Mandatory machine requirements not met plus first-run facts that fail. */
+  const toFix = $derived((machine?.blocking.length ?? 0) + (facts ?? []).filter((f) => f.state === "fail").length);
   const FACT_ORDER: Record<string, number> = { fail: 0, warn: 1, unknown: 2, info: 3, ok: 4 };
   const sortedFacts = $derived([...(facts ?? [])].sort((a, b) => FACT_ORDER[a.state] - FACT_ORDER[b.state]));
   function factBadge(state: string): "blocked" | "approval-required" | "implemented" | "idle" {
@@ -278,56 +281,85 @@
   <PageState state="loading" title="Reading Raiker's health…" />
 {:else}
   <div class="grid">
-    <section class="card" aria-labelledby="diag-machine-h" data-testid="machine-readiness">
-      <h2 id="diag-machine-h">This machine</h2>
+    <section class="card machine-card" aria-labelledby="diag-machine-h" data-testid="machine-readiness">
+      <div class="machine-head">
+        <h2 id="diag-machine-h">This machine</h2>
+        {#if machine !== null && facts !== null}
+          <Badge
+            variant={toFix === 0 ? "implemented" : "blocked"}
+            label={toFix === 0 ? "Ready" : `${toFix} to fix`}
+          />
+        {/if}
+      </div>
       <p class="sub">
-        The checks first run makes, measured here and sent nowhere. The same list prints with
-        <code class="mono">raiker doctor</code>.
+        What first run sets up, and the checks it makes — measured here, sent nowhere. The same
+        checks print with <code class="mono">raiker doctor</code>.
       </p>
-      {#if machineError}
-        <p class="sub" role="status">This machine's checks could not be read. Press Refresh.</p>
-      {:else if machine === null}
-        <p class="sub" role="status">Checking this machine…</p>
-      {:else}
-        <p class="sub">
-          {machine.ready
-            ? "Every mandatory requirement is met."
-            : `Not ready: ${machine.blocking.length} mandatory requirement${machine.blocking.length === 1 ? " is" : "s are"} not met.`}
-        </p>
-        <ul class="monitor machine">
-          {#each machineChecks as check (check.id)}
-            <li>
-              <Badge variant={machineBadge(check.state)} label={MACHINE_LABEL[check.state]} />
-              <div class="machine-check">
-                <span class="monitor-code">{check.label}</span>
-                <span class="machine-detail">{check.detail}</span>
-                {#if check.remedy && check.state !== "pass"}
-                  <span class="machine-fix">{check.remedy}</span>
-                {/if}
-              </div>
-            </li>
-          {/each}
-        </ul>
-      {/if}
-      <h3 class="machine-sub">Set up by first run</h3>
-      {#if facts === null}
-        <p class="sub" role="status">Reading what first run set up…</p>
-      {:else}
-        <ul class="monitor machine" data-testid="health-facts">
-          {#each sortedFacts as fact (fact.id)}
-            <li>
-              <Badge variant={factBadge(fact.state)} label={MACHINE_LABEL[fact.state]} />
-              <div class="machine-check">
-                <span class="monitor-code">{fact.label}</span>
-                <span class="machine-detail">{fact.detail}</span>
-                {#if fact.state !== "ok"}
-                  <a class="machine-fix" href={fact.href}>Open {fact.linkLabel}</a>
-                {/if}
-              </div>
-            </li>
-          {/each}
-        </ul>
-      {/if}
+      <div class="machine-cols">
+        <div class="machine-col">
+          <h3 class="machine-sub">Set up by first run</h3>
+          {#if facts === null}
+            <p class="sub" role="status">Reading what first run set up…</p>
+          {:else}
+            <ul class="machine-list" data-testid="health-facts">
+              {#each sortedFacts as fact (fact.id)}
+                <li>
+                  <Badge variant={factBadge(fact.state)} label={MACHINE_LABEL[fact.state]} />
+                  <div class="machine-check">
+                    <span class="machine-label">{fact.label}</span>
+                    <span class="machine-detail">{fact.detail}</span>
+                  </div>
+                  {#if fact.state !== "ok"}
+                    <a class="btn btn-ghost btn-sm machine-link" href={fact.href}>Open {fact.linkLabel}</a>
+                  {/if}
+                </li>
+              {/each}
+            </ul>
+          {/if}
+        </div>
+        <div class="machine-col">
+          <h3 class="machine-sub">Machine checks</h3>
+          {#if machineError}
+            <p class="sub" role="status">This machine's checks could not be read. Press Refresh.</p>
+          {:else if machine === null}
+            <p class="sub" role="status">Checking this machine…</p>
+          {:else}
+            <p class="sub">
+              {machine.ready
+                ? "Every mandatory requirement is met."
+                : `Not ready: ${machine.blocking.length} mandatory requirement${machine.blocking.length === 1 ? " is" : "s are"} not met.`}
+            </p>
+            <ul class="machine-list">
+              {#each machineChecks.filter((c) => c.state !== "pass") as check (check.id)}
+                <li>
+                  <Badge variant={machineBadge(check.state)} label={MACHINE_LABEL[check.state]} />
+                  <div class="machine-check">
+                    <span class="machine-label">{check.label}</span>
+                    <span class="machine-detail">{check.detail}</span>
+                    {#if check.remedy}<span class="machine-fix">{check.remedy}</span>{/if}
+                  </div>
+                </li>
+              {/each}
+            </ul>
+            {#if machineChecks.some((c) => c.state === "pass")}
+              <details class="machine-passing">
+                <summary>{passedCount === 1 ? "1 check passes" : `${passedCount} checks pass`}</summary>
+                <ul class="machine-list">
+                  {#each machineChecks.filter((c) => c.state === "pass") as check (check.id)}
+                    <li>
+                      <Badge variant="implemented" label="ok" />
+                      <div class="machine-check">
+                        <span class="machine-label">{check.label}</span>
+                        <span class="machine-detail">{check.detail}</span>
+                      </div>
+                    </li>
+                  {/each}
+                </ul>
+              </details>
+            {/if}
+          {/if}
+        </div>
+      </div>
     </section>
 
     <section class="card" aria-labelledby="diag-monitor-h">
@@ -622,11 +654,28 @@
     font-size: var(--text-xs);
     white-space: nowrap;
   }
-  .machine-check { display: flex; flex-direction: column; gap: 0.1rem; min-width: 0; flex: 1; }
+  .machine-card { grid-column: 1 / -1; }
+  .machine-head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); }
+  .machine-cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(22rem, 1fr)); gap: var(--space-4) var(--space-6); margin-top: var(--space-3); }
+  .machine-sub { font-size: var(--text-xs); font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-3); margin: 0 0 0.5rem; }
+  .machine-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+  .machine-list li {
+    display: grid;
+    grid-template-columns: 6.5rem 1fr auto;
+    align-items: start;
+    gap: 0.75rem;
+    padding: 0.55rem 0;
+    border-top: 1px solid var(--border);
+  }
+  .machine-list li:first-child { border-top: 0; }
+  .machine-list li > :global(:first-child) { justify-self: start; }
+  .machine-check { display: flex; flex-direction: column; gap: 0.15rem; min-width: 0; }
+  .machine-label { color: var(--text-1); font-size: var(--text-sm); font-weight: 500; }
   .machine-detail { color: var(--text-2); font-size: var(--text-xs); overflow-wrap: anywhere; }
   .machine-fix { color: var(--text-2); font-size: var(--text-xs); }
-  a.machine-fix { color: var(--accent); }
-  .machine-sub { font-size: var(--text-sm); font-weight: 600; margin: 0.9rem 0 0.4rem; }
+  .machine-link { white-space: nowrap; align-self: center; }
+  .machine-passing { margin-top: 0.4rem; }
+  .machine-passing summary { cursor: pointer; font-size: var(--text-sm); color: var(--text-2); padding: 0.3rem 0; }
   .recovery details { border-top: 1px solid var(--border); padding: 0.4rem 0; }
   .recovery summary { cursor: pointer; font-weight: 600; font-size: var(--text-sm); }
   .recovery summary:focus-visible { outline: 3px solid var(--focus-ring); outline-offset: 2px; }

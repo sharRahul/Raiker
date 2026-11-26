@@ -74,7 +74,12 @@ are implicitly read from parent directories outside the granted project.
 A project root with no `RAIKER.md` is read for `AGENTS.md`, then `CLAUDE.md`, then `.cursorrules`
 (RU-16, 2026-11-25): the first name present is the project's one file, under the
 same pinned read and review, and its name is part of what a review binds to. The
-global file has no alias. No GEMINI.md, `.cursor/rules`, imports, @file expansion,
+global file has no alias. Since 2026-11-26 the last fallback is Cursor's
+`.cursor/rules` folder: each `.mdc`/`.md` file directly in it is read pinned,
+the files are joined in name order under `## <name>` headings, the whole must fit
+one file's byte and character limits, and the digest covers every name and its
+bytes, so adding, renaming or editing a rule needs a new review. A link, a
+non-directory or any refused file refuses the folder. No GEMINI.md, imports, @file expansion,
 network fetches, executable directives, environment expansion or frontmatter.
 Remote-only/rootless projects cannot acquire local repository rules by guessing.
 

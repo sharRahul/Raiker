@@ -1,5 +1,9 @@
 # Fixed items
 
+## FIXED-1569 — A project's .cursor/rules folder was ignored
+
+**Severity: Low. Area: Build / instructions (RU-16). Status: Fixed 2026-11-26.** Cursor keeps a project's rules as several `.mdc` files in `.cursor/rules`; Raiker read only the older single-file `.cursorrules`, so a Cursor project gave Build no instructions. A project root with none of `RAIKER.md`, `AGENTS.md`, `CLAUDE.md` or `.cursorrules` is now read for `.cursor/rules`: each `.mdc`/`.md` file directly in it, read pinned like any instruction file, joined in name order under its name, held together to one file's 8,192-byte and 4,000-character limits, and reviewed by one digest over every name and its bytes before Build uses it. A link or a refused file refuses the folder; the global file never reads it. Evidence: `tests/test_raiker_md.py::test_the_cursor_rules_folder_is_read_as_one_source_after_every_file`, `::test_the_cursor_rules_folder_fits_one_files_limits`, `::test_the_global_file_never_reads_the_cursor_rules_folder`.
+
 ## FIXED-1568 — Health's This machine card was a long ragged column
 
 **Severity: Low. Area: Health / UI (RU-08). Status: Fixed 2026-11-26.** **This machine** sat in a third of the grid as an eighteen-row column beside two short cards, every passing check as loud as a failure, badges of four widths pushing labels out of line, and *Ready* in its head while the command sandbox needed a fix. The card now spans the page in two columns — **Set up by first run** and **Machine checks** — with one badge column, a divider per row, each fix link right-aligned, passing checks folded under *N checks pass*, and a head badge counting what needs fixing in both columns. Evidence: `web/src/lib/views/DiagnosticsView.test.ts`; live RT-HEALTH-01/02 captures inspected.
@@ -2149,6 +2153,7 @@ file you can open. The two capture sets that remain — `screenshots/pages/` and
 
 | ID | Severity | Area | Status |
 |---|---|---|---|
+| [FIXED-1569](#fixed-1569--a-projects-cursorrules-folder-was-ignored) | Low | Build / instructions (RU-16) | Fixed 2026-11-26 |
 | [FIXED-1568](#fixed-1568--healths-this-machine-card-was-a-long-ragged-column) | Low | Health / UI (RU-08) | Fixed 2026-11-26 |
 | [FIXED-1567](#fixed-1567--permissions-had-no-posture-only-sixty-rows-to-set-one-by-one) | Medium | Permissions / UI (RU-07) | Fixed 2026-11-26 |
 | [FIXED-1566](#fixed-1566--health-did-not-say-what-first-run-had-left-unset) | Medium | Health / UI (RU-08) | Fixed 2026-11-26 |

@@ -81,6 +81,39 @@ def test_cursorrules_is_the_last_fallback(tmp_path: Path) -> None:
     assert raiker_md.read_instruction_file(tmp_path, raiker_md.PROJECT_FILENAMES).name == "CLAUDE.md"
 
 
+def test_the_cursor_rules_folder_is_read_as_one_source_after_every_file(tmp_path: Path) -> None:
+    rules = tmp_path / ".cursor" / "rules"
+    rules.mkdir(parents=True)
+    (rules / "b-style.mdc").write_text("---\nalwaysApply: true\n---\nUse tabs.", encoding="utf-8")
+    (rules / "a-tests.md").write_text("Run the tests.", encoding="utf-8")
+    (rules / "notes.txt").write_text("not a rule", encoding="utf-8")
+    (rules / "empty.mdc").write_text("  ", encoding="utf-8")
+    read = raiker_md.read_instruction_file(tmp_path, raiker_md.PROJECT_FILENAMES)
+    assert read.state == "read"
+    assert read.name == ".cursor/rules"
+    assert read.text.index("## a-tests.md") < read.text.index("## b-style.mdc")
+    assert "not a rule" not in read.text
+    first = read.digest
+    (rules / "a-tests.md").write_text("Run the tests twice.", encoding="utf-8")
+    assert raiker_md.read_instruction_file(tmp_path, raiker_md.PROJECT_FILENAMES).digest != first
+    (tmp_path / ".cursorrules").write_text("Cursor rules", encoding="utf-8")
+    assert raiker_md.read_instruction_file(tmp_path, raiker_md.PROJECT_FILENAMES).name == ".cursorrules"
+
+
+def test_the_cursor_rules_folder_fits_one_files_limits(tmp_path: Path) -> None:
+    rules = tmp_path / ".cursor" / "rules"
+    rules.mkdir(parents=True)
+    for index in range(3):
+        (rules / f"r{index}.mdc").write_text("x" * 1500, encoding="utf-8")
+    assert raiker_md.read_instruction_file(tmp_path, raiker_md.PROJECT_FILENAMES).state == "oversized"
+
+
+def test_the_global_file_never_reads_the_cursor_rules_folder(tmp_path: Path) -> None:
+    (tmp_path / ".cursor" / "rules").mkdir(parents=True)
+    (tmp_path / ".cursor" / "rules" / "a.mdc").write_text("rule", encoding="utf-8")
+    assert raiker_md.read_instruction_file(tmp_path).state == "absent"
+
+
 def test_the_global_file_never_reads_another_agents_name(tmp_path: Path) -> None:
     (tmp_path / "AGENTS.md").write_text("Agent rules", encoding="utf-8")
     assert raiker_md.read_instruction_file(tmp_path).state == "absent"

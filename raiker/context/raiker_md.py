@@ -8,8 +8,9 @@ In short:
   (``.raiker/user-instructions/<user id>/RAIKER.md``) and the project root's
   ``RAIKER.md``. A ``RAIKER.md`` in a subdirectory is never read, and no
   import or ``@file`` expansion exists. A project root with no ``RAIKER.md``
-  is read for ``AGENTS.md``, then ``CLAUDE.md``, then ``.cursorrules`` (RU-16), under the same
-  review: one file per project, the first name present, never merged.
+  is read for ``AGENTS.md``, then ``CLAUDE.md``, then ``.cursorrules``, then Cursor's
+  ``.cursor/rules`` folder (RU-16), under the same review: one source per project, the
+  first present, never merged. The folder's ``.mdc``/``.md`` files are one source, in name order.
 * A project uses file instructions only after the owner turns them on for it.
 * Discovering a file does not approve it. The owner reviews the exact bytes
   (their SHA-256 and this module's projection version); a changed file needs a
@@ -38,9 +39,12 @@ from raiker.context.redaction import redact_text
 
 FILENAME: Final = "RAIKER.md"
 #: A project root's names, in order. The first present is the project's file.
-#: ``.cursorrules`` is Cursor's single-file rules; its ``.cursor/rules`` folder of
-#: several files is not read, because a project has one instruction file.
+#: ``.cursorrules`` is Cursor's single-file rules. Its ``.cursor/rules`` folder is
+#: the last fallback (:data:`CURSOR_RULES`), read as one source.
 PROJECT_FILENAMES: Final = (FILENAME, "AGENTS.md", "CLAUDE.md", ".cursorrules")
+#: Cursor's rules folder, relative to a project root, and what counts in it.
+CURSOR_RULES: Final = ".cursor/rules"
+CURSOR_RULE_SUFFIXES: Final = (".mdc", ".md")
 #: Bumped when what the model is shown for the same bytes changes (the
 #: redactor's projection or the wrapper). A review binds to it, so a new
 #: projection is reviewed again rather than trusted on the old approval.
@@ -203,9 +207,64 @@ def read_instruction_file(directory: Path, names: tuple[str, ...] = (FILENAME,))
         return FileRead("unsafe")
     name = _first_name_present(directory, names)
     if name is None:
+        if names == PROJECT_FILENAMES:
+            return _read_cursor_rules(directory)
         return FileRead("absent")
     read = _read_pinned(directory / name)
     return FileRead(read.state, read.text, read.digest, read.raw_bytes, name)
+
+
+def _safe_directory(path: Path) -> bool | None:
+    """True for a real directory, False for a link or other entry, None when absent."""
+    try:
+        info = os.lstat(path)
+    except FileNotFoundError:
+        return None
+    except OSError:
+        return False
+    return not _is_link_or_reparse(info) and stat.S_ISDIR(info.st_mode)
+
+
+def _read_cursor_rules(directory: Path) -> FileRead:
+    """Cursor's ``.cursor/rules`` folder as one source, or say why not.
+
+    Each ``.mdc``/``.md`` file directly in the folder is read pinned, as a
+    single file is; they are joined in name order under their names, and the
+    whole must fit the byte and character limits one file has. Anything a
+    single file would refuse refuses the folder.
+    """
+    for part in (directory / ".cursor", directory / ".cursor" / "rules"):
+        safe = _safe_directory(part)
+        if safe is None:
+            return FileRead("absent", name=CURSOR_RULES)
+        if not safe:
+            return FileRead("unsafe", name=CURSOR_RULES)
+    rules_dir = directory / ".cursor" / "rules"
+    try:
+        names = sorted(n for n in os.listdir(rules_dir) if n.endswith(CURSOR_RULE_SUFFIXES))
+    except OSError:
+        return FileRead("unreadable", name=CURSOR_RULES)
+    parts: list[str] = []
+    hasher = hashlib.sha256()
+    total = 0
+    for rule in names:
+        read = _read_pinned(rules_dir / rule)
+        if read.state == "empty":
+            continue
+        if read.state != "read":
+            return FileRead(read.state, digest=read.digest, raw_bytes=read.raw_bytes, name=CURSOR_RULES)
+        encoded = read.text.encode("utf-8")
+        hasher.update(rule.encode("utf-8") + b"\x00" + encoded + b"\x00")
+        total += len(encoded)
+        parts.append(f"## {rule}\n\n{read.text.strip()}")
+    if not names:
+        return FileRead("absent", name=CURSOR_RULES)
+    if not parts:
+        return FileRead("empty", name=CURSOR_RULES)
+    text = "\n\n".join(parts)
+    if total > MAX_FILE_BYTES or len(text) > MAX_FILE_CHARS:
+        return FileRead("oversized", raw_bytes=total, name=CURSOR_RULES)
+    return FileRead("read", text=text, digest=hasher.hexdigest(), raw_bytes=total, name=CURSOR_RULES)
 
 
 def _read_pinned(path: Path) -> FileRead:

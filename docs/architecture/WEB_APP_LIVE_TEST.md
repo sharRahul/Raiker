@@ -1,10 +1,37 @@
 # Web App Live Test — model backends
 
+## Result — 2026-11-26 WSL2 Build posture
+
+**RT-WSL-BUILD-01 failed; RU-07 stays open.** Windows build 26300.10075,
+real Ollama `qwen3.5:9b`, enforced WSL2, isolated workspace. The owner selected
+*Work in the sandbox*, enabled Build, created a project with
+`python3 -m unittest -q` as its declared check, and requested a pricing module
+and tests. The model made a real `write_file` call, which was parked as
+**medium risk / Accept**. Nothing had run. The test accepted no approvals
+and failed its no-prompt assertion (1.9 minutes). It did not reach tests or
+Git push, so neither is qualified by this attempt.
+
+The broker's ordinary approval path does not carry the persisted Allow mode
+to RuntimeAuthority for these file writes. Its memory-specific standing
+Allow bridge is not a sandbox posture. The required fix must prove disposable
+copy confinement rather than remove medium-risk approval globally. Details
+and the secondary refusal/path observations are in
+[TO_BE_FIXED](../plans/TO_BE_FIXED.md#windows-build-posture--found-live-2026-11-26).
+
+An earlier attempt on `qwen2.5-coder:7b` printed tool-call JSON inside its
+answer without making calls. Its prose claim that it created and tested files
+was not accepted as evidence. The reproducible live spec is
+`web/e2e/ru-07-wsl-build-live.spec.ts`; it deliberately retains the unmet
+assertion. Local screenshots were visually inspected:
+`output/playwright/ru-07-wsl-build.png` (real approval),
+`ru-07-wsl-build-progress.png` (running turn) and
+`ru-07-wsl-build-last.png`; log `output/ready-wsl-build-live.log`.
+
 ## Result — 2026-11-26 MXC containment evaluation
 
 RT-MXC-01 ran the pinned Microsoft MXC SDK 1.1.0 against Raiker's actual
 Windows self-test executable. The unsandboxed control could reach every
-synthetic canary and both host listeners. ProcessContainer passed all eleven
+synthetic canary, the external TCP destination and the host listener. ProcessContainer passed all eleven
 observations: relay, copy write, outside-write refusal, explicit grant below
 a denied root, protected `.git`, protected `.raiker`, masked read, egress,
 host loopback, own loopback and detached descendant reaping. No warnings;

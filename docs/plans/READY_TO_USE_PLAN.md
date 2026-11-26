@@ -322,6 +322,13 @@ chat. Release qualification still requires a live run on the published build.
 
 ## Changelog
 
+- **2026-11-26 (real WSL2 Build)** — RU-07's live journey found a product
+  blocker: the first copied file write still asked despite the sandbox
+  posture's Allow mapping. No approval was accepted. The failing criterion
+  and broker/root-confinement work are recorded in
+  [TO_BE_FIXED](TO_BE_FIXED.md#windows-build-posture--found-live-2026-11-26);
+  no Build or Git push sign-off is claimed.
+
 - **2026-11-26 (MXC evaluation)** — RU-05's missing Windows probe is recorded:
   the pinned SDK's native ProcessContainer passes all eleven observations,
   including protected descendants and an explicit ACL under a denied root.

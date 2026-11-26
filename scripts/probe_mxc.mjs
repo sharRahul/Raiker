@@ -8,7 +8,7 @@ import { execFile } from "node:child_process";
 import { copyFileSync, mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { createServer } from "node:net";
-import { networkInterfaces, release } from "node:os";
+import { release } from "node:os";
 import { join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { promisify } from "node:util";
@@ -33,13 +33,13 @@ writeFileSync(masked, "synthetic-mxc-canary");
 await execute("icacls.exe", [explicitChild, "/grant", "*S-1-15-2-1:(OI)(CI)F"]);
 const listener = createServer(socket => socket.end());
 await new Promise(resolve => listener.listen(0, "0.0.0.0", resolve));
-const ip = Object.values(networkInterfaces()).flat().find(item => item?.family === "IPv4" && !item.internal)?.address;
-if (!ip) throw new Error("No non-loopback IPv4 control address is available.");
 const port = listener.address().port;
 const test = {
   nonce: "mxc-probe-20261126", inside_path: join(copy, "inside.txt"),
   outside_paths: [join(base, "escape.txt"), join(explicitChild, "escape.txt"), join(copy, ".git", "escape.txt"), join(copy, ".raiker", "escape.txt")],
-  masked_read_path: masked, connect_address: `${ip}:${port}`, loopback_address: `127.0.0.1:${port}`,
+  // An external TCP handshake, with no application payload, separates egress
+  // from Windows' special treatment of connections to this same host.
+  masked_read_path: masked, connect_address: "1.1.1.1:443", loopback_address: `127.0.0.1:${port}`,
   spawn_grandchild: true, hold_for_probe: false,
 };
 // CommandLineToArgvW escaping; JSON must remain one literal argument.

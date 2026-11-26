@@ -710,7 +710,8 @@ specific machine, not a lower supported-version promise.
 [`scripts/probe_mxc.mjs`](../../scripts/probe_mxc.mjs) then ran Raiker's own
 `--selftest` executable once outside containment and once inside
 ProcessContainer. Only synthetic fixtures were used. The control can read and
-write every canary and connect to both host listeners; the contained process
+write every canary and connect to an external TCP destination and the host
+listener; the contained process
 can write its copy and connect to its own listener, but cannot reach the
 protected paths or host services. It starts a detached descendant which is
 gone after the contained parent exits.
@@ -723,7 +724,7 @@ gone after the contained parent exits.
 | Explicit application-package allow below a denied root | Enforced |
 | Protected `.git` and `.raiker` descendants | Both enforced |
 | Masked owner canary read | Enforced |
-| Non-loopback host connection | Enforced |
+| External TCP connection (`1.1.1.1:443`, no application payload) | Enforced |
 | Host loopback connection | Enforced |
 | Container's own loopback listener | Reachable, as required by toolchains |
 | Detached descendant reaped | Enforced |

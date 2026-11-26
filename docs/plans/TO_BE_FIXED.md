@@ -1,5 +1,31 @@
 ## Release blocker: native sandbox migration incomplete
 
+### Windows Build posture — found live 2026-11-26
+
+**RU-07 is not qualified.** RT-WSL-BUILD-01 selected *Work in the sandbox*
+through Permissions on an enforced WSL2 host, enabled the Build preset and
+used the real local `qwen3.5:9b` model. Its first `write_file` for `pricing.py`
+was parked as medium risk with **Accept**, before any test ran. No approval
+was accepted by the test. The existing posture mapping alone is insufficient:
+`ToolBroker` parks an ordinary approval-bound action before `RuntimeAuthority`
+can apply the persisted capability Allow mode; the broker's existing standing
+Allow bridge covers memory writes only. This requires a copy-scoped bridge
+that proves the target is disposable and the sandbox enforced, preserves
+per-turn Ask/Deny and all hard denials, and never authorizes Apply, durable
+memory, sending, spending or Git push. Do not fix it by globally relaxing the
+medium-risk policy. Commands need the same end-to-end qualification.
+
+`web/e2e/ru-07-wsl-build-live.spec.ts` retains the failing live criterion;
+it is not skipped or counted as passing. The earlier `qwen2.5-coder:7b`
+attempt printed tool-call JSON as prose and performed no tool calls, so it
+supplies no containment or execution evidence. Also observed on an early
+refused turn: the client tried to file its not-yet-stored session under the
+project and received 403. Investigate project filing on early refusal, as
+the profile-save path already does. The Build caption also named the data
+workspace rather than the new project's folder; no write was accepted, so
+this is an unqualified path to investigate, not a demonstrated outside write.
+See the [live record](../architecture/WEB_APP_LIVE_TEST.md#result--2026-11-26-wsl2-build-posture).
+
 **Windows review, 2026-11-26:** the current production account status still
 reports all four isolation gaps and refuses execution. All four dedicated
 accounts also report `network_denied: false` and

@@ -390,6 +390,11 @@ provider card's own secure field.
 | **Check** *(source checkouts only)* | Raiker checks its own parts from inside: the host, the interface, the encrypted database, the data format, long-term memory storage, the permission registry, the governed command runner and the credential vault — then makes one short request to the model you chose. A part that is not working says how to fix it; **Check again** reruns it. |
 | **Start** | *You're set. What should we do first?* — or, when you deferred the model, *Setup is saved. Chat and Build need a model before they can answer.* with **Choose a model**. Type a first task, or use one of four starters (*Summarise a document*, *Plan my week*, *Fix a bug in a repository*, *Make an image*). The first message opens Chat and that conversation is kept in Threads as *Getting started*. **Go to Home** finishes without sending anything. |
 
+**Work in the sandbox** is offered only after the command sandbox's probe
+passes, not merely after installation. Build can still ask for approval for
+file changes in the current source build; see the
+[posture limitation](permissions-and-runtime-modes.md#postures).
+
 Backup is offered on the last step as optional setup rather than asked for
 before your first turn, and nothing claims a backup exists until Raiker has
 written and verified an encrypted snapshot. Once setup is complete it does not

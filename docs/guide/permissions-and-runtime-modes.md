@@ -571,8 +571,16 @@ asks*; it never turns a permission on.
 | Posture | What it sets |
 |---|---|
 | **Ask first** | Every permission to **Ask me**. |
-| **Work in the sandbox** | File writes, patches, checkpoint restore, shell commands and processes to **Allow** — they stay inside the disposable copy and the command sandbox. Everything else, including git push, memory, messages and anything that leaves this machine, to **Ask me**. Offered only while the command sandbox is set up and enforced. |
+| **Work in the sandbox** | File writes, patches, checkpoint restore, shell commands and processes to **Allow**. Everything else, including git push, memory, messages and anything that leaves this machine, to **Ask me**. Offered only after the command sandbox's probe measures every mandatory observation enforced; installation alone is insufficient. |
 | **Read-only** | Anything that changes files, memory or git, runs a program, sends a message, installs a plugin, generates an image or exports telemetry to **Never**; everything else to **Ask me**. |
+
+**Current Build limitation:** the posture applies these modes, but a file
+creation can still stop for approval before the runtime applies its Allow
+mode. The Windows WSL2 live journey found this on 2026-11-26. Review any
+requested approval normally; a prompt-free Build journey is not yet
+qualified. The [open work and evidence](../plans/TO_BE_FIXED.md#windows-build-posture--found-live-2026-11-26)
+track the required copy-confined execution fix. Applying changes back to the
+project and pushing still require their own authority.
 
 Choosing one lists how many permissions it changes, and which, before
 **Apply**. Each change is the same governed mode change a row makes, recorded

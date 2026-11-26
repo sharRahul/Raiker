@@ -323,7 +323,7 @@ chat. Release qualification still requires a live run on the published build.
 ## Changelog
 
 - **2026-11-26 (real WSL2 Build)** — RU-07's live journey found a product
-  blocker: the first copied file write still asked despite the sandbox
+  blocker: the first proposed file write still asked despite the sandbox
   posture's Allow mapping. No approval was accepted. The failing criterion
   and broker/root-confinement work are recorded in
   [TO_BE_FIXED](TO_BE_FIXED.md#windows-build-posture--found-live-2026-11-26);

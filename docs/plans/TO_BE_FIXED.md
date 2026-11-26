@@ -2014,3 +2014,33 @@ FIXED-1526 to FIXED-1529.
   The Library's relative rule (FIXED-1525) has the right shape but its 0.52
   floor is v1.5's too. A per-model floor, or a floor read from the score spread,
   is needed before either search moves; not changed this round.
+
+## 2026-11-26 round — found, not fixed
+
+Run record: [WEB_APP_LIVE_TEST](../architecture/WEB_APP_LIVE_TEST.md#result--2026-11-26-conversation-exports-into-memory).
+RU-06, RU-07's postures, RU-08's facts, RU-09's steps and RU-16 shipped this
+round; what follows could not be finished in it.
+
+* **RU-03 — the restricted-account boundary is still refused on Windows.** Its
+  four gaps are native-runner work (per-account profile reset between tasks,
+  explicit descendant ACLs, explicit allows below denied drive roots, and
+  replacing the loopback-port approximation with a per-account firewall rule)
+  and each needs an elevated, adversarial test on this PC before the refusal is
+  lifted. Not attempted: lifting it without those tests would ship an
+  unproven boundary. WSL2 remains the Windows default where it is set up.
+* **RU-04 — macOS one-prompt account setup and the cross-platform Build turn.**
+  No macOS machine was available. Linux now names the Bubblewrap package
+  (FIXED-1570) but was not run on a Linux host this round; the Ubuntu 24.04
+  Build turn is still to be recorded.
+* **RU-05 — the MXC probe.** Windows' own process isolation needs Windows 11
+  24H2 or later and an API Raiker does not call yet; the probe (is it present,
+  does it contain the network) is unwritten. Not started.
+* **RU-07 — the *Work in the sandbox* Build journey.** The posture ships, but
+  the done-when journey (a Build turn that asks only for `git push`) needs a
+  workspace with Raiker's WSL2 distribution set up; the throwaway workspace had
+  none, so *Work in the sandbox* was correctly unavailable there.
+* **RU-08 — model and disk-and-memory facts on Health.** The model fact is on
+  Observability's attention list and the disk and memory checks are under
+  *Machine checks*, but neither is a *Set up by first run* line with its page.
+* **RU-09 — the ten-minute first answer.** The steps ship (FIXED-1571); the
+  timed journey to a first useful answer on Windows and Linux is not recorded.

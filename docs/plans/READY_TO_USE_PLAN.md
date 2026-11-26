@@ -322,6 +322,10 @@ chat. Release qualification still requires a live run on the published build.
 
 ## Changelog
 
+- **2026-11-26** — RU-06 and RU-16 done; RU-07's three postures, RU-08's
+  first-run facts on Health, RU-09's *This machine* and *Posture* steps and
+  RU-04's Linux package line shipped. What is left is in
+  [TO_BE_FIXED](TO_BE_FIXED.md#2026-11-26-round--found-not-fixed).
 - **2026-11-25** — Status table added. RU-10, RU-21 and RU-22 done; RU-03,
   RU-07, RU-08 and RU-16 advanced; MCP servers the owner adds run as the owner.
 - **2026-11-16** — Opened from the reference review. Rewritten the same day

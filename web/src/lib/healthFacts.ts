@@ -87,16 +87,28 @@ function backupFact(view: BackupsView | null, now: number): HealthFact {
 }
 
 function embeddingFact(view: MemorySettingsView | null): HealthFact {
-  const base = { id: "embedding", label: "Search by meaning", href: "#/memory", linkLabel: "Memory" };
+  // The same rule Memory's Recall backend card uses: meaning only when the
+  // backend in use is semantic and a question can be embedded into it.
+  const base = { id: "embedding", label: "Search by meaning", href: "#/memory?tab=controls", linkLabel: "Memory controls" };
   if (view === null || !Array.isArray(view.embedding_providers)) return { ...base, state: "unknown", detail: UNREAD };
-  if (view.retrieval === null || view.embedding_providers.length === 0) {
-    return { ...base, state: "warn", detail: "No embedding model; recall matches words only." };
+  const retrieval = view.retrieval;
+  if (retrieval === null || !retrieval.semantic) {
+    const offer = view.embedding_providers[0]?.model;
+    return {
+      ...base,
+      state: "warn",
+      detail: offer
+        ? `Recall matches words only. ${offer} is available to build a meaning-based index.`
+        : "Recall matches words only; no embedding model is available.",
+    };
+  }
+  if (retrieval.query_embeddable === false) {
+    return { ...base, state: "warn", detail: `Stored in ${retrieval.model}, but questions are not embedded yet, so recall still matches words.` };
   }
   const waiting = view.unindexed_memories + view.unindexed_file_chunks;
-  const model = view.embedding_providers[0].model;
   return waiting > 0
-    ? { ...base, state: "info", detail: `${model} · ${waiting} waiting to be indexed.` }
-    : { ...base, state: "ok", detail: `${model} · everything indexed.` };
+    ? { ...base, state: "info", detail: `${retrieval.model} · ${waiting} waiting to be indexed.` }
+    : { ...base, state: "ok", detail: `${retrieval.model} · everything indexed.` };
 }
 
 function voiceFact(view: VoiceStatus | null): HealthFact {

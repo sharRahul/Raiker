@@ -40,4 +40,11 @@ describe("healthFacts (RU-08)", () => {
     expect(healthFacts({ ...none, sandbox: view }, NOW)[0]).toMatchObject({ state: "fail", detail: expect.stringContaining("sudo dnf install bubblewrap") });
     expect(healthFacts({ ...none, sandbox: { ...view, native_ready: true } }, NOW)[0].state).toBe("ok");
   });
+
+  it("calls lexical recall words-only even when an embedding model is offered (matches Memory)", () => {
+    const lexical = { retrieval: { backend_id: "h", kind: "lexical_fallback", model: "raiker-local-hash-v1", dimensions: 0, semantic: false, reason_code: "" }, embedding_providers: [{ model: "local-gguf" }], unindexed_memories: 0, unindexed_file_chunks: 0 } as never;
+    expect(healthFacts({ ...none, memory: lexical }, NOW)[2]).toMatchObject({ state: "warn", detail: expect.stringContaining("local-gguf is available") });
+    const semantic = { retrieval: { backend_id: "n", kind: "local_model", model: "nomic-embed-text", dimensions: 768, semantic: true, reason_code: "", query_embeddable: true }, embedding_providers: [{ model: "nomic-embed-text" }], unindexed_memories: 0, unindexed_file_chunks: 0 } as never;
+    expect(healthFacts({ ...none, memory: semantic }, NOW)[2]).toMatchObject({ state: "ok", detail: "nomic-embed-text · everything indexed." });
+  });
 });

@@ -1,5 +1,13 @@
 # Fixed items
 
+## FIXED-1573 — Health called word-only recall "Search by meaning — Done"
+
+**Severity: Medium. Area: Health (RU-08). Status: Fixed 2026-11-26.** Health's search-by-meaning fact counted an available embedding model as done, so on a workspace recalling with `raiker-local-hash-v1` it read *local-gguf · everything indexed* while Memory's Recall backend said *matches words, not meaning*. Found while capturing RT-IMPORT-01. The fact now uses Memory's own rule — meaning only when the backend in use is semantic and a question can be embedded — and otherwise warns, naming the model that could build a meaning-based index, with **Open Memory controls**. Evidence: `web/src/lib/healthFacts.test.ts` (*calls lexical recall words-only even when an embedding model is offered*); live RT-HEALTH-02 recaptured (*Search by meaning — check*).
+
+## FIXED-1572 — ChatGPT and Claude conversation exports could not be imported
+
+**Severity: Low. Area: Memory / import (RU-16). Status: Fixed 2026-11-26.** RU-16 asks for ChatGPT and Claude exports as suggestions to review; Memory's **Review import** refused a `conversations.json` as *not a Raiker memory export*. It now reads ChatGPT's (`mapping` of message nodes, the earliest `user` message) and Claude's (`chat_messages`, the first `human` message, as `text` or content blocks) exports as one `user`-scope record per conversation — *From ChatGPT, “title” (day): first request*, clipped to 300 characters, without repeats — in the same review and governed write path as any import. Evidence: `web/src/lib/memoryImportText.test.ts` (*memoriesFromConversationExport (RU-16)*); live RT-IMPORT-01.
+
 ## FIXED-1571 — First run set up the device but not the machine, and never asked for a posture
 
 **Severity: Medium. Area: First run (RU-09). Status: Fixed 2026-11-26.** RU-09's first run is *Account → Model → This machine → Posture*. *This device* listed only hardware, so an owner left first run with commands refused for want of a sandbox and no backup, learning it later; *How I'll ask* named one fixed profile with a link away. *This device* now ends with **Set up on this machine** — command sandbox, search by meaning, backups and always-on host, from the same facts Health reads, each with its state word and a **Set up** link that opens the page in a new tab; every one can be left, and Health keeps listing them. *How I'll ask* now offers the three postures, **Ask first** selected; another one is applied on **Continue** through the same per-capability mode route Permissions uses, a refused change is named without holding first run up, and **Work in the sandbox** is offered only once the sandbox is enforced. Evidence: `web/src/lib/views/ModelSetupView.test.ts` (*states where model requests go…* now asserts the posture choice; *applies a posture chosen in first run through the mode routes (RU-09)*); live RT-FIRSTRUN-01/02 on a fresh workspace, where Read-only chosen in first run read *Now: Read-only.* on Permissions afterwards. The ten-minute first-answer journey on Windows and Linux is still to be timed.
@@ -2161,6 +2169,8 @@ file you can open. The two capture sets that remain — `screenshots/pages/` and
 
 | ID | Severity | Area | Status |
 |---|---|---|---|
+| [FIXED-1573](#fixed-1573--health-called-word-only-recall-search-by-meaning--done) | Medium | Health (RU-08) | Fixed 2026-11-26 |
+| [FIXED-1572](#fixed-1572--chatgpt-and-claude-conversation-exports-could-not-be-imported) | Low | Memory / import (RU-16) | Fixed 2026-11-26 |
 | [FIXED-1571](#fixed-1571--first-run-set-up-the-device-but-not-the-machine-and-never-asked-for-a-posture) | Medium | First run (RU-09) | Fixed 2026-11-26 |
 | [FIXED-1570](#fixed-1570--linux-without-bubblewrap-was-reported-as-sandboxed) | Medium | Sandbox / Linux (RU-04) | Fixed 2026-11-26 |
 | [FIXED-1569](#fixed-1569--a-projects-cursorrules-folder-was-ignored) | Low | Build / instructions (RU-16) | Fixed 2026-11-26 |

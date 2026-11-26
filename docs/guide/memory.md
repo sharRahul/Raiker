@@ -375,6 +375,12 @@ It also takes another agent's Markdown memory: Hermes Agent's `MEMORY.md` or
 in a `CLAUDE.md`. Each entry becomes one record about you, in the same review as
 an export — nothing is stored until you choose **Import**.
 
+And it takes the `conversations.json` from a ChatGPT or Claude data export.
+Each conversation becomes one record to review — where it came from, its title
+and day, and the first thing you asked, up to 300 characters — such as *From
+ChatGPT, “Weekly meal plan” (2026-01-01): I am vegetarian; plan my week of
+dinners.* Skip the ones not worth remembering before you import.
+
 An import is not a second way into the store: each record goes through the same
 governed write path a proposal does, and is recorded as a lifecycle event with
 `source: user_import`. What it will not do is store the same sentence twice.

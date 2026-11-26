@@ -21,6 +21,18 @@ PR #106: the **user-owned fallback sequence** and **prompt caching + normalised
 cache-hit metrics**.
 
 
+## Result — 2026-11-26 (Conversation exports into Memory)
+
+Same host. Spec: `web/e2e/ru-16-conversation-import-live.spec.ts`, **1/1** after
+pointing it at Memory → Controls, where the import lives. Captures
+`ru-16-chatgpt-conversations.png` and `ru-16-claude-conversations.png` were
+inspected; the second showed Memory's *matches words, not meaning* beside
+Health's *Search by meaning — Done*, which is FIXED-1573.
+
+| Case | Check | Result |
+|---|---|---|
+| RT-IMPORT-01 | **Review import** with a ChatGPT `conversations.json` lists *From ChatGPT, “Weekly meal plan” (2026-01-01): I am vegetarian; plan my week of dinners.*; with a Claude one, *From Claude, “Run club” (2026-02-10): I run 10k on Sundays; build me a training plan.*; the import button is offered and nothing is written before it | ✅ |
+
 ## Result — 2026-11-26 (Permissions families sweep)
 
 Against the throwaway host of *Health: this machine*. Spec:

@@ -42,7 +42,7 @@
     type MemoryFilter,
   } from "../memoryLifecycle";
   import { memoryEvidence, proposalEvidence } from "../memoryEvidence";
-  import { memoriesFromText } from "../memoryImportText";
+  import { memoriesFromConversationExport, memoriesFromText } from "../memoryImportText";
 
   type MemoryImport = Array<Partial<MemoryControlView> & { text: string }>;
   let memories = $state<MemoryControlView[] | null>(null);
@@ -274,7 +274,10 @@
       const raw = await file.text();
       // RU-16 — another agent's Markdown memory (Hermes MEMORY.md/USER.md, a
       // bullet list) is read as records to review, like an export.
-      const parsed = /\.(md|markdown|txt)$/i.test(file.name) ? memoriesFromText(raw) : (JSON.parse(raw) as unknown);
+      const read = /\.(md|markdown|txt)$/i.test(file.name) ? memoriesFromText(raw) : (JSON.parse(raw) as unknown);
+      // RU-16 — a ChatGPT or Claude export's conversations.json: one record
+      // per conversation to review.
+      const parsed = memoriesFromConversationExport(read) ?? read;
       const values = Array.isArray(parsed) ? parsed : typeof parsed === "object" && parsed !== null && Array.isArray((parsed as { memories?: unknown }).memories) ? (parsed as { memories: unknown[] }).memories : [];
       if (!values.every((value) => typeof value === "object" && value !== null && typeof (value as { text?: unknown }).text === "string")) throw new Error("schema");
       importPreview = values as MemoryImport; importFileName = file.name; actionError = null;
@@ -285,7 +288,7 @@
       importAlready = null;
       try { importAlready = await api.previewMemoryImport(importPreview); }
       catch { importAlready = null; }
-    } catch { importPreview = null; importAlready = null; actionError = "This file is not a Raiker memory export or a Markdown memory file."; }
+    } catch { importPreview = null; importAlready = null; actionError = "This file is not a Raiker memory export, a Markdown memory file, or a ChatGPT or Claude conversations.json."; }
     // A file input keeps its value, so choosing the same file again after an
     // undo would otherwise not fire `change`.
     input.value = "";

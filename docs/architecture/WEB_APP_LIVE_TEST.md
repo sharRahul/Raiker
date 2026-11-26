@@ -37,7 +37,7 @@ a denied root, protected `.git`, protected `.raiker`, masked read, egress,
 host loopback, own loopback and detached descendant reaping. No warnings;
 exit code 0. The local raw report is `output/ready-mxc-attack-probe.json`.
 
-The reproduction command, runtime discovery, support-version discrepancy
+The reproduction command, runtime discovery, supported Windows build
 and production limits are in the
 [MXC evaluation](NATIVE_SANDBOX_MIGRATION.md#windows-mxc-evaluation-2026-11-26).
 This is a native containment evaluation, not browser or installer evidence.

@@ -702,7 +702,8 @@ Microsoft now describes a native **ProcessContainer** backend with explicit
 denied paths, network policy and process containment, rather than the older
 AppContainer/DACL tiers. Its
 [support table](https://github.com/microsoft/mxc/blob/main/docs/backends/process-container/os-version-support.md)
-lists newer minimum builds, but this PC's runtime discovery reports the
+lists `26300.9550` as the Windows 11 26H2 minimum for process isolation.
+This PC's `26300.10075` exceeds that floor, and runtime discovery reports the
 native PSEC APIs and `base-container` tier available. A real denied-network
 `cmd.exe /d /c echo` control exited successfully. This is evidence for this
 specific machine, not a lower supported-version promise.

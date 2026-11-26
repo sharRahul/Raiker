@@ -1310,7 +1310,7 @@
     gap: 0.1rem 0.6rem;
     padding: 0.6rem 0.75rem;
     border: 1px solid var(--border);
-    border-radius: var(--radius-md, 10px);
+    border-radius: var(--r-md);
     cursor: pointer;
   }
   .posture-option.active { border-color: var(--text-2); }

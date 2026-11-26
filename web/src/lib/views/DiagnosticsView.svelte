@@ -625,7 +625,7 @@
   .machine-check { display: flex; flex-direction: column; gap: 0.1rem; min-width: 0; flex: 1; }
   .machine-detail { color: var(--text-2); font-size: var(--text-xs); overflow-wrap: anywhere; }
   .machine-fix { color: var(--text-2); font-size: var(--text-xs); }
-  a.machine-fix { color: var(--accent, var(--text-1)); }
+  a.machine-fix { color: var(--accent); }
   .machine-sub { font-size: var(--text-sm); font-weight: 600; margin: 0.9rem 0 0.4rem; }
   .recovery details { border-top: 1px solid var(--border); padding: 0.4rem 0; }
   .recovery summary { cursor: pointer; font-weight: 600; font-size: var(--text-sm); }

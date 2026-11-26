@@ -1,5 +1,19 @@
 # Fixed items
 
+## FIXED-1577 — The MXC assessment had no current Windows measurement
+
+**Severity: Medium. Area: Native sandbox evaluation (RU-05). Status: Fixed 2026-11-26.**
+The historical MXC rejection and a later documentation-only correction left
+no Raiker probe result on Windows. `scripts/probe_mxc.mjs` now evaluates a
+separately installed SDK against Raiker's own `--selftest`, with unsandboxed
+controls and synthetic canaries. SDK 1.1.0's native ProcessContainer passed
+all eleven observations on Windows build 26300.10075, including explicit
+application-package ACLs below a denied root, protected `.git`/`.raiker`
+descendants, host network/loopback refusal and detached descendant reaping.
+The [architecture record](../architecture/NATIVE_SANDBOX_MIGRATION.md#windows-mxc-evaluation-2026-11-26)
+supersedes the old rejection and records the limitations. This closes the
+missing measurement, not production integration or native-account isolation.
+
 ## FIXED-1576 — GitHub retained two active workflows after their files were removed
 
 **Severity: Low. Area: CI / maintenance. Status: Fixed 2026-11-26.**
@@ -2203,6 +2217,7 @@ file you can open. The two capture sets that remain — `screenshots/pages/` and
 | [FIXED-1574](#fixed-1574--health-did-not-say-whether-a-model-answers-or-the-disk-is-filling) | Medium | Health / UI (RU-08) | Fixed 2026-11-26 |
 | [FIXED-1575](#fixed-1575--the-sandbox-posture-trusted-installation-instead-of-enforcement) | High | Permissions / first run (RU-07) | Fixed 2026-11-26 |
 | [FIXED-1576](#fixed-1576--github-retained-two-active-workflows-after-their-files-were-removed) | Low | CI / maintenance | Fixed 2026-11-26 |
+| [FIXED-1577](#fixed-1577--the-mxc-assessment-had-no-current-windows-measurement) | Medium | Native sandbox evaluation (RU-05) | Fixed 2026-11-26 |
 | [FIXED-1573](#fixed-1573--health-called-word-only-recall-search-by-meaning--done) | Medium | Health (RU-08) | Fixed 2026-11-26 |
 | [FIXED-1572](#fixed-1572--chatgpt-and-claude-conversation-exports-could-not-be-imported) | Low | Memory / import (RU-16) | Fixed 2026-11-26 |
 | [FIXED-1571](#fixed-1571--first-run-set-up-the-device-but-not-the-machine-and-never-asked-for-a-posture) | Medium | First run (RU-09) | Fixed 2026-11-26 |

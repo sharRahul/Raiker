@@ -8,8 +8,11 @@ not been applied on this host. An unrestricted-tool native test run passes,
 including the diagnostic attack demonstrating descendant-ACL leakage; this
 does not qualify the refused production boundary. WSL2's probe measures all
 eight required observations enforced, but RU-07's real Build journey asking
-only for `git push` is still owed. MXC's executor is absent; no MXC containment
-result is claimed. RU-09 still needs a clean-machine timed run. See the
+only for `git push` is still owed. MXC was initially absent; the later isolated
+SDK 1.1.0 evaluation passed eleven containment observations
+([record](../architecture/NATIVE_SANDBOX_MIGRATION.md#windows-mxc-evaluation-2026-11-26)).
+A production adapter, resource limits, restart/lifecycle tests and a shipped
+runtime privacy/integrity decision remain. RU-09 still needs a clean-machine timed run. See the
 [Windows run record](../architecture/WEB_APP_LIVE_TEST.md#result--2026-11-26-windows-readiness-and-workflow-review).
 
 **Direction, 2026-11-16.** [ADR-0006](../adr/ADR-0006-one-supported-path-per-machine.md)

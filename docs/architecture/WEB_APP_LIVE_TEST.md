@@ -1,5 +1,23 @@
 # Web App Live Test — model backends
 
+## Result — 2026-11-26 MXC containment evaluation
+
+RT-MXC-01 ran the pinned Microsoft MXC SDK 1.1.0 against Raiker's actual
+Windows self-test executable. The unsandboxed control could reach every
+synthetic canary and both host listeners. ProcessContainer passed all eleven
+observations: relay, copy write, outside-write refusal, explicit grant below
+a denied root, protected `.git`, protected `.raiker`, masked read, egress,
+host loopback, own loopback and detached descendant reaping. No warnings;
+exit code 0. The local raw report is `output/ready-mxc-attack-probe.json`.
+
+The reproduction command, runtime discovery, support-version discrepancy
+and production limits are in the
+[MXC evaluation](NATIVE_SANDBOX_MIGRATION.md#windows-mxc-evaluation-2026-11-26).
+This is a native containment evaluation, not browser or installer evidence.
+It does not enable MXC in Raiker, change the default boundary, or qualify
+RU-03's restricted accounts. See
+[FIXED-1577](../plans/FIXED_ITEMS.md#fixed-1577--the-mxc-assessment-had-no-current-windows-measurement).
+
 ## Result — 2026-11-26 Windows readiness and workflow review
 
 Source run on Windows build 26300.10075, isolated workspaces, Chromium at
@@ -29,13 +47,15 @@ workflows were retained after [review](../plans/TESTING.md#github-workflow-revie
 two stale GitHub records with deleted YAML files were disabled.
 
 Open: RU-03's native account containment fixes and elevated attack
-qualification, RU-05's MXC adapter and probe, RU-07's real WSL2 Build journey
+qualification, RU-05's production MXC adapter, RU-07's real WSL2 Build journey
 asking only for `git push`, and RU-09's first useful answer in under ten
 minutes on clean Windows and Linux machines. The existing development PC
 cannot stand in for the clean-machine requirement. MXC's current
 [README](https://github.com/microsoft/mxc) describes an SDK and executor,
-not a Raiker adapter; no `wxc-exec` is installed here. Its current telemetry
-policy also needs review before adoption. No plan document was deleted:
+not a Raiker adapter. The later isolated
+[MXC evaluation](#result--2026-11-26-mxc-containment-evaluation) supplies the
+previously missing measurement. Its current telemetry policy also needs
+review before adoption. No plan document was deleted:
 each still owns requirements or open evidence gates.
 
 > A repeatable procedure + results matrix for exercising the Raiker web app

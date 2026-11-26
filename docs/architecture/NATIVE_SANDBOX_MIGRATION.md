@@ -669,6 +669,10 @@ output so the agent can name the host to ask for.
 
 ## Windows MXC evaluation (2026-10-30)
 
+**Superseded by the measured [2026-11-26 evaluation](#windows-mxc-evaluation-2026-11-26).**
+The historical assessment below is retained as a decision record, not current
+SDK or Windows support guidance.
+
 > **Superseded in part, 2026-11-16.** OpenAI's Codex Windows sandbox
 > documentation now names `mxc` as its recommended mode on Windows 11 24H2+
 > (build 26100.9278 or later), with `elevated` and `unelevated` as fallbacks
@@ -686,6 +690,66 @@ describes its own sandbox as a custom design. Decision: do not adopt MXC; keep
 and harden Raiker's AppContainer + Job Object runner. Revisit when MXC claims a
 security boundary. Licence and supported Windows versions were not assessed,
 because the security disclaimer already rules it out.
+
+## Windows MXC evaluation (2026-11-26)
+
+**RU-05 measurement recorded; no production backend enabled.** Tested the
+published `@microsoft/mxc-sdk` **1.1.0**, installed with scripts disabled in
+`output/mxc-evaluation`, on the owner's Windows development PC, build
+**26300.10075**. No Raiker dependency or default boundary changed.
+
+Microsoft now describes a native **ProcessContainer** backend with explicit
+denied paths, network policy and process containment, rather than the older
+AppContainer/DACL tiers. Its
+[support table](https://github.com/microsoft/mxc/blob/main/docs/backends/process-container/os-version-support.md)
+lists newer minimum builds, but this PC's runtime discovery reports the
+native PSEC APIs and `base-container` tier available. A real denied-network
+`cmd.exe /d /c echo` control exited successfully. This is evidence for this
+specific machine, not a lower supported-version promise.
+
+[`scripts/probe_mxc.mjs`](../../scripts/probe_mxc.mjs) then ran Raiker's own
+`--selftest` executable once outside containment and once inside
+ProcessContainer. Only synthetic fixtures were used. The control can read and
+write every canary and connect to both host listeners; the contained process
+can write its copy and connect to its own listener, but cannot reach the
+protected paths or host services. It starts a detached descendant which is
+gone after the contained parent exits.
+
+| Observation | Measured result |
+|---|---|
+| Relay / nonce | Enforced |
+| Write in disposable copy | Enforced |
+| Write outside copy | Enforced |
+| Explicit application-package allow below a denied root | Enforced |
+| Protected `.git` and `.raiker` descendants | Both enforced |
+| Masked owner canary read | Enforced |
+| Non-loopback host connection | Enforced |
+| Host loopback connection | Enforced |
+| Container's own loopback listener | Reachable, as required by toolchains |
+| Detached descendant reaped | Enforced |
+
+Reproduce from the repository root, with a built Windows runner:
+
+```console
+npm install --prefix output/mxc-evaluation --ignore-scripts --no-audit --no-fund @microsoft/mxc-sdk@1.1.0
+node scripts/probe_mxc.mjs > output/ready-mxc-attack-probe.json
+```
+
+The report includes SDK version, runtime capabilities, both control arms,
+observations and retained fixture paths. `passed` is only the evaluation's
+result; `production_available` is always false. No unavailable or
+indeterminate observation is treated as enforcement.
+
+**Decision.** MXC is a viable candidate for the native Windows boundary and
+is no longer rejected by the 2026-10-30 assessment. Keep it unavailable in
+Raiker until a pinned and integrity-checked production adapter handles
+launch/stop, authenticated output, disposable-copy lifetime, concurrency,
+resource limits, terminals and downloads, with restart and adversarial tests.
+The native account's existing refusal remains. Microsoft also documents
+[required telemetry](https://github.com/microsoft/mxc/blob/main/docs/telemetry.md)
+which the SDK's `enabled: false` option does not suppress; review that
+distribution/privacy contract before choosing a shipped runtime. No elevated
+account or clean-machine release qualification is inferred from this probe.
 
 ## Git filter programs (2026-10-31)
 

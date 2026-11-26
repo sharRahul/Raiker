@@ -52,7 +52,7 @@ build is still owed for every item (the regular-use journeys in
 | RU-02 Update in place | Open | — | Update channel, Roll back, data kept across both |
 | RU-03 Windows sandbox without WSL2 | Partly done | WSL2 is used by itself when it is set up and the owner never chose ([FIXED-1563](FIXED_ITEMS.md#fixed-1563--windows-refused-every-command-until-the-owner-found-the-sandbox-setting)); commands, hooks and generated MCP servers run there on the distribution's `python3`/`node` ([FIXED-1560](FIXED_ITEMS.md#fixed-1560--with-wsl2-chosen-mcp-servers-and-hooks-still-had-no-boundary-on-windows)); a source checkout's Linux runner is documented in Troubleshooting | The restricted-account boundary stays refused until its four gaps close (per-account profile reset, explicit descendant ACLs, explicit allows below denied roots, loopback-port approximation); its setup in Raiker's first run |
 | RU-04 Linux and macOS | Partly done | Linux Bubblewrap enforced (2026-11-16 journeys); Health, Settings and the posture gate name the distribution's Bubblewrap install command when it is missing ([FIXED-1570](FIXED_ITEMS.md#fixed-1570--linux-without-bubblewrap-was-reported-as-sandboxed)) | macOS account setup behind one prompt; the same Build turn on Ubuntu 24.04 and macOS 15 |
-| RU-05 WSL2 and MXC options | Partly done | WSL2 is available and measured | MXC probe result |
+| RU-05 WSL2 and MXC options | Partly done | WSL2 is available and measured; MXC SDK 1.1.0's ProcessContainer passes eleven Windows probe observations ([evaluation](../architecture/NATIVE_SANDBOX_MIGRATION.md#windows-mxc-evaluation-2026-11-26)) | Production MXC adapter and lifecycle/resource-limit qualification before offering it |
 | RU-06 Ten families | Done | Families, lines and the unit test ([FIXED-1537](FIXED_ITEMS.md#fixed-1537--permissions-was-grouped-in-six-headings-an-owner-had-to-learn)); live sweep of every family at 1440 and 390 px (RT-PERM-SWEEP-01, 2026-11-26) | — |
 | RU-07 Three postures | Partly done | Per-conversation command grant on the approval card ([FIXED-1540](FIXED_ITEMS.md#fixed-1540--a-command-could-not-be-allowed-for-a-conversation-from-any-screen)); per-MCP-server *use without asking* ([FIXED-1562](FIXED_ITEMS.md#fixed-1562--a-trusted-mcp-server-could-only-be-used-by-allowing-every-server)); the three postures and their unit-tested mapping ([FIXED-1567](FIXED_ITEMS.md#fixed-1567--permissions-had-no-posture-only-sixty-rows-to-set-one-by-one)) | A Build journey in *Work in the sandbox* that asks only for `git push` |
 | RU-08 Health | Partly done | `raiker doctor` with each fix ([FIXED-1552](FIXED_ITEMS.md#fixed-1552--there-was-no-raiker-doctor)); **This machine** on Observability → *Health, in detail* ([FIXED-1564](FIXED_ITEMS.md#fixed-1564--the-health-page-did-not-show-this-machines-readiness)); sandbox, backups, embedding, voice, updates and always-on facts with the page that fixes each ([FIXED-1566](FIXED_ITEMS.md#fixed-1566--health-did-not-say-what-first-run-had-left-unset)); model and disk-and-memory facts in the same list ([FIXED-1574](FIXED_ITEMS.md#fixed-1574--health-did-not-say-whether-a-model-answers-or-the-disk-is-filling)) | A fresh-machine pass showing exactly what first run fixes |
@@ -321,6 +321,12 @@ turns, and RU-J5 checks the approved facts in Memory before recall in a new
 chat. Release qualification still requires a live run on the published build.
 
 ## Changelog
+
+- **2026-11-26 (MXC evaluation)** — RU-05's missing Windows probe is recorded:
+  the pinned SDK's native ProcessContainer passes all eleven observations,
+  including protected descendants and an explicit ACL under a denied root.
+  The reproducible evaluation does not enable a production backend
+  ([FIXED-1577](FIXED_ITEMS.md#fixed-1577--the-mxc-assessment-had-no-current-windows-measurement)).
 
 - **2026-11-26 (Windows review)** — The posture now requires measured
   enforcement ([FIXED-1575](FIXED_ITEMS.md#fixed-1575--the-sandbox-posture-trusted-installation-instead-of-enforcement)).

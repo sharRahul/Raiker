@@ -70,6 +70,7 @@ ALWAYS_PROJECTED: frozenset[str] = frozenset({
     "run_command",
     # The turn's own controls.
     "update_plan",
+    "record_lesson",
     "ask_owner_question",
     "spawn_subagent",
     "skill_load",

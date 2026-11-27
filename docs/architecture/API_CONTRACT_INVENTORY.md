@@ -12,7 +12,7 @@ operation answers with, and whether OpenAPI describes it (OPT-01/OPT-02 —
 * **deferred** — the body has no declared type; a test fails while any is.
 * **special** — a stream, a file or another non-JSON transport; hand-written.
 
-**551 operations: 535 verified, 0 eligible, 0 deferred, 16 special.**
+**553 operations: 537 verified, 0 eligible, 0 deferred, 16 special.**
 
 | Method | Path | Request | Response | Status | Why |
 |---|---|---|---|---|---|
@@ -317,6 +317,7 @@ operation answers with, and whether OpenAPI describes it (OPT-01/OPT-02 —
 | GET | `/api/mcp/servers/{server_id}/sessions` |  | McpSessionView[] | verified | DashboardService.list_mcp_sessions |
 | POST | `/api/mcp/servers/{server_id}/tools/approve` | ApproveMcpToolsRequest | McpToolsApproved | verified | declared by cast |
 | GET | `/api/memory` |  | MemoryControlView[] | verified | DashboardService.list_memories |
+| PUT | `/api/memory/ask-before-remembering` | dict | AskBeforeRememberingSet | verified | declared by cast |
 | POST | `/api/memory/conversation-index/rebuild` |  | ConversationIndexRebuilt | verified | declared by cast |
 | POST | `/api/memory/eidetic/cleanup` | dict | ObservationsDeleted | verified | declared by cast |
 | PUT | `/api/memory/embedding-backend` | dict | EmbeddingBackendSet | verified | declared by cast |
@@ -346,6 +347,7 @@ operation answers with, and whether OpenAPI describes it (OPT-01/OPT-02 —
 | GET | `/api/memory/relationship-proposals` |  | MemoryRelationshipProposal[] | verified | declared MemoryRelationshipProposal[] |
 | POST | `/api/memory/relationship-proposals/scan` |  | RelationshipScan | verified | declared by cast |
 | POST | `/api/memory/relationship-proposals/{candidate_id}/decision` | dict | RelationshipDecided | verified | declared by cast |
+| GET | `/api/memory/remembered` |  | RememberedMemory[] | verified | declared RememberedMemory[] |
 | GET | `/api/memory/settings` |  | MemorySettingsView | verified | DashboardService.get_memory_settings |
 | POST | `/api/memory/text-indexes/rebuild` |  | TextIndexesRebuilt | verified | declared by cast |
 | POST | `/api/memory/vectors/remove-damaged` |  | DamagedVectorsRemoved | verified | declared by cast |

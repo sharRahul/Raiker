@@ -65,6 +65,26 @@ a memory you wrote yourself was never observed, and most observations are never
 suggested. *Recalled* counts approved records a turn has been given; being given
 one is not evidence the answer relied on it.
 
+## What Raiker remembers on its own
+
+Raiker remembers without asking, the way ChatGPT updates its memory: when an
+answer finishes, what you said about yourself or your work is kept, and the
+answer shows **Remembered: "…"** with **Undo**. Undo forgets it at once. So do
+lessons from Raiker's own work, shown as **Learned for this project**. You
+review by exception, not by approving each fact.
+
+Some things still wait for you, under the answer and in Suggestions:
+
+- a sentence **Raiker wrote** (a model can invent a detail);
+- **personal identifiers** such as an email address, phone number or address;
+- a lesson that would **change a project's declared check** — Keep fixes the
+  check as well.
+
+Secret- or credential-like text is never kept. Incognito, Use memory off, and a
+project whose memory is off keep nothing and offer nothing. Something Raiker
+already remembers is not kept twice. To approve everything yourself, turn on
+**Ask before remembering** in Memory › Controls.
+
 ## Reviewing what Raiker proposes
 
 The **Pending review** section shows the proposed text, scope, sensitivity, and
@@ -94,15 +114,15 @@ prompt, or bypass an approval gate.
 
 ### Lessons from Raiker's own work
 
-When a project task finishes, Raiker may offer **Lesson for this project**
-under the answer — for example *In this project, `npm test -- --runInBand`
-works where `npm test` failed.* It comes from the task's own command records,
-never from the model's wording: a command that failed and a passing variant of
-it (same program, different arguments), with no file changed in between. Keep
-stores it for that project only; the next task in the same project recalls it,
-other projects never do. Not this rejects it, and a lesson you forgot is not
-offered again. Incognito, Use memory off, and a project whose memory is off
-offer no lessons.
+When a command fails during a project task and a different one works, Raiker
+records a lesson — in its own words, but only when the task's records show the
+failing command, the working one after it, and no file changed in between. It
+ends with the commands, e.g. *This repo uses pnpm. Run `pnpm install` instead of
+`npm install`.* It is kept for that project only. When the failing command runs
+again in a later task, its result carries the lesson, so the next try is the one
+that works. When the recommended command itself fails, the lesson is out of date
+and Raiker archives it (restore it from Memory). A lesson about one of the
+project's declared checks asks first, because keeping it fixes the check.
 
 ## The Knowledge Map
 

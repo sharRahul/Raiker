@@ -163,6 +163,13 @@
     catch (e) { actionError = failure("Memory use was not updated", "The setting may not have changed.", "Refresh Memory to check it before trying again.", e); }
     finally { busy = false; }
   }
+  async function toggleAskFirst() {
+    if (!settings || busy) return;
+    busy = true; actionError = null;
+    try { await api.setAskBeforeRemembering(!settings.ask_before_remembering); await load(); }
+    catch (e) { actionError = failure("The setting was not updated", "Raiker remembers as before.", "Refresh Memory to check it before trying again.", e); }
+    finally { busy = false; }
+  }
   // MEM-MODE-02 — the owner's ambient-recall mode. Incognito still wins on the
   // server, so the card says so instead of pretending the mode is in force.
   async function chooseRecallMode(mode: MemoryRecallMode) {
@@ -837,6 +844,11 @@
   <section class="control-card">
     <div><h3>Use memory</h3><p>Use approved memories in conversations and tasks. Turning this off keeps stored memories and blocks recall and memory searches.</p></div>
     <button class="switch" class:on={!settings.incognito} role="switch" aria-checked={!settings.incognito} aria-label="Use memory" disabled={busy} onclick={() => void toggleIncognito()}><span></span><b>{settings.incognito ? "Off" : "On"}</b></button>
+  </section>
+
+  <section class="control-card">
+    <div><h3>Ask before remembering</h3><p>Off: Raiker keeps what you tell it and lessons from its own work, shows each under the answer, and Undo forgets it. What Raiker wrote itself and personal details like an email or phone number always wait for you.</p></div>
+    <button class="switch" class:on={settings.ask_before_remembering} role="switch" aria-checked={settings.ask_before_remembering} aria-label="Ask before remembering" disabled={busy} onclick={() => void toggleAskFirst()}><span></span><b>{settings.ask_before_remembering ? "On" : "Off"}</b></button>
   </section>
 
   <section class="control-card recall-mode-card">

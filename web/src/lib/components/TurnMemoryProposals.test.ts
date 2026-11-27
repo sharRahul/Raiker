@@ -20,13 +20,19 @@ const proposal = (over: Record<string, unknown> = {}) => ({
   ...over,
 });
 
-function stub(list: unknown[]) {
+function stub(list: unknown[], remembered: unknown[] = []) {
   const calls: { url: string; body?: unknown }[] = [];
   vi.stubGlobal(
     "fetch",
     vi.fn(async (url: string, init?: RequestInit) => {
       calls.push({ url: String(url), body: init?.body ? JSON.parse(String(init.body)) : undefined });
-      const json = String(url).endsWith("/decision") ? { ok: true, candidate_id: "memcand_1", decision: "approved" } : list;
+      const json = String(url).endsWith("/decision")
+        ? { ok: true, candidate_id: "memcand_1", decision: "approved" }
+        : String(url).includes("/api/memory/remembered")
+          ? remembered
+          : String(url).includes("/api/memory/mem_")
+            ? { ok: true }
+            : list;
       return { ok: true, status: 200, json: async () => json, headers: new Headers() } as Response;
     }),
   );
@@ -77,5 +83,18 @@ describe("TurnMemoryProposals (RU-10)", () => {
     render(TurnMemoryProposals, { sessionId: "sess_1", turnId: "turn_1" });
     expect(await screen.findByText(/Lesson for this project/)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Keep" })).toBeInTheDocument();
+  });
+
+  it("shows what Raiker kept on its own, and Undo forgets it", async () => {
+    const calls = stub([], [
+      { memory_id: "mem_1", text: "I prefer green tea", memory_type: "preference", source_turn_id: "turn_1" },
+      { memory_id: "mem_2", text: "Other turn", memory_type: "preference", source_turn_id: "turn_2" },
+    ]);
+    render(TurnMemoryProposals, { sessionId: "sess_1", turnId: "turn_1" });
+    expect(await screen.findByText(/Remembered/)).toBeInTheDocument();
+    expect(screen.queryByText("“Other turn”")).toBeNull();
+    await fireEvent.click(screen.getByRole("button", { name: "Undo" }));
+    expect(await screen.findByText("Forgotten.")).toBeInTheDocument();
+    expect(calls.some((call) => call.url.includes("/api/memory/mem_1"))).toBe(true);
   });
 });

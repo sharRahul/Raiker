@@ -39,7 +39,7 @@ TRIAL_AND_ERROR = [
 
 def test_a_failure_then_a_passing_variant_is_a_lesson() -> None:
     assert lessons_from_runs(TRIAL_AND_ERROR) == [
-        "In this project, `npm test -- --runInBand` works where `npm test` failed."
+        "In this project, run `npm test -- --runInBand` instead of `npm test`."
     ]
 
 

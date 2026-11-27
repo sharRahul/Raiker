@@ -255,10 +255,20 @@ is needed for the Memory journey; fixture model authorization is explicit
 propose a *lesson* ("`npm test` needs `--runInBand` in this repository"),
 reviewed like any memory and recalled for the same project.
 *Done when* a lesson kept on one task is recalled on the next in that project.
-*Progress 2026-11-27:* lessons come from the turn's command records, not the
-model's prose: a failing command followed by a passing variant of it becomes one
-deferred `project:<id>` proposal under the answer. Keep-then-recall in the same
-project (and not another) is covered by tests; the live journey is pending.
+*Progress 2026-11-27:* the model records a lesson with `record_lesson`, and the
+runtime files it only on this task's evidence (the failing command, then the
+passing one, no file change between); a same-program variant is also caught
+without the model. Lessons are kept without asking and shown with Undo; one
+about a declared check asks, and Keep fixes the check. A failed command carries
+the kept lesson about it, and a lesson whose command fails is archived as stale
+([FIXED-1586](FIXED_ITEMS.md#fixed-1586--every-memory-waited-for-an-approval)).
+The live two-task journey is pending.
+
+**Decision 2026-11-27 — almost no memory approvals.** Raiker keeps the owner's
+own words and evidence-backed lessons without asking and shows each with Undo,
+as ChatGPT does; it still asks for the model's own sentences, personal
+identifiers and check fixes, and **Ask before remembering** restores approval
+for everything. This replaces "nothing is stored until Keep" for RU-10.
 
 ### E. Always on, and a Pause that really pauses
 
@@ -335,6 +345,9 @@ chat. Release qualification still requires a live run on the published build.
 
 ## Changelog
 
+- **2026-11-27 (Almost no approvals)** — Raiker keeps trusted memories itself
+  with Undo; lessons are model-recorded on verified evidence, fix declared
+  checks, come back when their command fails and retire when stale (FIXED-1586).
 - **2026-11-27 (Lessons)** — RU-12 built: project lessons from Raiker's own
   command records, kept under the answer and recalled in that project only
   (FIXED-1585). The live two-task journey remains.

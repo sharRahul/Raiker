@@ -1010,6 +1010,10 @@ export const api = {
   forgetMemory: (id: string) => contract.forgetMemory(id),
   memorySettings: () => contract.getMemorySettings(),
   setMemoryIncognito: (incognito: boolean) => contract.setMemoryIncognito({ incognito }),
+  // Raiker remembers on its own unless the owner asks it to ask first.
+  setAskBeforeRemembering: (ask: boolean) =>
+    contract.setAskBeforeRemembering({ ask_before_remembering: ask }),
+  rememberedInSession: (sessionId: string) => contract.listRememberedInSession({ session_id: sessionId }),
   // MEM-MODE-02 — Off, Brief only or Search when relevant. Incognito still
   // wins on the server; this records the owner's choice and nothing more.
   setMemoryRecallMode: (mode: MemoryRecallMode) =>

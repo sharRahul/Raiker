@@ -1022,6 +1022,24 @@
         "title": "ApproveMcpToolsRequest",
         "type": "object"
       },
+      "AskBeforeRememberingSet": {
+        "properties": {
+          "ask_before_remembering": {
+            "title": "Ask Before Remembering",
+            "type": "boolean"
+          },
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "ok",
+          "ask_before_remembering"
+        ],
+        "title": "AskBeforeRememberingSet",
+        "type": "object"
+      },
       "AttachProjectFolderRequest": {
         "additionalProperties": false,
         "description": "A folder of the owner's to put behind a project, and whether Raiker may write to it.",
@@ -22944,6 +22962,11 @@
       },
       "MemorySettingsView": {
         "properties": {
+          "ask_before_remembering": {
+            "default": false,
+            "title": "Ask Before Remembering",
+            "type": "boolean"
+          },
           "background_index": {
             "anyOf": [
               {
@@ -29761,6 +29784,35 @@
           "signing"
         ],
         "title": "ReleaseTargetView",
+        "type": "object"
+      },
+      "RememberedMemory": {
+        "description": "A memory Raiker kept on its own in this conversation; Undo forgets it.",
+        "properties": {
+          "memory_id": {
+            "title": "Memory Id",
+            "type": "string"
+          },
+          "memory_type": {
+            "title": "Memory Type",
+            "type": "string"
+          },
+          "source_turn_id": {
+            "title": "Source Turn Id",
+            "type": "string"
+          },
+          "text": {
+            "title": "Text",
+            "type": "string"
+          }
+        },
+        "required": [
+          "memory_id",
+          "text",
+          "memory_type",
+          "source_turn_id"
+        ],
+        "title": "RememberedMemory",
         "type": "object"
       },
       "RemoteAccessApplyBody": {
@@ -51243,6 +51295,47 @@
         "summary": "List Memories"
       }
     },
+    "/api/memory/ask-before-remembering": {
+      "put": {
+        "description": "Ask before Raiker keeps a memory (off by default: it remembers, with Undo).",
+        "operationId": "set_ask_before_remembering_api_memory_ask_before_remembering_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": true,
+                "title": "Body",
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AskBeforeRememberingSet"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Set Ask Before Remembering"
+      }
+    },
     "/api/memory/conversation-index/rebuild": {
       "post": {
         "description": "MEM-09's repair for a drifted conversation index.",
@@ -52195,6 +52288,49 @@
           }
         },
         "summary": "Decide Memory Relationship Proposal"
+      }
+    },
+    "/api/memory/remembered": {
+      "get": {
+        "description": "What Raiker kept on its own in one conversation, so each answer can offer Undo.",
+        "operationId": "list_remembered_in_session_api_memory_remembered_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "title": "Session Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/RememberedMemory"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Remembered In Session"
       }
     },
     "/api/memory/settings": {

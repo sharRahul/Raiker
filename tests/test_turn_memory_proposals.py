@@ -50,11 +50,13 @@ def test_completed_turn_creates_role_provenanced_idempotent_proposals(tmp_path: 
     gateway._finalize_turn(envelope, response)  # noqa: SLF001
     gateway._finalize_turn(envelope, response)  # noqa: SLF001 - replay must be idempotent
 
-    rows = gateway.store.list_memory_candidates(
-        decision="deferred", owner_principal_id=gateway.owner_principal_id
-    )
+    rows = gateway.store.list_memory_candidates(owner_principal_id=gateway.owner_principal_id)
     assert len(rows) == 2
     assert {row["source_role"] for row in rows} == {"user", "assistant"}
+    # The owner's own words are kept as the turn ends; the model's sentence waits.
+    assert {row["source_role"]: row["decision"] for row in rows} == {
+        "user": "approved", "assistant": "deferred",
+    }
     assert {row["source_turn_id"] for row in rows} == {envelope.turn_id}
     assert all(row["extractor_version"] for row in rows)
     assert gateway.store.list_memory_candidates(

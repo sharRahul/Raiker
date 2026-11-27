@@ -71,6 +71,20 @@ class ProposalDecided(TypedDict):
     relationship_proposals: NotRequired[int]
 
 
+class AskBeforeRememberingSet(TypedDict):
+    ok: bool
+    ask_before_remembering: bool
+
+
+class RememberedMemory(TypedDict):
+    """A memory Raiker kept on its own in this conversation; Undo forgets it."""
+
+    memory_id: str
+    text: str
+    memory_type: str
+    source_turn_id: str
+
+
 class CorrectionProposed(TypedDict):
     """QUI-F20 — a correction waiting in Suggestions until the owner decides it."""
 

@@ -809,6 +809,7 @@ class AgentGateway:
                     )
                 )
             self._propose_turn_lesson(prompt_envelope)
+            self._auto_keep_turn(prompt_envelope)
         await self._adispatch_turn_end_hook(prompt_envelope, response)
         events_path = str(self.writer.path_for_session(prompt_envelope.session_id))
         return AgentResponse(
@@ -842,6 +843,36 @@ class AgentGateway:
             }
         except Exception:  # noqa: BLE001 — unknown means withheld
             return True
+
+    def _auto_keep_turn(self, prompt_envelope: PromptEnvelope) -> None:
+        """Keep this turn's trusted proposals without asking; the answer shows Undo."""
+        try:
+            from raiker.memory.auto_keep import auto_keep_turn
+
+            summary = auto_keep_turn(
+                self.store,
+                workspace_root=self.workspace_root,
+                owner_principal_id=self.owner_principal_id,
+                session_id=prompt_envelope.session_id,
+                turn_id=prompt_envelope.turn_id,
+            )
+            if summary.kept or summary.duplicates:
+                self.writer.append(
+                    make_event(
+                        session_id=prompt_envelope.session_id,
+                        turn_id=prompt_envelope.turn_id,
+                        event_type="memory_auto_kept",
+                        actor="memory_auto_keep",
+                        payload={
+                            "kept": len(summary.kept),
+                            "duplicates": summary.duplicates,
+                            "asked": summary.asked,
+                        },
+                        client=prompt_envelope.client,
+                    )
+                )
+        except Exception:  # noqa: BLE001 — a proposal left waiting is the safe failure
+            logging.getLogger(__name__).debug("auto-keep failed", exc_info=True)
 
     def _propose_turn_lesson(self, prompt_envelope: PromptEnvelope) -> None:
         """RU-12 — a lesson this project task's own commands taught, for the owner to keep."""

@@ -197,6 +197,26 @@ class MemoryStore:
                     ).fetchone()
         return bool(row["incognito"]) if row is not None else False
 
+    def asks_before_remembering(self: SQLiteStore, owner_principal_id: str) -> bool:
+        """Whether this owner asked Raiker to ask before keeping a memory (off by default)."""
+        row = self._row(
+            "SELECT ask_before_remembering FROM memory_settings WHERE scope_id = ?",
+            (f"{self.MEMORY_SETTINGS_SCOPE}:{owner_principal_id}",),
+        )
+        return bool(row["ask_before_remembering"]) if row is not None else False
+
+    def set_ask_before_remembering(self: SQLiteStore, ask: bool, owner_principal_id: str) -> None:
+        self._execute(
+            """
+            INSERT INTO memory_settings (scope_id, incognito, ask_before_remembering, updated_at)
+            VALUES (?, 0, ?, ?)
+            ON CONFLICT(scope_id) DO UPDATE SET
+              ask_before_remembering = excluded.ask_before_remembering,
+              updated_at = excluded.updated_at
+            """,
+            (f"{self.MEMORY_SETTINGS_SCOPE}:{owner_principal_id}", 1 if ask else 0, utc_now()),
+        )
+
     def set_memory_incognito(self: SQLiteStore, incognito: bool, owner_principal_id: str | None = None) -> None:
         if owner_principal_id is None:
             owner_principal_id = self.original_account_principal_id()

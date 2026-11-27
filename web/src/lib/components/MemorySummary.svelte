@@ -9,7 +9,7 @@
   } = $props();
   const topics: Record<string, string> = {
     preference: "Preferences", personal: "About you", fact: "Facts",
-    project: "Projects", procedure: "Ways of working", lesson: "Lessons",
+    project: "Projects", procedure: "Ways of working", lesson: "Lessons", check_fix: "Lessons",
     relationship: "People and relationships", summary: "Summaries",
   };
   const groups = $derived.by(() => {

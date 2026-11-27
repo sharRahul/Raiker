@@ -145,6 +145,9 @@ class EmbeddingProviderView(TypedDict):
 @dataclass(frozen=True)
 class MemorySettingsView(View):
     incognito: bool
+    #: Raiker keeps the owner's own words and evidence-backed lessons without
+    #: asking unless this is on.
+    ask_before_remembering: bool = False
     #: MEM-MODE-02 — the owner's ambient-recall mode. Incognito still wins.
     recall_mode: Literal["off", "brief", "search_when_relevant"] = "search_when_relevant"
     #: MEM-03 — which embedding space recall searches, and what is selectable.

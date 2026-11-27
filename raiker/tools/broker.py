@@ -503,8 +503,46 @@ class ToolBroker:
             "run_command": self._run_command,
             "background_run": self._background_run,
             "update_plan": self._update_plan,
+            "record_lesson": self._record_lesson,
             "spawn_subagent": self._spawn_subagent,
         }
+
+    def _record_lesson(
+        self, args: dict[str, Any], context: ToolExecutionContext
+    ) -> dict[str, Any]:
+        """RU-12 — file the model's lesson when this task's own records back it."""
+        from raiker.memory.lessons import record_lesson
+
+        if self.store is None:
+            return {"status": "failed", "error": {"type": "lesson_store_unavailable"}}
+        session = self.store.load_session(context.session_id) or {}
+        project_id = str(session.get("project_id") or "").strip()
+        if not project_id:
+            return {"status": "failed", "error": {"type": "lesson_needs_project"}}
+        from raiker.goals.store import session_memory_withheld
+
+        project = self.store.load_project(project_id) or {}
+        if (
+            self.store.is_memory_incognito(context.owner_principal_id)
+            or session_memory_withheld(self.store, context.session_id) in {"incognito", "unreadable"}
+            or not bool(project.get("memory_enabled", True))
+        ):
+            # Incognito and memory off create no memory, as they recall none.
+            return {"status": "failed", "error": {"type": "lesson_memory_off"}}
+        outcome = record_lesson(
+            self.store,
+            owner_principal_id=context.owner_principal_id,
+            project_id=project_id,
+            session_id=context.session_id,
+            turn_id=context.turn_id or "",
+            source_event_id=context.turn_id or "evt_missing",
+            text=str(args.get("text") or ""),
+            failed_command=str(args.get("failed_command") or ""),
+            passed_command=str(args.get("passed_command") or ""),
+        )
+        if outcome != "recorded":
+            return {"status": "failed", "error": {"type": outcome}}
+        return {"status": "success", "recorded": True}
 
     def _update_plan(
         self, args: dict[str, Any], context: ToolExecutionContext

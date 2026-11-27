@@ -1768,6 +1768,42 @@ TOOL_DEFINITIONS: tuple[ToolDefinition, ...] = (
         ),
         description="Record or revise your plan for this conversation as an ordered checklist, shown live to the user. Use it for any task of more than a couple of steps: write the plan before you start, mark exactly one step in_progress while you work on it, and mark it completed as soon as it is genuinely done. The plan persists across turns and approvals, so it is also how you pick the work back up after an interruption. Send the whole plan each time; this replaces the previous one.",
     ),
+    # RU-12 — what this task taught about the project, in the model's words but
+    # only on the evidence of the task's own command records: the runtime files
+    # it when `failed_command` exited non-zero and, later in the same task,
+    # `passed_command` exited zero with no file changed in between. It stores
+    # nothing durable itself; the turn's end keeps it, with Undo.
+    ToolDefinition(
+        name="record_lesson",
+        label="Record a lesson",
+        family=FAMILY_PLAN,
+        audit=AUDIT_FULL,
+        risk="medium",
+        risk_signals=("changes_state",),
+        requires_approval=False,
+        model_exposed=True,
+        contract_known=False,
+        capability=None,
+        source_kind=None,
+        delegable=False,
+        read_shaped=True,
+        required_args=("text", "failed_command", "passed_command"),
+        required_list_args=(),
+        optional_args=(),
+        arg_schemas=(
+            ("text", {"type": "string", "description": "The lesson in one sentence."}),
+            ("failed_command", {"type": "string", "description": "The command that failed, exactly as run."}),
+            ("passed_command", {"type": "string", "description": "The command that then passed, exactly as run."}),
+        ),
+        description=(
+            "Record one lesson this task taught about how this project works, so the next task "
+            "here starts with it. Use it after a command failed and a different command fixed it "
+            "without changing any file, e.g. text 'Tests need --runInBand here', failed_command "
+            "'npm test', passed_command 'npm test -- --runInBand'. Give both commands exactly as "
+            "you ran them; a lesson the task's records do not show is refused. One sentence, no "
+            "secrets. Only in a project."
+        ),
+    ),
     # Not in the model's catalogue, and deliberately so: `vector_get` is reachable
     # by a subagent step and by the policy engine's read-shaped set, but it is not
     # a tool a turn proposes. `model_exposed=False` is what keeps it out of the

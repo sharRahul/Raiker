@@ -1576,6 +1576,43 @@ class RuntimeOrchestrator:
         if engine is not None:
             engine.authority = authority
 
+    def _with_kept_lesson(self, envelope: PromptEnvelope, action: Any, payload: Any) -> Any:
+        """RU-12 — a failed command comes back with the kept lesson about it, if any."""
+        if action.tool_name not in {"shell", "run_command"} or not isinstance(payload, dict):
+            return payload
+        exit_code = payload.get("exit_code")
+        if not isinstance(exit_code, int) or exit_code == 0:
+            return payload
+        store = getattr(self.tool_broker, "store", None)
+        if store is None:
+            return payload
+        try:
+            from raiker.goals.store import session_memory_withheld
+            from raiker.memory.lessons import lesson_for_command
+
+            owner = self._source_owner(envelope)
+            session = store.load_session(envelope.session_id) or {}
+            project_id = str(
+                envelope.prompt.metadata.get("project_id") or session.get("project_id") or ""
+            ).strip()
+            if (
+                not project_id
+                or store.is_memory_incognito(owner)
+                or session_memory_withheld(store, envelope.session_id)
+            ):
+                return payload
+            command = str(
+                payload.get("safe_display") or (action.arguments or {}).get("command") or ""
+            )
+            note = lesson_for_command(
+                store, workspace_root=self.workspace_root, owner_principal_id=owner,
+                project_id=project_id, command=command, exit_code=exit_code,
+            )
+        except Exception:  # noqa: BLE001 — a lesson is a hint; the result stands without it
+            _LOGGER.debug("kept lesson could not be read", exc_info=True)
+            return payload
+        return {**payload, "kept_lesson": note} if note else payload
+
     def _declared_checks_due(self, envelope: PromptEnvelope) -> list[str]:
         """RU-22 — this Build turn's declared checks not yet run after its last change."""
         store = getattr(self.tool_broker, "store", None)
@@ -3907,10 +3944,14 @@ class RuntimeOrchestrator:
                     candidate_action.tool_name,
                     # C6 — a call that really returned material earns a citation
                     # id here, in the result the model is about to read.
-                    self._cite_result(
+                    self._with_kept_lesson(
                         envelope,
                         candidate_action,
-                        candidate_result.output or candidate_result.error or {},
+                        self._cite_result(
+                            envelope,
+                            candidate_action,
+                            candidate_result.output or candidate_result.error or {},
+                        ),
                     ),
                 ))
             if refusals:

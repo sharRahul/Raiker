@@ -205,6 +205,11 @@ export type ApproveMcpToolsRequest = {
   fingerprints?: Record<string, string> | null;
 };
 
+export type AskBeforeRememberingSet = {
+  ok: boolean;
+  ask_before_remembering: boolean;
+};
+
 /** A folder of the owner's to put behind a project, and whether Raiker may write to it. */
 export type AttachProjectFolderRequest = {
   path: string;
@@ -4485,6 +4490,7 @@ export type MemoryScopeChanged = {
 
 export type MemorySettingsView = {
   incognito: boolean;
+  ask_before_remembering: boolean;
   recall_mode: "off" | "brief" | "search_when_relevant";
   embedding_backend: string;
   retrieval: EmbeddingSpaceView | null;
@@ -5745,6 +5751,14 @@ export type ReleaseTargetView = {
   runner: string;
   installer_formats: string[];
   signing: ReleaseSigning;
+};
+
+/** A memory Raiker kept on its own in this conversation; Undo forgets it. */
+export type RememberedMemory = {
+  memory_id: string;
+  text: string;
+  memory_type: string;
+  source_turn_id: string;
 };
 
 export type RemoteAccessApplyBody = {
@@ -8155,6 +8169,8 @@ export const contract = {
     call<McpToolsApproved>("POST", `/api/mcp/servers/${encodeURIComponent(serverId)}/tools/approve`, { body }),
   listMemories: (query: { scope?: string; include_inactive?: boolean } = {}) =>
     request<MemoryControlView[]>(withQuery("/api/memory", query)),
+  setAskBeforeRemembering: (body: Record<string, unknown>) =>
+    call<AskBeforeRememberingSet>("PUT", "/api/memory/ask-before-remembering", { body }),
   rebuildConversationIndex: () =>
     call<ConversationIndexRebuilt>("POST", "/api/memory/conversation-index/rebuild"),
   cleanupExpiredObservations: (body: Record<string, unknown>) =>
@@ -8213,6 +8229,8 @@ export const contract = {
     call<RelationshipScan>("POST", "/api/memory/relationship-proposals/scan"),
   postMemoryRelationshipProposalsCandidateIdDecision: (candidateId: string, body: Record<string, unknown>) =>
     call<RelationshipDecided>("POST", `/api/memory/relationship-proposals/${encodeURIComponent(candidateId)}/decision`, { body }),
+  listRememberedInSession: (query: { session_id: string }) =>
+    request<RememberedMemory[]>(withQuery("/api/memory/remembered", query)),
   getMemorySettings: () =>
     request<MemorySettingsView>("/api/memory/settings"),
   rebuildTextIndexes: () =>

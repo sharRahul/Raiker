@@ -5171,6 +5171,14 @@ CONVERSATION_INCOGNITO_SQL = """
 ALTER TABLE sessions ADD COLUMN incognito INTEGER NOT NULL DEFAULT 0 CHECK (incognito IN (0, 1));
 """
 
+MEMORY_AUTO_KEEP_MIGRATION_ID = "RAIKER-2137-memory-auto-keep"
+#: Raiker remembers on its own unless the owner asks it to ask first. 0 is the
+#: default: remember, show it under the answer, Undo in one click.
+MEMORY_AUTO_KEEP_SQL = """
+ALTER TABLE memory_settings ADD COLUMN ask_before_remembering INTEGER NOT NULL DEFAULT 0
+  CHECK (ask_before_remembering IN (0, 1));
+"""
+
 PERSONAS_MIGRATION_ID = "RAIKER-2134-personas"
 #: ADR-0005 — composer personas. Owner data under the account; the ceiling is
 #: a JSON list of tool families (NULL inherits the turn's tools).
@@ -5468,6 +5476,7 @@ MIGRATIONS: tuple[MigrationStep, ...] = (
     Migration(PERSONAS_MIGRATION_ID, PERSONAS_SQL),
     Migration(MCP_CALL_MODE_MIGRATION_ID, MCP_CALL_MODE_SQL),
     Migration(CONVERSATION_INCOGNITO_MIGRATION_ID, CONVERSATION_INCOGNITO_SQL),
+    Migration(MEMORY_AUTO_KEEP_MIGRATION_ID, MEMORY_AUTO_KEEP_SQL),
 )
 
 #: DEC-17 step 8 — how far along the registry this build is, as one number.

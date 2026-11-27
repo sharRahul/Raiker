@@ -71,6 +71,25 @@ def _proposals(ws: Path, _client: TestClient, _h: dict[str, str]) -> Call:
     return "/api/memory/proposals"
 
 
+def _remembered(ws: Path, _client: TestClient, _h: dict[str, str]) -> Call:
+    """A turn's owner words Raiker kept on its own, listed for Undo."""
+    from dataclasses import replace
+
+    from raiker.memory.auto_keep import auto_keep_turn
+
+    store = SQLiteStore(ws)
+    candidate = replace(
+        create_deferred_candidate("evt_r", "I prefer green tea.", "global"),
+        source_session_id="sess_contract", source_turn_id="turn_contract", source_role="user",
+    )
+    store.insert_memory_candidate(candidate, owner_principal_id=OWNER)
+    auto_keep_turn(
+        store, workspace_root=ws, owner_principal_id=OWNER,
+        session_id="sess_contract", turn_id="turn_contract",
+    )
+    return "/api/memory/remembered?session_id=sess_contract"
+
+
 def _correction(ws: Path, client: TestClient, h: dict[str, str]) -> Call:
     """QUI-F20 — the owner's correction in a conversation they own."""
     with_turn("")(ws, client, h)
@@ -281,6 +300,7 @@ def _revoke_knowledge_source(ws: Path, client: TestClient, h: dict[str, str]) ->
 
 CASES: Cases = {
     ("GET", "/api/memory/proposals"): _proposals,
+    ("GET", "/api/memory/remembered"): _remembered,
     ("POST", "/api/memory/proposals"): _correction,
     ("POST", "/api/memory/proposals/{candidate_id}/decision"): _proposal_decision,
     ("GET", "/api/memory/relationship-proposals"): _relationships("relationship-proposals"),
@@ -310,6 +330,9 @@ CASES: Cases = {
     ("POST", "/api/memory/gists/{gist_id}/discard"): _gist,
     ("POST", "/api/memory/eidetic/cleanup"): _cleanup,
     ("PUT", "/api/memory/incognito"): plain("/api/memory/incognito", {"incognito": True}),
+    ("PUT", "/api/memory/ask-before-remembering"): plain(
+        "/api/memory/ask-before-remembering", {"ask_before_remembering": True}
+    ),
     ("PUT", "/api/memory/recall-mode"): plain(
         "/api/memory/recall-mode", {"recall_mode": "brief"}
     ),

@@ -1,5 +1,27 @@
 # Fixed items
 
+## FIXED-1586 — Every memory waited for an approval
+
+**Severity: Medium. Area: Memory / Chat (RU-10, RU-12). Status: Fixed 2026-11-27.**
+Each proposal — mostly the owner's own words — waited for **Keep**, so memory
+was a review chore and an unread queue protected nothing. Raiker now keeps
+trusted proposals as the turn ends (`raiker/memory/auto_keep.py`): the owner's
+words and evidence-backed lessons, as `policy_allowed` with an `approve`
+lifecycle row marked `auto`. The answer shows **Remembered** / **Learned for
+this project** with **Undo** (forget), read from `GET /api/memory/remembered`.
+Still asked: sentences the model wrote (FIXED-1548), personal identifiers, and
+check-fix lessons. Never kept: secret-like text; nothing in Incognito or with
+memory off. Repeats close as `already_remembered`. **Ask before remembering**
+(`PUT /api/memory/ask-before-remembering`, migration RAIKER-2137) restores
+approval for everything. Lessons are reworked: the model records them with the
+`record_lesson` tool, citing the failing and passing commands, and the runtime
+files one only when this task's records show both with no file change between
+(any program, so `npm` → `pnpm` counts); up to three per task. A lesson about a
+declared check fixes the check on Keep. A failed command's result carries the
+kept lesson about it; a lesson whose recommended command fails is archived as
+stale. Evidence: `tests/test_memory_auto_keep.py`, `tests/test_memory_lessons.py`,
+`tests/test_turn_memory_proposals.py`, `TurnMemoryProposals.test.ts`.
+
 ## FIXED-1585 — Raiker did not remember what its own work taught
 
 **Severity: Low. Area: Memory / Build (RU-12). Status: Fixed 2026-11-27.**
@@ -2378,6 +2400,7 @@ file you can open. The two capture sets that remain — `screenshots/pages/` and
 | [FIXED-1581](#fixed-1581--current-documentation-still-described-removed-approval-modes-and-ui) | Medium | Documentation / permissions | Fixed 2026-11-27 |
 | [FIXED-1582](#fixed-1582--memory-opened-on-counts-instead-of-the-facts-raiker-knows) | Medium | Memory / Quiet UI | Fixed 2026-11-27 |
 | [FIXED-1583](#fixed-1583--import-discarded-a-memorys-reviewed-topic) | Medium | Memory / import | Fixed 2026-11-27 |
+| [FIXED-1586](#fixed-1586--every-memory-waited-for-an-approval) | Medium | Memory / Chat | Fixed 2026-11-27 |
 | [FIXED-1585](#fixed-1585--raiker-did-not-remember-what-its-own-work-taught) | Low | Memory / Build | Fixed 2026-11-27 |
 | [FIXED-1584](#fixed-1584--conversation-incognito-was-missing-and-goal-noticing-ignored-memory-opt-out) | Medium | Memory / Chat / Quiet UI | Fixed 2026-11-27 |
 | [FIXED-1580](#fixed-1580--permissions-repeated-policy-and-work-pages-exposed-routine-metadata) | Medium | Quiet UI / permission clarity | Fixed 2026-11-27 |

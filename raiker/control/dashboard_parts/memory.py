@@ -387,6 +387,28 @@ class MemoryService:
         self.store.insert_memory_candidate(candidate, owner_principal_id=acting_principal_id)
         return ControlResult(ok=True, data={"candidate_id": candidate.candidate_id, "text": clean})
 
+    def list_remembered_in_session(
+        self: DashboardService, session_id: str, acting_principal_id: str | None
+    ) -> list[dict[str, str]]:
+        if not self._is_human(acting_principal_id):
+            return []
+        from raiker.memory.auto_keep import remembered_in_session
+
+        return remembered_in_session(
+            self.store,
+            workspace_root=self.workspace_root,
+            owner_principal_id=acting_principal_id or "",
+            session_id=session_id,
+        )
+
+    def set_ask_before_remembering(
+        self: DashboardService, ask: bool, acting_principal_id: str | None
+    ) -> ControlResult:
+        if not self._is_human(acting_principal_id):
+            return ControlResult(ok=False, reason_code="not_authorized_human")
+        self.store.set_ask_before_remembering(ask, acting_principal_id or "")
+        return ControlResult(ok=True, data={"ask_before_remembering": ask})
+
     def decide_memory_proposal(
         self: DashboardService,
         candidate_id: str,
@@ -440,6 +462,15 @@ class MemoryService:
 
         from raiker.memory.entity_extraction import propose_memory_relationships
         from raiker.memory.store import MemoryGovernance, write_memory
+
+        if str(candidate["memory_type"]) == "check_fix":
+            # RU-12 — keeping a check-fix lesson fixes the declared check too.
+            from raiker.memory.lessons import apply_check_fix, parse_check_fix
+
+            fix = parse_check_fix(text)
+            scope = str(candidate["scope"])
+            if fix is not None and scope.startswith("project:"):
+                apply_check_fix(self.store, scope.split(":", 1)[1], failed=fix[0], passed=fix[1])
 
         entry = write_memory(
             text,
@@ -1450,6 +1481,8 @@ class MemoryService:
             providers.append(item)
         return MemorySettingsView(
             incognito=self.store.is_memory_incognito(acting_principal_id),
+            ask_before_remembering=bool(acting_principal_id)
+            and self.store.asks_before_remembering(acting_principal_id or ""),
             recall_mode=cast(
                 Literal["off", "brief", "search_when_relevant"],
                 self.store.get_memory_recall_mode(acting_principal_id),

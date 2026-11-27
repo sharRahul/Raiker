@@ -21,6 +21,7 @@ from raiker.api.dependencies import refusal
 from raiker.api.schemas import CorrectionMemoryRequest, serialize_dto
 from raiker.api.sessions import ApiSession
 from raiker.api.wire.memory import (
+    AskBeforeRememberingSet,
     ConversationIndexRebuilt,
     CorrectionProposed,
     DamagedVectorsRemoved,
@@ -55,6 +56,7 @@ from raiker.api.wire.memory import (
     RelationshipDecided,
     RelationshipRejected,
     RelationshipScan,
+    RememberedMemory,
     TextIndexesRebuilt,
     memory_proposal,
     relationship_proposal,
@@ -102,6 +104,22 @@ async def list_memory_proposals(
     answer: list[MemoryProposal] = [
         memory_proposal(row)
         for row in _service(request).list_memory_proposals(auth_data[0].principal_id)
+    ]
+    return serialize_dto(answer)
+
+
+@router.get("/api/memory/remembered")
+async def list_remembered_in_session(
+    request: Request,
+    session_id: str,
+    auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+) -> list[dict[str, Any]]:
+    """What Raiker kept on its own in one conversation, so each answer can offer Undo."""
+    answer: list[RememberedMemory] = [
+        cast(RememberedMemory, row)
+        for row in _service(request).list_remembered_in_session(
+            session_id, auth_data[0].principal_id
+        )
     ]
     return serialize_dto(answer)
 
@@ -481,6 +499,22 @@ async def set_memory_incognito(
     if not result.ok:
         raise refusal(status.HTTP_403_FORBIDDEN, result.reason_code)
     answer = cast(IncognitoSet, {"ok": True, **result.data})
+    return serialize_dto(answer)
+
+
+@router.put("/api/memory/ask-before-remembering")
+async def set_ask_before_remembering(
+    request: Request,
+    body: dict[str, Any],
+    auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+) -> dict[str, Any]:
+    """Ask before Raiker keeps a memory (off by default: it remembers, with Undo)."""
+    result = _service(request).set_ask_before_remembering(
+        bool(body.get("ask_before_remembering", False)), auth_data[0].principal_id
+    )
+    if not result.ok:
+        raise refusal(status.HTTP_403_FORBIDDEN, result.reason_code)
+    answer = cast(AskBeforeRememberingSet, {"ok": True, **result.data})
     return serialize_dto(answer)
 
 

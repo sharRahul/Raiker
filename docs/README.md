@@ -44,6 +44,7 @@ Canonical technical references:
 | Question | Document |
 |---|---|
 | How should personal-agent UI/UX be implemented? | [UX specification](plans/PERSONAL_AUTONOMOUS_AGENT_SPEC.md#personal-agent-ui-and-ux) and [task decisions](plans/PERSONAL_AUTONOMOUS_AGENT_SPEC.md) |
+| How are standing permissions, action approvals and work-page details presented? | [Current UI record](architecture/PERMISSIONS_UI_REFINEMENT.md) and [Permissions guide](guide/permissions-and-runtime-modes.md) |
 | What is the Quiet UI redesign for laptop and desktop? | [Quiet UI redesign plan](plans/QUIET_UI_PLAN.md) |
 | What makes Raiker ready to use on any machine? | [Ready-to-use plan](plans/READY_TO_USE_PLAN.md) and [ADR-0006](adr/ADR-0006-one-supported-path-per-machine.md) |
 | What stands between Raiker and its first beta? | [First beta release plan](plans/BETA_RELEASE_PLAN.md) and the [beta guide](guide/beta.md) |

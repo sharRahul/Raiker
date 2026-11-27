@@ -72,7 +72,7 @@ Nothing about what you are called grants anything.
 | Agent runtime | **Settings → Advanced → Runtime** | Whether Raiker accepts new executions at all |
 | Capability gate | **Permissions** | Whether a category of action is available to the owner and agent |
 | Decision mode | **Permissions** | Whether an eligible action asks, is allowed, runs automatically, or is denied |
-| Turn posture | Chat or Build composer | Additional restrictions for this conversation, such as Build Plan/Edit/Auto and approval policy |
+| Turn posture | Chat or Build composer | Additional restrictions for this conversation, such as Build Plan/Suggest changes/Run within limits and the shared approval policy |
 | Approval | **Approvals** | Whether one specific proposed action may proceed |
 
 A turn may tighten authority but cannot widen it. The agent cannot turn on its

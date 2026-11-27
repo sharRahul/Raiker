@@ -153,22 +153,18 @@ literal against the declared set.
 
 Event records are append-style local audit evidence, not tamper-proof logging.
 
-**Approval resolution does emit execution events.** For the fourteen capabilities
-in `EXECUTABLE_ON_APPROVAL` (`raiker/approvals/execution.py`) the relay records
-`approval_executed` on success and `approval_execution_denied` when governance
-refused at execution time; a turn resolving its own eligible call under the
-`auto` approval mode records `approval_auto_executed`. For every other
-capability the resolution is a decision and emits no execution event, which is
-the distinction this paragraph used to collapse.
+**Approval resolution does emit execution events.** For capabilities relayed
+by `EXECUTABLE_ON_APPROVAL`, the relay records `approval_executed` on success
+and `approval_execution_denied` when governance refuses execution. Other
+capabilities can record a decision without executing; approval is not a receipt.
 
-**`auto` also records when it declines to grant.** `approval_auto_withheld`
-(BUG-218) is written when Auto's deterministic alignment check finds that the
-turn's own record does not establish the file an action is about to change: the
-payload carries the path, the reason code and the sentence the owner is shown,
-and the action falls back to the ordinary approval queue. An `auto` turn that
-withholds therefore emits `approval_auto_withheld` followed by
-`approval_requested`, never `approval_auto_executed`. `skip` is not
-alignment-checked and never emits it.
+**Verified preparation records its own authority.** The sandbox path emits
+`sandbox_preparation_executed`; bounded rules use `limit_rule_executed`, and the
+explicit standing-authority bridge uses `capability_allow_executed`. Real tool
+and command results establish success or failure. The old composer
+`approval_auto_executed`, `approval_auto_withheld` and skipped-preview records
+remain readable historical evidence; they do not describe the current sandbox
+authorization path. Legacy settings cannot mint an approval bypass.
 
 **This catalogue is a reader's guide, not the registry.** The registry is
 `raiker/contracts/models.py::EVENT_TYPES`, which declares 273 event types; the

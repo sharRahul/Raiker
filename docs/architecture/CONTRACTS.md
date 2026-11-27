@@ -1,5 +1,18 @@
 # Contracts
 
+## Approval-mode compatibility — 2026-11-27
+
+The current prompt approval modes are `manual`, `sandbox`, `dont_ask`.
+Legacy prompt `auto` maps to sandbox preparation and `skip` to manual;
+per-capability `auto` and Build's turn-mode IDs remain separate contracts.
+Preparation depends on runtime-derived owner/session scope and fresh measured
+containment, not model text. Explicit saved Ask/Deny, capability gates and
+critical human confirmation remain authoritative. Approval records a decision;
+actual executor results establish execution success, failure or unknown outcome.
+See [decision modes](DECISION_MODES_SPEC.md) and the
+[approval contract](../plans/APPROVAL_REDESIGN.md#contract).
+
+
 > runtime_enablement_candidate: completed
 > controlled_runtime_mode_activation: implemented
 > local_single_user_production_hardening: implemented

@@ -435,7 +435,7 @@ documentation review, not a fresh visual inspection or completed user study.
 
 ### Information architecture and primary journeys
 
-Keep Home, Chat, Build, Design, Threads, Tasks, Projects and Approvals in their
+Keep Home, Chat, Build, Design, Chats, Tasks, Projects and Approvals in their
 existing roles. Goals are persistent work objects surfaced in Home/Tasks and
 their linked conversations, not a mandatory new mode. Settings and observability
 retain advanced configuration and evidence. New goal routes need actual backend

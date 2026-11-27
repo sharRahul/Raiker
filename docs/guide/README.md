@@ -1,5 +1,10 @@
 # Raiker user guide
 
+**Permissions and approvals:** Permissions defines standing access and rules;
+Approvals reviews specific proposed actions. Start with the
+[Permissions guide](permissions-and-runtime-modes.md). Saved conversations are
+under **Work → Chats**; existing session links still open their records.
+
 This guide explains how to install, configure, use, and safely operate Raiker.
 It is written for people using the web dashboard or terminal client; you do not
 need to understand Raiker's internal architecture first.

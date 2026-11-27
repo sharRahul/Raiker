@@ -65,7 +65,7 @@ contract and refused again by the broker, so a turn can never grant itself
 authority you have not given it. **That is why Build opens in Run within limits**: it is the
 only mode that sends no override, so a new conversation runs under exactly your
 standing permissions rather than quietly tightening below them. Choosing Plan or
-Edit is a deliberate act.
+Suggest changes is a deliberate act.
 
 **A mode changes no standing permission.** The chips write nothing to your
 capability modes. Widening a capability stays on Permissions, under the step-up —
@@ -77,21 +77,21 @@ useful: it removes the ability to act, not the ability to look.
 
 ## Approval policy is a different control
 
-Beside the mode picker is the approval policy: **Manually approve**,
-**Automatically approve**, **Skip all approvals**, or **Decline what needs
-asking**.
+The turn mode and approval policy have different scopes. **Plan**, **Suggest
+changes** and **Run within limits** can only tighten the coding turn. Standing
+access and the shared default are managed in **Permissions**, not granted by a
+composer pill.
 
-The mode chooses the *posture* of a coding turn. The approval policy chooses
-whether an otherwise-eligible action waits for you. They are not the same
-control, and **Skip** omits only the interaction — it never bypasses project or
-path confinement, hunk validation, rollback, the sandbox, restricted command
-policy, or a critical hold.
+**Permissions → Overview → Default mode** offers **Ask first**, **Work in the
+sandbox** and **Read-only**. Its **Advanced** section offers **Manually approve**,
+**Work in sandbox** and **Decline what needs asking**. The sandbox policy permits
+verified preparation in a disposable task copy while consequential effects
+still need their ordinary authority. Legacy Auto/Skip approval settings migrate
+conservatively; there is no Skip bypass.
 
-**Decline what needs asking** is the unattended posture. An action that would
-have parked for a decision is refused instead, so a scheduled run carries on
-with what it is allowed to do rather than stopping. Its refusals are recorded as
-`denied_no_one_to_ask`, which reads differently from "you denied this" when you
-come back to the record.
+Unattended work may perform eligible sandbox preparation. If an action still
+needs approval, it is refused with `denied_no_one_to_ask` rather than silently
+approved. See [the shared policy](permissions-and-runtime-modes.md#composer-approval-policy).
 
 ## The composer
 
@@ -99,7 +99,7 @@ Build uses the same composer as Chat and Design, with one control Chat does not
 have:
 
 ```text
-[ + ]  [ Tools ]  [ Auto ▾ ]     Project Raiker · Raiker/main · 12%   Sonnet 4.5  [ Send ]
+[ + ]  [ Tools ]  [ Run within limits ▾ ]  [ Context ]  [ Model ]  [ Run ]
 ```
 
 The **mode** stays on the bar because it decides how much the next press is
@@ -107,10 +107,17 @@ allowed to do and it changes from turn to turn. The repository and the project
 are in the context line, because a turn that may edit files or run a command has
 to say where — and that is a fact to read, not a control to operate.
 
-The composer names two different things: **Filed in** the project — where the
-conversation is kept — and **works in** the workspace folder every relative read,
-write and command starts from. A managed project's own folder is not where
-commands start, and the line does not pretend it is.
+The context control distinguishes **Filed in** (the project that organises the
+chat) from **Works in** (the actual work folder). Attached projects resolve
+relative paths against their granted folder; legacy managed projects retain
+workspace-relative paths. Writes and commands use the task copy. Apply is what
+changes the real project.
+
+The header keeps the branch, execution boundary and active delegation visible.
+**Work details** opens commit, repository identity, target fingerprint and full
+scope evidence with the keyboard. Routine project/folder prose is not repeated
+above the input. Blockers, unreadable folder details and restrictive/unreadable
+permission rules remain visible.
 
 Open the context line and it reads as one boundary, in the order that decides
 where a turn's work lands: **Filed in → Works in → Repository → Runs on → Model**. The model

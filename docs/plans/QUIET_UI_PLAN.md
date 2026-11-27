@@ -280,21 +280,20 @@ Replaces the Guide page.
 
 #### QUI-L06 — Permissions
 
-Target: one screen, about 50 controls (from 3,712 px and 294 controls).
+Current implementation, 2026-11-27; supersedes earlier Permissions layout proposals:
 
-* Header: active profile in one line ("Standard · Raiker researches and
-  prepares; it asks before sending, deleting or paying").
-* Layout B with a category rail: Overview, Files & code, Web, Messages &
-  services, Memory, Schedules, then **Advanced** (collapsed).
-* **Overview** keeps only "What Raiker can do for you" (the seven plain
-  sentences) and the Set up for Build card.
-* Rows show the current policy as text. The four-way choice (Ask me, Allow,
-  Automatic, Never) moves into the detail pane: one control at a time instead of
-  152 inline buttons.
-* The 16 "System and runtimes" rows move under Advanced.
-* "Common permissions" is removed; it repeats rows that exist.
-* Bulk select and Group by move into an overflow menu.
-* "Not decided here" and "How your permissions apply" become help articles.
+* Default mode leads: Ask first, Work in the sandbox, Read-only, with reviewed
+  changes saved explicitly. Access is not enabled by choosing an approval rule.
+* Task categories and searchable rows lead to one permission detail. Access
+  precedes the approval rule. Automatic is under Advanced rule unless selected.
+* Permission summary is collapsed. Scope and safeguards discloses longer
+  authority/network explanations. Needs-review indicators remain actionable.
+* Build setup explains eligible copied edits/tests versus consequential effects.
+* Bulk select and technical grouping stay in the overflow menu; authority and
+  non-editable registry evidence remain available under Advanced.
+
+The [completed UI record](../architecture/PERMISSIONS_UI_REFINEMENT.md) owns the
+current wording, rendered verification and reference decisions.
 
 Details of the permission model: [Permissions guide](../guide/permissions-and-runtime-modes.md) (plan 02, closed 2026-11-08).
 
@@ -377,7 +376,7 @@ Restore is never the dominant button.
 |---|---|---|
 | Home | Single column, 980 px | See [03](#03-welcome-home-and-chat). |
 | Chat, Build, Design | A | Composer specs in 03. No size change. |
-| Work (Threads, Goals, Tasks, Projects) | B | 64 px rows with the selected item beside them. Paginate after 50 rows. |
+| Work (Chats, Goals, Tasks, Projects) | B | 64 px rows with the selected item beside them. Paginate after 50 rows. |
 | Memory | B | Knowledge map leaves the tabs and opens from search results. Recall folds into Controls. |
 | Approvals | B | Queue and decision side by side; evidence panel closed below 1,600 px. |
 | Connections › Advanced | B | One segmented list instead of four tabs. |

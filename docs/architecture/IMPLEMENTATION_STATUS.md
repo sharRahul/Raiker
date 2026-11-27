@@ -1,5 +1,19 @@
 # Implementation status
 
+## Permissions and work pages — 2026-11-27
+
+Implemented: shared sandbox preparation and conservative approval-mode migration;
+owner-bound file/command task copies; atomic bounded-grant use; action-specific
+approval controls; and Permissions with access before approval rules. Default
+mode, Permission summary, Advanced rule and Scope and safeguards follow the
+[UI record](PERMISSIONS_UI_REFINEMENT.md). Build keeps its branch/boundary visible
+and discloses target evidence through Work details. Work history is Chats;
+technical session identifiers and legacy routes are unchanged.
+
+Real-account UI and local-model refusal journeys passed. CI, llama.cpp and Data
+safety were green for `82f0cf1d`; see the [live evidence](WEB_APP_LIVE_TEST.md).
+This does not close native-account, clean-machine or full Apply/push release gates.
+
 > runtime_enablement_candidate: completed
 > controlled_runtime_mode_activation: implemented
 > local_single_user_production_hardening: implemented

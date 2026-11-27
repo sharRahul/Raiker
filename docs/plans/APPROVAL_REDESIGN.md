@@ -1,6 +1,6 @@
 # Approval process redesign
 
-**Status:** approved design, implementation active. **Owner:** release owner.
+**Status:** implementation delivered; remaining qualification cases are open. **Owner:** release owner.
 Approved 2026-11-26, including the explicit direction that this applies to
 Chat, Build, Design and every other workflow. This plan owns the authorization
 redesign; [Ready to use](READY_TO_USE_PLAN.md) retains release qualification.
@@ -118,9 +118,9 @@ matching Vitest suites and API read-model contracts when needed.
   ordinary in-copy work proceeds and the final consequential effect asks.
 - [x] Run the WSL2 Build regression and inspect the source/copy and real check
   receipts. Record screenshots and failed/unavailable cases honestly.
-- [ ] Update the user guide, live-test record, fixed/open ledgers and linked
+- [x] Update the user guide, live-test record, fixed/open ledgers and linked
   readiness plans. Preserve canonical document indexes and anchors.
-- [ ] Run relevant Python/TypeScript/native checks, commit and push, then
+- [x] Run relevant Python/TypeScript/native checks, commit and push, then
   monitor every triggered GitHub workflow to completion and resolve failures.
 
 ## Reference decisions
@@ -167,3 +167,16 @@ evidence are in the [live record](../architecture/WEB_APP_LIVE_TEST.md#result--2
 Local task drafts are eligible internal bookkeeping; scheduling or starting
 them still requires its ordinary authority. Full consequence journeys, Design
 live qualification and the remaining lifecycle/accessibility cases stay open.
+
+### Delivery and UI evidence
+
+Core approval delivery `07f0dbb7` and UI refinement `82f0cf1d` passed all triggered
+GitHub workflows. The latter passed [CI](https://github.com/sharRahul/Raiker/actions/runs/46026675533),
+[llama.cpp](https://github.com/sharRahul/Raiker/actions/runs/46026675468) and
+[Data safety](https://github.com/sharRahul/Raiker/actions/runs/46026675493).
+Permissions now distinguishes standing access from action approvals; the
+[UI record](../architecture/PERMISSIONS_UI_REFINEMENT.md) and
+[live cases](../architecture/WEB_APP_LIVE_TEST.md#result--2026-11-27-permissions-and-work-page-refinement)
+cover keyboard disclosure, both themes, 390 px and real-account review/refusal.
+The unchecked end-to-end consequence and lifecycle cases above remain open;
+these UI results do not close them.

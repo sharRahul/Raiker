@@ -1,5 +1,18 @@
 # Fixed items
 
+## FIXED-1581 — Current documentation still described removed approval modes and UI
+
+**Severity: Medium. Area: Documentation / permissions. Status: Fixed 2026-11-27.**
+Chat, Build and technical references still described composer Auto/Skip bypass
+behavior, while guides placed chat records under Diagnostics and active plans
+omitted the delivered UI evidence. Current guides now distinguish standing
+access from action approvals, describe sandbox/manual/unattended handling and
+conservative migration, and explain Chats, Default mode, Advanced rule, Scope
+and safeguards and Work details. The approval plan records its completed
+delivery separately from unfinished release/lifecycle qualification. Indexes
+link the delivered UI record; source research and dated failed attempts remain
+historical evidence. Documentation contract and link checks validate the update.
+
 ## FIXED-1580 — Permissions repeated policy and work pages exposed routine metadata
 
 **Severity: Medium. Area: Quiet UI / permission clarity. Status: Fixed 2026-11-27.**
@@ -2286,6 +2299,7 @@ file you can open. The two capture sets that remain — `screenshots/pages/` and
 | [FIXED-1575](#fixed-1575--the-sandbox-posture-trusted-installation-instead-of-enforcement) | High | Permissions / first run (RU-07) | Fixed 2026-11-26 |
 | [FIXED-1576](#fixed-1576--github-retained-two-active-workflows-after-their-files-were-removed) | Low | CI / maintenance | Fixed 2026-11-26 |
 | [FIXED-1577](#fixed-1577--the-mxc-assessment-had-no-current-windows-measurement) | Medium | Native sandbox evaluation (RU-05) | Fixed 2026-11-26 |
+| [FIXED-1581](#fixed-1581--current-documentation-still-described-removed-approval-modes-and-ui) | Medium | Documentation / permissions | Fixed 2026-11-27 |
 | [FIXED-1580](#fixed-1580--permissions-repeated-policy-and-work-pages-exposed-routine-metadata) | Medium | Quiet UI / permission clarity | Fixed 2026-11-27 |
 | [FIXED-1578](#fixed-1578--preparation-and-approval-policy-disagreed-across-workflows) | High | Authorization / Quiet UI | Fixed 2026-11-27 |
 | [FIXED-1579](#fixed-1579--a-reviewed-grant-could-be-spent-after-its-state-changed) | High | Bounded authorization | Fixed 2026-11-27 |

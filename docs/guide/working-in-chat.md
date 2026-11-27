@@ -4,7 +4,7 @@ Chat is a normal conversation: your prompt right-aligned in a teal bubble,
 Raiker's reply left-aligned in a quiet neutral one, with one quiet *Working…*
 indicator that ends as soon as there is something real to show. Governance
 panels, phase labels, and event traces deliberately stay out of the transcript —
-they live in **Sessions**, **Approvals**, and **Diagnostics**.
+they live in **Work → Chats**, **Approvals**, and **Diagnostics**.
 
 ## The composer
 
@@ -110,7 +110,7 @@ Outside the composer, on the page itself:
 |---|---|---|
 | **Title** | — | The conversation's name, at the left of the header. The pen beside it (`Rename conversation`) renames it in place; Enter keeps the new name, Escape keeps the old one. The same name appears in Work → Chats and in the sidebar. |
 | **New chat** | — | Start a fresh conversation. Shown once there is a conversation to leave. |
-| **⋯** | `Conversation actions` | Three groups. **Conversation**: **Export conversation…** and **Print / Save as PDF** (both also in Build). **Evidence**: every governed step in this conversation; each answer's own evidence is under it. **Continuity**: **Background work**, and a pointer to the per-message actions below. |
+| **⋯** | `Conversation actions` | Three groups. **Conversation**: **Export conversation…** and **Print / Save as PDF** (both also in Build). **Evidence**: **View activity** opens governed activity for this conversation; each answer's own evidence is under it. **Continuity**: **Background work**, and a pointer to the per-message actions below. |
 | **Background** | `Background work: 2 running, 1 failed today` | Opens the background-work rail. Shown only while work is running, waiting or failed in the last day; **⋯ → Background work** opens the rail at any time. Its label counts what is running and marks work that failed, read from the same list the rail shows. |
 | **Jump to latest** | — | Appears when you scroll up while reading. The conversation follows a streaming answer only while you are at the bottom; this takes you back down and resumes following. |
 | **⋯ on your own message** | `More actions for this message` | The **Continuity** group: **Branch**, **Summarise up to here**, and **Rewind to before this**. Copy, Edit and Retry stay on the row itself. |
@@ -180,8 +180,9 @@ says what each means.
 The chip is kept with the conversation, so opening it on another device shows
 the same choice. Home's composer
 has the same chip; what you pick there goes with the message to the new chat.
-The account's approval mode (*Manually approve*, *Automatically approve*,
-*Skip*, *Decline*) is not on the composer; it is in **Permissions → Advanced**.
+The account's default mode is in **Permissions → Overview**: **Ask first**,
+**Work in the sandbox**, or **Read-only**. **Advanced** holds the shared approval
+policy, including unattended handling. A chat profile can tighten these rules.
 
 There is no planning chip in Chat. While dictation is listening, **Done** or the
 first `Enter` stops listening and keeps focus in the draft; **Cancel** discards
@@ -207,18 +208,18 @@ default weather place, if you set one, is not sent with your turns either — a
 turn is told only that one exists, and the place goes to the weather service
 when you ask about the weather without naming one.
 
-The approval setting controls the interaction, not the runtime's protections:
+Permissions define standing access and rules. An approval decides a specific
+proposed action. The shared approval policies are:
 
-- **Manually approve** pauses before every otherwise eligible governed action.
-- **Automatically approve** proceeds without a user pause and retains normal
-  status plus preview/evidence.
-- **Skip all approvals** proceeds without the user prompt or generated preview,
-  but still enforces project/path confinement, edit hunk/context validation,
-  atomic rollback, managed policy, sandbox and security boundaries, restricted
-  command policy, and critical holds.
+- **Manually approve:** eligible actions that need a decision wait for you.
+- **Work in sandbox:** verified preparation proceeds in the owner-bound task
+  copy; consequential effects require their ordinary authority.
+- **Decline what needs asking:** eligible sandbox preparation may continue;
+  actions that still need a decision are declined when nobody is there to ask.
 
-The selected policy is shared with Build and is remembered for the next
-composer session. It is not the same as Build's Plan/Edit/Auto runtime modes.
+Explicit Ask/Deny restrictions and critical human confirmation still apply.
+Legacy Automatically approve maps to sandbox preparation; Skip maps to manual.
+Neither is offered as a bypass. See [Permissions](permissions-and-runtime-modes.md#composer-approval-policy).
 
 ### Personas — `@` a specialist
 
@@ -501,7 +502,7 @@ check how a turn happened rather than what it said, and it holds:
 - **the governed events the runtime recorded** for the turn, in time order —
   the same records Diagnostics holds, read where the turn is;
 - **Open the full record**, which opens this turn inside the
-  [Sessions inspector](dashboard-and-observability.md).
+  [Chat record](dashboard-and-observability.md).
 
 Nothing is read until you open it, so a long conversation costs nothing to
 scroll. If the record cannot be read, the disclosure says so rather than showing
@@ -633,20 +634,15 @@ grouped by the day they happened. Where the match was in a message, *"Open the
 match →"* opens the conversation **at that exchange** and marks it for a moment,
 rather than at the top; where only the title matched, *"Open →"* resumes where
 you left off. A checkpoint's **Turn** field and a turn opened from
-Diagnostics → Sessions link back the same way. **Back to your threads**
+a chat record link back the same way. The back link
 returns to the board with your filters as you left them.
 
-**Diagnostics → Sessions** is the complete record: every conversation with its
-turn count, status, tags, and the governed events behind each turn. Task runs
-live there too, which is why they are not among your own conversations. It is
-for reading the record rather than for picking work up or filing it away — a
-session there offers one **Resume in …** link, naming the surface that
-conversation belongs to, and its `⋯` menu offers Copy local link, a link to
-Chats, and Delete.
-Tags show there and can be filtered on, because finding a record is what that
-page is for; changing them is done on Chats. **Delete** stays in Sessions
-deliberately: it removes the governed record itself, so it sits beside the
-evidence it removes rather than among the controls that only tidy.
+**Work → Chats** is where you resume and organise conversations. Opening a
+chat's record shows its turns, status, tags and governed events. Existing
+`#/sessions?session=…` links still open that record; they do not create a second
+Sessions destination in Diagnostics. The record's menu offers Copy local link,
+Organise in Chats and Delete. Delete removes the governed record itself; archive,
+rename and tags remain conversation-library actions.
 
 ## Attachments
 

@@ -58,11 +58,10 @@ Use **Diagnostics** when you need evidence rather than a summary:
   only what the system calls *available*, since memory held by caches is given
   back on demand. A long routine run does not make the other background passes
   read *not running*: scheduled work runs beside them, not in front of them.
-- **Sessions** is the evidence inspector: every conversation with the runtime,
-  its turns, and the governed events behind each turn. Opening a turn offers
-  **Open in the conversation**, which lands on that exchange, and a session
-  offers one **Resume in …** link naming the surface that conversation was done
-  on. To pick work back up, use **Chats** — Sessions is for reading the record.
+- **Chat records** open from **Work → Chats** and existing session deep links.
+  They show each conversation's turns and governed events. Resume returns to
+  the appropriate work surface; the record is for inspecting what happened.
+  Diagnostics has no separate Sessions tab.
 - **Activity / Audit log** records governed steps and can be filtered and
   exported when the audit-export capability is enabled.
 

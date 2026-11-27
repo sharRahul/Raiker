@@ -28,7 +28,9 @@ navigation and wait for it to move off-screen before shooting.
 
 All 313 unit-test files passed (2,975 tests, one skipped), as did the 31-case
 deterministic browser suite, Svelte check, ESLint and production build. GitHub
-verification is attached to the delivering commit. Native-account, clean-machine and full repository Apply/push release
+verification passed for `82f0cf1d`: [CI](https://github.com/sharRahul/Raiker/actions/runs/46026675533),
+[llama.cpp](https://github.com/sharRahul/Raiker/actions/runs/46026675468) and
+[Data safety](https://github.com/sharRahul/Raiker/actions/runs/46026675493). Native-account, clean-machine and full repository Apply/push release
 gates retain their status in the readiness and approval plans.
 
 ## Result — 2026-11-27 shared approval redesign

@@ -1,5 +1,18 @@
 # Runtime orchestration
 
+## Shared preparation and approval authority — 2026-11-27
+
+The current prompt approval modes are `manual`, `sandbox`, `dont_ask`.
+Legacy prompt `auto` maps to sandbox preparation and `skip` to manual;
+per-capability `auto` and Build's turn-mode IDs remain separate contracts.
+Preparation depends on runtime-derived owner/session scope and fresh measured
+containment, not model text. Explicit saved Ask/Deny, capability gates and
+critical human confirmation remain authoritative. Approval records a decision;
+actual executor results establish execution success, failure or unknown outcome.
+See [decision modes](DECISION_MODES_SPEC.md) and the
+[approval contract](../plans/APPROVAL_REDESIGN.md#contract).
+
+
 The gateway orchestrates a turn: resolve principal, gather bounded context,
 obtain a model response, validate proposed tool calls, apply policy, route any
 allowed action through RuntimeAuthority, then record safe audit metadata and a

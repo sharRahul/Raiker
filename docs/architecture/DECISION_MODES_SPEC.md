@@ -6,21 +6,19 @@
 > decision-only for every other capability — see
 > [Implementation status](IMPLEMENTATION_STATUS.md).
 >
-> Decision modes are the **per-capability** standing policy described here. They
-> are not the same control as the **per-turn approval mode** a composer sends
-> (`manual`, `auto`, `skip`, `dont_ask` — `APPROVAL_MODES` in
-> `raiker/contracts/models.py`), which can only ever tighten a turn. Raiker has
-> no equivalent of a mode that skips every check; see
-> [Reference platform compatibility §4.1](REFERENCE_PLATFORM_COMPATIBILITY.md#41-a-mode-that-skips-every-check).
+> Decision modes are **standing per-capability policy**, not a one-action
+> approval. The shared prompt approval modes are `manual`, `sandbox` and
+> `dont_ask` (`APPROVAL_MODES` in `raiker/contracts/models.py`). Legacy prompt
+> `auto` normalizes to `sandbox`; `skip` normalizes to `manual`. Build's internal
+> `auto` turn-mode ID means Run within limits and supplies no extra authority.
 >
-> **The two `auto`s are different controls with the same name, and both are
-> deterministic.** The per-capability `auto` below is a risk lookup. The
-> composer's `auto` approval mode grants an ordinary approval on the owner's
-> behalf, and since 2026-08-24 it runs an **alignment check** first
-> ([`raiker/runtime/alignment.py`](../../raiker/runtime/alignment.py),
-> [FIXED-282](../plans/FIXED_ITEMS.md)): a change to an existing file the turn never
-> read, listed or was asked about falls back to the ordinary approval queue with
-> the path named. It can only withhold, and `skip` is not checked.
+> Sandbox preparation is authorized through the shared broker/runtime checks
+> in `raiker/runtime/authority/preparation.py`: owner/session-bound task copy,
+> fresh measured containment, enabled capabilities and no overriding restriction.
+> Local task drafts have a narrowly bounded internal-preparation path. Sending,
+> applying, pushing, scheduling and other consequential effects retain their
+> ordinary authority. Explicit saved Ask/Deny and critical confirmation win.
+> See the [approval contract](../plans/APPROVAL_REDESIGN.md#contract).
 
 Decision modes are a per-capability control layered **on top of** the capability
 gate. The gate still governs *whether* a capability is enabled at all: integrated
@@ -43,8 +41,9 @@ permission policy, with an owner-controlled four-way choice.
 > (`parse_decision_mode`).
 
 `ask` is the default for every capability, so enabling a gate does **not** by
-itself let an AI act unattended — the owner must explicitly choose `allow`
-or `auto`.
+itself authorize every effect. A saved `ask` remains restrictive; eligible
+sandbox preparation can satisfy an ordinary policy pause only through the
+separate runtime-derived scope check, not merely because a gate is enabled.
 
 ## Safety floors (always enforced, regardless of mode)
 
@@ -56,12 +55,11 @@ or `auto`.
 - **`auto` is deterministic and auditable** — it keys off the action's risk level
   (`raiker/runtime/authority/decision_modes.py::auto_requires_approval`), not an
   opaque model call. Only `low`-risk actions run unprompted.
-- **The composer's `auto` approval mode adds a second deterministic check.** It
-  answers "has this turn established the file this action is about to change?"
-  from the turn's own `tool_actions` rows and its prompt, withholds into the
-  ordinary approval queue when it has not, records
-  `approval_auto_withheld` with the path, and fails closed on an unreadable
-  record. It never widens a gate and never skips one.
+- **Preparation is established by runtime scope and fresh containment proof.**
+  Prompt text, model risk labels and caller-provided sandbox flags cannot grant
+  it. The old composer Auto alignment-bypass path is no longer used. Ordinary
+  review does not execute or spend a grant; dispatch revalidates and grant use
+  is atomically claimed against reviewed limits, expiry and revocation.
 - **Human principals** self-authorize as before; decision modes primarily govern
   **AI-proposed** actions.
 

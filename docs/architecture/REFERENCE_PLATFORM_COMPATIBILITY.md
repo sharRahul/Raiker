@@ -272,11 +272,11 @@ for every row that is not `Implemented`, `N/A` or `Different by design`.
 | A named tool set the model may call | All | Shared runtime | Implemented | `raiker/models/tool_registry.py` — 46 `TOOL_DEFINITIONS`, of which 45 are in `MODEL_EXPOSED_TOOLS` (`vector_get` is defined but not offered to a model) | — | PARITY |
 | Every advertised tool has a policy verdict | None state it as an invariant | Shared runtime | Implemented | `PolicyEngine` hard-denies anything in neither set; `tests/test_policy_engine.py` | — | **YES — differentiator** |
 | Per-tool permission rules | external coding assistant (`allow`/`ask`/`deny` rules), local subscription client, reference platform (`tools.allow`) | Permissions | Different by design | Per-capability decision modes over 67 capability gates (`raiker/phase_gates.py`) | Raiker gates a *capability*, not a tool-argument pattern; there is no `Bash(git *)` rule syntax | **Different — see [3.1](#31-a-capability-gate-instead-of-a-tool-argument-rule)** |
-| Permission modes for a session | external coding assistant (`default`/`acceptEdits`/`plan`/`auto`/`dontAsk`/`bypassPermissions`), local subscription client (`approval_policy`) | Chat, Build composers | Implemented | `APPROVAL_MODES = {manual, auto, skip, dont_ask}`; Build adds Plan/Edit/Auto | No `bypassPermissions` equivalent — refused, see [4.1](#41-a-mode-that-skips-every-check) | **PARITY**, with one refusal |
+| Permission modes for a session | external coding assistant (`default`/`acceptEdits`/`plan`/`auto`/`dontAsk`/`bypassPermissions`), local subscription client (`approval_policy`) | Chat, Build composers | Implemented | `APPROVAL_MODES = {manual, sandbox, dont_ask}`; legacy Auto/Skip migrate conservatively; Build adds Plan/Suggest changes/Run within limits | No `bypassPermissions` equivalent — refused, see [4.1](#41-a-mode-that-skips-every-check) | **PARITY**, with one refusal |
 | A turn may only tighten its own posture | None — reference modes can widen | Chat, Build | Implemented | `TURN_TIGHTENING_MODES`; `allow`/`auto` refused by the prompt contract | — | **YES — differentiator** |
 | An unattended posture that declines instead of asking | external coding assistant `dontAsk` | Chat, Build | Implemented | `dont_ask` (BUG-219 / FIXED-262) | — | PARITY |
 | A distinct reason for "refused because nobody was watching" | None | Platform-wide | Implemented | `denied_no_one_to_ask` | — | **YES — differentiator** |
-| Auto mode reviewed by a classifier model | external coding assistant auto mode | Permissions | Different by design | `auto_requires_approval` keys off the action's risk level, and `raiker/runtime/alignment.py` checks the action against the turn's own record — neither is a model call | Raiker's `auto` is deterministic in both halves. Its alignment check is narrower than a classifier and says so: it catches a change to a file the turn never established, not a semantically wrong change to one it did | **Different — see [3.2](#32-a-deterministic-auto-instead-of-a-classifier)** |
+| Auto mode reviewed by a classifier model | external coding assistant auto mode | Permissions | Different by design | Per-capability `auto_requires_approval` remains a risk lookup; shared sandbox preparation uses runtime-owned task scope and fresh measured containment | The current autonomous path proves confinement; it does not treat a model risk label, intent classifier or old alignment verdict as authorization | **Different — see [3.2](#32-a-deterministic-auto-instead-of-a-classifier)** |
 | Critical actions never auto-approved | external coding assistant protected paths, local subscription client | Shared runtime | Implemented | `raiker/runtime/authority/critical.py`; critical risk is human-only with step-up | — | **YES — improvement** |
 | Standing per-tool grants | external coding assistant "don't ask again" | Permissions, Git credential | Implemented | Decision modes; `run_command` standing grants; git-credential loan scopes | — | PARITY |
 | Deferring tool schemas to bound context cost | external coding assistant `ToolSearch` over deferred tools | Shared runtime | Implemented 2026-09-04 | [FIXED-376](../plans/FIXED_ITEMS.md#fixed-376--every-turn-paid-for-forty-nine-tool-schemas-to-call-two) | A turn carries the core schemas; `tool_search` fetches the rest by name or intent and they stay callable for that turn. 6,494 → 3,726 tokens before a word of the prompt. Deferring is not gating: every deferred name rides on `tool_search`'s own description, and a fetched tool passes the same gate, decision mode, policy review and approval | **YES — improvement** |
@@ -510,28 +510,18 @@ cost is real and stated: Raiker cannot express "allow `git status` but ask for
 
 ### 3.2 A deterministic `auto` instead of a classifier
 
-external coding assistant's auto mode has a second model review each action. Raiker's `auto`
-keys off the action's **risk level**
-(`raiker/runtime/authority/decision_modes.py::auto_requires_approval`): only
-`low`-risk actions run unprompted, and `critical` is human-only whatever the
-mode says.
+**Current implementation, 2026-11-27.** Per-capability `auto` remains the
+deterministic risk lookup in `decision_modes.py`; only low-risk actions qualify
+there, and critical actions retain their human-confirmation floor.
 
-A classifier is more permissive and more useful; it is also a second model whose
-judgement the owner cannot audit, reproduce, or appeal. A governed product's
-unattended path should be one an owner can predict from a table.
-
-**As of 2026-08-24 it is a risk lookup *and* an alignment check**
-([FIXED-282](../plans/FIXED_ITEMS.md)), and the second one is deterministic for the
-same reason the first is. It asks whether the turn's own record establishes the
-file an action is about to change — the owner's prompt named it, or an earlier
-completed step in the same turn read, listed or searched it — and withholds into
-the ordinary approval queue when it does not, naming the path.
-
-The honest counterpart, stated rather than implied: it is **narrower** than a
-classifier. It will not catch a semantically wrong change to a file the turn
-legitimately read, and it is not trying to. What it gives instead is a review
-with no model in the authority path, a verdict recomputable from the audit trail
-months later, and a refusal that names a file rather than expressing a doubt.
+The shared composer no longer offers the old Auto/Skip approval bypasses.
+`sandbox` preparation is established by owner/session-bound task-copy authority,
+fresh containment measurements and execution-time checks. Saved Ask/Deny rules
+and consequential-effect approval remain authoritative. Legacy `auto` maps to
+`sandbox`, and `skip` to `manual`. The previous alignment-check delivery is
+historical evidence, not the active preparation decision path. See the
+[approval contract](../plans/APPROVAL_REDESIGN.md#contract) and
+[Permissions/UI record](PERMISSIONS_UI_REFINEMENT.md).
 
 ### 3.3 A plugin *offers* an MCP server; it does not add one
 
@@ -680,7 +670,7 @@ reachable is the same defect as shipping one:
 | ★ `REFERENCE_PLATFORM_COMPATIBILITY.md`'s own "last reconciliation: 2026-08-24" | A date one day in the future, in four documents. Corrected to 2026-08-23 |
 | ★ `CHANNELS_SPEC.md`'s "reference personal agent's 20+ messaging surfaces" | 27+, which this document already recorded — two documents disagreeing about the same cited source |
 | The dated sections of `HANDOFF.md` | Deprecated in place with a currency banner naming what replaced them, rather than deleted: a handoff note rewritten after the fact is not a record of anything |
-| `EVENT_CATALOG.md`'s "approval resolution does not emit execution events" | It emits `approval_executed`, `approval_execution_denied` and `approval_auto_executed` |
+| `EVENT_CATALOG.md`'s "approval resolution does not emit execution events" | It emits `approval_executed` and `approval_execution_denied`; the current autonomous preparation path emits `sandbox_preparation_executed` (old Auto events are historical) |
 | The claim that web egress answers to `RAIKER_WEB_EGRESS_ALLOWLIST` | That variable no longer exists; egress answers to an owner blocklist plus a non-optional address guard |
 
 ---

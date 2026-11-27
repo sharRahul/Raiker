@@ -343,15 +343,16 @@ five rows in a list of sixty-seven is how people end up either giving up or
 turning on more than they meant to. **Set up for Build** is those five, offered
 once.
 
-The relay is the one that makes **Accept** mean *apply*. Without it the others
-only let a turn propose: an accepted change is recorded and not carried out, and
-the decision card in Build says so — naming the switch — before you accept.
+The relay lets **Approve once** execute a supported proposed action. Without it,
+the decision is recorded without execution, and the decision card names the
+missing switch before you approve. A file change in a copied Build workspace
+stays in that copy; **Apply** to the source project is a separate decision.
 
 It is a shortcut through the registry and not a different kind of decision:
 **What this turns on** lists the five before you press anything, each one goes
 through the same path the row's own **Turn on** uses, and none of their decision
-modes change — every one of them still asks. Writing to your files is a decision,
-which is why it is offered rather than simply arriving with the account. The
+modes change. The shared policy and saved rules still govern each action,
+including verified sandbox preparation and approval before consequential effects. The
 section disappears once all five are on.
 
 ### Not decided here
@@ -532,7 +533,7 @@ Independently of whether a capability is on, each has a decision mode:
 |---|---|
 | **Ask me** *(default)* | Raiker stops and waits for your decision each time. |
 | **Allow** | Raiker goes ahead without asking, within policy. |
-| **Automatic** | Raiker goes ahead and keeps going, within policy. The most permissive answer. |
+| **Automatic** | Advanced per-capability behavior; Raiker may continue related steps within authorized scope. Runtime restrictions still apply. |
 | **Never** | Raiker refuses this, whatever asks for it. |
 
 These are the owner-facing words for the four modes the runtime enforces. The
@@ -560,14 +561,14 @@ There is no unrestricted mode, by design.
 
 ### Postures
 
-**Permissions → Overview** opens on **How much Raiker asks**: three postures,
+**Permissions → Overview** opens on **Default mode**: three postures,
 each a fixed bundle of the modes above. A posture changes only *whether Raiker
 asks*; it never turns a permission on.
 
 | Posture | What it sets |
 |---|---|
 | **Ask first** | Every permission to **Ask me**. |
-| **Work in the sandbox** | File writes, patches, checkpoint restore, shell commands and processes to **Allow**. Everything else, including git push, memory, messages and anything that leaves this machine, to **Ask me**. Offered only after the command sandbox's probe measures every mandatory observation enforced; installation alone is insufficient. |
+| **Work in the sandbox** | File writes, patches, checkpoint restore, shell commands, processes and task management to **Allow**. Only local task drafts qualify as internal preparation; scheduling or starting them is excluded. Everything else, including git push, memory, messages and anything that leaves this machine, to **Ask me**. Offered only after the command sandbox's probe measures every mandatory observation enforced; installation alone is insufficient. |
 | **Read-only** | Anything that changes files, memory or git, runs a program, sends a message, installs a plugin, generates an image or exports telemetry to **Never**; everything else to **Ask me**. |
 
 With the **Work in sandbox** approval policy, verified preparation runs in
@@ -578,10 +579,10 @@ apply. Live release qualification is tracked in the
 [approval redesign plan](../plans/APPROVAL_REDESIGN.md).
 
 Choosing one lists how many permissions it changes, and which, before
-**Apply**. Each change is the same governed mode change a row makes, recorded
+**Save changes**. Each change is the same governed mode change a row makes, recorded
 with the posture's name as its reason and reported one by one; a permission the
 runtime refuses to change is named, and the rest still apply. When the modes
-match none of the three, the page says *Your own mix*.
+match none of the three, the page says *Custom rules are active*.
 
 ### Finding the permissions that need a look
 
@@ -700,13 +701,15 @@ conversation for eight hours without asking; nothing else is widened, and
   push still needs `RAIKER_GITHUB_TOKEN` today). Unlike a
   commit, this leaves your machine and git cannot take it back — undo it on the
   remote.
-- **Approve (record only).** Everything else — network, process, and any
-  capability outside that set — records your decision and executes nothing. The
+- **Approve once (record only).** Any capability outside the supported relay
+  set records your decision and executes nothing. General process execution
+  remains record-only; supported bounded shell, remote/cloud commands, GitHub,
+  memory and planning actions have their own governed execution paths. The
   response carries `executes_action: false`.
 
 Disabling any of these capabilities in Permissions returns its approvals to
 record-only, and the detail view says so **before** you decide — the button reads
-**Allow once (record only)** rather than **Allow once**. A **critical**
+**Approve once (record only)** rather than **Approve once**. A **critical**
 approval never takes either path: it uses the human-only, step-up-verified
 critical lifecycle.
 

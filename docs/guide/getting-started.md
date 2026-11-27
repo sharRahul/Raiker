@@ -481,10 +481,9 @@ could not read its own readiness, so this is not an all-clear* — rather
 than counting an unread check as zero problems. A readiness claim nobody checked
 is worse than no claim, because you would act on it.
 
-**Sessions is inside Diagnostics**, not a destination of its own: it is the
-complete record of every conversation *and* every task run, which is why
-**Chats** — the board you pick work up from — lists conversations and the
-threads your routines are advancing, and nothing else.
+**Work → Chats** holds saved conversations and routine work threads. Open a
+chat's record there to inspect its turns and execution evidence. Older Sessions
+links still work, but Diagnostics no longer has a Sessions tab.
 
 **The interface is deliberately quiet.** Pages open with their content, not a
 sentence about it: a page's one-line description is its title's tooltip, the
@@ -500,10 +499,10 @@ Five destinations are tabbed, and Settings has its own rail:
 
 | Destination | Tabs |
 |---|---|
-| Work | Chats, Tasks, Projects |
+| Work | Chats, Goals, Tasks, Projects, Library |
 | Memory | Overview, Memories, Suggestions, Sources, Controls (the map opens from Memories) |
 | Connections | Services, Channels, Advanced (MCP servers, Skills, Hooks, Plugins) |
-| Diagnostics | Overview, Sessions, Audit log, Checkpoints, Work in action, Notifications |
+| Diagnostics | Overview, Audit log, Recovery, Work in action, Notifications |
 | Settings | General, Personalisation, Notifications, Security, Privacy, Execution profiles, Web access, Advanced (Runtime, Memory engine, Model serving, Usage and spending), About & updates |
 
 Old links to the pages these absorbed still resolve and open the right tab —

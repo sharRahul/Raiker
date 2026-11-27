@@ -1,5 +1,11 @@
 # Design workspace
 
+**Current shared UI and authority (2026-11-27):** Design uses the same standing
+permissions and action decisions as Chat and Build. Research can resume through
+the common approval authority; it does not grant image-generation access.
+Routine details follow the [shared UI hierarchy](../architecture/PERMISSIONS_UI_REFINEMENT.md).
+This does not qualify paid image-provider or unfinished Design target features.
+
 ## Authority, purpose and status
 
 **Owner-approved direction, 2026-10-15.** This is the canonical requirements

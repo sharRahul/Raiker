@@ -1,5 +1,13 @@
 # First beta release plan
 
+**2026-11-27 implementation update:** shared sandbox preparation and the
+Permissions/work-page refinement are delivered, with real-account UI and WSL2
+copied preparation/check evidence. See the [approval plan](APPROVAL_REDESIGN.md),
+[UI record](../architecture/PERMISSIONS_UI_REFINEMENT.md) and
+[live results](../architecture/WEB_APP_LIVE_TEST.md). Native-account containment,
+clean-machine timing and the complete repository Apply/push journey retain their
+release-gate status; green CI and screenshots alone do not close them.
+
 > Owner scope update: personal use for at most five users, PC first and
 > phone/iPad later; no commercial-grade distribution/signing prerequisite.
 > Piper is removed in favor of Kokoro-82M. The earlier `6c211b60` signed

@@ -1,5 +1,17 @@
 # Raiker testing and real-user qualification
 
+## Permissions and work-page regression coverage — 2026-11-27
+
+The [live record](../architecture/WEB_APP_LIVE_TEST.md#result--2026-11-27-permissions-and-work-page-refinement)
+distinguishes real-account/model journeys from API-fixture browser checks.
+`permissions-refinement-live.spec.ts` verifies access-before-approval and Chats;
+`approval-redesign-live.spec.ts` verifies review/refusal at desktop and phone
+widths. `composer.spec.ts` covers Work details, scope visibility, keyboard
+opening/closing, both themes, 390 px and doubled CSS zoom. The source/copy,
+grant revocation/claim and explicit restriction suites remain runtime gates.
+31 browser scenarios and 2,975 frontend tests passed for the UI delivery.
+These do not qualify the still-open clean-machine/native-account/Apply-push runs.
+
 ## GitHub workflow review — 2026-11-26
 
 Reviewed the six source workflows and GitHub's workflow inventory. None of

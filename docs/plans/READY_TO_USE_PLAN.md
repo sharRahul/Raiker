@@ -177,8 +177,8 @@ surface sweep passes.
 *Progress 2026-11-25:* the families, their lines and the unit test shipped
 ([FIXED-1537](FIXED_ITEMS.md#fixed-1537--permissions-was-grouped-in-six-headings-an-owner-had-to-learn)); the live surface sweep is not re-run.
 
-**RU-07 · Three postures. P1, M.** Permissions opens on **Ask first** (today's
-baseline), **Work in the sandbox** (edits and commands *inside the disposable
+**RU-07 · Three postures. P1, M.** Permissions exposes **Default mode**:
+**Ask first**, **Work in the sandbox** (edits and commands *inside the disposable
 copy* run without a prompt; anything that leaves the copy, the machine, writes
 durable memory, sends a message or spends money asks) and **Read-only**. Each
 is a documented bundle of existing decision modes, changed through the same
@@ -188,7 +188,8 @@ Show the per-conversation command grant on the command's approval card
 (*Allow `python3 -m unittest` for this conversation*), so `run_command` is
 reachable without the API. *Shipped 2026-11-25 ([FIXED-1540](FIXED_ITEMS.md#fixed-1540--a-command-could-not-be-allowed-for-a-conversation-from-any-screen)). The three postures
 and their mapping shipped 2026-11-26 ([FIXED-1567](FIXED_ITEMS.md#fixed-1567--permissions-had-no-posture-only-sixty-rows-to-set-one-by-one)); the Build journey in
-*Work in the sandbox* is open.*
+*Work in the sandbox* passed copied preparation and three declared tests on
+2026-11-27; repository Apply/Git-push qualification remains open.*
 *Done when* the posture → mode mapping is unit-tested and a Build journey in
 **Work in the sandbox** asks only for `git push`.
 
@@ -321,6 +322,14 @@ turns, and RU-J5 checks the approved facts in Memory before recall in a new
 chat. Release qualification still requires a live run on the published build.
 
 ## Changelog
+
+- **2026-11-27** — Shared approval authorization and the Permissions/work-page
+  refinement shipped ([FIXED-1578](FIXED_ITEMS.md#fixed-1578--preparation-and-approval-policy-disagreed-across-workflows),
+  [FIXED-1580](FIXED_ITEMS.md#fixed-1580--permissions-repeated-policy-and-work-pages-exposed-routine-metadata)).
+  Real WSL2 Build preparation/checks and real-account approval UI passed;
+  the full Apply/push, native-account and clean-machine gates remain open.
+  All triggered workflows passed for `82f0cf1d`. Earlier failed attempts below
+  are historical evidence, not the current copied-write behavior.
 
 - **2026-11-26 (real WSL2 Build)** — RU-07's live journey found a product
   blocker: the first proposed file write still asked despite the sandbox

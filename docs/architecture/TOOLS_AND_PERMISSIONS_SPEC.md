@@ -1,5 +1,15 @@
 # Tools and permissions
 
+## Standing access and action decisions
+
+Permissions define available tools/resources and standing approval rules.
+Approvals decide a concrete proposed effect. The same shared authorization
+contract applies across Chat, Build, Design and unattended workflows. Verified
+task-copy preparation can proceed under `sandbox`; explicit restrictions and
+consequential-effect authority are rechecked at dispatch. Bounded grant use is
+claimed atomically before execution. See [decision modes](DECISION_MODES_SPEC.md)
+and the [current presentation](PERMISSIONS_UI_REFINEMENT.md).
+
 Tools are not called directly by clients or models. A proposed action is
 validated only after the broker verifies the turn's signed machine identity,
 then classified by policy, checked against the acting machine principal and
@@ -21,7 +31,7 @@ turn identity only as separate context.
 |---|---|
 | Read-only workspace and diagnostic access | Governed and auditable |
 | Local supported executors | Policy-gated; decision mode and approvals apply |
-| Approval resolution | Metadata-only by default |
+| Approval resolution | Executes only supported relayed actions after execution-time checks; other decisions remain record-only |
 | Repository writes (`git_branch`, `git_commit`) | Approval-required; the reviewed change set is what executes, and repository hooks never run |
 | Repository push (`git_push`) | Approval-required under its own capability; the remote's host must be on the owner egress allowlist and the owner's GitHub credential (Settings → GitHub, or the legacy `RAIKER_GITHUB_TOKEN`) must be lent under a grant; never forces and never deletes. Planned: grants bound to repository, account and the approved commit, and further explicitly selected credential methods ([GitHub connection](GITHUB_CONNECTION_SPEC.md)) |
 | Remote/cloud and sensitive domains | Disabled and fail-closed |

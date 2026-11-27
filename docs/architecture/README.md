@@ -50,7 +50,7 @@ work; existing implementation status and known limits remain authoritative.
 | Design requirements and workspace | [Design workspace](../plans/DESIGN_WORKSPACE_SPEC.md) |
 | Build turn protocol | [Raiker Build process](RAIKER_BUILD_PROCESS.md) |
 | Terminal commands and interactive mode | [Commands and interactive mode](COMMANDS_AND_INTERACTIVE_MODE_SPEC.md) |
-| Web dashboard behavior | [Web UI control deck](DESIGN_HISTORY.md#web-ui-control-deck-plan-superseded-by-the-quiet-ui-plan) |
+| Web dashboard behavior | [Quiet UI plan](../plans/QUIET_UI_PLAN.md) and [Permissions/work-page implementation](PERMISSIONS_UI_REFINEMENT.md); the [original control deck](DESIGN_HISTORY.md#web-ui-control-deck-plan-superseded-by-the-quiet-ui-plan) is historical |
 | Visual language and responsive layout | [Visual design](VISUAL_DESIGN_SPEC.md) |
 | Application host, startup, updates, and packaging | [Desktop distribution](DESKTOP_DISTRIBUTION_DESIGN.md) |
 
@@ -58,6 +58,7 @@ work; existing implementation status and known limits remain authoritative.
 
 | Topic | Document |
 |---|---|
+| Standing permissions versus action approvals | [Approval contract](../plans/APPROVAL_REDESIGN.md#contract) and [Permissions guide](../guide/permissions-and-runtime-modes.md) |
 | Ask, Deny, Allow, and Auto | [Decision modes](DECISION_MODES_SPEC.md) |
 | Validation, classification, and routing | [Tools and permissions](TOOLS_AND_PERMISSIONS_SPEC.md) |
 | Executor registration and capability activation | [Runtime executors](RUNTIME_EXECUTORS_SPEC.md) |

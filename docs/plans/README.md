@@ -12,7 +12,7 @@ removed (the merged section says where it came from).
 | [Testing](TESTING.md) | How Raiker is tested as a real owner uses it, including the [regular-use journeys](TESTING.md#regular-use-journeys) and their prompts |
 | [Personal autonomous-agent architecture](PERSONAL_AUTONOMOUS_AGENT_SPEC.md) | Goals, the coordinator, execution profiles, and the personal-agent UI and UX |
 | [Build workspace](BUILD_WORKSPACE_SPEC.md) · [Design workspace](DESIGN_WORKSPACE_SPEC.md) · [Voice conversation](VOICE_CONVERSATION_SPEC.md) | Requirements for each work surface |
-| [Quiet UI](QUIET_UI_PLAN.md) | The interface redesign: layout, Home and Chat, the Raiker Browser proposal, quick fixes, brand |
+| [Quiet UI](QUIET_UI_PLAN.md) | Active interface work; the delivered Permissions and work-page refinement is recorded in [architecture](../architecture/PERMISSIONS_UI_REFINEMENT.md) |
 | [Open defects](TO_BE_FIXED.md) · [Fixed items](FIXED_ITEMS.md) | The defect ledgers |
 
 Removed by consolidation on 2026-11-16: `PERSONAL_BETA_SCOPE.md`,

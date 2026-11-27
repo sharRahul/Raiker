@@ -1,3 +1,12 @@
+## Current Permissions/UI status — 2026-11-27
+
+The standing-access/action-approval clarification and work-page simplification
+are delivered as [FIXED-1580](FIXED_ITEMS.md#fixed-1580--permissions-repeated-policy-and-work-pages-exposed-routine-metadata).
+The guides, architecture and active plans are reconciled with those controls.
+Historical entries below retain their dated evidence. This UI delivery does not
+close native-account isolation, clean-machine timing, full Apply/push or the
+remaining approval lifecycle qualification cases.
+
 ## Release blocker: native sandbox migration incomplete
 
 ### Windows Build posture — found live 2026-11-26

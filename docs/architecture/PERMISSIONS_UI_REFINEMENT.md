@@ -9,24 +9,24 @@ Help the owner understand what Raiker may access, when it asks, and what needs
 attention. Chat, Build and Design should give most of their space to the work.
 The audience is a personal-agent owner, not a runtime administrator.
 
-## Findings from the current source
+## Findings before implementation
 
-* Permissions repeats its state through a profile sentence, three posture
+* Permissions repeated its state through a profile sentence, three posture
   choices, seven goal summaries, Build setup, category rows and advanced notes.
-  These representations compete instead of guiding one decision.
-* Build setup still says every change and command asks first. That is inaccurate
+  These representations competed instead of guiding one decision.
+* Build setup said every change and command asks first. That was inaccurate
   when verified sandbox preparation is selected.
-* `permissionLanguage.ts` exposes Allow and Automatic with different promises,
-  while the shared composer now has a separate sandbox policy. The UI must
+* `permissionLanguage.ts` exposed Allow and Automatic with different promises,
+  while the shared composer had a separate sandbox policy. The UI must
   describe the effective authority, not imply that a capability setting bypasses
   runtime restrictions.
-* Build repeats repository, target, environment, approval mode and project/folder
-  facts between its header and composer. Routine context competes with blockers.
-* User-facing history mixes Threads, Session and Conversation; Sessions remains
+* Build repeated repository, target, environment, approval mode and project/folder
+  facts between its header and composer. Routine context competed with blockers.
+* User-facing history mixed Threads, Session and Conversation; Sessions remained
   visible in errors and table headings. Technical identifiers belong in details.
 
-These are source findings. Rendered desktop, compact-width, light and dark
-audits are required before claiming visual improvements.
+These findings motivated the implementation. Desktop and compact-width, light
+and dark captures were subsequently reviewed; verification is recorded below.
 
 ## Considered approaches
 
@@ -45,7 +45,7 @@ One page header, one compact current-mode section and a searchable list of
 permission categories. Use existing Inter typography, semantic color tokens,
 spacing, focus styles and restrained surfaces; avoid new decorative cards.
 
-* **Default mode:** Ask first, Work in sandbox, Read-only. Explain the selected
+* **Default mode:** Ask first, Work in the sandbox, Read-only. Explain the selected
   choice in one short sentence. Keep measured sandbox unavailability visible
   with its setup action. Show pending changes and a concrete Save changes action.
 * **Permissions:** task-oriented categories with concise names and truthful row
@@ -108,8 +108,9 @@ both themes and source/target evidence. Existing rule, explicit-denial,
 unavailable-sandbox, continuation and partial-save regressions remain in CI.
 
 See the [live record](WEB_APP_LIVE_TEST.md#result--2026-11-27-permissions-and-work-page-refinement)
-for screenshots, test scope and limitations. GitHub run status is attached to
-the delivering commit. Full release qualification remains in the
+for screenshots, test scope and limitations. Delivery `82f0cf1d` passed [CI](https://github.com/sharRahul/Raiker/actions/runs/46026675533),
+[llama.cpp](https://github.com/sharRahul/Raiker/actions/runs/46026675468) and
+[Data safety](https://github.com/sharRahul/Raiker/actions/runs/46026675493). Full release qualification remains in the
 [readiness plan](../plans/READY_TO_USE_PLAN.md), independently of this UI work.
 
 ## Reference decisions

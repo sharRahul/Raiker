@@ -20,14 +20,14 @@ task scheduler, and projects — into one place. Every claim the page makes abou
 what the agent may do is a claim the runtime will keep, because the page sets the
 runtime's own controls rather than describing an intention.
 
-The shared composer also has an **approval policy** pill: **Manually approve**,
-**Automatically approve**, or **Skip all approvals**. This is deliberately a
-different control from Plan/Edit/Auto: the runtime modes choose the planning and
-decision-mode posture for a coding turn, while the approval policy chooses
-whether an otherwise eligible action waits for a user interaction. In particular,
-Skip omits only that interaction and generated preview; it never bypasses
-project/path confinement, hunk/context validation, rollback, managed policy,
-sandbox or security boundaries, restricted command policy, or critical holds.
+Standing access and shared approval policy live in **Permissions**. The default
+is autonomous verified sandbox preparation with consequential effects requiring
+their ordinary authority. Prompt modes are `manual`, `sandbox`, `dont_ask`;
+legacy `auto` maps to sandbox and `skip` to manual. These are separate from
+Build's turn-mode IDs `plan`, `edit`, `auto`, displayed as **Plan**, **Suggest
+changes**, **Run within limits**. A turn mode never grants broader authority.
+See the [approval contract](APPROVAL_REDESIGN.md#contract) and
+[current UI record](../architecture/PERMISSIONS_UI_REFINEMENT.md).
 
 ## The three modes
 
@@ -40,8 +40,8 @@ coding turn acts through (`file_write_execution`, `patch_apply_execution`,
 | Mode | Turn posture sent | Planning | What the runtime does |
 |---|---|---|---|
 | **Plan** | `deny` on the four | `always` | Research and propose only. A write proposed anyway is refused by the runtime under `denied_by_turn_posture`, not by prompt wording. |
-| **Edit** | `ask` on the four | default | Every file write, patch, and command becomes a pending approval you accept or reject, and the unattended approval modes cannot swallow it. |
-| **Auto** | none | default | The turn adds no restriction of its own and runs under the owner's standing permissions. |
+| **Suggest changes** (`edit`) | `ask` on the four | default | Every file write, patch, and command becomes a pending approval you accept or reject, and the unattended approval modes cannot swallow it. |
+| **Run within limits** (`auto`) | none | default | The turn adds no restriction of its own and runs under the owner's standing permissions. |
 
 Mode help is available on hover and keyboard focus, rather than occupying
 permanent composer space. This keeps the explanation accessible without
@@ -58,21 +58,22 @@ Notes that keep the mapping honest:
   `/api/capability-modes/` write at all. Widening a capability stays on the
   Permissions page, under the step-up — a recorded reason, and a threat-model
   acknowledgement where the capability demands one.
-- **Auto therefore does exactly as much as the owner already allowed**, so the
-  composer reads the standing modes (read-only) and states what it found rather
-  than implying unprompted execution: *"Every write capability is set to Ask, so
-  every change will still be proposed to you."*, with **Change in Permissions →**.
+- **Run within limits adds no authority.** The composer reports unreadable or
+  restrictive rules rather than repeating healthy policy prose. Branch,
+  execution placement and active delegation remain visible; commit, fingerprint
+  and full evidence are in keyboard-accessible Work details. Project/folder
+  context is stated once, with an explicit fallback if folder details cannot be read.
 - Read capabilities are deliberately excluded from the set a mode covers, so
   Plan stays useful — it removes the ability to act, not the ability to look.
 - The posture is persisted with a turn parked on an approval, so a resume
   continues under the posture it was sent with rather than under whatever the
   standing modes say by then.
-- `Shift+Tab` cycles Plan → Edit → Auto without leaving the prompt.
-- **Build opens in Auto.** Auto is the only mode that sends no override, so a new
+- `Shift+Tab` cycles Plan → Suggest changes → Run within limits without leaving the prompt.
+- **Build opens in Run within limits.** Its internal `auto` ID is the only mode that sends no override, so a new
   conversation runs under exactly the owner's standing permissions. Opening in
   Edit — as Build used to — meant the surface silently tightened *below* what the
   owner had set on the Permissions page, on every new conversation, with nothing
-  saying so. Choosing Plan or Edit stays a deliberate act of tightening.
+  saying so. Choosing Plan or Suggest changes stays a deliberate act of tightening.
 
 ## The operating protocol
 
@@ -95,16 +96,18 @@ gate, decision mode, approval and boundary is identical with or without it; the
 tool set offered to the model is asserted identical on both surfaces
 (`tests/test_build_operating_protocol.py`).
 
-Accepting a proposed change from the transcript uses the ordinary approval
+Approving a proposed action from the transcript uses the ordinary approval
 route, and the action is **re-governed before anything runs** — the capability
 gate, decision mode, policy review and the resolver's posture are all re-checked
 at execution time, so a recorded decision is never treated as permission it
-already had. Accepting a proposed **file change** then applies it once, with the
-previous contents checkpointed first; accepting anything else records the
-decision and executes nothing. The decisions rail reports which happened after
-the fact, so "Accept" is never read as "already applied".
+already had. Supported actions execute through the enabled approval relay;
+unsupported actions or disabled execution capabilities record the decision only.
+File mutations checkpoint the previous contents and remain bound to the approved
+workspace. Copied Build work still needs a separate **Apply** decision before it
+changes the source project. The decision card identifies record-only approvals
+before the owner decides and reports the actual execution outcome afterward.
 
-Accepting also **continues the turn**. The conversation that proposed the change
+Approving also **continues the turn**. The conversation that proposed the change
 kept its working state, so the decision is handed back to the model as the result
 of its own tool call — the real result when the change was applied, an explicit
 refusal when it was rejected — and the same turn streams on from there, in place.

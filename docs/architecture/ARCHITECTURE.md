@@ -71,7 +71,7 @@ remain brokered under a signed turn identity.
 Owner bootstrap creates a persisted principal and a human `runtime_gate_manager`.
 The runtime state and capability gate state are durable. sessions: deferred; no
 `/sessions` command is currently implemented. Session records are exposed through
-the local API and **Observability → Sessions**.
+the local API and **Work → Chats** and its chat records (legacy Sessions links are preserved).
 
 See [implementation status](IMPLEMENTATION_STATUS.md) for the current capability
 ledger and [security architecture](SECURITY_ARCHITECTURE.md) for trust boundaries.

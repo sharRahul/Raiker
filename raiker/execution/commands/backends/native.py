@@ -859,11 +859,13 @@ class NativeSandboxBackend:
             raise CommandBackendError("command_cwd_outside_workspace")
         owner, session = request.owner_principal_id, request.session_id
         bound = self.workspaces.bound_root(owner, session)
-        if cwd == root and bound is not None and root in bound.resolve().parents:
+        if cwd == root and bound is not None:
             # RU-21 — a command that names no folder in a project turn runs in
             # the project, not the workspace root beside `.raiker`. Without
             # this a project's `python3 -m unittest` took a copy of the whole
             # workspace and could not see the files Build had just written.
+            # The trusted binding can name an attached project outside the data
+            # workspace as well; commands and file tools must share that copy.
             cwd = bound.resolve()
         try:
             _, workspace = self.workspaces.acquire(

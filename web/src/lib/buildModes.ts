@@ -168,7 +168,7 @@ export function standingPostureNote(
   // BUG-218 — Auto gained a second check, and the note that describes Auto has
   // to describe it too. It is deterministic and can only withhold, so the
   // sentence promises a pause rather than a judgement.
-  return "Your standing permissions let low-risk changes run unprompted; medium and higher still ask. A change to a file this turn never looked at waits for you either way.";
+  return "Work in sandbox prepares edits and tests in a verified task copy. Applying to the real project and consequential actions still ask. Your approval mode and explicit limits also apply.";
 }
 
 /**

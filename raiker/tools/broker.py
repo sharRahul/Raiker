@@ -40,7 +40,7 @@ from raiker.models.tool_registry import (
     CONTENT_WITHHELD_TOOL_NAMES,
 )
 from raiker.policy.engine import PolicyEngine
-from raiker.runtime.alignment import AlignmentVerdict, check_alignment
+from raiker.runtime.alignment import AlignmentVerdict
 from raiker.runtime.identity.contracts import (
     IDENTITY_AUDIENCE,
     MachineIdentityError,
@@ -1831,18 +1831,9 @@ class ToolBroker:
         Critical actions are also excluded before the runtime authority is ever
         asked to execute them.
         """
-        if decision.decision != "needs_approval" or action.risk_level == "critical":
-            return False
-        from raiker.runtime.authority.critical import classify_critical
+        from raiker.runtime.authority.preparation import ordinary_approval
 
-        return (
-            classify_critical(action.tool_name, action.tool_name, action.arguments) is None
-            and decision.reasons
-            == [
-                f"{action.tool_name}_requires_approval",
-                "phase2_action_bound_approval_required",
-            ]
-        )
+        return ordinary_approval(action, decision)
 
     def _covering_limit_rule(self, action: ToolAction, session_id: str) -> dict[str, Any] | None:
         """QUI-P03 — the owner's Allow-with-limits rule that covers this action, if any.
@@ -1929,55 +1920,33 @@ class ToolBroker:
         ``None`` intentionally falls back to the normal paused workflow.
         """
         if approval_mode not in {
-            "auto",
-            "skip",
+            "sandbox",
             "standing_allow",
             "limit_rule",
         } or not self._is_ordinary_approval_decision(action, decision):
             return None
-        # ADD-22 — a question is not an approval, and no composer mode may answer
-        # one. `auto` and `skip` are the owner saying "grant the permissions I
-        # would have granted"; neither is them saying "and decide what I meant".
-        # An unattended run has nobody to ask, so the question waits — which is
-        # the honest outcome, and the one `dont_ask` already refuses outright.
+        # Questions require an answer, never a grant or inferred intent.
         if action.tool_name == OWNER_QUESTION_TOOL:
             return None
         if self.store is None:
             return None
-        # BUG-218 — Auto's second check. `auto` says "approvals are granted for
-        # you"; the reference products attach a safety review to exactly that
-        # promise and Raiker did not. This one is deterministic rather than a
-        # classifier: it asks whether the turn's own record establishes the file
-        # the action is about to change, and can only withhold — returning None
-        # falls back to the ordinary approval queue, where the owner decides.
-        #
-        # `skip` is deliberately not checked. Its label says no approval is
-        # raised at all; attaching a silent second check to it would redefine a
-        # mode whose whole point is not to interrupt.
-        if approval_mode == "auto":
-            verdict = check_alignment(
-                self.store,
+        if approval_mode == "sandbox":
+            from raiker.runtime.authority.preparation import (
+                confined_preparation,
+                internal_preparation,
+            )
+
+            if not (confined_preparation(
+                self.path_authority,
+                workspace_root=self.workspace_root,
+                owner_principal_id=self.owner_scope or self.principal_id,
+                session_id=session_id,
                 tool_name=action.tool_name,
                 arguments=action.arguments,
-                session_id=session_id,
-                turn_id=turn_id,
-                workspace_root=self.workspace_root,
-                action_id=action.action_id,
-            )
-            if not verdict.aligned:
-                self._alignment_withheld[action.action_id] = verdict
-                self._event(
-                    session_id=session_id,
-                    turn_id=turn_id,
-                    event_type="approval_auto_withheld",
-                    actor="tool_broker",
-                    payload={
-                        "action_id": action.action_id,
-                        "tool_name": action.tool_name,
-                        "alignment": verdict.to_dict(),
-                    },
-                    client=client,
-                )
+            ) or internal_preparation(
+                self.path_authority, owner_principal_id=self.owner_scope or self.principal_id,
+                session_id=session_id, tool_name=action.tool_name, arguments=action.arguments,
+            )):
                 return None
         raw_principal = self.store.get_principal(action.proposed_by)
         if raw_principal is None:
@@ -1995,6 +1964,7 @@ class ToolBroker:
             executor_registry=build_default_executor_registry(
                 self.workspace_root, self.store, authority=self.path_authority
             ),
+            path_authority=self.path_authority,
         )
         governed = GovernedAction(
             action_id=action.action_id,
@@ -2006,15 +1976,24 @@ class ToolBroker:
             session_id=session_id,
             turn_id=turn_id,
             # This path is reached only after the broker has proved the action is
-            # ordinary and the owner selected auto/skip for this turn.
-            decision_mode_override="always_allow",
+            # ordinary and a task scope or explicit owner authority may cover it.
+            decision_mode_override=None if approval_mode == "sandbox" else "always_allow",
+            approval_posture="sandbox" if approval_mode == "sandbox" else "",
         )
         # GH-50 — a push or GitHub write is not the composer mode's to wave
         # through: without a delegation that covers it, it goes to the owner's
         # approval queue like any other turn's would.
         if not authority.repository_delegation_available(governed, principal):
             return None
-        preview = self._approval_preview(action) if approval_mode == "auto" else None
+        if approval_mode == "sandbox":
+            review = authority.route_action(governed, principal, execute=False)
+            if review.decision == "needs_approval":
+                return None
+        rule = self._limit_rule_applied.get(action.action_id) if approval_mode == "limit_rule" else None
+        # Claim before announcing execution. A rejected attempt still spends a
+        # successfully claimed use; a stale review never spends anything.
+        if rule is not None and not self.store.claim_standing_grant_use(rule):
+            return None
         self._event(
             session_id=session_id,
             turn_id=turn_id,
@@ -2024,34 +2003,44 @@ class ToolBroker:
             client=client,
         )
         self._stream_tool(action, "tool_started", status="running")
-        rule = self._limit_rule_applied.get(action.action_id) if approval_mode == "limit_rule" else None
-        if rule is not None:
-            # Spent before the attempt, like a delegation: a use the executor
-            # then refuses is still a use, so a refused action cannot be retried
-            # past the limit the owner set.
-            self.store.record_standing_grant_use(str(rule["grant_id"]))
         governed_result = authority.route_action(governed, principal)
+        if approval_mode == "sandbox" and governed_result.decision == "needs_approval":
+            return None
         if governed_result.decision != "allow" or governed_result.error is not None:
+            execution_failed = governed_result.decision == "allow"
             blocked_decision = PolicyDecision(
                 decision_id=new_id("pol_"),
                 action_id=action.action_id,
-                decision="deny",
-                reasons=["runtime_protection_preserved", governed_result.message or "execution_denied"],
+                decision="allow" if execution_failed else "deny",
+                reasons=[
+                    "authorized_execution_failed" if execution_failed else "runtime_protection_preserved",
+                    governed_result.message or "execution_denied",
+                ],
                 requires_user_approval=False,
-                risk_level="blocked",
+                risk_level=decision.risk_level if execution_failed else "blocked",
                 timestamp=utc_now(),
             )
             failed = ToolResult(
                 action_id=action.action_id,
                 tool_name=action.tool_name,
-                status="denied",
-                output=None,
-                error={"type": "runtime_execution_denied", "reason": governed_result.message},
+                status="failed" if execution_failed else "denied",
+                output={
+                    "status": "failed" if execution_failed else "denied",
+                    "error": {
+                        "type": "runtime_execution_failed" if execution_failed else "runtime_execution_denied",
+                        "reason": governed_result.message,
+                    },
+                    "artifacts": governed_result.artifacts, **governed_result.transient,
+                },
+                error={
+                    "type": "runtime_execution_failed" if execution_failed else "runtime_execution_denied",
+                    "reason": governed_result.message,
+                },
                 started_at=now,
                 completed_at=utc_now(),
             )
             if self.store is not None:
-                self.store.insert_tool_action(sanitized_action, session_id, turn_id, "denied")
+                self.store.insert_tool_action(sanitized_action, session_id, turn_id, failed.status)
                 self.store.insert_policy_decision(blocked_decision)
             self._event(
                 session_id=session_id,
@@ -2084,7 +2073,10 @@ class ToolBroker:
             action_id=action.action_id,
             tool_name=action.tool_name,
             status="success",
-            output={"status": "success", "executed": True, "approval_mode": approval_mode},
+            output={
+                "status": "success", "executed": True, "approval_mode": approval_mode,
+                "artifacts": governed_result.artifacts, **governed_result.transient,
+            },
             error=None,
             started_at=now,
             completed_at=utc_now(),
@@ -2093,13 +2085,13 @@ class ToolBroker:
             self.store.insert_tool_action(sanitized_action, session_id, turn_id, result.status)
             self.store.insert_policy_decision(executed_decision)
         event_type = (
-            "approval_auto_executed"
-            if approval_mode == "auto"
+            "sandbox_preparation_executed"
+            if approval_mode == "sandbox"
             else "capability_allow_executed"
             if approval_mode == "standing_allow"
             else "limit_rule_executed"
             if rule is not None
-            else "approval_preview_skipped"
+            else "limit_rule_executed"
         )
         self._event(
             session_id=session_id,
@@ -2111,7 +2103,6 @@ class ToolBroker:
                 "tool_name": action.tool_name,
                 "approval_mode": approval_mode,
                 "policy_reasons": decision.reasons,
-                **({"proposal_preview": preview} if approval_mode == "auto" else {}),
                 **({"grant_id": rule["grant_id"]} if rule is not None else {}),
             },
             client=client,
@@ -2189,6 +2180,8 @@ class ToolBroker:
         turn_capability_modes: Mapping[str, str] | None = None,
     ) -> tuple[ToolResult, PolicyDecision]:
         now = utc_now()
+        # Legacy bypass modes never mint a broader grant during migration.
+        approval_mode = {"auto": "sandbox", "skip": "manual"}.get(approval_mode, approval_mode)
         if machine_identity is None:
             return self._identity_refusal(
                 action,
@@ -2338,7 +2331,7 @@ class ToolBroker:
                 approval_mode = "manual"
         elif (
             decision.decision == "needs_approval"
-            and approval_mode == "manual"
+            and approval_mode in {"manual", "sandbox"}
             and (rule := self._covering_limit_rule(action, session_id)) is not None
         ):
             # QUI-P03 — an Allow-with-limits rule the owner made covers this
@@ -2347,7 +2340,10 @@ class ToolBroker:
             # executor's own checks still apply, and the rule's use is counted.
             self._limit_rule_applied[action.action_id] = rule
             approval_mode = "limit_rule"
-        elif decision.decision == "needs_approval" and self._memory_write_has_standing_allow(action):
+        elif (
+            decision.decision == "needs_approval" and approval_mode == "manual"
+            and self._memory_write_has_standing_allow(action)
+        ):
             # The owner made the durable, capability-specific decision in
             # Permissions. Carry it into the broker before the approval queue;
             # RuntimeAuthority still rechecks the same gate and mode before the
@@ -2357,6 +2353,13 @@ class ToolBroker:
         # the decision. Recording `needs_approval` and then refusing would leave
         # the audit log describing a queue entry that never existed.
         if decision.decision == "needs_approval" and approval_mode == "dont_ask":
+            if turn_mode is None:
+                prepared = self._execute_preapproved_action(
+                    action, decision, approval_mode="sandbox", session_id=session_id,
+                    turn_id=turn_id, client=client, sanitized_action=sanitized_action, now=now,
+                )
+                if prepared is not None:
+                    return prepared
             decision = self._unattended_deny_decision(action, decision)
         self._event(
             session_id=session_id,

@@ -51,13 +51,13 @@ def test_prompt_without_approval_mode_uses_account_preference(workspace: Path) -
 
     envelope = _build_envelope(PromptRequest(text="hello"), "principal_owner", workspace)
 
-    assert envelope.options.approval_mode == "auto"
+    assert envelope.options.approval_mode == "sandbox"
 
 
-def test_prompt_without_approval_mode_defaults_to_manual(workspace: Path) -> None:
+def test_prompt_without_approval_mode_defaults_to_sandbox(workspace: Path) -> None:
     envelope = _build_envelope(PromptRequest(text="hello"), "principal_owner", workspace)
 
-    assert envelope.options.approval_mode == "manual"
+    assert envelope.options.approval_mode == "sandbox"
 
 
 def test_prompt_preserves_optional_reasoning_effort_for_the_turn(workspace: Path) -> None:
@@ -219,7 +219,7 @@ class TestPrompts:
 
         assert prompt.status_code == 200
         assert stream.status_code == 200
-        assert [envelope.options.approval_mode for envelope in captured] == ["auto", "auto"]
+        assert [envelope.options.approval_mode for envelope in captured] == ["sandbox", "sandbox"]
 
     def test_prompt_runs_a_governed_turn(
         self, workspace: Path, client: TestClient, mark_model_ready: Callable[..., None]

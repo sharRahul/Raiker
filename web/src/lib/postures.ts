@@ -8,7 +8,8 @@
  *
  * - **Ask first** — every available permission asks. Today's baseline.
  * - **Work in the sandbox** — changing files in the disposable copy and running
- *   commands in the command sandbox go ahead without a prompt. Anything that
+ *   commands in the command sandbox and recording local task drafts go ahead
+ *   without a prompt. Anything that
  *   leaves the copy or the machine, writes durable memory, sends a message,
  *   pushes or spends money still asks. Offered only while the command sandbox
  *   is fully enforced; otherwise the owner stays on Ask first.
@@ -21,13 +22,14 @@ import type { CapabilityGate, CommandSandboxView } from "./apiTypes";
 export type PostureId = "ask" | "sandbox" | "read_only";
 export type PostureMode = "ask" | "allow" | "deny";
 
-/** Changes that stay inside the disposable copy or the command sandbox. */
+/** Preparation capabilities; the runtime still checks each effect's scope. */
 export const SANDBOX_ALLOWED: readonly string[] = [
   "file_write_execution",
   "patch_apply_execution",
   "checkpoint_restore_execution",
   "shell_execution",
   "process_execution",
+  "task_management_runtime",
 ];
 
 /** Everything Read-only refuses: a change to something, or an act on someone's behalf. */
@@ -46,6 +48,7 @@ export const READ_ONLY_DENIED: readonly string[] = [
   "remote_execution_cap",
   "cloud_execution_cap",
   "scheduled_routines",
+  "task_management_runtime",
   "external_channel_runtime",
   "email_runtime",
   "calendar_runtime",

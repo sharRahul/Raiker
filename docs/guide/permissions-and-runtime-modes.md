@@ -574,13 +574,12 @@ asks*; it never turns a permission on.
 | **Work in the sandbox** | File writes, patches, checkpoint restore, shell commands and processes to **Allow**. Everything else, including git push, memory, messages and anything that leaves this machine, to **Ask me**. Offered only after the command sandbox's probe measures every mandatory observation enforced; installation alone is insufficient. |
 | **Read-only** | Anything that changes files, memory or git, runs a program, sends a message, installs a plugin, generates an image or exports telemetry to **Never**; everything else to **Ask me**. |
 
-**Current Build limitation:** the posture applies these modes, but a file
-creation can still stop for approval before the runtime applies its Allow
-mode. The Windows WSL2 live journey found this on 2026-11-26. Review any
-requested approval normally; a prompt-free Build journey is not yet
-qualified. The [open work and evidence](../plans/TO_BE_FIXED.md#windows-build-posture--found-live-2026-11-26)
-track the required copy-confined execution fix. Applying changes back to the
-project and pushing still require their own authority.
+With the **Work in sandbox** approval policy, verified preparation runs in
+the same owner-bound task copy across file tools and commands, including
+attached project folders outside the data workspace. The real project waits
+for Apply. Explicit Ask/Deny restrictions and critical confirmation still
+apply. Live release qualification is tracked in the
+[approval redesign plan](../plans/APPROVAL_REDESIGN.md).
 
 Choosing one lists how many permissions it changes, and which, before
 **Apply**. Each change is the same governed mode change a row makes, recorded
@@ -629,34 +628,23 @@ decides whether the user is paused for an ordinary eligible action.
 
 | Policy | Behaviour |
 |---|---|
-| **Manually approve** | Pauses for user approval before each otherwise eligible governed action. |
-| **Automatically approve** | Runs an otherwise eligible action without a user pause, while keeping normal status and preview/evidence visible. |
-| **Skip all approvals** | Runs an otherwise eligible action without a UI confirmation or generated preview. |
-| **Decline, don't ask** | Refuses an otherwise eligible action instead of queuing it. |
+| **Work in sandbox** (default) | Prepares edits, patches and foreground tests in the authenticated task's disposable copy after checking measured enforcement. Asks before consequential effects. |
+| **Manually approve** | Pauses for each ordinary action that needs a decision. |
+| **Decline, don't ask** | Performs authorized preparation; refuses anything still needing a decision instead of leaving an unattended prompt. |
 
-**Skip and Decline are opposites, and the menu says so under each.** Both stop
-Raiker asking you. *Skip* then **runs** the action; *Decline* then **refuses**
-it. Decline is the posture for a run with nobody watching — a scheduled routine
-at 06:00 cannot answer a prompt, and parking on one is not the same as declining:
-only the refusal lets the rest of the work carry on. The refusal is recorded like
-any other, with its own reason (`denied_no_one_to_ask`) so an audit reader can
-tell *"you refused this"* from *"nobody was there to ask"* — and only the second
-means running it again while you are watching would have worked.
+The same policy applies to Chat, Build, Design and other tool-using workflows.
+An enabled capability is not permission to perform every effect. Applying a
+copy to the real project, pushing, sending or publishing, changing durable
+memory, and new access or network destinations require their own authority.
+Explicit Ask or Deny restrictions still apply. A missing or failed sandbox
+never causes a command to run unrestricted.
 
-Decline can only ever refuse **more**. It never widens a gate, never skips one,
-and an action policy already allows is untouched.
+Older **Automatically approve** settings are read as **Work in sandbox**;
+older **Skip all approvals** settings become **Manually approve**. Neither
+migration creates a grant. Saved manual and unattended choices are retained.
 
-**Skip all approvals is not an unrestricted mode.** It skips only the user
-prompt and preview step. The runtime still enforces project/path confinement,
-hunk and context validation, atomic rollback for a failed patch, managed policy,
-security and sandbox boundaries, restricted-command policy, and critical holds.
-An action rejected by any of those protections remains rejected; Raiker does
-not guess a malformed edit or force an action through.
-
-The selected policy is remembered for later composer sessions. It does not
-change the standing capability configuration in **Permissions**, and it cannot
-run anything while the agent runtime is disabled in
-**Settings → Advanced → Runtime**.
+The policy is remembered across composers. It does not enable capabilities
+or override the runtime switch in **Settings → Advanced → Runtime**.
 
 ---
 
@@ -666,9 +654,9 @@ Approving does one of two things, and the approval detail tells you which
 **before** you decide — it is computed by the server from your own capability
 gates, not assumed:
 
-The decision itself is **Allow once** or **Decline** on every surface: the
+The decision itself is **Approve once** or **Don't do this** on every surface: the
 Raiker Safety card in Chat, the floating card and Approvals. On Approvals a
-record-only decision reads **Allow once (record only)**. An unanswered approval
+record-only decision reads **Approve once (record only)**. An unanswered approval
 expires after the time limit in **Settings → Security** (30 minutes by default)
 and never runs on its own.
 

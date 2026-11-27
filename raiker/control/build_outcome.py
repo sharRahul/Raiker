@@ -75,6 +75,7 @@ _REASONS: dict[str, str] = {
     "blocked": "A check you declared is waiting for your approval.",
     "outcome_unknown": "A check you declared did not finish, so its result is not known.",
     "readback_missing": "Every check passed, but a file this turn wrote is no longer on disk.",
+    "readback_unavailable": "Every check passed, but a file this turn wrote could not be read back.",
     "target_changed": "Every check passed, but the folder, repository, branch or environment this turn started on has changed since.",
     "review_high": "Every check passed, but the review of the current patch has a high-severity finding.",
     "write_waiting": "A change this turn proposed is waiting for your approval; nothing has changed yet.",
@@ -134,7 +135,7 @@ def _patch_paths(patch: str) -> list[tuple[str, bool]]:
 
 
 def read_back_writes(
-    tool_actions: Iterable[Mapping[str, Any]], workspace_root: str | Path
+    tool_actions: Iterable[Mapping[str, Any]], workspace_root: str | Path, *, authority: Any = None,
 ) -> list[dict[str, Any]]:
     """BR-D01 — read each file the turn wrote back from disk, once per path.
 
@@ -143,8 +144,9 @@ def read_back_writes(
     (its exact bytes are not known from the call). ``changed_since``: the file is
     there but no longer holds what this turn wrote — a later change, which does
     not undo this turn's verification. ``missing``: it is gone. Paths resolve
-    through the read authority, so this can never read outside the workspace.
+    through the current owner's read authority and pinned task-copy I/O.
     """
+    from raiker.tools import task_tree_io
     from raiker.tools.filesystem import resolve_workspace_path
 
     root = Path(workspace_root).resolve()
@@ -171,24 +173,20 @@ def read_back_writes(
     for path, (mode, text, keep) in expected.items():
         state: ReadBack
         try:
-            target = resolve_workspace_path(root, path)
+            target = resolve_workspace_path(root, path, authority=authority)
+            if not keep:
+                state = "matches" if not task_tree_io.exists(target, authority) else "changed_since"
+            elif not task_tree_io.exists(target, authority) or not task_tree_io.is_file(target, authority):
+                state = "missing"
+            elif mode == "present":
+                state = "present"
+            else:
+                content = task_tree_io.read_text(target, authority)
+                same = content == text if mode == "exact" else bool(text) and (text or "") in content
+                state = "matches" if same else "changed_since"
         except Exception:  # noqa: BLE001 — an unreadable destination is stated
             rows.append({"path": path, "state": "unreadable"})
             continue
-        if not keep:
-            state = "matches" if not target.exists() else "changed_since"
-        elif not target.is_file():
-            state = "missing"
-        elif mode == "present":
-            state = "present"
-        else:
-            try:
-                content = target.read_text(encoding="utf-8")
-            except (OSError, UnicodeDecodeError):
-                rows.append({"path": path, "state": "unreadable"})
-                continue
-            same = content == text if mode == "exact" else bool(text) and (text or "") in content
-            state = "matches" if same else "changed_since"
         rows.append({"path": path, "state": state})
     return rows
 
@@ -310,6 +308,8 @@ def classify_build_turn(
     if outcome == "completed_verified":
         if any(item.get("state") == "missing" for item in readback):
             outcome, reason = "completed_unverified", _REASONS["readback_missing"]
+        elif any(item.get("state") == "unreadable" for item in readback):
+            outcome, reason = "completed_unverified", _REASONS["readback_unavailable"]
         elif target_drift:
             outcome, reason = "completed_unverified", _REASONS["target_changed"]
         elif review is not None and int((review.get("counts") or {}).get("high") or 0) > 0:

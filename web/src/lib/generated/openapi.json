@@ -7309,8 +7309,7 @@
           "approval_mode": {
             "enum": [
               "manual",
-              "auto",
-              "skip",
+              "sandbox",
               "dont_ask"
             ],
             "title": "Approval Mode",

@@ -219,7 +219,7 @@ TOOL_DEFINITIONS: tuple[ToolDefinition, ...] = (
         required_list_args=(),
         optional_args=(),
         arg_schemas=(),
-        description="Propose one atomic, context-anchored unified diff across one or more files (approval required once for the complete change set). An optional path may identify the first target for backward compatibility.",
+        description="Prepare one atomic, context-anchored unified diff across one or more files. Runtime authorization decides whether it runs in the task copy or waits for approval; preparing a copy never applies it to the real project. An optional path may identify the first target for backward compatibility.",
     ),
     # The active session is trusted broker context, never a model argument.
     ToolDefinition(
@@ -619,7 +619,7 @@ TOOL_DEFINITIONS: tuple[ToolDefinition, ...] = (
             ("insert_line", {"type": "integer", "description": "Insert new_text after this line number instead of replacing (0 inserts at the top)."}),
             ("cell", {"type": "string", "description": "For a .ipynb notebook: the cell to edit, by index (from 0) or cell id. The edit then applies to that cell's source, not the file's JSON."}),
         ),
-        description="Propose one edit to a file (approval required): replace one exact, unique old_text with new_text; or every occurrence with replace_all; or insert new_text after insert_line with old_text empty. For a Jupyter notebook, name the cell and the edit applies to that cell's source.",
+        description="Prepare one file edit under runtime authorization: replace one exact, unique old_text with new_text; or every occurrence with replace_all; or insert new_text after insert_line with old_text empty. Project-relative paths refer to this task's project copy; applying to the real project is separate. For a Jupyter notebook, name the cell and the edit applies to that cell's source.",
     ),
     # Governed inside the tool: connector_gcal_runtime / connector_slack_runtime
     # gate + decision mode (default `ask` withholds) + owner credential + egress.
@@ -1400,7 +1400,7 @@ TOOL_DEFINITIONS: tuple[ToolDefinition, ...] = (
         required_list_args=(),
         optional_args=(),
         arg_schemas=(),
-        description="Propose running a shell command (approval required).",
+        description="Run one foreground program under runtime authorization in the task's sandbox copy. Pass a plain executable and arguments, for example python3 -m unittest -q. This does not invoke a shell: do not use cd, redirection such as 2>&1, pipes, command chaining, substitutions, or background operators. The current directory is the task project root; stdout, stderr and exit status are returned automatically. A failed command may be corrected and retried; runtime gates and containment are rechecked.",
     ),
     # An installed skill is the owner's own instruction document, already
     # validated on install and readable only for the owner who installed it.
@@ -1950,7 +1950,7 @@ TOOL_DEFINITIONS: tuple[ToolDefinition, ...] = (
         required_list_args=(),
         optional_args=(),
         arg_schemas=(),
-        description="Propose writing a file (approval required).",
+        description="Prepare a file write under runtime authorization. Project-relative paths refer to this task's project copy; the real project changes only after the owner applies the prepared changes. The runtime asks when the target or effect is outside authorized preparation.",
     ),
 )
 

@@ -529,4 +529,23 @@ describe("CapabilitiesView — posture by goal", () => {
     );
     expect(fetchMock.mock.calls.filter(([u]) => String(u).includes("/api/capability-modes/") && !String(u).includes("shell_execution"))).toHaveLength(0);
   });
+
+  it("does not call a manual approval policy Work in the sandbox", async () => {
+    let mode = "manual";
+    const fetchMock = stubFetch({
+      "GET /api/capability-gates": GATES.map((gate) => gate.capability === "shell_execution" ? { ...gate, decision_mode: "allow" } : gate),
+      "GET /api/command-sandbox": { applies: false, native_ready: true, enforced: true },
+      get "GET /api/settings/composer-approval-mode"() { return { approval_mode: mode }; },
+      get "PUT /api/settings/composer-approval-mode"() { mode = "sandbox"; return { approval_mode: mode }; },
+    });
+    render(CapabilitiesView);
+    const panel = await screen.findByTestId("postures");
+    await waitFor(() => expect(panel).toHaveTextContent("Your own mix"));
+    await fireEvent.click(within(panel).getByRole("radio", { name: /Work in the sandbox/ }));
+    await fireEvent.click(within(panel).getByRole("button", { name: "Apply" }));
+    await waitFor(() => expect(fetchMock.mock.calls.some(([url, init]) =>
+      String(url).endsWith("/api/settings/composer-approval-mode") && (init as RequestInit | undefined)?.method === "PUT",
+    )).toBe(true));
+    await waitFor(() => expect(panel).toHaveTextContent("Now: Work in the sandbox."));
+  });
 });

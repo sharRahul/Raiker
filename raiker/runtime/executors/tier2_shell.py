@@ -26,6 +26,18 @@ def _with_module_note(summary: str, result: Mapping[str, Any]) -> str:
 
 UNREACHABLE = "native_sandbox_executable_unreachable"
 
+
+def _command_owner(service: CommandService, action: GovernedAction, principal: Principal) -> str:
+    """Keep the actor distinct from the owner of the session and its task copy."""
+    identity = service.sqlite.get_turn_machine_identity(principal.principal_id)
+    if (
+        identity is not None and identity["is_active"]
+        and identity["session_id"] == action.session_id
+        and identity["turn_id"] == action.turn_id
+    ):
+        return str(identity["owner_principal_id"])
+    return principal.principal_id
+
 #: Programs a model commonly names, and the one a typical install has instead.
 _USUAL_ALTERNATIVES: dict[str, tuple[str, ...]] = {
     "python": ("python3",),
@@ -110,7 +122,7 @@ class ShellExecutor:
             )
         try:
             result = self._commands.run_foreground(
-                owner_principal_id=principal.principal_id,
+                owner_principal_id=_command_owner(self._commands, action, principal),
                 acting_principal_id=principal.principal_id,
                 session_id=action.origin_session_id or action.session_id,
                 turn_id=action.turn_id or "turn_unavailable",
@@ -189,7 +201,7 @@ class ProcessExecutor:
             )
         try:
             result = self._commands.run_foreground(
-                owner_principal_id=principal.principal_id,
+                owner_principal_id=_command_owner(self._commands, action, principal),
                 acting_principal_id=principal.principal_id,
                 session_id=action.origin_session_id or action.session_id,
                 turn_id=action.turn_id or "turn_unavailable",

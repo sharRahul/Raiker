@@ -235,12 +235,14 @@
    * without holding first run up — Permissions can finish it.
    */
   let posture = $state<PostureId>("ask");
+  let postureTouched = false;
   let postureNote = $state("");
   async function applyChosenPosture(): Promise<void> {
     postureNote = "";
-    if (posture === "ask") return;
     const label = POSTURES.find((p) => p.id === posture)?.label ?? posture;
     try {
+      await api.setComposerApprovalMode(posture === "sandbox" ? "sandbox" : "manual");
+      if (posture === "ask") return;
       const gates = await api.capabilityGates();
       let failed = 0;
       for (const change of postureChanges(posture, gates)) {
@@ -474,15 +476,22 @@
   let setupFacts = $state<HealthFact[] | null>(null);
   let sandboxView = $state<CommandSandboxView | null>(null);
   const FIRST_RUN_FACTS = ["sandbox", "embedding", "backups", "always-on"];
+  $effect(() => {
+    if (stage === "privacy") void loadSetupFacts();
+  });
   async function loadSetupFacts() {
     const read = <T,>(p: Promise<T>) => p.then((v) => v, () => null);
-    const [sandbox, backups, memory, host] = await Promise.all([
+    const [sandbox, backups, memory, host, approval] = await Promise.all([
       read(api.commandSandbox()),
       read(api.backups()),
       read(api.memorySettings()),
       read(api.host()),
+      read(api.composerApprovalMode()),
     ]);
     sandboxView = sandbox;
+    if (!postureTouched && approval?.approval_mode === "sandbox" && sandboxEnforced(sandbox)) {
+      posture = "sandbox";
+    }
     setupFacts = healthFacts({ sandbox, backups, memory, voice: null, update: null, host }).filter((f) =>
       FIRST_RUN_FACTS.includes(f.id),
     );
@@ -831,7 +840,8 @@
           {#each POSTURES as option (option.id)}
             {@const blocked = option.id === "sandbox" && !sandboxEnforced(sandboxView)}
             <label class="posture-choice">
-              <input type="radio" name="first-run-posture" value={option.id} bind:group={posture} disabled={blocked || busy} />
+              <input type="radio" name="first-run-posture" value={option.id} bind:group={posture}
+                onchange={() => { postureTouched = true; }} disabled={blocked || busy} />
               <span><strong>{option.label}</strong> — {blocked ? "available once the command sandbox is set up." : option.summary}</span>
             </label>
           {/each}

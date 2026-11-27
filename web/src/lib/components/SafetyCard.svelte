@@ -1,4 +1,5 @@
 <script lang="ts">
+  import ApprovalDecisionButton from "./ApprovalDecisionButton.svelte";
   /**
    * QUI-P05 — the approval card ("Raiker Safety"), where the conversation parked.
    *
@@ -290,23 +291,13 @@
   {:else if !settled && !undone}
     {#if failure}<p class="note failure" role="alert">{failure}</p>{/if}
     <div class="actions">
-      <button type="button" class="btn btn-sm" disabled={busy || disabled} onclick={() => void decide(false)}>
-        Decline
-      </button>
+      <ApprovalDecisionButton decision="deny" {busy} {disabled} onclick={() => void decide(false)} />
       <a class="btn btn-ghost btn-sm" href={changeHref}>Change</a>
       <!-- QUI-P05 — where policy allows: never on a critical action, which
            returns earlier with its own ceremony, nor on a question. -->
-      <button type="button" class="btn btn-sm" disabled={busy || disabled} onclick={() => (limiting = true)}>
-        Allow for this task…
-      </button>
-      <button
-        type="button"
-        class="btn btn-primary btn-sm allow"
-        disabled={busy || disabled}
-        onclick={() => void decide(true)}
-      >
-        <Icon name="check" size="sm" /> Allow once
-      </button>
+      <ApprovalDecisionButton decision="task" {busy} {disabled} onclick={() => (limiting = true)} />
+      <ApprovalDecisionButton decision="approve" {busy} {disabled}
+        recordOnly={detail?.executes_on_approval === false} onclick={() => void decide(true)} />
     </div>
   {/if}
   {#if ruleNote}<p class="note rule-note" role="status">{ruleNote}</p>{/if}
@@ -385,8 +376,5 @@
     align-items: center;
     gap: var(--space-2);
     flex-wrap: wrap;
-  }
-  .actions .allow {
-    margin-left: auto;
   }
 </style>

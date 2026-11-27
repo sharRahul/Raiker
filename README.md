@@ -23,6 +23,13 @@ window, web dashboard and terminal client are available for local, single-owner
 use; features without a governed executor fail closed, and hosted multi-user
 operation is deferred. There is no Raiker cloud account.
 
+The shared approval default is **Work in sandbox**: prepare edits and tests in
+a verified task copy, then ask before applying to the real project or taking
+consequential actions. Chat, Build, Design and other tool-using workflows share
+the same authorization rules; explicit restrictions remain in force. See the
+[approval guide](docs/guide/permissions-and-runtime-modes.md#what-approved-means)
+and [remaining qualification](docs/plans/APPROVAL_REDESIGN.md).
+
 ## Download and install Raiker
 
 Raiker is packaged as a desktop application for Windows, macOS and Linux. The

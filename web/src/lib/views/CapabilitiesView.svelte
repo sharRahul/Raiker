@@ -2,6 +2,7 @@
   import { failure } from "../errorCopy";
   import { onPermissionsChanged } from "../permissionSync";
   import ApprovalModeControl from "../components/ApprovalModeControl.svelte";
+  import type { ApprovalMode } from "../approvalMode";
   import { goalSummaries } from "../permissionGoals";
   import { onMount, tick } from "svelte";
   import AuthorityMatrix from "../components/AuthorityMatrix.svelte";
@@ -424,9 +425,15 @@
    */
   let postureChoice = $state<PostureId | null>(null);
   let sandboxView = $state<CommandSandboxView | null>(null);
+  let composerMode = $state<ApprovalMode | null>(null);
   const sandboxReady = $derived(sandboxEnforced(sandboxView));
-  const activePosture = $derived(currentPosture(effective));
+  const activePosture = $derived.by(() => {
+    const posture = currentPosture(effective);
+    return posture === "sandbox" && composerMode !== "sandbox" ? "custom" : posture;
+  });
   const postureDiff = $derived(postureChoice === null ? [] : postureChanges(postureChoice, effective));
+  const postureMode = $derived(postureChoice === "sandbox" ? "sandbox" : "manual");
+  const postureModeDiff = $derived(postureChoice !== null && composerMode !== postureMode);
   async function loadSandbox() {
     try {
       sandboxView = await api.commandSandbox();
@@ -435,13 +442,21 @@
     }
   }
   async function applyPosture() {
-    if (mutationBusy || postureChoice === null || postureDiff.length === 0) return;
+    if (mutationBusy || postureChoice === null || (postureDiff.length === 0 && !postureModeDiff)) return;
     const label = POSTURES.find((p) => p.id === postureChoice)?.label ?? postureChoice;
     postureBusy = true;
     notice = null;
     const applied: string[] = [];
     const failed: string[] = [];
     try {
+      if (postureModeDiff) {
+        try {
+          composerMode = (await api.setComposerApprovalMode(postureMode)).approval_mode;
+          applied.push("approval_policy");
+        } catch {
+          failed.push("approval_policy");
+        }
+      }
       for (const change of postureDiff) {
         try {
           await api.setCapabilityDecisionMode(change.capability, change.to, `Posture “${label}” via web UI`, change.from);
@@ -481,6 +496,8 @@
       const fresh = await api.capabilityGates();
       if (read !== loadSeq) return;
       gates = fresh;
+      try { composerMode = (await api.composerApprovalMode()).approval_mode; }
+      catch { composerMode = null; }
       const editable = new Set(fresh.filter(g => g.can_current_principal_change && !isDeferred(g) && !isInherent(g) && governsItsOwnCapability(g)).map(g => g.capability));
       selectedCaps = new Set([...selectedCaps].filter(cap => editable.has(cap)));
       confirmedModes = survivingModes(confirmedModes, confirmedBefore);
@@ -823,7 +840,7 @@
             {#if postureChoice !== null}
               <p class="preset-lede" role="status">
                 {postureDiff.length === 0
-                  ? "Nothing to change."
+                  ? postureModeDiff ? "This changes the shared approval policy." : "Nothing to change."
                   : `This changes ${postureDiff.length} permission${postureDiff.length === 1 ? "" : "s"}: ${(["allow", "ask", "deny"] as const)
                       .map((mode) => [mode, postureDiff.filter((c) => c.to === mode).length] as const)
                       .filter(([, n]) => n > 0)
@@ -841,7 +858,7 @@
                 </details>
               {/if}
               <div class="posture-actions">
-                <button type="button" class="btn btn-primary btn-sm" disabled={mutationBusy || postureDiff.length === 0} onclick={() => void applyPosture()}>
+                <button type="button" class="btn btn-primary btn-sm" disabled={mutationBusy || (postureDiff.length === 0 && !postureModeDiff)} onclick={() => void applyPosture()}>
                   {postureBusy ? "Applying…" : "Apply"}
                 </button>
                 <button type="button" class="btn btn-ghost btn-sm" disabled={postureBusy} onclick={() => (postureChoice = null)}>Cancel</button>
@@ -974,7 +991,7 @@
             <p class="posture-note-text">
               For every conversation on this account. A conversation set to Careful still asks.
             </p>
-            <ApprovalModeControl placement="down" />
+            <ApprovalModeControl placement="down" onchange={(mode) => (composerMode = mode)} />
           </section>
         {/if}
         {#if grouping === "task" && categoryGroup && categoryGroup in CAPABILITY_FAMILY_SUMMARY}

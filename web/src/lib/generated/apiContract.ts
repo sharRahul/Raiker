@@ -1458,7 +1458,7 @@ export type CompensationWindow = {
 };
 
 export type ComposerApprovalMode = {
-  approval_mode: "manual" | "auto" | "skip" | "dont_ask";
+  approval_mode: "manual" | "sandbox" | "dont_ask";
 };
 
 export type ComposerApprovalModeRequest = {

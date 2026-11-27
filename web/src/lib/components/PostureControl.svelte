@@ -99,15 +99,14 @@
   const askSummary = $derived.by(() => {
     if (mode === null) return null;
     if (mode === "manual") return "Asks first";
-    if (mode === "auto") return "Approves automatically";
-    if (mode === "skip") return "Raises no approvals";
+    if (mode === "sandbox") return "Asks before effects";
     return "Declines unattended";
   });
 
   // The resting state is neutral. This turns amber only for a posture
   // that is genuinely less careful than the default, so the colour means
   // something the one time it appears.
-  const relaxed = $derived(mode === "auto" || mode === "skip");
+  const relaxed = $derived(false);
 
   const summary = $derived.by(() => {
     const parts = [whereSummary, askSummary].filter((part) => part !== null);
@@ -162,7 +161,7 @@
     <div class="panel motion-enter" role="dialog" aria-label="Governance posture">
       <div class="field">
         <p class="field-label">Approval policy</p>
-        <ApprovalModeControl />
+        <ApprovalModeControl onchange={(next) => (mode = next)} />
         {#if modeDetail}<p class="field-detail">{modeDetail}</p>{/if}
       </div>
 

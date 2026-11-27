@@ -125,8 +125,8 @@ describe("ChatView — cross-tab approval continuation (BUG-24)", () => {
     // QUI-P05 — the Raiker Safety card, decided in place.
     const card = screen.getByRole("region", { name: "Raiker Safety" });
     expect(card).toHaveTextContent("Write file: Writes one file in your workspace.");
-    expect(screen.getByRole("button", { name: "Decline" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Allow once" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Don't do this" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Approve once" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Change" })).toHaveAttribute("href", "#/approvals?item=apv_1");
     expect(card).not.toHaveTextContent(/always allow/i);
   });

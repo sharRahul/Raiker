@@ -1,4 +1,5 @@
 <script lang="ts">
+  import ApprovalDecisionButton from "../components/ApprovalDecisionButton.svelte";
   import EditedDraftMemory from "../components/EditedDraftMemory.svelte";
   import { contract } from "../generated/apiContract";
   import { HELD_SEND_SECONDS, holdsBeforeSending } from "../heldSend";
@@ -1065,9 +1066,7 @@
         </div>
       {:else}
         <div class="decision-actions">
-          <button type="button" class="btn btn-danger" onclick={() => resolve(false)} disabled={busy}>
-            Decline
-          </button>
+          <ApprovalDecisionButton decision="deny" {busy} onclick={() => void resolve(false)} />
           {#if editablePatch(selected.approval.tool_name, selected.arguments) !== null}
             <button
               type="button"
@@ -1086,19 +1085,10 @@
           <!-- QUI-P05 — wherever the card offers it: a rule covers later
                ordinary actions, whether or not accepting this one runs it. -->
           {#if !selected.approval.critical}
-            <button type="button" class="btn" onclick={() => (limiting = true)} disabled={busy}>
-              Allow for this task…
-            </button>
+            <ApprovalDecisionButton decision="task" {busy} onclick={() => (limiting = true)} />
           {/if}
-          <button type="button" class="btn btn-primary" onclick={() => resolve(true)} disabled={busy}>
-            {busy
-              ? selected.executes_on_approval
-                ? "Executing…"
-                : "Recording…"
-              : selected.executes_on_approval
-                ? "Allow once"
-                : "Allow once (record only)"}
-          </button>
+          <ApprovalDecisionButton decision="approve" {busy}
+            recordOnly={!selected.executes_on_approval} onclick={() => void resolve(true)} />
           {/if}
         </div>
         {#if limiting}

@@ -69,7 +69,7 @@ it("announces a pending decision on whatever page is open and resolves it there"
   expect(await screen.findByText("Approval needed")).toBeInTheDocument();
   expect(screen.getByText("Write file")).toBeInTheDocument();
 
-  await fireEvent.click(screen.getByRole("button", { name: /Allow once/ }));
+  await fireEvent.click(screen.getByRole("button", { name: /Approve once/ }));
   await waitFor(() =>
     expect(resolve).toHaveBeenCalledWith("ap_1", {
       approve: true,
@@ -83,7 +83,7 @@ it("sends a critical decision to the inbox instead of answering it here", async 
   render(ApprovalPrompt);
 
   expect(await screen.findByText(/needs your password/)).toBeInTheDocument();
-  expect(screen.queryByRole("button", { name: /Allow once/ })).not.toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: /Approve once/ })).not.toBeInTheDocument();
   expect(screen.getByRole("button", { name: "Review" })).toBeInTheDocument();
 });
 
@@ -291,6 +291,6 @@ it("offers no conversation grant for a command a shell would reinterpret", async
     approval({ tool_name: "shell", capability: "shell_execution", target: "rm -rf build && ls" }),
   ]);
   render(ApprovalPrompt);
-  expect(await screen.findByRole("button", { name: /Allow once/ })).toBeInTheDocument();
+  expect(await screen.findByRole("button", { name: /Approve once/ })).toBeInTheDocument();
   expect(screen.queryByRole("button", { name: /in this conversation/ })).toBeNull();
 });

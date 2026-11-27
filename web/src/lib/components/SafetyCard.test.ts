@@ -52,7 +52,7 @@ function stub(view: ApprovalDetailView, sideEffect = "reversible") {
   vi.spyOn(api, "capabilityGate").mockResolvedValue({ side_effect: sideEffect } as never);
 }
 
-it("says the six things in order, and offers Decline, Change and Allow once", async () => {
+it("says the six things in order, and offers Decline, Change and Approve once", async () => {
   stub(detail());
   render(SafetyCard, { props: { approval: INFO } });
 
@@ -69,9 +69,9 @@ it("says the six things in order, and offers Decline, Change and Allow once", as
   ]);
   expect(screen.getByTestId("safety-affects")).toHaveTextContent("notes.md");
   expect(screen.getByTestId("safety-data")).toHaveTextContent("2 lines of text.");
-  expect(screen.getByRole("button", { name: "Decline" })).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "Don't do this" })).toBeInTheDocument();
   expect(screen.getByRole("link", { name: "Change" })).toHaveAttribute("href", "#/approvals?item=ap_1");
-  expect(screen.getByRole("button", { name: "Allow once" })).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "Approve once" })).toBeInTheDocument();
   expect(document.body).not.toHaveTextContent(/always allow/i);
   expect(document.querySelector("[data-raiker-safety]")).not.toBeNull();
 });
@@ -88,7 +88,7 @@ it("decides in place and announces it, so every other place clears", async () =>
   const onDecided = vi.fn();
   render(SafetyCard, { props: { approval: INFO, sessionId: "sess_1", onDecided } });
 
-  await fireEvent.click(await screen.findByRole("button", { name: "Allow once" }));
+  await fireEvent.click(await screen.findByRole("button", { name: "Approve once" }));
   await waitFor(() => expect(onDecided).toHaveBeenCalledWith(true, true));
   expect(resolve).toHaveBeenCalledWith("ap_1", { approve: true, reason: "allowed once in the conversation" });
   expect(heard).toHaveBeenCalledTimes(1);
@@ -109,7 +109,7 @@ it("marks an unanswered approval Not done, with Ask again and the time limit", a
     "href",
     "#/settings?tab=security",
   );
-  expect(screen.queryByRole("button", { name: "Allow once" })).not.toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: "Approve once" })).not.toBeInTheDocument();
   // Nothing to change any more, so no safer alternative pointing at Change.
   expect(screen.queryByTestId("safety-alternative")).not.toBeInTheDocument();
   await fireEvent.click(screen.getByRole("button", { name: "Ask again" }));
@@ -124,7 +124,7 @@ it("turns a decision the server refused as expired into the Not done state", asy
   );
   render(SafetyCard, { props: { approval: INFO } });
 
-  await fireEvent.click(await screen.findByRole("button", { name: "Decline" }));
+  await fireEvent.click(await screen.findByRole("button", { name: "Don't do this" }));
   expect(await screen.findByText("Not done: no decision")).toBeInTheDocument();
   expect(await screen.findByText(/Nobody answered within 30 minutes/)).toBeInTheDocument();
 });
@@ -134,7 +134,7 @@ it("sends a critical decision to Approvals, where the password is asked", async 
   render(SafetyCard, { props: { approval: INFO } });
 
   expect(await screen.findByText(/needs your password or a code/)).toBeInTheDocument();
-  expect(screen.queryByRole("button", { name: "Allow once" })).not.toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: "Approve once" })).not.toBeInTheDocument();
   expect(screen.getByRole("link", { name: "Review in Approvals" })).toBeInTheDocument();
 });
 
@@ -146,9 +146,9 @@ it("holds an allowed connector write with a countdown and Undo, and says when it
   const connectorWrite = { ...INFO, tool_name: "connector_write", arguments: { connector_id: "gmail", operation_id: "send", account: "Personal Gmail" } } as ApprovalInfo;
   render(SafetyCard, { props: { approval: connectorWrite, sessionId: "sess_1" } });
 
-  await fireEvent.click(await screen.findByRole("button", { name: "Allow once" }));
+  await fireEvent.click(await screen.findByRole("button", { name: "Approve once" }));
   expect(await screen.findByText("Sending in 10 s")).toBeInTheDocument();
-  expect(screen.queryByRole("button", { name: "Allow once" })).not.toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: "Approve once" })).not.toBeInTheDocument();
   await fireEvent.click(screen.getByRole("button", { name: "Undo" }));
   expect(undo).toHaveBeenCalledWith("ap_1");
   finish({ approval_id: "ap_1", status: "undone", resume: { resumable: true, session_id: "sess_1", turn_id: "turn_1" } });
@@ -159,7 +159,7 @@ it("does not hold anything that is not sent through a connection", async () => {
   stub(detail());
   vi.spyOn(api, "resolveApproval").mockResolvedValue({ approval_id: "ap_1", status: "approved", resume: { resumable: false } } as never);
   render(SafetyCard, { props: { approval: INFO } });
-  await fireEvent.click(await screen.findByRole("button", { name: "Allow once" }));
+  await fireEvent.click(await screen.findByRole("button", { name: "Approve once" }));
   expect(screen.queryByText(/Sending in/)).not.toBeInTheDocument();
 });
 

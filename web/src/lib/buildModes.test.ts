@@ -118,7 +118,7 @@ describe("what Auto amounts to under the owner's standing permissions", () => {
   });
 
   it("confirms an actually permissive posture", () => {
-    expect(standingPostureNote("auto", all("auto"))).toContain("low-risk changes run unprompted");
+    expect(standingPostureNote("auto", all("auto"))).toContain("verified task copy");
   });
 
   it("admits it could not read them rather than assuming the happy answer", () => {

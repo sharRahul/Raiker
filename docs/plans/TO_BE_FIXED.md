@@ -2,6 +2,20 @@
 
 ### Windows Build posture — found live 2026-11-26
 
+**2026-11-27 implementation update:** [FIXED-1578](FIXED_ITEMS.md#fixed-1578--preparation-and-approval-policy-disagreed-across-workflows)
+adds verified copy-scoped preparation and consistent shared controls. A direct
+live WSL2 run passed the copy/edit/three-test/outside-write checks. The browser
+RT-WSL-BUILD-01 also passed with real `qwen3.6:27b`: two copied files, three
+passing tests and a verified outcome. RU-07's repository/Apply/push boundary
+remains unqualified. Earlier small-model attempts emitted invalid commands and
+tripped the existing circuit breaker. An attached-project command-copy mismatch
+and a Permissions/shared-policy mismatch found during those attempts are fixed
+with regressions. Historical evidence below is retained; it is not the current
+claim that every copied write asks. See the
+[current live record](../architecture/WEB_APP_LIVE_TEST.md#result--2026-11-27-shared-approval-redesign)
+and [active redesign plan](APPROVAL_REDESIGN.md). Early-refusal project filing,
+clean-machine timing and native-account qualification are still open.
+
 **RU-07 is not qualified.** RT-WSL-BUILD-01 selected *Work in the sandbox*
 through Permissions on an enforced WSL2 host, enabled the Build preset and
 used the real local `qwen3.5:9b` model. Its first `write_file` for `pricing.py`
@@ -15,8 +29,8 @@ per-turn Ask/Deny and all hard denials, and never authorizes Apply, durable
 memory, sending, spending or Git push. Do not fix it by globally relaxing the
 medium-risk policy. Commands need the same end-to-end qualification.
 
-`web/e2e/ru-07-wsl-build-live.spec.ts` retains the failing live criterion;
-it is not skipped or counted as passing. The earlier `qwen2.5-coder:7b`
+The historical failing criterion in `web/e2e/ru-07-wsl-build-live.spec.ts`
+now passes as recorded above. The earlier `qwen2.5-coder:7b`
 attempt printed tool-call JSON as prose and performed no tool calls, so it
 supplies no containment or execution evidence. Also observed on an early
 refused turn: the client tried to file its not-yet-stored session under the

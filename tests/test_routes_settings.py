@@ -89,13 +89,13 @@ def test_chinese_speech_language_can_be_saved(client: TestClient) -> None:
     assert client.get("/api/settings", headers=_h(token)).json()["settings"]["general.speech_language"] == "zh"
 
 
-def test_composer_approval_mode_defaults_to_manual(client: TestClient) -> None:
+def test_composer_approval_mode_defaults_to_sandbox(client: TestClient) -> None:
     token = _token(client, "alice")
 
     response = client.get("/api/settings/composer-approval-mode", headers=_h(token))
 
     assert response.status_code == 200
-    assert response.json() == {"approval_mode": "manual"}
+    assert response.json() == {"approval_mode": "sandbox"}
 
 
 def test_composer_approval_mode_normalizes_and_preserves_unrelated_settings(client: TestClient) -> None:
@@ -113,12 +113,12 @@ def test_composer_approval_mode_normalizes_and_preserves_unrelated_settings(clie
     )
 
     assert response.status_code == 200
-    assert response.json() == {"approval_mode": "auto"}
+    assert response.json() == {"approval_mode": "sandbox"}
     settings = client.get("/api/settings", headers=_h(token)).json()["settings"]
     assert settings == {
         "personalisation": {"theme": "dark"},
         "other": True,
-        "composer": {"approval_mode": "auto"},
+        "composer": {"approval_mode": "sandbox"},
     }
 
 
@@ -134,7 +134,7 @@ def test_composer_approval_mode_isolated_per_account(client: TestClient, tmp_pat
     response = client.get("/api/settings/composer-approval-mode", headers=_h(token_bob))
 
     assert response.status_code == 200
-    assert response.json() == {"approval_mode": "manual"}
+    assert response.json() == {"approval_mode": "sandbox"}
 
 
 def test_composer_approval_mode_rejects_unknown_value(client: TestClient) -> None:

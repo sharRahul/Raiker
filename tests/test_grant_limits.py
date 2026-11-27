@@ -145,9 +145,12 @@ def _two_turns(tmp_path: Path) -> FakeRouter:
     ])
 
 
-def test_a_rule_for_this_conversation_runs_the_write_through_the_authority(tmp_path: Path) -> None:
+@pytest.mark.parametrize("mode", ["manual", "sandbox"])
+def test_a_rule_for_this_conversation_runs_the_write_through_the_authority(
+    tmp_path: Path, mode: str,
+) -> None:
     orchestrator = _orchestrator(tmp_path, _two_turns(tmp_path))
-    envelope = _envelope("write the report")
+    envelope = _envelope("write the report", approval_mode=mode)
     store = orchestrator.tool_broker.store
     assert store is not None
     store.create_session(envelope.session_id, str(tmp_path), user_id="owner")
@@ -156,13 +159,40 @@ def test_a_rule_for_this_conversation_runs_the_write_through_the_authority(tmp_p
     response = _handle(orchestrator, envelope)
 
     assert response.status == "completed"
-    assert (tmp_path / "report.md").read_text(encoding="utf-8") == "# Report\n"
+    from raiker.execution.task_tree import owner_tree
+
+    assert not (tmp_path / "report.md").exists()
+    tree = owner_tree(tmp_path, "principal_owner", envelope.session_id)
+    assert tree is not None
+    assert tree.to_copy(tmp_path / "report.md", create=False).read_text(encoding="utf-8") == "# Report\n"
     events = _events(orchestrator, envelope.session_id)
     assert "approval_requested" not in events
     assert _event_record(orchestrator, envelope.session_id, "limit_rule_executed")["payload"]["grant_id"] == grant_id
     # The full authority still decided: the executor ran under its own event.
     assert "action_executed" in events
     assert store.load_standing_grant(grant_id)["use_count"] == 1  # type: ignore[index]
+
+
+def test_a_grant_snapshot_can_be_claimed_only_once(tmp_path: Path) -> None:
+    orchestrator = _orchestrator(tmp_path, _two_turns(tmp_path))
+    store = orchestrator.tool_broker.store
+    assert store is not None
+    grant_id = _owner_rule(store, "principal_owner", "session", max_uses=1)
+    snapshot = store.load_standing_grant(grant_id)
+    assert snapshot is not None
+    assert store.claim_standing_grant_use(snapshot)
+    assert not store.claim_standing_grant_use(snapshot)
+
+
+def test_revocation_invalidates_an_already_reviewed_grant(tmp_path: Path) -> None:
+    orchestrator = _orchestrator(tmp_path, _two_turns(tmp_path))
+    store = orchestrator.tool_broker.store
+    assert store is not None
+    grant_id = _owner_rule(store, "principal_owner", "session", max_uses=1)
+    snapshot = store.load_standing_grant(grant_id)
+    assert snapshot is not None
+    assert store.revoke_standing_grant(grant_id, revoked_by="principal_owner")
+    assert not store.claim_standing_grant_use(snapshot)
 
 
 def test_a_spent_or_foreign_rule_leaves_the_approval_to_the_owner(tmp_path: Path) -> None:

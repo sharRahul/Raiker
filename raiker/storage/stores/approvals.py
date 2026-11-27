@@ -550,6 +550,17 @@ class ApprovalStore:
             (utc_now(), grant_id),
         )
 
+    def claim_standing_grant_use(self: SQLiteStore, reviewed: dict[str, Any]) -> bool:
+        """Spend a reviewed grant version once, checking revocation and expiry."""
+        now = utc_now()
+        return self._execute(
+            "UPDATE standing_grants SET use_count = use_count + 1, last_used_at = ? "
+            "WHERE grant_id = ? AND revoked = 0 AND expires_at > ? "
+            "AND use_count = ? AND limits_json = ?",
+            (now, reviewed["grant_id"], now, int(reviewed.get("use_count") or 0),
+             reviewed.get("limits_json") or "{}"),
+        ) == 1
+
     def count_pending_approvals(self: SQLiteStore, session_id: str | None = None) -> int:
         row = self._row(
             "SELECT COUNT(*) AS cnt FROM approvals WHERE status = 'pending'"

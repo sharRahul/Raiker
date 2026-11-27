@@ -77,7 +77,7 @@ describe("ApprovalsView recovery (QUI-G06)", () => {
 
     routes["GET /api/approvals/appr_1"] = DETAIL;
     await fireEvent.click(screen.getByRole("button", { name: "Open it again" }));
-    expect(await screen.findByRole("button", { name: /^allow once$/i })).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: /^approve once$/i })).toBeInTheDocument();
   });
 
   it("says a lost decision may have run and to check History before deciding again", async () => {
@@ -88,7 +88,7 @@ describe("ApprovalsView recovery (QUI-G06)", () => {
     });
     render(ApprovalsView);
     await openFirst();
-    await fireEvent.click(await screen.findByRole("button", { name: /^allow once$/i }));
+    await fireEvent.click(await screen.findByRole("button", { name: /^approve once$/i }));
     const notice = await screen.findByText(/allowing this was not confirmed \(HTTP 502\)/i);
     expect(notice).toHaveTextContent(/may have been recorded/i);
     expect(notice).toHaveTextContent(/check History for this approval before deciding again/i);
@@ -103,7 +103,7 @@ describe("ApprovalsView recovery (QUI-G06)", () => {
     });
     render(ApprovalsView);
     await openFirst();
-    await fireEvent.click(await screen.findByRole("button", { name: /^allow once$/i }));
+    await fireEvent.click(await screen.findByRole("button", { name: /^approve once$/i }));
     await waitFor(() => expect(document.querySelector(".notice-danger")).not.toBeNull());
     expect(document.querySelector(".notice-danger")?.textContent).not.toMatch(/was not confirmed/i);
   });
@@ -169,7 +169,7 @@ describe("ApprovalsView recovery (QUI-G06)", () => {
     });
     render(ApprovalsView);
     await openFirst();
-    await fireEvent.click(await screen.findByRole("button", { name: /^allow once$/i }));
+    await fireEvent.click(await screen.findByRole("button", { name: /^approve once$/i }));
     const notice = await screen.findByText(/allowing this was not confirmed \(HTTP 503, injected_failure\)/i);
     expect(notice).toHaveTextContent(/check History/i);
   });

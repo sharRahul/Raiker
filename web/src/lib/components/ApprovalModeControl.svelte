@@ -4,9 +4,12 @@
   import { APPROVAL_MODES, type ApprovalMode } from "../approvalMode";
   import Icon from "./Icon.svelte";
 
-  let { placement = "up" }: { placement?: "up" | "down" } = $props();
-  let mode = $state<ApprovalMode>("manual");
-  let confirmedMode = $state<ApprovalMode>("manual");
+  let { placement = "up", onchange }: {
+    placement?: "up" | "down";
+    onchange?: (mode: ApprovalMode) => void;
+  } = $props();
+  let mode = $state<ApprovalMode>("sandbox");
+  let confirmedMode = $state<ApprovalMode>("sandbox");
   let open = $state(false);
   let busy = $state(false);
   let error = $state<string | null>(null);
@@ -49,6 +52,7 @@
       if (selectionVersion !== initialSelectionVersion) return;
       mode = saved.approval_mode;
       confirmedMode = saved.approval_mode;
+      onchange?.(saved.approval_mode);
     } catch {
       if (selectionVersion !== initialSelectionVersion) return;
       error = "Approval mode unavailable.";
@@ -71,6 +75,7 @@
       const saved = await api.setComposerApprovalMode(next);
       mode = saved.approval_mode;
       confirmedMode = saved.approval_mode;
+      onchange?.(saved.approval_mode);
       open = false;
     } catch {
       mode = previous;
@@ -99,7 +104,6 @@
     bind:this={triggerEl}
     type="button"
     class="approval-trigger control"
-    class:skip-mode={mode === "skip"}
     aria-label={`Approval mode: ${descriptor(mode).label}`}
     aria-haspopup="menu"
     aria-expanded={open}
@@ -144,8 +148,6 @@
   .approval-trigger, .approval-choice { font: inherit; }
   .approval-trigger { display: inline-flex; align-items: center; gap: .3rem; border: 1px solid var(--neutral-border); background: var(--surface); color: var(--text-2); font-size: var(--text-xs); font-weight: 600; padding: .2rem .45rem; border-radius: var(--r-pill); cursor: pointer; }
   .approval-trigger:hover { border-color: var(--accent-border); color: var(--text-1); }
-  .approval-trigger.skip-mode { border-color: var(--warn-border); background: var(--warn-soft); color: var(--warn); }
-  .approval-trigger.skip-mode:hover { border-color: var(--warn); color: var(--warn); }
   /* Opens **upward**. This control lives in the composer bar, which is pinned to
      the bottom of the viewport in both Chat and Build, so a menu dropped below
      the trigger is clipped by the fold — the last option was unreachable without

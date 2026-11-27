@@ -109,15 +109,24 @@ def _refuse_links(copy_root: Path, target: Path) -> None:
 class TaskTreeAuthority(PathAuthority):
     """A :class:`PathAuthority` whose files live in the session's task copy."""
 
-    def __init__(self, base: PathAuthority, tree: TaskTree) -> None:
+    def __init__(
+        self, base: PathAuthority, tree: TaskTree, *, project_relative: bool = False,
+    ) -> None:
         super().__init__(base.workspace_root, base.roots[1:])
         self.base = base
         self.tree = tree
+        self.project_relative = project_relative
 
     def _resolve(self, requested: str | Path, *, for_write: bool) -> ResolvedPath:
         candidate = Path(requested)
         if candidate.is_absolute():
             candidate = self.tree.to_real(candidate)
+        elif self.project_relative:
+            root = self.tree.registry.bound_root(
+                self.tree.owner_principal_id, self.tree.session_id,
+            )
+            if root is not None and not _within(root.resolve(), (self.workspace_root / candidate).resolve()):
+                candidate = root / candidate
         resolved = super()._resolve(candidate, for_write=for_write)
         return dataclasses.replace(
             resolved, path=self.tree.to_copy(resolved.path, create=for_write)
@@ -128,7 +137,7 @@ def wrap_authority(authority: Any, tree: TaskTree | None, workspace_root: str | 
     """*authority* reading and writing through *tree*; unchanged without one."""
     if tree is None or isinstance(authority, TaskTreeAuthority):
         return authority
-    return TaskTreeAuthority(authority or PathAuthority(workspace_root), tree)
+    return TaskTreeAuthority(authority or PathAuthority(workspace_root), tree, project_relative=True)
 
 
 def authority_for_action(

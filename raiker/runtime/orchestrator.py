@@ -713,7 +713,10 @@ class RuntimeOrchestrator:
     # model writes and the chip the transcript renders pointing at the same row.
 
     def _source_owner(self, envelope: PromptEnvelope) -> str:
-        return envelope.user.id or self.tool_broker.owner_scope or self.tool_broker.principal_id
+        # The CLI's default metadata is a display placeholder, not a principal.
+        if envelope.user.id and envelope.user.id != "local_user":
+            return envelope.user.id
+        return self.tool_broker.owner_scope or self.tool_broker.principal_id
 
     def _record_turn_sources(
         self, envelope: PromptEnvelope, drafts: list[Any]
@@ -1622,8 +1625,7 @@ class RuntimeOrchestrator:
             from raiker.execution.task_tree import TaskTree, wrap_authority
 
             registry = task_workspace_registry(self.workspace_root)
-            if task_root is not None:
-                registry.bind(owner, envelope.session_id, task_root)
+            registry.bind(owner, envelope.session_id, task_root or self.workspace_root)
             tree = TaskTree(registry, owner, envelope.session_id)
         except Exception:  # noqa: BLE001 — no registry means no copy to route to
             return authority

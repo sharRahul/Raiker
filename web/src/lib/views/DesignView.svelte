@@ -48,6 +48,8 @@
   import { routeStateFromHash } from "../routeState";
   import { densityGap, workSurface } from "../workSurface";
   import { api, ApiError } from "../api";
+  import type { AgentResponse } from "../apiTypes";
+  import { alreadyResumedElsewhere, watchForResumableTurns, type ResumeWatcher } from "../approvalResume";
   import { contract } from "../generated/apiContract";
   import { providerName } from "../format";
   import { runtimeBlock } from "../capabilityModel";
@@ -186,6 +188,36 @@
   let researchError = $state<string | null>(null);
   let researchSourcesNote = $state<string | null>(null);
   let researchSession = $state<string | null>(null);
+  let researchProject = $state<string | null>(null);
+  let researchWaiting = $state(false);
+  let researchResume: ResumeWatcher | null = null;
+
+  onMount(() => {
+    researchResume = watchForResumableTurns({
+      sessionId: () => researchSession,
+      hasParkedTurn: () => researchWaiting && !researching && research !== null,
+      onResume: async (turn) => {
+        if (research === null || researching) return;
+        researching = true;
+        researchError = null;
+        try {
+          const response = await api.resumeAfterApproval(turn.approval_id);
+          await recordResearchResponse(response, research.question);
+        } catch (error) {
+          if (error instanceof ApiError && alreadyResumedElsewhere(error.reasonCode)) {
+            researchWaiting = false;
+            researchError = "Continued in another tab. Open this conversation in Threads to see the result.";
+          } else {
+            researchError = recoveryFailure("Research could not continue", "The recorded decision is kept.", "Open the conversation in Threads to continue.", error);
+          }
+        } finally {
+          researching = false;
+          if (researchWaiting) researchResume?.checkNow();
+        }
+      },
+    });
+    return () => researchResume?.stop();
+  });
 
   /**
    * BUG-281 — the pages that research turn actually read, openable here.
@@ -459,15 +491,38 @@
       return;
     }
     if (researching) return;
+    if (researchWaiting) {
+      researchError = "Research is waiting for a decision. Open Approvals to continue.";
+      return;
+    }
+    const nextProject = project?.project_id ?? null;
+    if (nextProject !== researchProject) researchSession = null;
+    researchProject = nextProject;
     researching = true;
     researchError = null;
     try {
       const response = await api.submitPrompt({
         text: ask + subject,
         surface: "design",
+        ...(nextProject ? { project_id: nextProject } : {}),
         ...(researchSession ? { session_id: researchSession } : {}),
       });
+      await recordResearchResponse(response, subject);
+    } catch (error) {
+      research = null;
+      researchSources = [];
+      closeSource();
+      researchError =
+        recoveryFailure("That research turn did not finish", "No sources were added to this design.", "Ask again, or check the model in the composer.", error);
+    } finally {
+      researching = false;
+      if (researchWaiting) researchResume?.checkNow();
+    }
+  }
+
+  async function recordResearchResponse(response: AgentResponse, subject: string) {
       researchSession = response.session_id ?? researchSession;
+      researchWaiting = response.status === "needs_approval";
       research = {
         question: subject,
         answer: response.message ?? "",
@@ -491,15 +546,6 @@
           error,
         );
       }
-    } catch (error) {
-      research = null;
-      researchSources = [];
-      closeSource();
-      researchError =
-        recoveryFailure("That research turn did not finish", "No sources were added to this design.", "Ask again, or check the model in the composer.", error);
-    } finally {
-      researching = false;
-    }
   }
 
   /**

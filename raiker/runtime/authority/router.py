@@ -240,12 +240,14 @@ class GovernedAction:
     origin_session_id: str = ""
     critical_confirmation: CriticalConfirmation | None = None
     # Internal broker-only override after the owner's per-turn approval mode has
-    # already selected auto/skip. It changes the decision path, never the actor.
+    # established explicit standing authority. It changes the path, never the actor.
     decision_mode_override: str | None = None
     # Runtime-authored proof for command execution. Model arguments can never
     # populate these fields; the approval relay or standing-grant broker does.
     authority_kind: str = ""
     authority_id: str = ""
+    # Runtime-selected posture; no caller-supplied argument grants confinement.
+    approval_posture: str = ""
 
 
 @dataclass(frozen=True)
@@ -271,6 +273,7 @@ class RuntimeAuthority:
         writer: EventLogWriter,
         policy_engine: PolicyEngine | None = None,
         executor_registry: ExecutorRegistry | None = None,
+        path_authority: Any = None,
     ) -> None:
         self.store = store
         self.writer = writer
@@ -279,6 +282,7 @@ class RuntimeAuthority:
             store=store,
         )
         self.executor_registry = executor_registry or ExecutorRegistry()
+        self.path_authority = path_authority
         self._capture_service: CheckpointCaptureService | None = None
 
     @property
@@ -1472,6 +1476,11 @@ class RuntimeAuthority:
             argv_of(base, action.arguments),
             self.store.paths.workspace_root,
         )
+        if action.approval_posture == "sandbox" and placement.kind == "sandbox":
+            # Native execution now always constructs a boundary. A historical
+            # host-risk label cannot turn a verified task-copy test into host
+            # execution; fresh scope/proof and the native launch still follow.
+            return action, None
         if not placement.needs_host_network_capability:
             return action, None
         # Asked by the action's own names, which is how the gate map is keyed.
@@ -1509,7 +1518,9 @@ class RuntimeAuthority:
         )
         return replace(action, action_type=HOST_NETWORK_CODE_CAPABILITY), None
 
-    def route_action(self, action: GovernedAction, principal: Principal) -> GovernedActionResult:
+    def route_action(
+        self, action: GovernedAction, principal: Principal, *, execute: bool = True,
+    ) -> GovernedActionResult:
         action, placement_refusal = self._place_code(action, principal)
         if placement_refusal is not None:
             return placement_refusal
@@ -1641,6 +1652,11 @@ class RuntimeAuthority:
                 # at execution time (execution-time re-verification).
                 pass
             else:
+                if not execute:
+                    return GovernedActionResult(
+                        action_id=action.action_id, decision="needs_approval",
+                        message="critical_human_confirmation_required",
+                    )
                 return self._park_critical_action(action, principal, critical_match)
 
         from raiker.contracts.models import ToolAction
@@ -1683,6 +1699,63 @@ class RuntimeAuthority:
             if cap_for_mode
             else None
         )
+        if cap_for_mode and self._resolve_decision_mode(
+            cap_for_mode, principal.principal_id,
+        ) == DecisionMode.DENY:
+            mode = DecisionMode.DENY
+        if action.approval_posture == "sandbox" and cap_for_mode:
+            from raiker.runtime.authority.preparation import (
+                confined_preparation,
+                internal_preparation,
+                ordinary_approval,
+            )
+
+            control_scope = self._control_scope(principal.principal_id)
+            persisted = (
+                self.store.get_principal_capability_decision_mode(control_scope, cap_for_mode)
+                if control_scope is not None
+                else self.store.get_capability_decision_mode(cap_for_mode)
+            )
+            # A saved Ask or Deny is an explicit owner restriction. The default
+            # Ask may be satisfied only by independently verified preparation.
+            explicit = parse_decision_mode(persisted) if persisted else None
+            identity = self.store.get_turn_machine_identity(principal.principal_id)
+            preparation_owner = (
+                str(identity["owner_principal_id"])
+                if identity is not None
+                and identity["is_active"]
+                and identity["session_id"] == action.session_id
+                and identity["turn_id"] == action.turn_id
+                else control_scope or ""
+            )
+            eligible = confined_preparation(
+                self.path_authority,
+                workspace_root=self.store.paths.workspace_root,
+                owner_principal_id=preparation_owner,
+                session_id=action.session_id,
+                tool_name=action.tool_or_service_name,
+                arguments=action.arguments,
+            ) or internal_preparation(
+                self.path_authority, owner_principal_id=preparation_owner,
+                session_id=action.session_id, tool_name=action.tool_or_service_name,
+                arguments=action.arguments,
+            )
+            eligible = eligible and (
+                decision.decision == "allow" or ordinary_approval(tool_action, decision)
+            )
+            if action.tool_or_service_name in {"shell", "process"}:
+                eligible = eligible and action.action_type != "host_network_code_execution" and (
+                    self.store.selected_execution_environment(preparation_owner)
+                    in {"local_native", "native_sandbox"}
+                )
+            mode = (
+                explicit if explicit in {DecisionMode.ASK, DecisionMode.DENY}
+                else DecisionMode.ALWAYS_ALLOW if eligible else DecisionMode.ASK
+            )
+            if mode == DecisionMode.ALWAYS_ALLOW:
+                action = replace(
+                    action, authority_kind="sandbox_preparation", authority_id=action.action_id,
+                )
         if mode == DecisionMode.DENY:
             return GovernedActionResult(
                 action_id=action.action_id,
@@ -1779,8 +1852,14 @@ class RuntimeAuthority:
                     policy_decision=decision,
                     message="risk_acceptance_required",
                 )
-            if valid.get("one_time_or_reusable") == "one_time":
+            if execute and valid.get("one_time_or_reusable") == "one_time":
                 self.store.consume_risk_acceptance(valid["risk_acceptance_id"])
+
+        if not execute:
+            return GovernedActionResult(
+                action_id=action.action_id, decision="allow", policy_decision=decision,
+                message="authorization_validated",
+            )
 
         # F1 (ZT-3) — capture the per-action posture snapshot once, so every
         # governed execution/failure event carries "who was in control, on what
@@ -1794,7 +1873,11 @@ class RuntimeAuthority:
         # its use (with the grant id) before executing, so the audit trail shows
         # the grant that authorized this unprompted run.
         if grant_applied is not None:
-            self.store.record_standing_grant_use(str(grant_applied["grant_id"]))
+            if not self.store.claim_standing_grant_use(grant_applied):
+                return GovernedActionResult(
+                    action_id=action.action_id, decision="needs_approval",
+                    policy_decision=decision, message="grant_changed_before_execution",
+                )
             self._event(
                 event_type="standing_grant_applied",
                 actor="runtime_authority",

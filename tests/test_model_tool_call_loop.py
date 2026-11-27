@@ -2,8 +2,11 @@ from __future__ import annotations
 
 import json
 from collections.abc import Sequence
+from dataclasses import replace
 from pathlib import Path
 from typing import Any
+
+import pytest
 
 from raiker.cli.principal_resolver import bootstrap_owner
 from raiker.contracts.ids import new_id
@@ -337,161 +340,68 @@ def test_model_proposed_shell_requires_approval(tmp_path: Path) -> None:
     assert "tool_started" not in events
 
 
-def test_auto_approval_executes_an_ordinary_file_write_with_preview_evidence(tmp_path: Path) -> None:
-    router = FakeRouter(
-        [
-            ModelResponse(text="", tool_calls=[_write_call()], finish_reason="tool_calls"),
-            ModelResponse(text="Done.", finish_reason="stop"),
-        ]
-    )
-    orchestrator = _orchestrator(tmp_path, router)
-    envelope = _envelope("write the report", approval_mode="auto")
-
-    response = _handle(orchestrator, envelope)
-
-    assert response.status == "completed"
-    assert (tmp_path / "report.md").read_text(encoding="utf-8") == "# Report\n"
-    events = _events(orchestrator, envelope.session_id)
-    assert "approval_requested" not in events
-    assert "approval_auto_executed" in events
-    auto_event = _event_record(orchestrator, envelope.session_id, "approval_auto_executed")
-    assert auto_event["payload"]["proposal_preview"]["status"] == "proposal"  # type: ignore[index]
-    assert orchestrator.tool_broker.store is not None
-    with orchestrator.tool_broker.store.connect() as connection:
-        stored_actor = connection.execute(
-            "SELECT proposed_by FROM tool_actions WHERE session_id = ? ORDER BY proposed_at DESC LIMIT 1",
-            (envelope.session_id,),
-        ).fetchone()
-    assert stored_actor is not None
-    assert str(stored_actor["proposed_by"]).startswith("principal_turn_agent_")
-    executed = _event_record(orchestrator, envelope.session_id, "action_executed")
-    assert executed["payload"]["posture"]["principal_id"] == stored_actor["proposed_by"]  # type: ignore[index]
-
-
-def test_auto_withholds_a_write_to_an_existing_file_the_turn_never_looked_at(
-    tmp_path: Path,
+@pytest.mark.parametrize("mode", ["auto", "skip", "sandbox"])
+@pytest.mark.parametrize("existing", [False, True])
+def test_legacy_modes_never_authorize_an_unverified_write(
+    tmp_path: Path, mode: str, existing: bool, monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """BUG-218 — Auto's alignment check, end to end through the broker.
-
-    The exact reproduction the defect entry gives: every write capability
-    permitted, Auto selected, and a change to a file unrelated to the request.
-    It used to run. It now falls back to the ordinary approval queue, and the
-    approval says which path did not match.
-    """
-    (tmp_path / "deploy.sh").write_text("#!/bin/sh\nreal deployment\n", encoding="utf-8")
-    unrelated = ToolCallProposal(
-        call_id="call_write",
-        tool_name="write_file",
-        arguments={"path": "deploy.sh", "text": "rm -rf /"},
-    )
-    router = FakeRouter(
-        [ModelResponse(text="", tool_calls=[unrelated], finish_reason="tool_calls")]
-    )
+    monkeypatch.setattr("raiker.runtime.authority.preparation.sandbox_available", lambda *a, **kw: False)
+    if existing:
+        (tmp_path / "report.md").write_text("original", encoding="utf-8")
+    router = FakeRouter([
+        ModelResponse(text="", tool_calls=[_write_call()], finish_reason="tool_calls"),
+        ModelResponse(text="Done.", finish_reason="stop"),
+    ])
     orchestrator = _orchestrator(tmp_path, router)
-    envelope = _envelope("write the report", approval_mode="auto")
-
+    envelope = _envelope("rewrite report.md", approval_mode=mode)
     response = _handle(orchestrator, envelope)
-
     assert response.status == "needs_approval"
-    # The file the owner never mentioned is untouched.
-    assert (tmp_path / "deploy.sh").read_text(encoding="utf-8") == "#!/bin/sh\nreal deployment\n"
-
+    if existing:
+        assert (tmp_path / "report.md").read_text(encoding="utf-8") == "original"
+    else:
+        assert not (tmp_path / "report.md").exists()
     events = _events(orchestrator, envelope.session_id)
-    assert "approval_auto_executed" not in events
-    assert "approval_auto_withheld" in events
     assert "approval_requested" in events
-
-    withheld = _event_record(orchestrator, envelope.session_id, "approval_auto_withheld")
-    alignment = withheld["payload"]["alignment"]  # type: ignore[index]
-    assert alignment["aligned"] is False
-    assert alignment["target"] == "deploy.sh"
-
-    # And the evidence travels onto the approval the owner is shown, so they are
-    # answering a stated question rather than an unexplained interruption.
-    requested = _event_record(orchestrator, envelope.session_id, "approval_requested")
-    assert requested["payload"]["alignment"]["target"] == "deploy.sh"  # type: ignore[index]
+    assert "approval_auto_executed" not in events
+    assert "approval_preview_skipped" not in events
+    assert "tool_started" not in events
 
 
-def test_auto_still_executes_a_write_the_turn_established(tmp_path: Path) -> None:
-    """The check must not turn Auto into Manual for the work that was asked for."""
-    (tmp_path / "report.md").write_text("old", encoding="utf-8")
-    router = FakeRouter(
-        [
-            ModelResponse(text="", tool_calls=[_write_call()], finish_reason="tool_calls"),
-            ModelResponse(text="Done.", finish_reason="stop"),
-        ]
-    )
+@pytest.mark.parametrize("surface", ["chat", "build", "design"])
+def test_no_project_turn_prepares_in_an_owner_bound_copy(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, surface: str,
+) -> None:
+    from raiker.execution.commands.backends.native import NativeSandboxDriver, NativeSandboxProof
+    from raiker.execution.task_tree import owner_tree
+
+    monkeypatch.setattr(NativeSandboxDriver, "probe", lambda self: NativeSandboxProof(
+        True, None, "test_boundary", "2026-11-27T00:00:00Z",
+    ))
+    router = FakeRouter([
+        ModelResponse(text="", tool_calls=[_write_call()], finish_reason="tool_calls"),
+        ModelResponse(text="Prepared.", finish_reason="stop"),
+    ])
     orchestrator = _orchestrator(tmp_path, router)
-    # The owner named the file, so an existing `report.md` is established.
-    envelope = _envelope("rewrite report.md", approval_mode="auto")
-
-    response = _handle(orchestrator, envelope)
-
-    assert response.status == "completed"
-    assert (tmp_path / "report.md").read_text(encoding="utf-8") == "# Report\n"
-    events = _events(orchestrator, envelope.session_id)
-    assert "approval_auto_executed" in events
-    assert "approval_auto_withheld" not in events
-
-
-def test_skip_is_deliberately_not_alignment_checked(tmp_path: Path) -> None:
-    """Skip says no approval is raised at all, and that stays true.
-
-    Attaching a silent second check to Skip would redefine a mode whose entire
-    point is not to interrupt. Auto is the mode that promises a review.
-    """
-    (tmp_path / "deploy.sh").write_text("real deployment\n", encoding="utf-8")
-    unrelated = ToolCallProposal(
-        call_id="call_write",
-        tool_name="write_file",
-        arguments={"path": "deploy.sh", "text": "changed"},
+    envelope = _envelope("write report.md", approval_mode="sandbox")
+    envelope = replace(
+        envelope, user=UserMetadata(id="principal_owner"),
+        prompt=replace(envelope.prompt, metadata={"surface": surface}),
     )
-    router = FakeRouter(
-        [
-            ModelResponse(text="", tool_calls=[unrelated], finish_reason="tool_calls"),
-            ModelResponse(text="Done.", finish_reason="stop"),
-        ]
-    )
-    orchestrator = _orchestrator(tmp_path, router)
-    envelope = _envelope("write the report", approval_mode="skip")
-
     response = _handle(orchestrator, envelope)
-
-    assert response.status == "completed"
+    assert response.status == "completed", response.message
+    assert not (tmp_path / "report.md").exists()
+    tree = owner_tree(tmp_path, "principal_owner", envelope.session_id)
+    assert tree is not None
+    assert tree.to_copy(tmp_path / "report.md", create=False).read_text(encoding="utf-8") == "# Report\n"
     events = _events(orchestrator, envelope.session_id)
-    assert "approval_auto_withheld" not in events
-    assert "approval_preview_skipped" in events
-
-
-def test_skip_approval_executes_an_ordinary_file_write_without_preview(tmp_path: Path) -> None:
-    router = FakeRouter(
-        [
-            ModelResponse(text="", tool_calls=[_write_call()], finish_reason="tool_calls"),
-            ModelResponse(text="Done.", finish_reason="stop"),
-        ]
-    )
-    orchestrator = _orchestrator(tmp_path, router)
-    envelope = _envelope("write the report", approval_mode="skip")
-
-    response = _handle(orchestrator, envelope)
-
-    assert response.status == "completed"
-    assert (tmp_path / "report.md").read_text(encoding="utf-8") == "# Report\n"
-    events = _events(orchestrator, envelope.session_id)
+    assert "sandbox_preparation_executed" in events
     assert "approval_requested" not in events
-    assert "approval_preview_skipped" in events
-    skip_event = _event_record(orchestrator, envelope.session_id, "approval_preview_skipped")
-    assert "proposal_preview" not in skip_event["payload"]  # type: ignore[operator]
 
 
-# ── BUG-219: the unattended posture ──────────────────────────────────────────
-#
-# `dont_ask` is for a run with nobody watching: a scheduled routine at 06:00
-# cannot answer a prompt, and parking on one is not the same as declining. Three
-# properties, and each is a test.
-
-
-def test_dont_ask_declines_what_would_have_needed_approval(tmp_path: Path) -> None:
+def test_dont_ask_declines_what_would_have_needed_approval(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr("raiker.runtime.authority.preparation.sandbox_available", lambda *a, **kw: False)
     router = FakeRouter(
         [
             ModelResponse(text="", tool_calls=[_write_call()], finish_reason="tool_calls"),
@@ -511,7 +421,10 @@ def test_dont_ask_declines_what_would_have_needed_approval(tmp_path: Path) -> No
     assert response.status in {"completed", "denied"}
 
 
-def test_the_refusal_says_it_was_because_nobody_was_there_to_ask(tmp_path: Path) -> None:
+def test_the_refusal_says_it_was_because_nobody_was_there_to_ask(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr("raiker.runtime.authority.preparation.sandbox_available", lambda *a, **kw: False)
     router = FakeRouter(
         [ModelResponse(text="", tool_calls=[_write_call()], finish_reason="tool_calls")]
     )

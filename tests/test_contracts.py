@@ -36,14 +36,14 @@ def test_invalid_planning_mode_rejected() -> None:
         PromptOptions(planning_mode="guess")
 
 
-@pytest.mark.parametrize("approval_mode", ["manual", "auto", "skip"])
+@pytest.mark.parametrize("approval_mode", ["manual", "sandbox", "dont_ask"])
 def test_canonical_approval_modes_are_retained(approval_mode: str) -> None:
     assert PromptOptions(approval_mode=approval_mode).approval_mode == approval_mode
 
 
 @pytest.mark.parametrize(
     ("legacy_mode", "canonical_mode"),
-    [("interactive", "manual"), ("allow_safe_only", "auto"), ("deny_risky", "manual")],
+    [("interactive", "manual"), ("allow_safe_only", "sandbox"), ("auto", "sandbox"), ("skip", "manual"), ("deny_risky", "manual")],
 )
 def test_legacy_approval_modes_are_normalized(legacy_mode: str, canonical_mode: str) -> None:
     assert PromptOptions(approval_mode=legacy_mode).approval_mode == canonical_mode

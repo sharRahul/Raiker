@@ -1,7 +1,7 @@
 /**
  * RT-WSL-BUILD-01: real model + enforced WSL2; no approval is accepted.
- * Known failing qualification: the broker parks copied medium-risk writes
- * before RuntimeAuthority sees the owner's Allow mode (TO_BE_FIXED.md).
+ * Qualification requires real copy writes and successful declared checks,
+ * never the model's prose or acceptance of an ordinary approval.
  * Needs a running host and a local model that actually emits tool calls.
  */
 import { join } from "node:path";
@@ -31,6 +31,9 @@ test("RT-WSL-BUILD-01 — sandbox posture writes and tests without approval", as
   await capture(page, join(import.meta.dirname, "..", "..", "output", "playwright", "ru-07-ollama-picker.png"));
   await keepOffered(page.getByRole("dialog", { name: "Ollama models" }), MODEL);
   console.log("WSL journey: kept local coding model");
+  await pressCardAction(page, row, /^Test connection$/);
+  await expect(row.locator("[data-test-result]")).toBeVisible({ timeout: 120_000 });
+  await expect(row).toContainText(/Ready|checked|responded|available/i);
   await page.goto(`${BASE}/#/capabilities`);
   await page.getByRole("navigation", { name: "Permission categories" }).waitFor({ timeout: 60_000 });
   const panel = page.getByTestId("postures");
@@ -62,15 +65,19 @@ test("RT-WSL-BUILD-01 — sandbox posture writes and tests without approval", as
   await page.getByLabel("Describe the change").fill(
     "Create pricing.py with final_price(total), giving a 10% discount for totals over 100. " +
     "Create test_pricing.py with unittest tests for 50, 100 and 150, then run python3 -m unittest -q. " +
-    "Use your tools to create the files and execute the tests in this project's disposable copy.",
+    "Use your tools to create the files and execute the tests in this project's disposable copy. " +
+    "Run exactly python3 -m unittest -q as one command: no cd, redirection, chaining or extra module names. " +
+    "The command tool already uses the project folder and captures both output streams.",
   );
   await page.getByRole("button", { name: /^(Run|Plan|Propose)$/ }).first().click();
   setTimeout(() => {
     void capture(page, join(import.meta.dirname, "..", "..", "output", "playwright", "ru-07-wsl-build-progress.png")).catch(() => undefined);
   }, 15_000);
-  const approval = page.getByRole("button", { name: "Allow once", disabled: false }).or(
-    page.locator("section.decisions").getByRole("button", { name: "Accept", disabled: false }),
-  ).first();
+  // Only this Build conversation's decisions count. A floating decision from
+  // an older conversation is unrelated to the current copy's authorization.
+  const approval = page.locator("section.decisions").getByRole("button", {
+    name: /^(Accept|Approve once)$/, disabled: false,
+  }).first();
   const outcome = page.getByTestId("build-outcome").last();
   const answered = page.getByRole("button", { name: "Copy response" }).last();
   await expect(approval.or(outcome).or(answered).first()).toBeVisible({ timeout: 300_000 });

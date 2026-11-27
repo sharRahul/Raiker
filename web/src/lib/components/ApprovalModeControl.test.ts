@@ -5,7 +5,7 @@ import ApprovalModeControl from "./ApprovalModeControl.svelte";
 
 afterEach(() => vi.restoreAllMocks());
 
-function stubModeApi(mode: "manual" | "auto" | "skip" | "dont_ask") {
+function stubModeApi(mode: "manual" | "sandbox" | "dont_ask") {
   vi.spyOn(api, "composerApprovalMode").mockResolvedValue({ approval_mode: mode });
   return vi.spyOn(api, "setComposerApprovalMode").mockResolvedValue({ approval_mode: mode });
 }
@@ -23,13 +23,13 @@ async function openMenu() {
 
 describe("ApprovalModeControl", () => {
   it("loads the persisted mode and shows one current-policy checkmark", async () => {
-    stubModeApi("auto");
+    stubModeApi("sandbox");
     render(ApprovalModeControl);
 
-    expect(await screen.findByRole("button", { name: /automatically approve/i })).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: /work in sandbox/i })).toBeInTheDocument();
     await openMenu();
-    expect(screen.getByRole("menuitemradio", { name: /automatically approve/i })).toHaveAttribute("aria-checked", "true");
-    expect(screen.getByRole("menuitemradio", { name: /Skip all approvals/ })).toBeInTheDocument();
+    expect(screen.getByRole("menuitemradio", { name: /work in sandbox/i })).toHaveAttribute("aria-checked", "true");
+    expect(screen.queryByRole("menuitemradio", { name: /Skip all approvals/ })).not.toBeInTheDocument();
     expect(screen.getAllByRole("img", { name: "Selected approval mode" })).toHaveLength(1);
   });
 
@@ -50,7 +50,7 @@ describe("ApprovalModeControl", () => {
     stubModeApi("manual");
     render(ApprovalModeControl);
     const menu = await openMenu();
-    const choice = screen.getByRole("menuitemradio", { name: /automatically approve/i });
+    const choice = screen.getByRole("menuitemradio", { name: /work in sandbox/i });
     choice.focus();
 
     await fireEvent.keyDown(menu, { key: "Escape" });
@@ -60,30 +60,30 @@ describe("ApprovalModeControl", () => {
   });
 
   it("keeps a local selection when the initial persisted-mode load resolves late", async () => {
-    const load = deferred<{ approval_mode: "manual" | "auto" | "skip" | "dont_ask" }>();
+    const load = deferred<{ approval_mode: "manual" | "sandbox" | "dont_ask" }>();
     vi.spyOn(api, "composerApprovalMode").mockReturnValue(load.promise);
-    const save = vi.spyOn(api, "setComposerApprovalMode").mockResolvedValue({ approval_mode: "auto" });
+    const save = vi.spyOn(api, "setComposerApprovalMode").mockResolvedValue({ approval_mode: "dont_ask" });
     render(ApprovalModeControl);
 
     await openMenu();
-    await fireEvent.click(screen.getByRole("menuitemradio", { name: /automatically approve/i }));
-    await vi.waitFor(() => expect(save).toHaveBeenCalledWith("auto"));
+    await fireEvent.click(screen.getByRole("menuitemradio", { name: /decline/i }));
+    await vi.waitFor(() => expect(save).toHaveBeenCalledWith("dont_ask"));
 
     load.resolve({ approval_mode: "manual" });
     await new Promise((resolve) => setTimeout(resolve, 0));
-    await vi.waitFor(() => expect(screen.getByRole("button", { name: /automatically approve/i })).toBeInTheDocument());
+    await vi.waitFor(() => expect(screen.getByRole("button", { name: /decline/i })).toBeInTheDocument());
   });
 
   it("persists a clicked policy and closes the menu after confirmation", async () => {
-    const save = stubModeApi("manual").mockResolvedValue({ approval_mode: "skip" });
+    const save = stubModeApi("manual").mockResolvedValue({ approval_mode: "sandbox" });
     render(ApprovalModeControl);
 
     await openMenu();
-    await fireEvent.click(screen.getByRole("menuitemradio", { name: /Skip all approvals/ }));
+    await fireEvent.click(screen.getByRole("menuitemradio", { name: /Work in sandbox/ }));
 
-    await vi.waitFor(() => expect(save).toHaveBeenCalledWith("skip"));
+    await vi.waitFor(() => expect(save).toHaveBeenCalledWith("sandbox"));
     expect(screen.queryByRole("menu", { name: /approval mode/i })).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /skip/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /work in sandbox/i })).toBeInTheDocument();
   });
 
   // BUG-219 — the unattended posture. It must be selectable, and the menu must
@@ -106,9 +106,9 @@ describe("ApprovalModeControl", () => {
     render(ApprovalModeControl);
 
     await openMenu();
-    await fireEvent.click(screen.getByRole("menuitemradio", { name: /automatically approve/i }));
+    await fireEvent.click(screen.getByRole("menuitemradio", { name: /work in sandbox/i }));
 
-    await vi.waitFor(() => expect(save).toHaveBeenCalledWith("auto"));
+    await vi.waitFor(() => expect(save).toHaveBeenCalledWith("sandbox"));
     expect(screen.getByRole("button", { name: /manually approve/i })).toBeInTheDocument();
     expect(screen.getByRole("status")).toHaveTextContent("Approval mode was not saved.");
   });

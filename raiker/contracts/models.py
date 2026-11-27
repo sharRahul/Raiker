@@ -45,7 +45,7 @@ ANSWER_STYLES = {"auto", "text", "visual"}
 #: scheduled routine at 06:00 cannot answer a prompt and parking is not the same
 #: as declining. It adds no enforcement — `deny` is a decision the runtime
 #: already honours — and it can never widen a gate.
-APPROVAL_MODES = {"manual", "auto", "skip", "dont_ask"}
+APPROVAL_MODES = {"manual", "sandbox", "dont_ask"}
 
 #: ADD-22 — the tool that asks the owner a question rather than for permission.
 #: Named once here because several modules have to recognise it and none of them
@@ -75,7 +75,9 @@ VOICE_INPUT_MODES = {"typed", "dictated", "mixed", "spoken"}
 PROMPT_SURFACES = {"chat", "build", "design"}
 _LEGACY_APPROVAL_MODE_ALIASES = {
     "interactive": "manual",
-    "allow_safe_only": "auto",
+    "allow_safe_only": "sandbox",
+    "auto": "sandbox",
+    "skip": "manual",
     "deny_risky": "manual",
 }
 # Effectively unbounded: a turn ends when the model finishes or the provider's
@@ -83,6 +85,7 @@ _LEGACY_APPROVAL_MODE_ALIASES = {
 # a hard runaway-loop fail-safe; callers may still pass a lower explicit bound.
 DEFAULT_MAX_TOOL_CALLS = 10_000
 EVENT_TYPES = {
+    "sandbox_preparation_executed",
     "global_command_invoked",
     "terminal_client_started",
     "tui_started",
@@ -814,7 +817,7 @@ class PromptPayload:
 @dataclass(frozen=True)
 class PromptOptions:
     planning_mode: str = "auto"
-    approval_mode: str = "manual"
+    approval_mode: str = "sandbox"
     # Empty means "the operator's selected model" (persisted via /model use);
     # an explicit profile id binds this turn only. Never defaults to a test provider.
     model_profile: str = ""

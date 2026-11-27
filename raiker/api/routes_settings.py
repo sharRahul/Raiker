@@ -87,10 +87,10 @@ def load_reasoning_retention(ws: str | Path, principal_id: str) -> bool:
 def load_composer_approval_mode(ws: str | Path, principal_id: str) -> str:
     composer = _load(ws, principal_id).get("composer")
     if not isinstance(composer, dict):
-        return "manual"
+        return "sandbox"
     approval_mode = composer.get("approval_mode")
     if not isinstance(approval_mode, str):
-        return "manual"
+        return "sandbox"
     try:
         return normalize_approval_mode(approval_mode)
     except ContractValidationError:

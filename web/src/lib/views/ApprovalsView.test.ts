@@ -199,7 +199,7 @@ describe("ApprovalsView", () => {
     expect(screen.getByText("Added:")).toBeInTheDocument();
     expect(screen.getByText("notes.txt")).toBeInTheDocument();
     // Approve is explicit about not executing.
-    expect(screen.getByRole("button", { name: /allow once \(record only\)/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /approve once \(record only\)/i })).toBeInTheDocument();
   });
 
   it("puts the proposed change above the provenance, not below it", async () => {
@@ -259,8 +259,8 @@ describe("ApprovalsView", () => {
 
     expect(await screen.findByText(/expired at/i)).toBeInTheDocument();
     expect(screen.getByText(/the server will not accept a decision/i)).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /allow once/i })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Decline" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /approve once/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Don't do this" })).not.toBeInTheDocument();
     expect(
       screen.queryByText((_, element) => element?.textContent?.includes("Already resolved: pending") ?? false),
     ).not.toBeInTheDocument();
@@ -293,7 +293,7 @@ describe("ApprovalsView", () => {
     expect(
       await screen.findByText(/approving this performs the change shown above/i),
     ).toBeInTheDocument();
-    await fireEvent.click(await screen.findByRole("button", { name: /^allow once$/i }));
+    await fireEvent.click(await screen.findByRole("button", { name: /^approve once$/i }));
 
     expect(await screen.findByText(/executed once — wrote notes\.txt/i)).toBeInTheDocument();
   });
@@ -325,7 +325,7 @@ describe("ApprovalsView", () => {
     render(ApprovalsView);
 
     await openFirst();
-    await fireEvent.click(await screen.findByRole("button", { name: /^allow once$/i }));
+    await fireEvent.click(await screen.findByRole("button", { name: /^approve once$/i }));
 
     const notice = await screen.findByText(/change completed — not reversible/i);
     expect(notice).toHaveTextContent(/checkpoint_snapshot_os_error/i);
@@ -348,7 +348,7 @@ describe("ApprovalsView", () => {
     render(ApprovalsView);
 
     await openFirst();
-    await fireEvent.click(await screen.findByRole("button", { name: /allow once \(record only\)/i }));
+    await fireEvent.click(await screen.findByRole("button", { name: /approve once \(record only\)/i }));
 
     expect(await screen.findByText(/was NOT executed \(metadata-only\)/i)).toBeInTheDocument();
   });
@@ -412,7 +412,7 @@ describe("ApprovalsView", () => {
     render(ApprovalsView);
 
     await openFirst();
-    await fireEvent.click(await screen.findByRole("button", { name: /^allow once$/i }));
+    await fireEvent.click(await screen.findByRole("button", { name: /^approve once$/i }));
 
     await fireEvent.click(await screen.findByRole("button", { name: /continue the turn/i }));
 
@@ -438,7 +438,7 @@ describe("ApprovalsView", () => {
     render(ApprovalsView);
 
     await openFirst();
-    await fireEvent.click(await screen.findByRole("button", { name: /allow once \(record only\)/i }));
+    await fireEvent.click(await screen.findByRole("button", { name: /approve once \(record only\)/i }));
 
     await screen.findByText(/was NOT executed/i);
     expect(screen.queryByRole("button", { name: /continue the turn/i })).not.toBeInTheDocument();
@@ -515,7 +515,7 @@ describe("ApprovalsView", () => {
     render(ApprovalsView);
 
     await openFirst();
-    await fireEvent.click(await screen.findByRole("button", { name: /^allow once$/i }));
+    await fireEvent.click(await screen.findByRole("button", { name: /^approve once$/i }));
 
     expect(await screen.findByText(/executed once: executed/i)).toBeInTheDocument();
   });
@@ -604,7 +604,7 @@ describe("ApprovalsView", () => {
     // Both the list row and the open detail pane place the decision inside its
     // batch, so the owner sees it whether or not they opened the review.
     expect(screen.getAllByText(/decision 2 of 3/i)).toHaveLength(2);
-    await fireEvent.click(await screen.findByRole("button", { name: /allow once \(record only\)/i }));
+    await fireEvent.click(await screen.findByRole("button", { name: /approve once \(record only\)/i }));
 
     expect(
       await screen.findByText(/1 more call from the same batch/i),
@@ -647,7 +647,7 @@ describe("ApprovalsView", () => {
     render(ApprovalsView);
 
     await openFirst();
-    await fireEvent.click(await screen.findByRole("button", { name: /allow once \(record only\)/i }));
+    await fireEvent.click(await screen.findByRole("button", { name: /approve once \(record only\)/i }));
     await fireEvent.click(await screen.findByRole("button", { name: /continue the turn/i }));
 
     expect(await screen.findByText(/continued in another tab/i)).toBeInTheDocument();
@@ -731,8 +731,8 @@ describe("ApprovalsView", () => {
     expect(screen.getByRole("heading", { name: /Answer a question/i })).toBeTruthy();
     // The controls that must not exist here. An owner who can "approve" a
     // question has been shown a decision they were never asked to make.
-    expect(screen.queryByRole("button", { name: /^Allow once/ })).toBeNull();
-    expect(screen.queryByRole("button", { name: /^Decline$/ })).toBeNull();
+    expect(screen.queryByRole("button", { name: /^Approve once/ })).toBeNull();
+    expect(screen.queryByRole("button", { name: /^Don't do this$/ })).toBeNull();
     expect(screen.getByText(/grants nothing and\s+runs nothing/i)).toBeTruthy();
   });
 
@@ -806,7 +806,7 @@ describe("ApprovalsView per-hunk acceptance", () => {
 
     await waitFor(() => expect(screen.getAllByRole("checkbox")).toHaveLength(2));
     await fireEvent.click(screen.getAllByRole("checkbox")[0]);
-    await fireEvent.click(screen.getByRole("button", { name: /allow once/i }));
+    await fireEvent.click(screen.getByRole("button", { name: /approve once/i }));
 
     const post = await waitFor(() =>
       fetchMock.mock.calls.find(([url]) => String(url).endsWith("/resolve")),
@@ -825,7 +825,7 @@ describe("ApprovalsView per-hunk acceptance", () => {
     await openFirst();
 
     await waitFor(() => expect(screen.getAllByRole("checkbox")).toHaveLength(2));
-    await fireEvent.click(screen.getByRole("button", { name: /allow once/i }));
+    await fireEvent.click(screen.getByRole("button", { name: /approve once/i }));
 
     const post = await waitFor(() =>
       fetchMock.mock.calls.find(([url]) => String(url).endsWith("/resolve")),
@@ -956,7 +956,7 @@ describe("ApprovalsView edit then propose", () => {
     render(ApprovalsView);
     await openFirst();
 
-    await screen.findByRole("button", { name: /allow once/i });
+    await screen.findByRole("button", { name: /approve once/i });
     expect(screen.queryByRole("button", { name: "Edit…" })).toBeNull();
   });
 });

@@ -34,6 +34,7 @@
   import { humanize } from "../format";
   import { watchLayout } from "../layoutWatch";
   import Icon from "./Icon.svelte";
+  import ApprovalDecisionButton from "./ApprovalDecisionButton.svelte";
   import { GRANT_TIMEOUT_SECONDS, GRANT_TTL_MINUTES, grantableCommand } from "../commandGrant";
 
   /** How often pending approvals are re-read while the tab is visible. */
@@ -210,7 +211,7 @@
   }
 
   function review() {
-    window.location.hash = "#/approvals";
+    window.location.hash = current === null ? "#/approvals" : `#/approvals?item=${encodeURIComponent(current.approval_id)}`;
   }
 
   // QUI-F02 — a mid-task question parks through the same transport, but it is
@@ -306,6 +307,7 @@
         <strong>{humanize(current.tool_name)}</strong>
         <span>{capabilityLabel(current.capability)}</span>
       </p>
+      {#if current.target}<p class="note">{current.target}</p>{/if}
     {/if}
     {#if isQuestion}
       <p class="note">Raiker has a question and is waiting for your answer.</p>
@@ -316,12 +318,12 @@
     {:else}
       {#if failure}<p class="note" role="alert">{failure}</p>{/if}
       <div class="actions">
-        <button type="button" class="primary" disabled={busy} onclick={() => void decide(true)}>
-          <Icon name="check" size="sm" /> Allow once
-        </button>
+        <ApprovalDecisionButton decision="approve" {busy} recordOnly={current.executes_action === false}
+          onclick={() => void decide(true)} />
         <!-- QUI-P05 — the same words on every surface that decides: Decline
              and Allow once. There is no "Always allow". -->
-        <button type="button" disabled={busy} onclick={() => void decide(false)}>Decline</button>
+        <ApprovalDecisionButton decision="deny" {busy} onclick={() => void decide(false)} />
+        <ApprovalDecisionButton decision="task" {busy} onclick={review} />
         <button type="button" class="quiet" onclick={review}>Details</button>
       </div>
       {#if grantWords !== null}
@@ -398,6 +400,7 @@
   }
   .actions {
     display: flex;
+    flex-wrap: wrap;
     gap: 0.4rem;
   }
   button {

@@ -133,6 +133,16 @@ class SessionService:
         ]
         actions = self.store.list_turn_tool_actions(session_id, turn_id)
         workspace_root = self.store.paths.workspace_root
+        from raiker.control.project_roots import authority_for_project
+        from raiker.execution.task_tree import owner_tree, wrap_authority
+
+        project = self.store.load_project(str(project_id), user_id=user_id) if project_id else None
+        base_authority = authority_for_project(
+            project, self.store.list_brain_source_grants(owner_principal_id), workspace_root,
+        )
+        read_authority = wrap_authority(
+            base_authority, owner_tree(workspace_root, owner_principal_id, session_id), workspace_root,
+        )
         # BR-D02 — the target this turn started on, when one was recorded. A
         # turn from before targets were recorded is judged without one rather
         # than against whatever is selected today.
@@ -155,7 +165,7 @@ class SessionService:
             command_runs=runs,
             checks=checks,
             expected_cwd=expected_cwd,
-            readback=read_back_writes(actions, workspace_root),
+            readback=read_back_writes(actions, workspace_root, authority=read_authority),
             target_drift=drift,
             review=_stored_patch_review(self.store, owner_principal_id, started),
             turn_status=str(turn.get("status") or ""),

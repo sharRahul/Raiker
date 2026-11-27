@@ -238,6 +238,43 @@ def test_a_command_in_a_subfolder_runs_in_the_projects_copy(tmp_path: Path) -> N
     assert (copy.root / "src" / "app.py").read_text(encoding="utf-8") == "print('edited')\n"
 
 
+@pytest.mark.parametrize("external", [False, True])
+def test_default_command_folder_is_the_bound_project_even_outside_workspace(
+    tmp_path: Path, external: bool,
+) -> None:
+    from raiker.tools.path_authority import AuthorityRoot
+    from tests.test_command_backends import _installed_runner, _probe_reply, request
+
+    workspace = _workspace(tmp_path)
+    project = tmp_path / "external" if external else workspace / "proj"
+    project.mkdir(exist_ok=True)
+    (project / "pricing.py").write_text("original", encoding="utf-8")
+    registry = TaskWorkspaceRegistry(tmp_path / "copies", records=tmp_path / "records")
+    registry.bind(OWNER, SESSION, project)
+    authority = TaskTreeAuthority(
+        PathAuthority(workspace, (AuthorityRoot("project", project, True, "Project"),)),
+        TaskTree(registry, OWNER, SESSION), project_relative=True,
+    )
+    write_file_content(workspace, "pricing.py", "prepared", authority=authority)
+    driver = native_backend.NativeSandboxDriver(
+        workspace, helper_root=_installed_runner(tmp_path), run_probe=_probe_reply(),
+    )
+    policies: list[dict[str, Any]] = []
+
+    def runner(req: Any, argv: list[str], cwd: Path, *_a: Any, **_k: Any) -> Any:
+        policies.append(json.loads(Path(argv[2]).read_text(encoding="utf-8")))
+        return object()
+
+    backend = native_backend.NativeSandboxBackend(
+        driver=driver, proof=driver.probe(), workspaces=registry, runner=runner,
+    )
+    backend.start(replace(request(workspace), owner_principal_id=OWNER, session_id=SESSION))
+    [(_, copy)] = registry.session_copies(OWNER, SESSION)
+    assert Path(policies[0]["cwd"]) == copy.root.resolve()
+    assert (copy.root / "pricing.py").read_text(encoding="utf-8") == "prepared"
+    assert (project / "pricing.py").read_text(encoding="utf-8") == "original"
+
+
 def test_git_status_and_diff_show_the_copys_edits_git_cannot_see(tmp_path: Path) -> None:
     from raiker.execution.task_tree import pending_copy_changes
 

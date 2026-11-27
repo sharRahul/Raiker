@@ -88,18 +88,18 @@ describe("posture control", () => {
     expect(screen.queryByText(/Local/)).not.toBeInTheDocument();
   });
 
-  it("colours the chip only for a posture less careful than the default", async () => {
+  it("keeps verified preparation neutral and states when it asks", async () => {
     // Every normal state neutral, so the one coloured state means
     // something. "Ask first" is the careful default and stays plain.
     stubFetch({
-      "GET /api/settings/composer-approval-mode": { approval_mode: "auto" },
+      "GET /api/settings/composer-approval-mode": { approval_mode: "sandbox" },
       "GET /api/execution-environments": ENVIRONMENTS,
     });
 
     render(PostureControl);
 
-    const chip = await screen.findByRole("button", { name: /Approves automatically/i });
-    expect(chip.className).toContain("relaxed");
+    const chip = await screen.findByRole("button", { name: /Asks before effects/i });
+    expect(chip.className).not.toContain("relaxed");
     // And it does not simultaneously call itself protected. A chip
     // that reads "Protected · Auto-approve" in amber is telling the owner two
     // contradictory things about one setting.
@@ -111,7 +111,7 @@ describe("posture control", () => {
   // every protection off.
   it("names the protections that hold in every posture", async () => {
     stubFetch({
-      "GET /api/settings/composer-approval-mode": { approval_mode: "skip" },
+      "GET /api/settings/composer-approval-mode": { approval_mode: "sandbox" },
       "GET /api/execution-environments": ENVIRONMENTS,
     });
     render(PostureControl);

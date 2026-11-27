@@ -150,7 +150,9 @@ def test_a_second_hard_link_is_refused(tmp_path: Path) -> None:
 
 @posix_only
 def test_a_fifo_is_refused_without_hanging(tmp_path: Path) -> None:
-    os.mkfifo(tmp_path / "RAIKER.md")
+    mkfifo = getattr(os, "mkfifo", None)
+    assert mkfifo is not None
+    mkfifo(tmp_path / "RAIKER.md")
     assert raiker_md.read_instruction_file(tmp_path).state == "unsafe"
 
 

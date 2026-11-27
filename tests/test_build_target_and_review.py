@@ -143,6 +143,36 @@ def test_read_back_never_reads_outside_the_workspace(tmp_path: Path) -> None:
     assert rows == [{"path": "../escape.txt", "state": "unreadable"}]
 
 
+def test_read_back_checks_the_authorized_task_copy(tmp_path: Path) -> None:
+    from raiker.execution.task_tree import TaskTree, TaskTreeAuthority
+    from raiker.execution.workspaces import TaskWorkspaceRegistry
+    from raiker.tools.filesystem import write_file_content
+    from raiker.tools.path_authority import AuthorityRoot, PathAuthority
+
+    workspace = tmp_path / "data"
+    project = tmp_path / "project"
+    workspace.mkdir()
+    project.mkdir()
+    registry = TaskWorkspaceRegistry(tmp_path / "copies", records=tmp_path / "records")
+    registry.bind("owner", "session", project)
+    authority = TaskTreeAuthority(
+        PathAuthority(workspace, (AuthorityRoot("project", project, True, "Project"),)),
+        TaskTree(registry, "owner", "session"), project_relative=True,
+    )
+    write_file_content(workspace, "notes.txt", "prepared", authority=authority)
+    actions = [_write("write_file", {"path": "notes.txt", "text": "prepared"})]
+    assert read_back_writes(actions, workspace, authority=authority) == [{"path": "notes.txt", "state": "matches"}]
+    assert not (project / "notes.txt").exists()
+
+
+def test_an_unreadable_destination_cannot_be_called_verified() -> None:
+    outcome = classify_build_turn(
+        tool_actions=[_write()], command_runs=[_run("pytest -q")], checks=["pytest -q"],
+        readback=[{"path": "notes.txt", "state": "unreadable"}],
+    )
+    assert outcome["outcome"] == "completed_unverified"
+
+
 def test_a_missing_destination_keeps_a_passing_turn_unverified() -> None:
     outcome = classify_build_turn(
         tool_actions=[_write()],

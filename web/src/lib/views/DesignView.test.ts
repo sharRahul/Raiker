@@ -365,6 +365,31 @@ describe("Design research sources", () => {
     expect(screen.queryByRole("button", { name: /Something else entirely/ })).not.toBeInTheDocument();
   });
 
+  it("continues a parked research turn through the shared approval authority", async () => {
+    const calls = stubFetch(researchRoutes({
+      "POST /api/prompts": {
+        request_id: "req_1", session_id: "sess_research", turn_id: "turn_r1",
+        status: "needs_approval", message: "Waiting for your decision.",
+      },
+      "GET /api/approvals/resumable?session_id=sess_research": { turns: [{
+        approval_id: "appr_design", session_id: "sess_research", turn_id: "turn_r1",
+        tool_name: "web_fetch", outcome_status: "approved", created_at: "2026-11-27T00:00:00Z",
+      }] },
+      "POST /api/approvals/appr_design/resume": {
+        request_id: "req_1", session_id: "sess_research", turn_id: "turn_r1",
+        status: "completed", message: "Approved research continued in Design.",
+      },
+    }));
+    render(DesignView);
+    await fireEvent.input(await screen.findByLabelText("Describe the image"), {
+      target: { value: "a maple leaf" },
+    });
+    await fireEvent.click(await screen.findByRole("button", { name: /Tools/ }));
+    await fireEvent.click(await screen.findByRole("menuitem", { name: /Search the web/i }));
+    await waitFor(() => expect(screen.getByTestId("design-research")).toHaveTextContent("Approved research continued in Design."));
+    expect(calls.mock.calls.filter(([url]) => String(url).endsWith("/appr_design/resume"))).toHaveLength(1);
+  });
+
   it("renders the findings as prose, not as raw markdown", async () => {
     stubFetch(
       researchRoutes({

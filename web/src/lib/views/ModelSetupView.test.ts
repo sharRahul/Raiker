@@ -996,6 +996,7 @@ describe("the Model step with connected providers", () => {
       "GET /api/setup": { ...required, status: "in_progress", stage: "privacy" },
       "PUT /api/setup": { ...required, status: "in_progress", stage: "permissions", privacy_mode: "balanced" },
       "GET /api/models": { profiles: [], chat_profiles: [] },
+      "PUT /api/settings/composer-approval-mode": { approval_mode: "manual" },
       "GET /api/capability-gates": [{ capability: "git_push_execution", decision_mode: "ask" }, { capability: "web_fetch", decision_mode: "ask" }],
       "POST /api/capability-modes/git_push_execution/deny": { capability: "git_push_execution", decision_mode: "deny" },
     });
@@ -1006,5 +1007,18 @@ describe("the Model step with connected providers", () => {
       expect(calls.mock.calls.some(([url]) => String(url).includes("/api/capability-modes/git_push_execution/deny"))).toBe(true),
     );
     expect(calls.mock.calls.some(([url]) => String(url).includes("/api/capability-modes/web_fetch"))).toBe(false);
+  });
+
+  it("selects the sandbox default only with measured enforcement", async () => {
+    stubFetch({
+      "GET /api/setup": { ...required, status: "in_progress", stage: "privacy" },
+      "GET /api/models": { profiles: [], chat_profiles: [] },
+      "GET /api/command-sandbox": { enforced: true, applies: false, native_ready: true },
+      "GET /api/settings/composer-approval-mode": { approval_mode: "sandbox" },
+    });
+    render(ModelSetupView);
+    await waitFor(() => expect(screen.getByRole("radio", { name: /Work in the sandbox/ })).toBeChecked());
+    await fireEvent.click(screen.getByRole("radio", { name: /Ask first/ }));
+    expect(screen.getByRole("radio", { name: /Ask first/ })).toBeChecked();
   });
 });

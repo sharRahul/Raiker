@@ -10,7 +10,7 @@ from typing_extensions import TypedDict
 
 from raiker.auth.vault_key_file import VaultState
 
-ApprovalMode = Literal["manual", "auto", "skip", "dont_ask"]
+ApprovalMode = Literal["manual", "sandbox", "dont_ask"]
 
 
 class SettingsStatus(TypedDict):

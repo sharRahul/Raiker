@@ -1,5 +1,46 @@
 # Fixed items
 
+## FIXED-1578 — Preparation and approval policy disagreed across workflows
+
+**Severity: High. Area: Authorization / Quiet UI. Status: Fixed 2026-11-27.**
+Ordinary copy-confined work could stop before RuntimeAuthority saw its scope,
+while legacy Auto/Skip controls described broader bypasses. The shared
+`ordinary_approval` and `confined_preparation` checks now require a runtime-owned
+task tree, matching owner/session and fresh measured enforcement. The broker
+uses RuntimeAuthority for review and dispatch; explicit restrictions, critical
+confirmation, gates and consequential-effect approvals remain in force.
+Chat, Build and Design prepare without a project in an owner-bound copy too.
+Legacy Auto becomes sandbox preparation and Skip becomes manual approval.
+Permissions and first run keep the shared policy consistent with the selected
+posture. Inline, floating and inbox decisions share one button component;
+Design research now continues through the common approval-resume authority.
+
+Commands retain their machine actor while using the human owner's session
+copy. An attached project outside the data folder no longer gets a different
+command copy. Authorized execution failures are reported as failures rather
+than policy denials, with the failure returned to the model. A direct live
+WSL2 run prepared a pricing module and three tests without prompts, ran all
+three successfully with a hash-verified command receipt, left the source unchanged,
+and required approval for an outside write. This is runtime evidence, not a
+claim that the complete release journey or clean-machine gate passed. The real
+`qwen3.6:27b` browser Build journey also passed its copied preparation and three
+tests. Build read-back uses current owner authority and pinned task-copy I/O;
+missing or unreadable evidence cannot verify a result. Local task drafts can
+be recorded without per-step approval; scheduling or running them is excluded.
+See the [live record](../architecture/WEB_APP_LIVE_TEST.md#result--2026-11-27-shared-approval-redesign)
+and [active qualification plan](APPROVAL_REDESIGN.md).
+
+## FIXED-1579 — A reviewed grant could be spent after its state changed
+
+**Severity: High. Area: Bounded authorization. Status: Fixed 2026-11-27.**
+Grant review and the old unconditional use-counter increment were separate.
+The broker and runtime now claim a reviewed grant with one conditional update
+over its counter, limits, expiry and revocation state before execution. A
+stale or revoked review cannot spend a use or execute. Saved Deny decisions
+also take precedence over internal standing-authority overrides. Regression
+tests cover a repeated snapshot claim and revocation after review; existing
+critical, standing-grant and per-turn restriction suites remain applicable.
+
 ## FIXED-1577 — The MXC assessment had no current Windows measurement
 
 **Severity: Medium. Area: Native sandbox evaluation (RU-05). Status: Fixed 2026-11-26.**
@@ -2221,6 +2262,8 @@ file you can open. The two capture sets that remain — `screenshots/pages/` and
 | [FIXED-1575](#fixed-1575--the-sandbox-posture-trusted-installation-instead-of-enforcement) | High | Permissions / first run (RU-07) | Fixed 2026-11-26 |
 | [FIXED-1576](#fixed-1576--github-retained-two-active-workflows-after-their-files-were-removed) | Low | CI / maintenance | Fixed 2026-11-26 |
 | [FIXED-1577](#fixed-1577--the-mxc-assessment-had-no-current-windows-measurement) | Medium | Native sandbox evaluation (RU-05) | Fixed 2026-11-26 |
+| [FIXED-1578](#fixed-1578--preparation-and-approval-policy-disagreed-across-workflows) | High | Authorization / Quiet UI | Fixed 2026-11-27 |
+| [FIXED-1579](#fixed-1579--a-reviewed-grant-could-be-spent-after-its-state-changed) | High | Bounded authorization | Fixed 2026-11-27 |
 | [FIXED-1573](#fixed-1573--health-called-word-only-recall-search-by-meaning--done) | Medium | Health (RU-08) | Fixed 2026-11-26 |
 | [FIXED-1572](#fixed-1572--chatgpt-and-claude-conversation-exports-could-not-be-imported) | Low | Memory / import (RU-16) | Fixed 2026-11-26 |
 | [FIXED-1571](#fixed-1571--first-run-set-up-the-device-but-not-the-machine-and-never-asked-for-a-posture) | Medium | First run (RU-09) | Fixed 2026-11-26 |

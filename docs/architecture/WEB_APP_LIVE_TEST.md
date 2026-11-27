@@ -1,5 +1,48 @@
 # Web App Live Test — model backends
 
+## Result — 2026-11-27 shared approval redesign
+
+**RT-APPROVAL-PREP-01 passed against the real WSL2 runtime.** The synthetic
+harness used the production machine-identity issuer/verifier, ToolBroker,
+RuntimeAuthority, path authority, native driver, executors and command service;
+none was mocked. It enabled file and command capabilities for its synthetic
+owner, bound a project outside its data folder, prepared `pricing.py` and
+`test_pricing.py`, then ran `python3 -m unittest -q`. All three tests passed;
+the source had neither file and an absolute write outside the project required
+approval. The command ran in `wsl_bubblewrap`, exit 0, receipt digest
+`7cf666cceaa9ddf92c1c80547265d7a290d153684ba1efb5c4148a1da2cc0fd4`.
+Local evidence: `output/approval-redesign-real-runtime.json` and `.log`.
+
+The model-driven browser attempts with real Ollama `qwen3.5:9b` progressed
+beyond copied-write approval, and their screenshots showed **Sandbox changes**
+with the real project awaiting Apply. They exposed and reproduced an external
+project/default-command-folder mismatch; that mapping now has inside/outside
+regressions and the live runtime proof above. The model also emitted shell
+operators and incorrect test modules. Those commands were refused or failed;
+the existing consecutive-failure circuit breaker remained in force. No failed
+receipt or prose claim was counted as a passing check.
+
+**RT-WSL-BUILD-01 passed with real Ollama `qwen3.6:27b` in 3.1 minutes.**
+The browser journey prepared both files, ran the exact declared check with
+three passing tests and reported `completed_verified`. Source changes remained
+pending Apply. Build read-back now resolves the owner's current task copy with
+pinned I/O; unavailable evidence cannot produce a verified outcome.
+**RU-07 remains open for the full repository/Apply/Git-push boundary.**
+The initial fresh `qwen3.6:27b` attempt also revealed
+that Permissions could label a capability mix sandbox while the shared policy
+remained Manual; applying a posture now sets both and mismatches read as a
+custom posture. See [FIXED-1578](../plans/FIXED_ITEMS.md#fixed-1578--preparation-and-approval-policy-disagreed-across-workflows)
+and the [approval plan](../plans/APPROVAL_REDESIGN.md).
+
+New browser case `web/e2e/approval-redesign-live.spec.ts` exercises the same
+pending actions in Chat and the inbox at desktop/390 px, checks overflow,
+captures screenshots and declines the synthetic proposal. **Passed in 43 seconds**;
+the test accepts no consequential action. Screenshots were visually inspected:
+`output/playwright/approval-redesign-chat-1440.png`,
+`approval-redesign-chat-390.png`, `approval-redesign-inbox.png` and
+`ru-07-wsl-build-last.png`. Logs: `output/approval-redesign-ui-mobile-verified.log`
+and `output/approval-redesign-live-outcome.log`.
+
 ## Result — 2026-11-26 WSL2 Build posture
 
 **RT-WSL-BUILD-01 failed; RU-07 stays open.** Windows build 26300.10075,

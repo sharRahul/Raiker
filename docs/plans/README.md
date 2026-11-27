@@ -6,6 +6,7 @@ removed (the merged section says where it came from).
 
 | Document | Owns |
 |---|---|
+| [Approval redesign](APPROVAL_REDESIGN.md) | Shared authorization, sandbox autonomy, scoped approvals and owner decisions across every workflow |
 | [Ready to use](READY_TO_USE_PLAN.md) | **The work that remains** before the owner uses Raiker every day on a Windows or Linux desktop: publishing, the native command sandbox, permissions, memory, the always-on host, Pause, interoperability ([ADR-0006](../adr/ADR-0006-one-supported-path-per-machine.md)) |
 | [Beta release plan](BETA_RELEASE_PLAN.md) | Release gates and their evidence by area, the owner scope (Appendix A), the Linux qualification record (B), data-safety evidence (C) and the desktop package acceptance matrix (D) |
 | [Testing](TESTING.md) | How Raiker is tested as a real owner uses it, including the [regular-use journeys](TESTING.md#regular-use-journeys) and their prompts |

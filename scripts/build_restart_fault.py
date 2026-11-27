@@ -312,10 +312,13 @@ def run_scenario(workspace: Path, report: dict[str, Any], *, variant: str) -> bo
         })
         parked = host.call("POST", "/api/prompts", {
             "text": "Add a sub helper and run the checks.", "surface": "build", "project_id": project,
-            "session_id": session_id, "capability_modes": {},
+            "session_id": session_id, "capability_modes": {}, "approval_mode": "manual",
         })
         turn_id = str(parked["turn_id"])
         report["turn_status_before"] = parked.get("status")
+        if parked.get("status") != "needs_approval":
+            report["error"] = "the explicit Ask-first fixture did not park its file change"
+            return False
         if parked.get("status") == "needs_approval":
             approval_id = str(parked["approval"]["approval_id"])
             host.call("POST", f"/api/approvals/{approval_id}/resolve", {"approve": True, "reason": "accepted"})

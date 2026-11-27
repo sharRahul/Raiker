@@ -988,7 +988,7 @@ test("approval mode menu remains visible in Permissions", async ({ page }) => {
     const trigger = page.getByRole("button", { name: /Approval mode:/ });
     await trigger.click();
     const menu = page.getByRole("menu", { name: "Approval mode" });
-    await expect(menu.getByRole("menuitemradio")).toHaveCount(4);
+    await expect(menu.getByRole("menuitemradio")).toHaveCount(3);
     await expect.poll(async () => { const rect = await menu.boundingBox(); return !!rect && rect.x >= 0 && rect.y >= 0 && rect.x + rect.width <= width + 1 && rect.y + rect.height <= 681; }).toBe(true);
     const box = await menu.boundingBox();
     expect(box!.x).toBeGreaterThanOrEqual(0);

@@ -69,7 +69,7 @@ def _envelope(prompt: str) -> PromptEnvelope:
         client=ClientMetadata(type="test_harness", name="tests", version="0.0.0"),
         user=UserMetadata(),
         prompt=PromptPayload(text=prompt),
-        options=PromptOptions(max_tool_calls=5),
+        options=PromptOptions(max_tool_calls=5, approval_mode="manual"),
     )
 
 

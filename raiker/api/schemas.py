@@ -838,6 +838,10 @@ class MoveProjectRequest(StrictRequest):
     expected_revision: str | None = None
 
 
+class SetSessionIncognitoRequest(StrictRequest):
+    incognito: bool
+
+
 class SetSessionProfileRequest(StrictRequest):
     # QUI-P02 — a conversation's profile. Careful narrows each turn; Standard
     # sends no override. A label only: it grants nothing.

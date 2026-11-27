@@ -12,7 +12,7 @@ operation answers with, and whether OpenAPI describes it (OPT-01/OPT-02 —
 * **deferred** — the body has no declared type; a test fails while any is.
 * **special** — a stream, a file or another non-JSON transport; hand-written.
 
-**549 operations: 533 verified, 0 eligible, 0 deferred, 16 special.**
+**551 operations: 535 verified, 0 eligible, 0 deferred, 16 special.**
 
 | Method | Path | Request | Response | Status | Why |
 |---|---|---|---|---|---|
@@ -474,6 +474,7 @@ operation answers with, and whether OpenAPI describes it (OPT-01/OPT-02 —
 | POST | `/api/security/workspace-key/rotate` |  | KeyRotated | verified | declared by cast |
 | GET | `/api/sessions` |  | SessionView[] | verified | DashboardService.list_sessions |
 | DELETE | `/api/sessions/bulk` | BulkDeleteSessionsRequest | SessionsDeleted | verified | declared SessionsDeleted |
+| POST | `/api/sessions/incognito` |  | SessionIncognitoSet | verified | declared SessionIncognitoSet |
 | DELETE | `/api/sessions/{session_id}` |  | SessionDeleted | verified | declared SessionDeleted |
 | GET | `/api/sessions/{session_id}` |  | SessionDetail | verified | built as SessionDetail |
 | PUT | `/api/sessions/{session_id}/archive` |  | SessionArchived | verified | declared SessionArchived |
@@ -490,6 +491,7 @@ operation answers with, and whether OpenAPI describes it (OPT-01/OPT-02 —
 | GET | `/api/sessions/{session_id}/context-usage` |  | ContextUsageView | verified | DashboardService.get_context_usage |
 | POST | `/api/sessions/{session_id}/export` | ExportSessionRequest |  | special | special |
 | GET | `/api/sessions/{session_id}/export/manifest` |  | TranscriptManifest | verified | declared TranscriptManifest |
+| PUT | `/api/sessions/{session_id}/incognito` | SetSessionIncognitoRequest | SessionIncognitoSet | verified | declared SessionIncognitoSet |
 | PUT | `/api/sessions/{session_id}/pin` | SetSessionPinnedRequest | SessionPinned | verified | declared SessionPinned |
 | GET | `/api/sessions/{session_id}/plan` |  | AgentPlan | verified | declared AgentPlan |
 | PUT | `/api/sessions/{session_id}/profile` | SetSessionProfileRequest | SessionProfileSet | verified | declared SessionProfileSet |

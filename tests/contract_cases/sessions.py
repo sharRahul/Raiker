@@ -149,6 +149,8 @@ CASES: Cases = {
     ("GET", "/api/sessions/{session_id}/export/manifest"): _on_session("/export/manifest"),
     ("PUT", "/api/sessions/{session_id}/pin"): _on_session("/pin", {"pinned": True}),
     ("PUT", "/api/sessions/{session_id}/profile"): _on_session("/profile", {"profile": "careful"}),
+    ("POST", "/api/sessions/incognito"): plain("/api/sessions/incognito"),
+    ("PUT", "/api/sessions/{session_id}/incognito"): _on_session("/incognito", {"incognito": True}),
     ("PUT", "/api/sessions/{session_id}/rename"): _on_session("/rename", {"title": "Renamed"}),
     ("PUT", "/api/sessions/{session_id}/archive"): _on_session("/archive"),
     ("PUT", "/api/sessions/{session_id}/unarchive"): _on_session("/unarchive"),

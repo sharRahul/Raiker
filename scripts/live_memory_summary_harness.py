@@ -11,6 +11,7 @@ import json
 from pathlib import Path
 
 from raiker.control.service import RuntimeControlService
+from raiker.models.connections import clear_model_connection, put_model_connection
 from raiker.storage.sqlite import SQLiteStore
 from raiker.tools.memory_tools import memory_search
 
@@ -18,13 +19,19 @@ from raiker.tools.memory_tools import memory_search
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("workspace", type=Path)
-    parser.add_argument("operation", choices=("authorize", "search"))
+    parser.add_argument("operation", choices=("authorize", "search", "unavailable", "restore"))
     args = parser.parse_args()
     store = SQLiteStore(args.workspace)
     owner = store.original_account_principal_id()
     if owner is None:
         raise RuntimeError("The live account must exist first")
-    if args.operation == "authorize":
+    if args.operation == "unavailable":
+        put_model_connection(store, owner, "ollama-local-openai-compatible", {"endpoint": "http://127.0.0.1:1/v1"})
+        print(json.dumps({"unavailable": True}))
+    elif args.operation == "restore":
+        clear_model_connection(store, owner, "ollama-local-openai-compatible")
+        print(json.dumps({"restored": True}))
+    elif args.operation == "authorize":
         control = RuntimeControlService(args.workspace)
         result = control.activate_runtime_mode("local_single_user_runtime", owner, "RU-11 isolated live fixture")
         if not result.ok:

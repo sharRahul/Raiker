@@ -6211,6 +6211,12 @@ export type SessionDetail = {
   parked_approvals: ParkedApproval[];
 };
 
+export type SessionIncognitoSet = {
+  ok: boolean;
+  session_id: string;
+  incognito: boolean;
+};
+
 export type SessionPinned = {
   ok: boolean;
   session_id: string;
@@ -6277,6 +6283,7 @@ export type SessionView = {
   archived_at: string | null;
   origin: string;
   conversation_profile: string;
+  incognito: boolean;
 };
 
 export type SessionsDeleted = {
@@ -6315,6 +6322,10 @@ export type SetModelFallbackRequest = {
 export type SetModelSelectionRequest = {
   profile_id: string;
   model?: string | null;
+};
+
+export type SetSessionIncognitoRequest = {
+  incognito: boolean;
 };
 
 export type SetSessionPinnedRequest = {
@@ -8454,6 +8465,8 @@ export const contract = {
     request<SessionView[]>(withQuery("/api/sessions", query)),
   deleteSessions: (body: BulkDeleteSessionsRequest) =>
     call<SessionsDeleted>("DELETE", "/api/sessions/bulk", { body }),
+  startIncognitoConversation: () =>
+    call<SessionIncognitoSet>("POST", "/api/sessions/incognito"),
   deleteSession: (sessionId: string, xSessionDeleteConfirm?: string) =>
     call<SessionDeleted>("DELETE", `/api/sessions/${encodeURIComponent(sessionId)}`, { headers: { "x-session-delete-confirm": xSessionDeleteConfirm } }),
   getSession: (sessionId: string) =>
@@ -8478,6 +8491,8 @@ export const contract = {
     request<ContextUsageView>(`/api/sessions/${encodeURIComponent(sessionId)}/context-usage`),
   getSessionExportManifest: (sessionId: string) =>
     request<TranscriptManifest>(`/api/sessions/${encodeURIComponent(sessionId)}/export/manifest`),
+  setSessionIncognito: (sessionId: string, body: SetSessionIncognitoRequest) =>
+    call<SessionIncognitoSet>("PUT", `/api/sessions/${encodeURIComponent(sessionId)}/incognito`, { body }),
   setSessionPinned: (sessionId: string, body: SetSessionPinnedRequest) =>
     call<SessionPinned>("PUT", `/api/sessions/${encodeURIComponent(sessionId)}/pin`, { body }),
   getSessionPlan: (sessionId: string) =>

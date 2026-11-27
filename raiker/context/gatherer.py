@@ -303,6 +303,7 @@ class ContextGatherer:
         # PA-D02 — a goal step whose execution profile keeps personal memory
         # away from a hosted model recalls nothing, the same as Incognito.
         withheld = session_memory_withheld(store, session_id)
+        incognito = incognito or withheld == "incognito"
         effective = "off" if incognito or withheld else mode
         if effective == "search_when_relevant":
             from raiker.vector.backends import resolve_embedding_backend

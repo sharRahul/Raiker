@@ -53,6 +53,7 @@ class SessionView(View):
     # the conversation so every device opens it the same way. A narrowing label
     # the composer sends with each turn; it grants nothing.
     conversation_profile: str = "standard"
+    incognito: bool = False
 
 
 def _stored_content_parts(summary: Any) -> tuple[ContentPartView, ...]:

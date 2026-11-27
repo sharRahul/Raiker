@@ -29,6 +29,7 @@ from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from raiker.contracts.ids import utc_now
+from raiker.goals.store import session_memory_withheld
 from raiker.storage.sqlite import SQLiteStore
 
 #: Two requests share an aim when they share this many content words…
@@ -208,6 +209,8 @@ def suggestion_for(
     another conversation is noticed too. Without it nothing changes.
     """
     session = store.load_session(session_id)
+    if store.is_memory_incognito(owner_principal_id) or session_memory_withheld(store, session_id):
+        return None
     if session is None or (user_id and session.get("user_id") not in (None, user_id)):
         return None
     if str(session.get("origin") or "chat") == "task":

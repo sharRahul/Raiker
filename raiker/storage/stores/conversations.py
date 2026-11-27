@@ -376,6 +376,15 @@ class ConversationStore:
         value = str(row["conversation_profile"] or "standard")
         return value if value in self.CONVERSATION_PROFILES else "standard"
 
+    def set_session_incognito(self: SQLiteStore, session_id: str, incognito: bool, user_id: str) -> bool:
+        """Only the owning account may change this conversation's recall boundary."""
+        with self.connect() as connection:
+            result = connection.execute(
+                "UPDATE sessions SET incognito = ? WHERE session_id = ? AND user_id = ?",
+                (int(incognito), session_id, user_id),
+            )
+            return result.rowcount == 1
+
     # A tag is an organizing label only (like the `pinned` flag and the
     # `projects` table) — it grants nothing and changes no gate, policy, or
     # authority. Many-to-many: a session carries an ordered set of tags; the

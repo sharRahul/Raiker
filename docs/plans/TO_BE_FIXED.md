@@ -1,14 +1,8 @@
-## RU-11 remaining qualification — 2026-11-27
+## Windows test-runner qualification — 2026-11-27
 
-The summary, inline edits/forget, Use memory and Memory Controls setup shipped
-([FIXED-1582](FIXED_ITEMS.md#fixed-1582--memory-opened-on-counts-instead-of-the-facts-raiker-knows)).
-RT-MEM-SUMMARY-01 passes against a real isolated host, with screenshots inspected.
-The real Ollama extension also passes local setup, paraphrase vector recall and
-global off/on (42.6 seconds, with explicit fixture authorization). Still required:
-subsequent chat-model turns and a conversation-level Incognito control/journey,
-without visiting Permissions or Settings. The existing runtime opt-out tests
-do not establish that conversation UI. Do not mark RU-11 complete from
-tool-level recall and UI-store tests alone.
+RU-11 is completed as
+[FIXED-1584](FIXED_ITEMS.md#fixed-1584--conversation-incognito-was-missing-and-goal-noticing-ignored-memory-opt-out).
+These independent Windows runner issues remain open.
 
 The broad Windows API response-contract run emitted native exception `0xc0000008`
 at `raiker/models/llama_cpp/hardware.py:_windows_native_machine` while probing
@@ -17,6 +11,13 @@ the new route contract pass; the broad run is not a pass. Reproduce the hardware
 probe and classify the full suite failures on an isolated Windows test process
 before changing ctypes or hardware detection. Local log:
 `output/ru11-python-tests.log`.
+
+The existing `test_run_command_returns_feedback_only_for_exact_active_session_grant`
+also fails on this PC: its governed `git --version` returns exit code 91 in an
+elevated test process (and fails earlier in the restricted runner). The new
+Incognito broker regression and the other focused memory cases pass. Investigate
+the command runner/native-account test environment; do not relax command policy
+to make this qualification pass. Log: `output/ru11-broker-elevated.log`.
 
 ## Current Permissions/UI status — 2026-11-27
 

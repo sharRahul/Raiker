@@ -341,6 +341,21 @@ class SessionService:
             return ControlResult(ok=False, reason_code=f"unknown_session:{session_id}")
         return ControlResult(ok=True, data={"session_id": session_id, "profile": profile})
 
+    def set_conversation_incognito(
+        self: DashboardService, session_id: str | None, incognito: bool, acting_principal_id: str | None,
+    ) -> ControlResult:
+        """Save an account-owned recall opt-out before the next turn starts."""
+        principal = self.control._resolve_or_none(acting_principal_id)  # noqa: SLF001
+        if principal is None or principal.principal_type != PrincipalType.HUMAN or not principal.delegated_by_user_id:
+            return ControlResult(ok=False, reason_code="not_authorized_human")
+        user_id = principal.delegated_by_user_id
+        if session_id is None:
+            session_id = new_id("sess_")
+            self.store.create_session(session_id, str(self.store.paths.workspace_root), user_id=user_id)
+        if not self.store.set_session_incognito(session_id, incognito, user_id):
+            return ControlResult(ok=False, reason_code="unknown_session")
+        return ControlResult(ok=True, data={"session_id": session_id, "incognito": incognito})
+
     # Renaming and archiving are organizing actions only — they grant nothing
     # and change no gate, policy, or authority. Both are human-only and respect
     # the same user/session visibility boundary as set_session_pinned: an
@@ -947,6 +962,7 @@ class SessionService:
             updated_at=str(row.get("updated_at", "")),
             turn_count=len(self.store.list_turns(session_id, limit=1000)),
             pinned=bool(row.get("pinned", 0)),
+            incognito=bool(row.get("incognito", 0)),
             tags=tuple(self.store.list_session_tags(session_id)),
             project_id=row.get("project_id"),
             archived=bool(row.get("archived", 0)),

@@ -100,7 +100,7 @@ the runtime still judges each action when it is invoked.
 
 | Control | `aria-label` | What it does |
 |---|---|---|
-| **Context** | `Context for this turn: …` | One line — **Filed in *project***, attachments, and how much of the model's window is in play. Opening it gives the token counts, the window and any compaction, and says what filing means: the project's instructions and shared files apply, while **recall still draws on all your memory**, not only that project's, unless Incognito is on in Memory. (Build is the surface whose recall narrows to its project.) It never compacts the conversation. |
+| **Context** | `Context for this turn: …` | One line — **Filed in *project***, attachments, and how much of the model's window is in play. Opening it gives the token counts, the window and any compaction, and says what filing means: the project's instructions and shared files apply, while **recall still draws on all your memory**, not only that project's, unless Use memory is off in Memory or Incognito is on for this conversation. (Build is the surface whose recall narrows to its project.) It never compacts the conversation. |
 | **Model** | `Model for this turn: <name>` | Only *configured* profiles. No free-text model ids. The menu opens with **Default model** — the one chosen on Models — and, when this work is on another, **This work uses … · Reset to default**; the reset holds after a reload. It carries **Effort** when the model publishes thinking levels, names a model that is selected but cannot serve rather than hiding it, and ends in one link to **Manage models**. |
 | **Send** | `Send` | The one primary action. |
 

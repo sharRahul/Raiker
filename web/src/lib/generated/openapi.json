@@ -32126,6 +32126,29 @@
         "title": "SessionDetail",
         "type": "object"
       },
+      "SessionIncognitoSet": {
+        "properties": {
+          "incognito": {
+            "title": "Incognito",
+            "type": "boolean"
+          },
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          },
+          "session_id": {
+            "title": "Session Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "ok",
+          "session_id",
+          "incognito"
+        ],
+        "title": "SessionIncognitoSet",
+        "type": "object"
+      },
       "SessionPinned": {
         "properties": {
           "ok": {
@@ -32378,6 +32401,11 @@
           "created_at": {
             "title": "Created At",
             "type": "string"
+          },
+          "incognito": {
+            "default": false,
+            "title": "Incognito",
+            "type": "boolean"
           },
           "match_kind": {
             "default": "",
@@ -32645,6 +32673,20 @@
           "profile_id"
         ],
         "title": "SetModelSelectionRequest",
+        "type": "object"
+      },
+      "SetSessionIncognitoRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "incognito": {
+            "title": "Incognito",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "incognito"
+        ],
+        "title": "SetSessionIncognitoRequest",
         "type": "object"
       },
       "SetSessionPinnedRequest": {
@@ -56791,6 +56833,25 @@
         "summary": "Delete Sessions"
       }
     },
+    "/api/sessions/incognito": {
+      "post": {
+        "description": "Create an owned conversation with recall withheld before its first turn.",
+        "operationId": "start_incognito_conversation_api_sessions_incognito_post",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionIncognitoSet"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Start Incognito Conversation"
+      }
+    },
     "/api/sessions/{session_id}": {
       "delete": {
         "description": "Permanently delete one session and its cascaded rows (human-only).\n\nRequires an explicit confirmation header matching the session id (mirrors\nproject deletion). Respects user/session visibility — an account cannot\ndelete another account's session.",
@@ -57506,6 +57567,56 @@
           }
         },
         "summary": "Get Session Export Manifest"
+      }
+    },
+    "/api/sessions/{session_id}/incognito": {
+      "put": {
+        "description": "Change recall for subsequent turns; the saved transcript remains readable.",
+        "operationId": "set_session_incognito_api_sessions__session_id__incognito_put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "title": "Session Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetSessionIncognitoRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionIncognitoSet"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Set Session Incognito"
       }
     },
     "/api/sessions/{session_id}/pin": {

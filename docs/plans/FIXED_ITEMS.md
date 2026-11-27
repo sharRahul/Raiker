@@ -1,5 +1,28 @@
 # Fixed items
 
+## FIXED-1584 — Conversation Incognito was missing and goal noticing ignored memory opt-out
+
+**Severity: Medium. Area: Memory / Chat / Quiet UI (RU-11). Status: Fixed 2026-11-27.**
+Chat now offers a saved **Incognito** switch before the first turn and on existing
+conversations. Only the owning human account can change it. The context gatherer
+and explicit personal-memory tools withhold recall; the global switch and
+execution-profile restrictions remain independent. Reload restores the setting,
+failed saves retain it, and the UI blocks changes during an answer. Messages
+remain saved, as the control and guide explain. Withheld tool results retain
+their privacy reason instead of becoming an unexplained failure.
+
+Screenshot review exposed a cross-conversation goal suggestion under Incognito.
+Goal noticing now respects both conversation and account opt-out, with route
+regressions. The live journey uses real `nomic-embed-text` and `qwen2.5-coder:7b`:
+memory on answers Darjeeling; Incognito and global off withhold it; global on
+restores it. Saved recall disclosures verify each result. Refused authorization
+and an unavailable loopback endpoint show failure before successful local setup.
+Desktop/phone light/dark captures verify the final controls. RU-11 is complete;
+its dedicated completed design and implementation plans were removed.
+Evidence: `tests/test_conversation_incognito.py`, memory/broker/goal regressions,
+component and API-contract tests, and RT-MEM-SUMMARY-01
+([live record](../architecture/WEB_APP_LIVE_TEST.md#result--2026-11-27-memory-summary)).
+
 ## FIXED-1582 — Memory opened on counts instead of the facts Raiker knows
 
 **Severity: Medium. Area: Memory / Quiet UI (RU-11). Status: Fixed 2026-11-27.**
@@ -13,7 +36,8 @@ Memory → Controls, and old Settings links forward there. The local meaning-sea
 action validates the resolved loopback profile server-side, builds through the
 governed executor and selects the resulting space. Engine changes refresh the
 parent's retrieval status. Real Ollama paraphrase vector search and global off/on
-pass; RU-11's chat-turn and conversation-Incognito acceptance remain open.
+pass; RU-11's remaining chat-turn and conversation-Incognito acceptance is closed
+by [FIXED-1584](#fixed-1584--conversation-incognito-was-missing-and-goal-noticing-ignored-memory-opt-out).
 Evidence: 54 focused Python tests,
 the new API response contract, component tests and RT-MEM-SUMMARY-01
 ([live record](../architecture/WEB_APP_LIVE_TEST.md#result--2026-11-27-memory-summary)).
@@ -2330,6 +2354,7 @@ file you can open. The two capture sets that remain — `screenshots/pages/` and
 | [FIXED-1581](#fixed-1581--current-documentation-still-described-removed-approval-modes-and-ui) | Medium | Documentation / permissions | Fixed 2026-11-27 |
 | [FIXED-1582](#fixed-1582--memory-opened-on-counts-instead-of-the-facts-raiker-knows) | Medium | Memory / Quiet UI | Fixed 2026-11-27 |
 | [FIXED-1583](#fixed-1583--import-discarded-a-memorys-reviewed-topic) | Medium | Memory / import | Fixed 2026-11-27 |
+| [FIXED-1584](#fixed-1584--conversation-incognito-was-missing-and-goal-noticing-ignored-memory-opt-out) | Medium | Memory / Chat / Quiet UI | Fixed 2026-11-27 |
 | [FIXED-1580](#fixed-1580--permissions-repeated-policy-and-work-pages-exposed-routine-metadata) | Medium | Quiet UI / permission clarity | Fixed 2026-11-27 |
 | [FIXED-1578](#fixed-1578--preparation-and-approval-policy-disagreed-across-workflows) | High | Authorization / Quiet UI | Fixed 2026-11-27 |
 | [FIXED-1579](#fixed-1579--a-reviewed-grant-could-be-spent-after-its-state-changed) | High | Bounded authorization | Fixed 2026-11-27 |

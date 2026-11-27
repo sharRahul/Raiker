@@ -54,6 +54,7 @@ from raiker.api.schemas import (
     SetModelAdvisorRequest,
     SetModelFallbackRequest,
     SetModelSelectionRequest,
+    SetSessionIncognitoRequest,
     SetSessionPinnedRequest,
     SetSessionProfileRequest,
     SetSessionProjectRequest,
@@ -151,6 +152,7 @@ from raiker.api.wire.sessions import (
     SessionArchived,
     SessionDeleted,
     SessionDetail,
+    SessionIncognitoSet,
     SessionPinned,
     SessionProfileSet,
     SessionProjectSet,
@@ -1317,6 +1319,34 @@ async def set_session_pinned(
         "session_id": result.data["session_id"],
         "pinned": result.data["pinned"],
     }
+    return serialize_dto(answer)
+
+
+@router.post("/api/sessions/incognito")
+async def start_incognito_conversation(
+    request: Request,
+    auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+) -> dict[str, Any]:
+    """Create an owned conversation with recall withheld before its first turn."""
+    result = _service(request).set_conversation_incognito(None, True, auth_data[0].principal_id)
+    if not result.ok:
+        raise refusal(status.HTTP_403_FORBIDDEN, result.reason_code)
+    answer: SessionIncognitoSet = {"ok": True, "session_id": result.data["session_id"], "incognito": result.data["incognito"]}
+    return serialize_dto(answer)
+
+
+@router.put("/api/sessions/{session_id}/incognito")
+async def set_session_incognito(
+    session_id: str,
+    body: SetSessionIncognitoRequest,
+    request: Request,
+    auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+) -> dict[str, Any]:
+    """Change recall for subsequent turns; the saved transcript remains readable."""
+    result = _service(request).set_conversation_incognito(session_id, body.incognito, auth_data[0].principal_id)
+    if not result.ok:
+        raise refusal(status.HTTP_403_FORBIDDEN, result.reason_code)
+    answer: SessionIncognitoSet = {"ok": True, "session_id": result.data["session_id"], "incognito": result.data["incognito"]}
     return serialize_dto(answer)
 
 

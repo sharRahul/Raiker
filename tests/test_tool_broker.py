@@ -48,6 +48,21 @@ def test_broker_routes_list_directory_and_logs(tmp_path) -> None:  # type: ignor
     assert "README.md" in result.output["entries"]  # type: ignore[index]
 
 
+def test_conversation_incognito_withholds_an_explicit_memory_tool(tmp_path: Path) -> None:
+    broker = _broker(tmp_path)
+    session_id = new_id("sess_")
+    broker.store.create_session(session_id, str(tmp_path))
+    with broker.store.connect() as connection:
+        connection.execute("UPDATE sessions SET incognito = 1 WHERE session_id = ?", (session_id,))
+    broker.executors["memory_search"] = lambda _args: pytest.fail("Incognito executed a personal memory read")
+    result, decision = broker.execute(
+        ToolAction(new_id("act_"), "memory_search", {"query": "favourite tea"}, "low", False),
+        session_id=session_id, turn_id=new_id("turn_"),
+    )
+    assert decision.decision == "allow"
+    assert result.output == {"status": "withheld", "reason": "incognito", "count": 0, "results": []}
+
+
 def test_a_tool_assigned_to_a_retired_container_never_runs_on_the_host(
     tmp_path: Path,
 ) -> None:

@@ -278,6 +278,11 @@ def session_memory_withheld(store: Any, session_id: str | None) -> str:
         return ""
     try:
         with store.connect() as connection:
+            private = connection.execute(
+                "SELECT incognito FROM sessions WHERE session_id = ?", (session_id,)
+            ).fetchone()
+            if private is not None and private[0]:
+                return "incognito"
             row = connection.execute(
                 "SELECT reason FROM session_memory_withholds WHERE session_id = ?", (session_id,)
             ).fetchone()

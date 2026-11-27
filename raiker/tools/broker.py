@@ -2611,11 +2611,10 @@ class ToolBroker:
             and session_memory_withheld(self.store, session_id)
         )
         if memory_withheld:
-            # PA-D02 — this conversation is a goal step whose execution profile
-            # keeps personal memory away from the hosted model doing the work.
-            # The gatherer withholds ambient recall; this withholds the
-            # assistant's own reads, which would otherwise carry the same text.
-            raw = {"status": "withheld", "reason": "execution_profile", "count": 0, "results": []}
+            # The conversation's Incognito setting or execution profile also
+            # withholds explicit reads, which could otherwise bypass the
+            # gatherer's ambient recall boundary.
+            raw = {"status": "withheld", "reason": str(memory_withheld), "count": 0, "results": []}
         elif profile_resolution.reason_code is not None:
             raw = {
                 "status": "failed",
@@ -2680,7 +2679,9 @@ class ToolBroker:
                     raw = executor(action.arguments)
             except FilesystemSafetyError as exc:
                 raw = {"status": "failed", "error": {"type": str(exc)}}
-        status = "success" if raw.get("status") == "success" else ("denied" if raw.get("status") == "denied" else "failed")
+        # A deliberately withheld read is an answered request with no data,
+        # rather than a provider failure that loses the privacy explanation.
+        status = "success" if raw.get("status") in ("success", "withheld") else ("denied" if raw.get("status") == "denied" else "failed")
         result = ToolResult(
             action_id=action.action_id,
             tool_name=action.tool_name,

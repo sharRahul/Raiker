@@ -5166,6 +5166,11 @@ ALTER TABLE mcp_servers ADD COLUMN call_mode TEXT NOT NULL DEFAULT 'ask';
 ALTER TABLE mcp_servers ADD COLUMN runs_as TEXT NOT NULL DEFAULT 'sandbox';
 """
 
+CONVERSATION_INCOGNITO_MIGRATION_ID = "RAIKER-2136-conversation-incognito"
+CONVERSATION_INCOGNITO_SQL = """
+ALTER TABLE sessions ADD COLUMN incognito INTEGER NOT NULL DEFAULT 0 CHECK (incognito IN (0, 1));
+"""
+
 PERSONAS_MIGRATION_ID = "RAIKER-2134-personas"
 #: ADR-0005 — composer personas. Owner data under the account; the ceiling is
 #: a JSON list of tool families (NULL inherits the turn's tools).
@@ -5462,6 +5467,7 @@ MIGRATIONS: tuple[MigrationStep, ...] = (
     Migration(INSTRUCTION_FILES_MIGRATION_ID, INSTRUCTION_FILES_SQL),
     Migration(PERSONAS_MIGRATION_ID, PERSONAS_SQL),
     Migration(MCP_CALL_MODE_MIGRATION_ID, MCP_CALL_MODE_SQL),
+    Migration(CONVERSATION_INCOGNITO_MIGRATION_ID, CONVERSATION_INCOGNITO_SQL),
 )
 
 #: DEC-17 step 8 — how far along the registry this build is, as one number.

@@ -31,16 +31,52 @@ memory off/on switch withholds and then restores that actual search. The
 embeddings and explicit fixture authorization; it does not claim a chat-model
 answer or permission-free setup on a new account.
 
-**Still open:** subsequent chat-model turns and a conversation-level Incognito
-control/journey. Backend opt-out tests are not a substitute for that UI.
-RU-11 is partly done, not signed off. The wider API response suite also emitted a Windows
-native hardware-probe exception; it is not counted as a passing suite.
+**Completion extension — RT-MEM-SUMMARY-01 passed end to end in 48.1 seconds.** The full real-host
+journey now includes refused authorization and a genuinely unavailable loopback
+endpoint before successful setup. Both failures are shown inline without a
+false success claim. Fixture preparation authorizes only the disposable account
+through public services; no model response or API route is mocked. The test
+does not visit Permissions or Settings for the Memory operations (it separately
+checks the old Settings address redirects).
+
+Four real `qwen2.5-coder:7b` turns through Chat prove:
+
+| Condition | Answer and saved evidence |
+|---|---|
+| Memory on | Answers Darjeeling; saved disclosure records brief/retrieval use |
+| New conversation Incognito, reloaded before sending | Answers that it does not know; effective mode Off, Incognito true, no recalled memories |
+| Global Use memory off, ordinary new chat | Withholds Darjeeling; saved mode Off and no recalled memories |
+| Global Use memory restored, ordinary new chat | Answers Darjeeling again with saved recall evidence |
+
+The final captures include `chat-memory-on.png`, `chat-incognito.png`,
+`chat-global-memory-off.png`, `chat-memory-restored.png`,
+`local-meaning-refused.png`, `local-meaning-unavailable.png`, and
+`incognito-{light,dark}-{1440,390}.png` in `output/playwright/ru-11/`.
+They were inspected for wrapping, legibility and horizontal overflow.
+Screenshot review caught a goal offer referencing an earlier chat under
+Incognito; the corrected backend and UI now suppress that offer, with failing-
+then-passing regressions and a live absence assertion. The small `gemma3:1b`
+attempt returned “I do not know” despite receiving memory and did not qualify
+recall; the successful run uses Qwen and checks both answers and recall records.
+
+RU-11 is complete. The independent Windows native hardware-probe exception and
+existing command-runner exit 91 remain recorded in
+[TO_BE_FIXED](../plans/TO_BE_FIXED.md#windows-test-runner-qualification--2026-11-27);
+neither broad Windows suite is counted as passing.
 
 Validation: 54 focused memory Python tests, the local-meaning response contract,
 Ruff, Mypy (1,342 files), Svelte check, ESLint, production build and documentation
 contracts passed. The full web unit run passed 314 files (2,982 tests, one
 skipped); focused tests were repeated for subsequent engine refresh changes.
 The deterministic browser suite also passed all 31 cases (19.4 seconds).
+Completion adds three Incognito component tests (full web total: 315 files,
+2,985 passed, one skipped), account-isolation/strict-input/persistence and
+execution-profile regressions, actual ambient and explicit tool withholding,
+and nine goal-noticing tests. Both new API response contracts pass.
+The final focused Python run passed 97 cases with the independently failing
+Windows command qualification deselected; 20 documentation/generated-contract
+and persistence cases also passed. Ruff, Mypy (1,343 files), Svelte check,
+ESLint, build, SAST and secret scan passed on the final change.
 The first GitHub Python check flagged the fixture's public `confirm` phrase as
 S106; its exact finding was reviewed in `.github/sast-exceptions.json`, following
 the existing live-fixture convention. No scanner or runtime gate was disabled.

@@ -28,6 +28,7 @@
   import ModelReadinessStrip from "../components/ModelReadinessStrip.svelte";
   import BuildSidePanel from "../components/BuildSidePanel.svelte";
   import ExportConversationDialog from "../components/ExportConversationDialog.svelte";
+  import ConversationIncognito from "../components/ConversationIncognito.svelte";
   import { densityGap, workSurface } from "../workSurface";
   import { api, ApiError, streamPrompt, streamResumeAfterApproval } from "../api";
   import { contract, type PersonaView } from "../generated/apiContract";
@@ -261,6 +262,8 @@
   const runningTurn = new RunningTurn();
   // Reuse one session across turns so the governed conversation stays continuous.
   let sessionId = $state<string | null>(null);
+  let conversationIncognito = $state(false);
+  let incognitoBusy = $state(false);
   // Provider-reported usage and API cost for this conversation. Null until the
   // popover is opened at least once; the meter falls back to the labelled local
   // estimate until the server has something real to report.
@@ -1108,6 +1111,7 @@
     landedAnchor = null;
     try {
       const detail = await api.session(id);
+      conversationIncognito = detail.session?.incognito ?? false;
       conversationTitle = detail.session?.title ?? "";
       conversationProfile = profileFromSession(id, detail.session?.conversation_profile, saveProfile);
       const parked = parkedByTurn(detail);
@@ -1284,7 +1288,7 @@
       }
       return "not_sent";
     }
-    if (typed === "" || streaming || attachStore.uploading) return "not_sent";
+    if (typed === "" || streaming || attachStore.uploading || incognitoBusy) return "not_sent";
     // Pinned answers ride as quoted context above what was typed (QUI-C04).
     const text = spoken === null ? withPins(typed, promptPins) : typed;
     // QUI-Q04 — Send is never a dead button. With no usable model the press
@@ -1684,7 +1688,7 @@
    * original turn stays and the edited one arrives as a new turn beneath it.
    */
   function editPrompt(text: string) {
-    if (streaming) return;
+    if (streaming || incognitoBusy) return;
     draft.text = text;
     menuKind = "none";
     queueMicrotask(() => {
@@ -1912,7 +1916,7 @@
   }
 
   function newConversation() {
-    if (streaming) return;
+    if (streaming || incognitoBusy) return;
     audioSessionCoordinator.stopAll("route");
     resetVoiceProvenance();
     // Release the transcript's thumbnails with the transcript. They are held
@@ -1922,6 +1926,7 @@
     turns = [];
     earlierShown = 0;
     sessionId = null;
+    conversationIncognito = false;
     conversationProfile = "standard";
     conversationTitle = "";
     editingTitle = false;
@@ -2256,6 +2261,7 @@
       ><Icon name="folder" size="sm" /><span>{selectedProject.name}</span></a>
     {/if}
     <div class="header-actions">
+      <ConversationIncognito bind:sessionId bind:incognito={conversationIncognito} bind:busy={incognitoBusy} disabled={streaming || historyLoading} onsaved={(id) => rememberSessionInRoute("new-chat", id)} />
       {#if searchOpen}
         <div class="conversation-search" role="search">
           <input
@@ -2882,7 +2888,7 @@
         </div>
       </div>
     {/each}
-    {#if sessionId !== null && !streaming && turns.length > 0}
+    {#if sessionId !== null && !streaming && turns.length > 0 && !conversationIncognito}
       <!-- QUI-F03 — an aim that came up in another conversation too, offered
            once under the latest answer. -->
       <GoalSuggestion

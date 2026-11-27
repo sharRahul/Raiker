@@ -20,6 +20,19 @@ chose. This is the account's Incognito boundary; a conversation's own memory
 opt-out stays separate. Turning Use memory back on does not change an Off
 automatic-recall mode into an enabled one.
 
+In **Chat**, turn on **Incognito** before sending to withhold approved memory
+and cross-conversation recall from that conversation. It also withholds the
+assistant's explicit personal-memory lookups. The switch is saved on the
+conversation, survives reloads, and does not change other chats or the global
+Use memory setting. Change it between turns; the switch is unavailable while
+an answer runs. Turning it off cannot override account-wide Use memory off or
+an execution profile that withholds memory.
+
+Incognito does not erase the transcript or facts already quoted in this chat.
+Messages remain saved and the current chat's own history remains available.
+Start a new Incognito conversation when earlier messages contain information
+you do not want included in the next answer.
+
 ## The memory path
 
 ```text

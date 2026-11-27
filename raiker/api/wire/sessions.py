@@ -160,6 +160,12 @@ class SessionPinned(TypedDict):
     pinned: bool
 
 
+class SessionIncognitoSet(TypedDict):
+    ok: bool
+    session_id: str
+    incognito: bool
+
+
 class SessionProfileSet(TypedDict):
     ok: bool
     session_id: str

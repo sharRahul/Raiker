@@ -71,6 +71,17 @@ def test_the_same_aim_in_two_conversations_is_offered_once(client: TestClient) -
     assert _suggestion(client, h, "sess_c") is None
 
 
+@pytest.mark.parametrize("scope", ["account", "conversation"])
+def test_incognito_does_not_notice_aims_from_other_chats(client: TestClient, scope: str) -> None:
+    h = _headers(client)
+    _chat(client, h, "sess_a", "Plan my Berlin marathon training schedule")
+    _chat(client, h, "sess_b", "Revise my Berlin marathon training schedule")
+    assert _suggestion(client, h, "sess_b") is not None
+    path = "/api/memory/incognito" if scope == "account" else "/api/sessions/sess_b/incognito"
+    assert client.put(path, json={"incognito": True}, headers=h).status_code == 200
+    assert _suggestion(client, h, "sess_b") is None
+
+
 def test_unrelated_requests_and_routines_offer_nothing(client: TestClient) -> None:
     h = _headers(client)
     _chat(client, h, "sess_a", "Draft a polite reply to the landlord about the broken boiler")

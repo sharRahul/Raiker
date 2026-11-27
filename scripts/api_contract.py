@@ -595,6 +595,8 @@ VERIFIED: frozenset[tuple[str, str]] = frozenset(
         ("PUT", "/api/sessions/{session_id}/command-grant"),
         ("PUT", "/api/sessions/{session_id}/pin"),
         ("PUT", "/api/sessions/{session_id}/profile"),
+        ("POST", "/api/sessions/incognito"),
+        ("PUT", "/api/sessions/{session_id}/incognito"),
         ("PUT", "/api/sessions/{session_id}/project"),
         ("PUT", "/api/sessions/{session_id}/rename"),
         ("PUT", "/api/sessions/{session_id}/tags"),

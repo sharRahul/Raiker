@@ -1206,6 +1206,8 @@ export const api = {
   // the composer sends as a narrowing override; it grants nothing.
   setSessionProfile: (id: string, profile: "careful" | "standard" | "within_limits") =>
     announcing("profile", contract.setSessionProfile(id, { profile })),
+  startIncognitoConversation: () => contract.startIncognitoConversation(),
+  setSessionIncognito: (id: string, incognito: boolean) => contract.setSessionIncognito(id, { incognito }),
   // Permanently delete one session and its cascaded rows. Requires the explicit
   // confirmation header (mirrors project deletion). Human-only; an account
   // cannot delete another account's session.

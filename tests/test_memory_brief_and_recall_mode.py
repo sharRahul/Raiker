@@ -311,6 +311,27 @@ def test_incognito_withholds_ambient_and_explicit_search(
     }
 
 
+@pytest.mark.parametrize("mode", ["brief", "search_when_relevant"])
+def test_conversation_incognito_withholds_context_without_changing_other_chats(
+    workspace: Path, owner: str, mode: str,
+) -> None:
+    store = SQLiteStore(workspace)
+    _remember(workspace, owner, "The favourite tea is oolong.")
+    store.set_memory_recall_mode(mode, owner)
+    session_id = new_id("sess_")
+    store.create_session(session_id, str(workspace))
+    with store.connect() as connection:
+        connection.execute("UPDATE sessions SET incognito = 1 WHERE session_id = ?", (session_id,))
+    private = ContextGatherer().gather(
+        workspace_root=workspace, session_id=session_id, turn_id=new_id("turn_"),
+        prompt_text="favourite tea", owner_principal_id=owner,
+    )
+    assert _item(private, "memory_brief") is None
+    assert _item(private, "memory_recall") is None
+    assert private.disclosure()["incognito"] is True
+    assert _item(_gather(workspace, owner, "favourite tea"), "memory_brief") is not None
+
+
 def test_disclosure_counts_only_what_the_budget_let_in(workspace: Path, owner: str) -> None:
     _remember(workspace, owner, "The favourite tea is oolong.")
 

@@ -27,7 +27,8 @@ describe("Memory summary", () => {
     expect(screen.getByRole("heading", { name: "Preferences" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Projects" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Other memories" })).toBeInTheDocument();
-    expect(screen.getByText("project:alpha")).toBeInTheDocument();
+    expect(screen.getByText("In one project only")).toBeInTheDocument();
+    expect(screen.queryByText("project:alpha")).toBeNull();
     expect(screen.queryByText("Fact archived")).toBeNull();
     expect(screen.queryByText("Fact expired")).toBeNull();
     expect(screen.queryByText("Fact pending")).toBeNull();

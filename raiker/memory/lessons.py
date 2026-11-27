@@ -60,11 +60,18 @@ def _related(failed: str, passed: str) -> bool:
     return a[:shared] == b[:shared]
 
 
-def lessons_from_runs(runs: Iterable[Mapping[str, Any]]) -> list[str]:
+def lessons_from_runs(
+    runs: Iterable[Mapping[str, Any]], changes: Iterable[str] = ()
+) -> list[str]:
     """Lesson sentences from one turn's command runs, oldest first.
 
-    A run is ``{"command": str, "exit_code": int | None, "created_at": str}``.
+    A run is ``{"command": str, "exit_code": int | None, "created_at": str}``;
+    *changes* are the times this turn changed a file. A pass that follows a file
+    change may be the change working, not the command — `pytest a.py` failing,
+    a fix, then `pytest a.py -x` passing teaches nothing about `-x` — so a
+    change between the two runs is no lesson.
     """
+    edits = sorted(str(at) for at in changes)
     ordered = sorted(
         (run for run in runs if str(run.get("command") or "").strip()),
         key=lambda run: str(run.get("created_at") or ""),
@@ -80,6 +87,10 @@ def lessons_from_runs(runs: Iterable[Mapping[str, Any]]) -> list[str]:
             passed = str(later["command"]).strip()
             if later.get("exit_code") != 0 or not _related(failed, passed):
                 continue
+            start, end = str(run.get("created_at") or ""), str(later.get("created_at") or "")
+            # Seconds-granular clocks: a tie counts as between, so a doubt is no lesson.
+            if any(start <= at <= end for at in edits):
+                break
             if len(failed) > _COMMAND_LIMIT or len(passed) > _COMMAND_LIMIT:
                 break
             lessons.append(f"In this project, `{passed}` works where `{failed}` failed.")
@@ -99,10 +110,11 @@ def propose_turn_lessons(
     turn_id: str,
     source_event_id: str,
     runs: Iterable[Mapping[str, Any]],
+    changes: Iterable[str] = (),
 ) -> LessonSummary:
     """File each lesson this turn taught as a deferred, project-scoped proposal."""
     proposed = already = suppressed = 0
-    for text in lessons_from_runs(runs):
+    for text in lessons_from_runs(runs, changes):
         sensitivity = classify_memory_sensitivity(text)
         if sensitivity in _REFUSED:
             suppressed += 1

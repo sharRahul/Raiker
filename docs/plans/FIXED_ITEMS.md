@@ -11,11 +11,17 @@ becomes one deferred *lesson* — "In this project, `npm test -- --runInBand`
 works where `npm test` failed." — scoped `project:<id>`, offered under the
 answer as **Lesson for this project** with Keep / Not this, and stored only on
 Keep through the same decision route as every proposal. The model's prose is
-never the source (FIXED-1548). One lesson per task; a forgotten or pending
+never the source (FIXED-1548). A file change between the two runs is no
+lesson — the fix, not the flag, may be what passed. Incognito (the account
+switch or the conversation), and a project whose memory is off, file no lesson;
+Incognito now also files no turn proposal, as in ChatGPT's Temporary Chat and
+Claude's incognito chats. One lesson per task; a forgotten or pending
 lesson is not proposed again; secret-like text is refused; the Memory Brief
 recalls a kept lesson only in the same project. `memory_lesson_proposed`
 records counts only. Evidence: `tests/test_memory_lessons.py`,
-`web/src/lib/components/TurnMemoryProposals.test.ts` (*offers a lesson*).
+`web/src/lib/components/TurnMemoryProposals.test.ts` (*offers a lesson*). The
+RU-11 summary now labels a project-scoped memory *In one project only* instead
+of its internal id (`MemorySummary.test.ts`).
 The live two-task journey is not yet run.
 
 ## FIXED-1584 — Conversation Incognito was missing and goal noticing ignored memory opt-out

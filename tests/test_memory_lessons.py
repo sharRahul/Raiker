@@ -146,3 +146,72 @@ def test_a_finished_project_turn_files_its_lesson(
     [proposal] = service.list_memory_proposals(OWNER)
     assert (proposal["source_turn_id"], proposal["scope"]) == ("turn_9", "project:alpha")
     assert len(events) == 1
+
+
+def test_a_file_change_between_the_runs_is_no_lesson() -> None:
+    # The fix may be what made the second run pass, not the flag.
+    runs = [_run("pytest a.py", 1, "2026-11-27T10:00:00Z"), _run("pytest a.py -x", 0, "2026-11-27T10:02:00Z")]
+    assert lessons_from_runs(runs, changes=["2026-11-27T10:01:00Z"]) == []
+    assert lessons_from_runs(runs, changes=["2026-11-27T09:00:00Z"]) != []
+
+
+def _gateway(service: DashboardService, monkeypatch: pytest.MonkeyPatch, session: dict[str, object]) -> object:
+    from types import SimpleNamespace
+
+    from raiker.execution.commands.store import CommandStore
+
+    runs = [
+        SimpleNamespace(turn_id="turn_9", safe_display=str(r["command"]),
+                        exit_code=r["exit_code"], created_at=str(r["created_at"]))
+        for r in TRIAL_AND_ERROR
+    ]
+    monkeypatch.setattr(CommandStore, "list_runs", lambda self, owner, **_: runs)
+    service.store.load_session = lambda _sid: session  # type: ignore[method-assign,assignment]
+    return SimpleNamespace(
+        store=service.store, owner_principal_id=OWNER,
+        writer=SimpleNamespace(last_event_id="evt_9", append=lambda _e: None),
+    )
+
+
+
+def _envelope() -> object:
+    from types import SimpleNamespace
+
+    return SimpleNamespace(session_id="sess_9", turn_id="turn_9", client=None,
+                           prompt=SimpleNamespace(metadata={}))
+
+
+def test_incognito_files_no_proposal_or_lesson(
+    service: DashboardService, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from raiker.gateway.agent_gateway import AgentGateway
+
+    gateway = _gateway(service, monkeypatch, {"project_id": "alpha"})
+    assert AgentGateway._memory_proposals_withheld(gateway, _envelope()) is False  # type: ignore[arg-type]
+    monkeypatch.setattr(type(service.store), "is_memory_incognito", lambda self, owner=None: True)
+    assert AgentGateway._memory_proposals_withheld(gateway, _envelope()) is True  # type: ignore[arg-type]
+
+
+def test_a_conversation_kept_incognito_files_nothing(
+    service: DashboardService, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import raiker.goals.store as goals_store
+    from raiker.gateway.agent_gateway import AgentGateway
+
+    gateway = _gateway(service, monkeypatch, {"project_id": "alpha"})
+    monkeypatch.setattr(goals_store, "session_memory_withheld", lambda _s, _sid: "incognito")
+    assert AgentGateway._memory_proposals_withheld(gateway, _envelope()) is True  # type: ignore[arg-type]
+
+
+def test_a_project_with_memory_off_keeps_no_lesson(
+    service: DashboardService, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from raiker.gateway.agent_gateway import AgentGateway
+
+    gateway = _gateway(service, monkeypatch, {"project_id": "alpha"})
+    monkeypatch.setattr(
+        type(service.store), "load_project",
+        lambda self, pid, user_id=None: {"project_id": pid, "memory_enabled": 0},
+    )
+    AgentGateway._propose_turn_lesson(gateway, _envelope())  # type: ignore[arg-type]
+    assert service.list_memory_proposals(OWNER) == []

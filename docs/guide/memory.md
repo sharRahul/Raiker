@@ -24,7 +24,8 @@ In **Chat**, turn on **Incognito** before sending to withhold approved memory
 and cross-conversation recall from that conversation. It also withholds the
 assistant's explicit personal-memory lookups. The switch is saved on the
 conversation, survives reloads, and does not change other chats or the global
-Use memory setting. Change it between turns; the switch is unavailable while
+Use memory setting. An Incognito turn also proposes nothing to remember: no
+*Remember* or lesson appears under its answers. Change it between turns; the switch is unavailable while
 an answer runs. Turning it off cannot override account-wide Use memory off or
 an execution profile that withholds memory.
 
@@ -90,6 +91,18 @@ relationship retrieval. Rejection does not delete the underlying memories.
 Approval is not a blanket instruction to the agent. Recalled text is supplied
 as labelled evidence and cannot increase permissions, replace the current
 prompt, or bypass an approval gate.
+
+### Lessons from Raiker's own work
+
+When a project task finishes, Raiker may offer **Lesson for this project**
+under the answer — for example *In this project, `npm test -- --runInBand`
+works where `npm test` failed.* It comes from the task's own command records,
+never from the model's wording: a command that failed and a passing variant of
+it (same program, different arguments), with no file changed in between. Keep
+stores it for that project only; the next task in the same project recalls it,
+other projects never do. Not this rejects it, and a lesson you forgot is not
+offered again. Incognito, Use memory off, and a project whose memory is off
+offer no lessons.
 
 ## The Knowledge Map
 

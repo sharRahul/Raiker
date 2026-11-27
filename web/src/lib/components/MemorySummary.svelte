@@ -21,6 +21,13 @@
     }
     return [...grouped].sort(([a], [b]) => a.localeCompare(b));
   });
+  // An internal id is not a label: `project:proj_3f…` reads as one project.
+  function scopeLabel(scope: string): string {
+    if (scope === "account" || scope === "global" || scope === "user") return "Across your conversations";
+    if (scope.startsWith("project:")) return "In one project only";
+    if (scope === "project") return "In your projects";
+    return scope;
+  }
   let editing = $state<string | null>(null);
   let draft = $state("");
   let saving = $state(false);
@@ -53,7 +60,7 @@
               {#if editing === memory.memory_id}
                 <textarea rows="3" aria-label="Memory text" bind:value={draft} disabled={saving}></textarea>
               {:else}<p>{memory.text}</p>{/if}
-              <small>{memory.scope === "account" || memory.scope === "global" ? "Across your conversations" : memory.scope}</small>
+              <small>{scopeLabel(memory.scope)}</small>
             </div>
             <div class="actions">
               {#if editing === memory.memory_id}

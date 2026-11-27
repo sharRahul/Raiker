@@ -768,7 +768,7 @@ class AgentGateway:
             response.status,
             self._persisted_summary(response),
         )
-        if response.status == "completed":
+        if response.status == "completed" and not self._memory_proposals_withheld(prompt_envelope):
             try:
                 from raiker.memory.entity_extraction import propose_completed_turn_memories
 
@@ -824,6 +824,25 @@ class AgentGateway:
             last_event_id=self.writer.last_event_id,
         )
 
+    def _memory_proposals_withheld(self, prompt_envelope: PromptEnvelope) -> bool:
+        """Incognito creates no memory, as it recalls none.
+
+        Like ChatGPT's Temporary Chat and Claude's incognito chats, a turn the
+        owner kept out of memory — the account switch off, or this conversation
+        Incognito — files no proposal or lesson either. An unreadable marker
+        withholds; it never releases.
+        """
+        try:
+            from raiker.goals.store import session_memory_withheld
+
+            if self.store.is_memory_incognito(self.owner_principal_id):
+                return True
+            return session_memory_withheld(self.store, prompt_envelope.session_id) in {
+                "incognito", "unreadable",
+            }
+        except Exception:  # noqa: BLE001 — unknown means withheld
+            return True
+
     def _propose_turn_lesson(self, prompt_envelope: PromptEnvelope) -> None:
         """RU-12 — a lesson this project task's own commands taught, for the owner to keep."""
         try:
@@ -832,6 +851,10 @@ class AgentGateway:
                 prompt_envelope.prompt.metadata.get("project_id") or session.get("project_id") or ""
             ).strip()
             if not project_id:
+                return
+            # A project whose memory is off keeps no lessons, as it recalls none.
+            project = self.store.load_project(project_id)
+            if project is not None and not bool(project.get("memory_enabled")):
                 return
             from raiker.execution.commands.store import CommandStore
             from raiker.memory.lessons import propose_turn_lessons
@@ -845,6 +868,15 @@ class AgentGateway:
             ]
             if not runs:
                 return
+            from raiker.control.build_outcome import WRITE_TOOLS
+
+            changes = [
+                str(row.get("completed_at") or row.get("proposed_at") or "")
+                for row in self.store.list_turn_tool_actions(
+                    prompt_envelope.session_id, prompt_envelope.turn_id
+                )
+                if str(row.get("tool_name") or "") in WRITE_TOOLS and row.get("status") == "success"
+            ]
             summary = propose_turn_lessons(
                 self.store,
                 owner_principal_id=self.owner_principal_id,
@@ -853,6 +885,7 @@ class AgentGateway:
                 turn_id=prompt_envelope.turn_id,
                 source_event_id=self.writer.last_event_id or "evt_missing",
                 runs=runs,
+                changes=changes,
             )
             if summary.proposed or summary.suppressed:
                 self.writer.append(

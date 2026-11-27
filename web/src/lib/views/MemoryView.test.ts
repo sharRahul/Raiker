@@ -12,6 +12,20 @@ afterEach(() => {
 });
 
 describe("MemoryView", () => {
+  it("opens on readable facts with a global Use memory switch that preserves recall mode", async () => {
+    const fetchMock = stubFetch({
+      "GET /api/memory": [],
+      "GET /api/memory/settings": { incognito: false, recall_mode: "brief" },
+      "PUT /api/memory/incognito": { ok: true, incognito: true },
+    });
+    render(MemoryView, { props: { tab: "overview" } });
+    expect(await screen.findByRole("heading", { name: "What Raiker knows about you" })).toBeInTheDocument();
+    await fireEvent.click(screen.getByRole("switch", { name: "Use memory" }));
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledWith(
+      "/api/memory/incognito", expect.objectContaining({ method: "PUT", body: JSON.stringify({ incognito: true }) }),
+    ));
+    expect(fetchMock.mock.calls.some(([url]) => String(url).includes("recall-mode"))).toBe(false);
+  });
   it("opens on what is waiting and what can be recalled, not on a category", async () => {
     // Memory kept records, proposals, observations, a library and two settings
     // at one visual level, so the proposal that needed a decision looked like
@@ -328,8 +342,8 @@ describe("MemoryView", () => {
     });
     render(MemoryView, { props: { tab: "controls" } });
 
-    await waitFor(() => expect(screen.getByRole("switch", { name: /incognito session/i })).toHaveAttribute("aria-checked", "false"));
-    await fireEvent.click(screen.getByRole("switch", { name: /incognito session/i }));
+    await waitFor(() => expect(screen.getByRole("switch", { name: /use memory/i })).toHaveAttribute("aria-checked", "true"));
+    await fireEvent.click(screen.getByRole("switch", { name: /use memory/i }));
 
     await waitFor(() => {
       expect(fetchMock).toHaveBeenCalledWith(
@@ -887,12 +901,10 @@ describe("MemoryView observations (MEM-04)", () => {
     await waitFor(() =>
       expect(screen.getByText(/matches words, not meaning/i)).toBeInTheDocument(),
     );
-    expect(
-      screen.getByRole("link", { name: /change the recall backend/i }),
-    ).toHaveAttribute("href", "#/settings?tab=advanced&kind=memory-engine");
-    // The controls themselves are not here any more.
+    // RU-11: recall controls now live on Memory, with no Settings detour.
+    expect(screen.getByRole("heading", { name: "Find by meaning" })).toBeInTheDocument();
     expect(screen.queryByLabelText(/embedding model/i)).not.toBeInTheDocument();
-    expect(screen.queryByLabelText(/recall backend/i)).not.toBeInTheDocument();
+    expect(await screen.findByLabelText(/recall backend/i)).toBeInTheDocument();
   });
 
   // A semantic *space* and semantic *recall* are two claims. The card said

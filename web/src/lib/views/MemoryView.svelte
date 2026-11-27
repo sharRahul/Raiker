@@ -1,6 +1,8 @@
 <script lang="ts">
   import { failure } from "../errorCopy";
   import MemoryControls from "../components/MemoryControls.svelte";
+  import MemorySummary from "../components/MemorySummary.svelte";
+  import MemoryEngine from "./settings/MemoryEngine.svelte";
   import EmptyState from "../components/EmptyState.svelte";
   import { askConfirm, askText } from "../confirm.svelte";
   import Icon from "../components/Icon.svelte";
@@ -538,6 +540,11 @@
 {:else if memories === null}<PageState state="loading" title="Loading memories…" />
 {:else if tab === "overview"}
   <div id="panel-overview" role="tabpanel" aria-labelledby="tab-overview">
+    <div class="section-head"><h2>What Raiker knows about you</h2>
+      {#if settings}<button class="switch" class:on={!settings.incognito} role="switch" aria-checked={!settings.incognito} aria-label="Use memory" disabled={busy} onclick={() => void toggleIncognito()}><span></span><b>Use memory · {settings.incognito ? "Off" : "On"}</b></button>{/if}
+    </div>
+    {#if settings?.incognito}<p class="page-lead">Memory use is off. Your stored memories are kept.</p>
+    {:else if settings?.recall_mode === "off"}<p class="page-lead">Automatic recall is off. You can still ask for a memory lookup. <a href="#/memory?tab=controls">Change recall mode</a></p>{/if}
     {#if counts.approved === 0}
       <!-- FIXED-1410 — the empty overview was one grey sentence on a bare page;
            it is the shared carded empty state, as on every other tab. -->
@@ -545,8 +552,25 @@
         <EmptyState icon="memory" title="Nothing remembered yet" body={memorySentence(counts)} />
       </div>
     {:else}
-      <p class="page-lead">{memorySentence(counts)}</p>
+      <p class="page-lead">{settings?.incognito ? `${counts.approved} approved memor${counts.approved === 1 ? "y is" : "ies are"} stored. Turn on Use memory to recall them.` : memorySentence(counts)}</p>
     {/if}
+
+    <MemorySummary memories={memories} onSave={async (memory, text) => { await api.editMemory(memory.memory_id, text); await load(); }} onForget={(memory) => void forget(memory)} />
+
+    {#if attention.length > 0}
+      <section class="memory-section" aria-label="Waiting on you">
+        <div class="section-head"><h3>Waiting on you</h3></div>
+        <ul class="attention-list">
+          {#each attention as item (item.label)}
+            <li><span><strong>{item.count}</strong> {item.label}</span>
+              <button type="button" class="btn btn-sm" onclick={() => selectTab(item.tab)}>Open {MEMORY_TAB_LABELS[item.tab]}</button>
+            </li>
+          {/each}
+        </ul>
+      </section>
+    {/if}
+
+    <details class="activity"><summary>Memory activity and retention</summary>
 
   <!-- UX-MEM-06 — where every record is in the one pipeline it passes
        through, so "why is Raiker using this?" has an answer on the page that
@@ -608,25 +632,7 @@
   </section>
   {/if}
 
-    {#if attention.length > 0}
-      <!-- The attention half of the hub. Only decisions appear here:
-           an expired memory has already stopped being recalled, so it is a fact
-           in the summary above rather than a row saying "act on this" about
-           something with nothing to act on. -->
-      <section class="memory-section" aria-label="Waiting on you">
-        <div class="section-head"><h3>Waiting on you</h3></div>
-        <ul class="attention-list">
-          {#each attention as item (item.label)}
-            <li>
-              <span><strong>{item.count}</strong> {item.label}</span>
-              <button type="button" class="btn btn-sm" onclick={() => selectTab(item.tab)}>
-                Open {MEMORY_TAB_LABELS[item.tab]}
-              </button>
-            </li>
-          {/each}
-        </ul>
-      </section>
-    {/if}
+    </details>
   </div>
 {:else if tab === "memories"}
   <div id="panel-memories" role="tabpanel" aria-labelledby="tab-memories">
@@ -829,8 +835,8 @@
   <MemoryControls />
 {#if settings}
   <section class="control-card">
-    <div><h3>Incognito session</h3><p>Do not use approved memories in new conversations and tasks. Stored memories are not deleted.</p></div>
-    <button class="switch" class:on={settings.incognito} role="switch" aria-checked={settings.incognito} aria-label="Incognito session" disabled={busy} onclick={() => void toggleIncognito()}><span></span><b>{settings.incognito ? "On" : "Off"}</b></button>
+    <div><h3>Use memory</h3><p>Use approved memories in conversations and tasks. Turning this off keeps stored memories and blocks recall and memory searches.</p></div>
+    <button class="switch" class:on={!settings.incognito} role="switch" aria-checked={!settings.incognito} aria-label="Use memory" disabled={busy} onclick={() => void toggleIncognito()}><span></span><b>{settings.incognito ? "Off" : "On"}</b></button>
   </section>
 
   <section class="control-card recall-mode-card">
@@ -861,7 +867,7 @@
 
   <section class="control-card">
     <div>
-      <h3>Recall backend</h3>
+      <h3>How recall searches</h3>
       <!-- MEM-11 — the setting governs both the memories Raiker attaches to a
            turn on its own and the search the assistant runs itself. That was
            not always true, and the guide is where the distinction is
@@ -882,25 +888,16 @@
           {/if}
         </span>
       </p>
-      <!-- The index's mechanics are in the guide's *Recall backend and token
-           budget*; this page keeps the one number a reader might check. -->
-      {#if settings.vector_search_strategy === "exact_then_approximate"}
-        <p class="control-note">
-          Ranks {settings.vector_search_exact_limit ?? 512} vectors exactly, then approximates.
-        </p>
-      {/if}
-      <!-- REM-MEM-03 — the health, and the way to repair it. Which space recall
-           searches, and building one, are engine configuration and moved to
-           Settings → Memory engine; what an owner reading their own memories
-           needs here is whether recall is matching meaning or only words, and
-           one link when it is not what they wanted. -->
+      <!-- RU-11: the engine below owns configuration; this sentence reads the
+           same refreshed runtime settings rather than promising semantic recall. -->
       <p class="control-note">
-        <a href="#/settings?tab=advanced&kind=memory-engine">Change the recall backend, or build a
-        meaning-based index</a>
+        Configure meaning-based recall below. Your chosen recall mode is preserved when memory use is off.
       </p>
     </div>
   </section>
 {/if}
+
+  <MemoryEngine onchanged={load} />
 
   <details class="advanced"><summary><span><strong>Advanced memory management</strong><small>Import or export governed memory records.</small></span><Icon name="chevron-down" size="md" /></summary><div class="advanced-body"><button class="btn btn-ghost" onclick={() => void exportMemories()}>Export memories</button><label class="btn btn-ghost file-button">Review import<input type="file" accept="application/json,.json,.md,.markdown,.txt,text/markdown,text/plain" onchange={(e) => void reviewImport(e)} /></label>{#if importPreview}
       <!-- BUG-244 — what this would change, before it changes anything. A

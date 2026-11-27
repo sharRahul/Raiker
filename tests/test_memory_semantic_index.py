@@ -562,3 +562,88 @@ def test_an_unnamed_model_is_refused(tmp_path: Path) -> None:
     result = RuntimeControlService(ws).build_memory_embedding_index("principal_owner", "", "")
     assert result.ok is False
     assert result.reason_code == "embedding_model_not_named"
+
+
+def test_local_meaning_builds_and_selects_actual_space(tmp_path: Path) -> None:
+    ws = _ws(tmp_path)
+    _enable(ws)
+    store = SQLiteStore(ws)
+    _memory(ws, store, 'Backups go to the encrypted NAS.')
+    authority, _ = _authority(ws, _counting_embedder([]))
+    service = DashboardService(ws)
+    service.control._authority = authority
+    result = service.enable_local_meaning_search(_LOCAL_PROVIDER, _LOCAL_MODEL, 'principal_owner')
+    assert result.ok, result.reason_code
+    assert result.data['embedding_backend'] == _LOCAL_SPACE
+    assert store.get_memory_embedding_backend('principal_owner') == _LOCAL_SPACE
+
+
+def test_local_meaning_rejects_hosted_before_indexing(tmp_path: Path) -> None:
+    ws = _ws(tmp_path)
+    _enable(ws)
+    result = DashboardService(ws).enable_local_meaning_search(_PROVIDER, _MODEL, 'principal_owner')
+    assert not result.ok
+    assert result.reason_code == 'local_meaning_requires_loopback'
+
+
+def test_local_meaning_rejects_nonloopback_endpoint(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    ws = _ws(tmp_path)
+    _enable(ws)
+    from raiker.models.registry import ModelProfileRegistry
+    registry = ModelProfileRegistry.load()
+    profile = registry.resolve(_LOCAL_PROVIDER, _LOCAL_MODEL)
+    profile.raw['endpoint'] = 'http://192.168.1.50:8080'
+    monkeypatch.setattr(ModelProfileRegistry, 'load', lambda: registry)
+    result = DashboardService(ws).enable_local_meaning_search(_LOCAL_PROVIDER, _LOCAL_MODEL, 'principal_owner')
+    assert not result.ok
+    assert result.reason_code == 'local_meaning_requires_loopback'
+
+
+def test_local_meaning_rejects_nonloopback_saved_connection(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    ws = _ws(tmp_path)
+    _enable(ws)
+    monkeypatch.setattr(
+        'raiker.models.connections.get_model_connection',
+        lambda *_: {'endpoint': 'https://embedding.example.com/v1'},
+    )
+    result = DashboardService(ws).enable_local_meaning_search(
+        _LOCAL_PROVIDER, _LOCAL_MODEL, 'principal_owner'
+    )
+    assert not result.ok
+    assert result.reason_code == 'local_meaning_requires_loopback'
+
+
+def test_local_meaning_failed_build_preserves_selection(tmp_path: Path) -> None:
+    ws = _ws(tmp_path)
+    _enable(ws)
+    store = SQLiteStore(ws)
+    store.set_memory_embedding_backend('previous-space', 'principal_owner')
+    result = DashboardService(ws).enable_local_meaning_search(
+        _LOCAL_PROVIDER, _LOCAL_MODEL, 'principal_owner'
+    )
+    assert not result.ok
+    assert result.reason_code == 'no_memories_to_index'
+    assert store.get_memory_embedding_backend('principal_owner') == 'previous-space'
+
+
+def test_local_meaning_rejects_hosted_provider_mislabeled_local(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from dataclasses import replace
+
+    from raiker.models.registry import ModelProfileRegistry
+
+    ws = _ws(tmp_path)
+    _enable(ws)
+    registry = ModelProfileRegistry.load()
+    profile = registry.resolve(_PROVIDER, _MODEL)
+    local_claim = replace(profile, local_only=True, requires_network=False)
+    local_claim.raw['endpoint'] = 'http://127.0.0.1:8080'
+    monkeypatch.setattr(ModelProfileRegistry, 'resolve', lambda *_: local_claim)
+    result = DashboardService(ws).enable_local_meaning_search(
+        _PROVIDER, _MODEL, 'principal_owner'
+    )
+    assert not result.ok
+    assert result.reason_code == 'local_meaning_requires_loopback'

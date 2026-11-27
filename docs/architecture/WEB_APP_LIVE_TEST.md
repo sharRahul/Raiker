@@ -1,5 +1,47 @@
 # Web App Live Test — model backends
 
+## Result — 2026-11-27 Memory summary
+
+**RT-MEM-SUMMARY-01 passed on the Windows development PC against an isolated
+running host and its real encrypted store.** The final run passed in 9.2 seconds.
+`web/e2e/ru-11-memory-summary-live.spec.ts` signs in, imports three reviewed facts,
+checks topic and project scope, edits a fact on the landing page, forgets one
+after confirmation, switches Use memory off, reloads to verify persistence,
+and switches it back on. It follows the old Settings → Memory engine address
+to Memory → Controls. No API response is mocked and no provider turn is claimed.
+
+Screenshots were captured and visually inspected at 1440 and 390 px, light and
+dark, under `output/playwright/ru-11/` (`summary-*-*.png`, `controls.png`, plus
+`manifest.json`). The final captures wait for responsive navigation and its
+drawer transition; earlier obscured images were replaced. There is no horizontal
+overflow. The local setup operation has unit coverage for loopback enforcement,
+hosted refusal, failed builds retaining selection and owner authority, plus a
+real API response-contract check.
+
+**Real embedding extension passed in 42.6 seconds.** After correcting the
+sandbox's loopback visibility, the Windows host's real Ollama was reachable.
+The default `nomic-embed-text` model was downloaded and checksum-verified by
+Ollama. With `RAIKER_RU11_SEMANTIC_WORKSPACE` set to the disposable workspace,
+the same spec uses `scripts/live_memory_summary_harness.py` to authorize the
+fixture through public control services, then clicks the local setup action.
+The page reports matches meaning. The real query **Which hot drink suits me?**
+finds the Darjeeling fact with `vector` among its sources. The browser's Use
+memory off/on switch withholds and then restores that actual search. The
+`local-meaning-ready.png` capture was inspected. This extension uses real
+embeddings and explicit fixture authorization; it does not claim a chat-model
+answer or permission-free setup on a new account.
+
+**Still open:** subsequent chat-model turns and a conversation-level Incognito
+control/journey. Backend opt-out tests are not a substitute for that UI.
+RU-11 is partly done, not signed off. The wider API response suite also emitted a Windows
+native hardware-probe exception; it is not counted as a passing suite.
+
+Validation: 54 focused memory Python tests, the local-meaning response contract,
+Ruff, Mypy (1,342 files), Svelte check, ESLint, production build and documentation
+contracts passed. The full web unit run passed 314 files (2,982 tests, one
+skipped); focused tests were repeated for subsequent engine refresh changes.
+The deterministic browser suite also passed all 31 cases (19.4 seconds).
+
 ## Result — 2026-11-27 Permissions and work-page refinement
 
 **RT-PERMISSIONS-UI-01 passed against the real isolated Raiker account.**

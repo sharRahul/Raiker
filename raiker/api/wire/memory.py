@@ -297,6 +297,10 @@ class EmbeddingIndexBuilt(TypedDict):
     content_redacted: bool
 
 
+class LocalMeaningEnabled(EmbeddingIndexBuilt):
+    embedding_backend: str
+
+
 class MemoryForgotten(TypedDict):
     ok: bool
     memory_id: str

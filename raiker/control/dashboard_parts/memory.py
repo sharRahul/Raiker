@@ -928,6 +928,7 @@ class MemoryService:
                 text,
                 workspace_root=self.workspace_root,
                 scope=str(item.get("scope", "project")),
+                memory_type=str(item.get("memory_type") or "project"),
                 # The card's Source line reads this; left at the default it said
                 # "agent" for a record the owner imported.
                 source="user_import",
@@ -1516,6 +1517,69 @@ class MemoryService:
         same vectors while proving nothing about how they got there.
         """
         return self.control.build_memory_embedding_index(acting_principal_id, provider, model)
+
+    def enable_local_meaning_search(
+        self: DashboardService, provider: str, model: str, acting_principal_id: str | None
+    ) -> ControlResult:
+        """Build through the governed executor, then select the space it produced."""
+        import ipaddress
+        import os
+        from urllib.parse import urlparse
+
+        from raiker.models.connections import get_model_connection
+        from raiker.models.registry import ModelProfileRegistry, RegistryError
+        from raiker.vector.backends import embedding_capable_profiles
+
+        principal = self.control._resolve_or_none(acting_principal_id)  # noqa: SLF001
+        if principal is None:
+            return ControlResult(ok=False, reason_code="principal_not_resolved")
+        if principal.principal_type != PrincipalType.HUMAN:
+            return ControlResult(ok=False, reason_code="not_authorized_human")
+        provider, model = provider.strip(), model.strip()
+        if not provider or not model:
+            return ControlResult(ok=False, reason_code="embedding_model_not_named")
+        if (provider, model) not in {
+            (item["provider"], item["model"]) for item in embedding_capable_profiles()
+        }:
+            return ControlResult(ok=False, reason_code="embedding_model_not_offered")
+        try:
+            profile = ModelProfileRegistry.load().resolve(provider, model)
+        except (RegistryError, OSError, ValueError):
+            return ControlResult(ok=False, reason_code="embedding_model_not_offered")
+        connection = get_model_connection(self.store, principal.principal_id, profile.profile_id) or {}
+        raw = profile.raw
+        endpoint = (
+            connection.get("endpoint")
+            or os.environ.get(str(raw.get("endpoint_env") or ""))
+            or raw.get("endpoint") or raw.get("base_url") or ""
+        )
+        local = (
+            profile.provider in {
+                "llama.cpp", "llama-cpp", "llama-cpp-server", "mlx", "ollama",
+                "lm-studio", "vllm", "openai-compatible",
+            }
+            and bool(profile.local_only) and not bool(profile.requires_network)
+        )
+        if endpoint:
+            parsed = urlparse(str(endpoint))
+            host = parsed.hostname or ""
+            try:
+                loopback = ipaddress.ip_address(host).is_loopback
+            except ValueError:
+                loopback = host.lower() == "localhost"
+            local = local and parsed.scheme in {"http", "https"} and loopback
+        else:
+            local = local and profile.provider == "llama.cpp"
+        if not local:
+            return ControlResult(ok=False, reason_code="local_meaning_requires_loopback")
+        built = self.build_memory_embedding_index(provider, model, principal.principal_id)
+        if not built.ok:
+            return built
+        backend = str(built.data.get("embedding_model") or "")
+        selected = self.set_memory_embedding_backend(backend, principal.principal_id)
+        if not selected.ok:
+            return selected
+        return ControlResult(ok=True, data={**built.data, **selected.data})
 
     def set_memory_embedding_backend(
         self: DashboardService, backend: str, acting_principal_id: str | None

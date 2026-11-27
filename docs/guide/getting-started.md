@@ -503,7 +503,7 @@ Five destinations are tabbed, and Settings has its own rail:
 | Memory | Overview, Memories, Suggestions, Sources, Controls (the map opens from Memories) |
 | Connections | Services, Channels, Advanced (MCP servers, Skills, Hooks, Plugins) |
 | Diagnostics | Overview, Audit log, Recovery, Work in action, Notifications |
-| Settings | General, Personalisation, Notifications, Security, Privacy, Execution profiles, Web access, Advanced (Runtime, Memory engine, Model serving, Usage and spending), About & updates |
+| Settings | General, Personalisation, Notifications, Security, Privacy, Execution profiles, Web access, Advanced (Runtime, Model serving, Usage and spending), About & updates |
 
 Old links to the pages these absorbed still resolve and open the right tab —
 `#/tasks` opens Work on Tasks, `#/brain` opens Memory on Map, `#/messaging`

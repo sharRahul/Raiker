@@ -171,6 +171,16 @@ class TestImportPreviewNamesEveryRecord:
 
 
 class TestImportIsABatchThatCanBeTakenBack:
+    def test_import_keeps_the_reviewed_memory_type(self, service: DashboardService) -> None:
+        result = service.import_memories(
+            [{"text": "I prefer Assam tea.", "memory_type": "preference", "scope": "account"}],
+            OWNER,
+        )
+        assert result.ok
+        row = service.list_memories(acting_principal_id=OWNER)[0]
+        assert row.memory_type == "preference"
+        assert row.scope == "account"
+
     def test_the_owners_skips_are_honoured_and_counted(
         self, service: DashboardService
     ) -> None:

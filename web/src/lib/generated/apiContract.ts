@@ -3932,6 +3932,21 @@ export type LocalMcpServerCreated = {
   runs_as: "owner";
 };
 
+export type LocalMeaningEnabled = {
+  ok: boolean;
+  operation: "index_memories";
+  embedding_model: string;
+  provider_models: string[];
+  indexed_count: number;
+  indexed_file_chunk_count: number;
+  skipped_count: number;
+  skipped: Record<string, string>[];
+  provider_backed: boolean;
+  local_only: boolean;
+  content_redacted: boolean;
+  embedding_backend: string;
+};
+
 export type LocalModelDeployRequest = {
   profile_id?: string | null;
   install_if_missing?: boolean;
@@ -8165,6 +8180,8 @@ export const contract = {
     call<IncognitoSet>("PUT", "/api/memory/incognito", { body }),
   memoryIntegrity: () =>
     request<MemoryIntegrity>("/api/memory/integrity"),
+  enableLocalMeaningSearch: (body: Record<string, unknown>) =>
+    call<LocalMeaningEnabled>("POST", "/api/memory/local-meaning", { body }),
   listObservations: () =>
     request<ObservationsView>("/api/memory/observations"),
   deleteObservations: (body: Record<string, unknown>) =>

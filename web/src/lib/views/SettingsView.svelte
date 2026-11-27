@@ -18,7 +18,6 @@
   import Runtime from "./settings/Runtime.svelte";
   import WebAccess from "./settings/WebAccess.svelte";
   import ExecutionProfiles from "./settings/ExecutionProfiles.svelte";
-  import MemoryEngine from "./settings/MemoryEngine.svelte";
   import Updates from "./settings/Updates.svelte";
   import Voice from "./settings/Voice.svelte";
   import Icon from "../components/Icon.svelte";
@@ -463,8 +462,6 @@
       </div>
       {#if advancedKind === "runtime"}
         <Runtime {principal} {settings} {save} />
-      {:else if advancedKind === "memory-engine"}
-        <MemoryEngine />
       {:else if advancedKind === "models"}
         <ModelsView view="routing" />
       {:else}

@@ -64,6 +64,7 @@ export const SECTION_ALIASES: Readonly<Record<string, string>> = {
 
 /** Sections that left Settings for another page, and where they went. */
 export const SECTIONS_MOVED: Readonly<Record<string, string>> = {
+  "memory-engine": "#/memory?tab=controls",
   github: "#/connections?tab=services&item=github-account",
   "git-credential": "#/connections?tab=services&item=github-account",
 };
@@ -75,14 +76,15 @@ export const SECTIONS_MOVED: Readonly<Record<string, string>> = {
  */
 export function movedSettingsAddress(hash: string): string | null {
   if (!/^#\/?settings(?:[?/]|$)/.test(hash)) return null;
-  const tab = new URLSearchParams(hash.split("?", 2)[1] ?? "").get("tab");
+  const query = new URLSearchParams(hash.split("?", 2)[1] ?? "");
+  const tab = query.get("tab");
+  if (tab === "advanced" && query.get("kind") === "memory-engine") return "#/memory?tab=controls";
   return tab === null ? null : (SECTIONS_MOVED[tab] ?? null);
 }
 
 /** QUI-L09 — the segments of Settings › Advanced, in order. */
 export const ADVANCED_SETTINGS = [
   { id: "runtime", label: "Runtime" },
-  { id: "memory-engine", label: "Memory engine" },
   { id: "models", label: "Model serving" },
   { id: "usage", label: "Usage and spending" },
 ] as const;

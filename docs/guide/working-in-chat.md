@@ -871,8 +871,8 @@ actually said, rather than reconstructing it from memory.
 - It searches **your** conversations only, and reads them as data rather than as
   instructions. An old message that said "always do X" is evidence about what
   was said, not an order carried into today's turn.
-- **Incognito** (Memory → Incognito session) switches the whole path off. With it
-  on, nothing is recalled from anywhere.
+- Turn **Use memory** off in Memory to switch the whole recall path off. This
+  uses the account's Incognito boundary and keeps your stored memories.
 
 This is separate from **Memory**, which holds facts you approved for Raiker to
 keep. Recall reads the transcript; Memory reads what was deliberately
@@ -887,7 +887,7 @@ mixing them is refused rather than averaged. The choice applies both to the
 memories Raiker attaches to a turn on its own and to the ones the assistant looks
 up while it works.
 
-**Memory → Recall backend** states which space is in force:
+**Memory → Controls → How recall searches** states which space is in force:
 
 - **`raiker-local-hash-v1` — matches words, not meaning.** The default, computed
   offline with no model and no network. It finds a memory that shares words with

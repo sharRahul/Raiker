@@ -1,5 +1,33 @@
 # Fixed items
 
+## FIXED-1582 — Memory opened on counts instead of the facts Raiker knows
+
+**Severity: Medium. Area: Memory / Quiet UI (RU-11). Status: Fixed 2026-11-27.**
+Memory now opens on **What Raiker knows about you**, grouped by topic with scope,
+inline Edit and Forget, and the pending suggestions count. **Use memory** reuses
+the account's Incognito boundary without changing recall mode; retention and
+pipeline details are disclosed below the facts. Memory's permission notice
+now distinguishes disabled agent proposals from the
+owner's still-available record management. Recall configuration lives in
+Memory → Controls, and old Settings links forward there. The local meaning-search
+action validates the resolved loopback profile server-side, builds through the
+governed executor and selects the resulting space. Engine changes refresh the
+parent's retrieval status. Real Ollama paraphrase vector search and global off/on
+pass; RU-11's chat-turn and conversation-Incognito acceptance remain open.
+Evidence: 54 focused Python tests,
+the new API response contract, component tests and RT-MEM-SUMMARY-01
+([live record](../architecture/WEB_APP_LIVE_TEST.md#result--2026-11-27-memory-summary)).
+
+## FIXED-1583 — Import discarded a memory's reviewed topic
+
+**Severity: Medium. Area: Memory / import. Status: Fixed 2026-11-27.**
+A preference imported from a reviewed file became `project`, so the new summary
+grouped it under Projects. Import now preserves `memory_type`, retaining the
+existing project default when absent. The regression failed before the change
+and passes after it; the live test imports a preference and verifies its topic.
+Evidence: `test_import_keeps_the_reviewed_memory_type` in
+`tests/test_memory_lifecycle_usage_import.py` and RT-MEM-SUMMARY-01.
+
 ## FIXED-1581 — Current documentation still described removed approval modes and UI
 
 **Severity: Medium. Area: Documentation / permissions. Status: Fixed 2026-11-27.**
@@ -2300,6 +2328,8 @@ file you can open. The two capture sets that remain — `screenshots/pages/` and
 | [FIXED-1576](#fixed-1576--github-retained-two-active-workflows-after-their-files-were-removed) | Low | CI / maintenance | Fixed 2026-11-26 |
 | [FIXED-1577](#fixed-1577--the-mxc-assessment-had-no-current-windows-measurement) | Medium | Native sandbox evaluation (RU-05) | Fixed 2026-11-26 |
 | [FIXED-1581](#fixed-1581--current-documentation-still-described-removed-approval-modes-and-ui) | Medium | Documentation / permissions | Fixed 2026-11-27 |
+| [FIXED-1582](#fixed-1582--memory-opened-on-counts-instead-of-the-facts-raiker-knows) | Medium | Memory / Quiet UI | Fixed 2026-11-27 |
+| [FIXED-1583](#fixed-1583--import-discarded-a-memorys-reviewed-topic) | Medium | Memory / import | Fixed 2026-11-27 |
 | [FIXED-1580](#fixed-1580--permissions-repeated-policy-and-work-pages-exposed-routine-metadata) | Medium | Quiet UI / permission clarity | Fixed 2026-11-27 |
 | [FIXED-1578](#fixed-1578--preparation-and-approval-policy-disagreed-across-workflows) | High | Authorization / Quiet UI | Fixed 2026-11-27 |
 | [FIXED-1579](#fixed-1579--a-reviewed-grant-could-be-spent-after-its-state-changed) | High | Bounded authorization | Fixed 2026-11-27 |

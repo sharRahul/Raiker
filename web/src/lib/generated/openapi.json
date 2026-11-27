@@ -20106,6 +20106,84 @@
         "title": "LocalMcpServerCreated",
         "type": "object"
       },
+      "LocalMeaningEnabled": {
+        "properties": {
+          "content_redacted": {
+            "title": "Content Redacted",
+            "type": "boolean"
+          },
+          "embedding_backend": {
+            "title": "Embedding Backend",
+            "type": "string"
+          },
+          "embedding_model": {
+            "title": "Embedding Model",
+            "type": "string"
+          },
+          "indexed_count": {
+            "title": "Indexed Count",
+            "type": "integer"
+          },
+          "indexed_file_chunk_count": {
+            "title": "Indexed File Chunk Count",
+            "type": "integer"
+          },
+          "local_only": {
+            "title": "Local Only",
+            "type": "boolean"
+          },
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          },
+          "operation": {
+            "const": "index_memories",
+            "title": "Operation",
+            "type": "string"
+          },
+          "provider_backed": {
+            "title": "Provider Backed",
+            "type": "boolean"
+          },
+          "provider_models": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Provider Models",
+            "type": "array"
+          },
+          "skipped": {
+            "items": {
+              "additionalProperties": {
+                "type": "string"
+              },
+              "type": "object"
+            },
+            "title": "Skipped",
+            "type": "array"
+          },
+          "skipped_count": {
+            "title": "Skipped Count",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "ok",
+          "operation",
+          "embedding_model",
+          "provider_models",
+          "indexed_count",
+          "indexed_file_chunk_count",
+          "skipped_count",
+          "skipped",
+          "provider_backed",
+          "local_only",
+          "content_redacted",
+          "embedding_backend"
+        ],
+        "title": "LocalMeaningEnabled",
+        "type": "object"
+      },
       "LocalModelDeployRequest": {
         "additionalProperties": false,
         "properties": {
@@ -51716,6 +51794,47 @@
           }
         },
         "summary": "Memory Integrity"
+      }
+    },
+    "/api/memory/local-meaning": {
+      "post": {
+        "description": "Build and select a verified on-device meaning-search space.",
+        "operationId": "enable_local_meaning_search_api_memory_local_meaning_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": true,
+                "title": "Body",
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LocalMeaningEnabled"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Enable Local Meaning Search"
       }
     },
     "/api/memory/observations": {

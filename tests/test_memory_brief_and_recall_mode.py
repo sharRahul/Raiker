@@ -293,6 +293,24 @@ def test_incognito_wins_over_every_mode(workspace: Path, owner: str) -> None:
     assert disclosure["incognito"] is True
 
 
+@pytest.mark.parametrize("mode", ["off", "brief", "search_when_relevant"])
+def test_incognito_withholds_ambient_and_explicit_search(
+    workspace: Path, owner: str, mode: str
+) -> None:
+    from raiker.tools.memory_tools import memory_search
+
+    store = SQLiteStore(workspace)
+    _remember(workspace, owner, "The favourite tea is oolong.")
+    store.set_memory_recall_mode(mode, owner)
+    store.set_memory_incognito(True, owner)
+    bundle = _gather(workspace, owner, "favourite tea")
+    assert _item(bundle, "memory_brief") is None
+    assert _item(bundle, "memory_recall") is None
+    assert memory_search(workspace, "favourite tea", owner_principal_id=owner) == {
+        "status": "withheld", "reason": "incognito", "count": 0, "results": []
+    }
+
+
 def test_disclosure_counts_only_what_the_budget_let_in(workspace: Path, owner: str) -> None:
     _remember(workspace, owner, "The favourite tea is oolong.")
 

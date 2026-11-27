@@ -60,6 +60,35 @@ function settings(overrides: Record<string, unknown> = {}) {
 }
 
 describe("Settings → Memory engine", () => {
+  it("offers one local meaning-search action and never sends it a hosted profile", async () => {
+    const onchanged = vi.fn();
+    const fetchMock = stubFetch({
+      "GET /api/memory/settings": settings(),
+      "POST /api/memory/local-meaning": { ok: true, indexed_count: 4, indexed_file_chunk_count: 2, embedding_model: LOCAL_PROVIDER.space },
+    });
+    render(MemoryEngine, { onchanged });
+    await fireEvent.click(await screen.findByRole("button", { name: "Find by meaning (stays on this computer)" }));
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledWith(
+      "/api/memory/local-meaning", expect.objectContaining({ method: "POST", body: JSON.stringify({ provider: "llama.cpp", model: "local-gguf" }) }),
+    ));
+    expect(await screen.findByRole("status", { name: "Meaning search result" })).toHaveTextContent(/index prepared/i);
+    expect(onchanged).toHaveBeenCalledOnce();
+  });
+
+  it("explains that a local model is required when only hosted models are offered", async () => {
+    stubFetch({ "GET /api/memory/settings": settings({ embedding_providers: [HOSTED_PROVIDER] }) });
+    render(MemoryEngine);
+    expect(await screen.findByText(/Add a local embedding model in Models/)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Find by meaning (stays on this computer)" })).toBeNull();
+  });
+
+  it("reports a refused local setup without claiming meaning search is ready", async () => {
+    stubFetch({ "GET /api/memory/settings": settings() });
+    render(MemoryEngine);
+    await fireEvent.click(await screen.findByRole("button", { name: "Find by meaning (stays on this computer)" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent(/could not prepare meaning search/i);
+    expect(screen.queryByRole("status", { name: "Meaning search result" })).toBeNull();
+  });
   it("builds a meaning-based index with the model the owner named", async () => {
     const fetchMock = stubFetch({
       "GET /api/memory/settings": settings(),

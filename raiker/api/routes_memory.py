@@ -28,6 +28,7 @@ from raiker.api.wire.memory import (
     EmbeddingIndexBuilt,
     GistDiscarded,
     IncognitoSet,
+    LocalMeaningEnabled,
     MemoryArchived,
     MemoryCorrected,
     MemoryExport,
@@ -564,6 +565,30 @@ async def build_memory_embedding_index(
             }
             else status.HTTP_403_FORBIDDEN, result.reason_code)
     answer = cast(EmbeddingIndexBuilt, {"ok": True, **result.data})
+    return serialize_dto(answer)
+
+
+@router.post("/api/memory/local-meaning")
+async def enable_local_meaning_search(
+    request: Request,
+    body: dict[str, Any],
+    auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+) -> dict[str, Any]:
+    """Build and select a verified on-device meaning-search space."""
+    result = await asyncio.to_thread(
+        lambda: _service(request).enable_local_meaning_search(
+            str(body.get("provider", "")).strip(),
+            str(body.get("model", "")).strip(),
+            auth_data[0].principal_id,
+        )
+    )
+    if not result.ok:
+        raise refusal(status.HTTP_409_CONFLICT if result.reason_code in {
+            "embedding_model_not_named", "embedding_model_not_offered",
+            "no_memories_to_index", "local_meaning_requires_loopback",
+            "embedding_backend_unknown",
+        } else status.HTTP_403_FORBIDDEN, result.reason_code)
+    answer = cast(LocalMeaningEnabled, {"ok": True, **result.data})
     return serialize_dto(answer)
 
 

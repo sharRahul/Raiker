@@ -151,11 +151,13 @@ describe("supported-preferences settings", () => {
     );
     expect(
       within(segments).getAllByRole("button").map((button) => button.textContent?.trim()),
-    ).toEqual(["Runtime", "Memory engine", "Model serving", "Usage and spending"]);
+    ).toEqual(["Runtime", "Model serving", "Usage and spending"]);
   });
 
   it("forwards GitHub to Connections, where it is connected now (QUI-L09)", async () => {
     const { movedSettingsAddress } = await import("../settingsSections");
+    expect(movedSettingsAddress("#/settings?tab=memory-engine")).toBe("#/memory?tab=controls");
+    expect(movedSettingsAddress("#/settings?tab=advanced&kind=memory-engine")).toBe("#/memory?tab=controls");
     expect(movedSettingsAddress("#/settings?tab=github")).toBe(
       "#/connections?tab=services&item=github-account",
     );

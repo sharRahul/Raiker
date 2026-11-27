@@ -58,7 +58,7 @@ build is still owed for every item (the regular-use journeys in
 | RU-08 Health | Partly done | `raiker doctor` with each fix ([FIXED-1552](FIXED_ITEMS.md#fixed-1552--there-was-no-raiker-doctor)); **This machine** on Observability → *Health, in detail* ([FIXED-1564](FIXED_ITEMS.md#fixed-1564--the-health-page-did-not-show-this-machines-readiness)); sandbox, backups, embedding, voice, updates and always-on facts with the page that fixes each ([FIXED-1566](FIXED_ITEMS.md#fixed-1566--health-did-not-say-what-first-run-had-left-unset)); model and disk-and-memory facts in the same list ([FIXED-1574](FIXED_ITEMS.md#fixed-1574--health-did-not-say-whether-a-model-answers-or-the-disk-is-filling)) | A fresh-machine pass showing exactly what first run fixes |
 | RU-09 Four-step first run | Partly done | Model step says which models suit numbers and code ([FIXED-1538](FIXED_ITEMS.md#fixed-1538--first-run-did-not-say-which-models-suit-numbers-and-code)) ; *This machine* facts and the *Posture* choice ([FIXED-1571](FIXED_ITEMS.md#fixed-1571--first-run-set-up-the-device-but-not-the-machine-and-never-asked-for-a-posture)) | A timed first useful answer under ten minutes on Windows and Linux |
 | RU-10 Keep or skip under the answer | Done | [FIXED-1539](FIXED_ITEMS.md#fixed-1539--a-memory-raiker-proposed-could-only-be-kept-from-memory), owner's words only ([FIXED-1548](FIXED_ITEMS.md#fixed-1548--a-sentence-the-model-invented-was-offered-to-keep-as-a-memory)); RT-1125-08 | — |
-| RU-11 Memory as a summary | Open | — | *What Raiker knows about you*, one switch, *Find by meaning* |
+| RU-11 Memory as a summary | Partly done | *What Raiker knows about you*, inline Edit/Forget, Use memory, recall controls and loopback-checked local setup ([FIXED-1582](FIXED_ITEMS.md#fixed-1582--memory-opened-on-counts-instead-of-the-facts-raiker-knows)); live UI/store and real Ollama paraphrase-search/global-off-on passes | Subsequent chat-model turns and conversation-level Incognito control/journey without Permissions or Settings |
 | RU-12 Remembers its own work | Open | — | Lessons proposed after a task |
 | RU-13 Always-on host | Open | — | User service on each platform; delivery with the window closed |
 | RU-14 Pause and Resume a running step | Open | — | Park a turn at the next safe boundary, freeze a command, resume |
@@ -242,6 +242,11 @@ switch (*Use memory*), Incognito for a conversation, and *Find by meaning
 (Provider embeddings scoped to the loopback profile only). Recall settings move
 under Memory › Controls.
 *Done when* the memory journeys pass with no visit to Permissions or Settings.
+*Progress 2026-11-27:* the summary, controls move and local setup operation ship;
+the real-host UI/store journey and desktop/phone screenshots pass. Real Ollama
+index setup, paraphrase vector search and global off/on also pass. Subsequent
+chat-model turns and conversation-level Incognito remain open
+([live record](../architecture/WEB_APP_LIVE_TEST.md#result--2026-11-27-memory-summary)).
 
 **RU-12 · Raiker remembers its own work. P2, M.** After a task, Raiker may
 propose a *lesson* ("`npm test` needs `--runInBand` in this repository"),
@@ -322,6 +327,14 @@ turns, and RU-J5 checks the approved facts in Memory before recall in a new
 chat. Release qualification still requires a live run on the published build.
 
 ## Changelog
+
+- **2026-11-27 (Memory summary)** — RU-11's landing summary, inline Edit/Forget,
+  Use memory and local setup in Memory Controls shipped. Import preserves topics.
+  RT-MEM-SUMMARY-01 passes on an isolated Windows host, including real Ollama
+  semantic search and global off/on. Chat-turn and conversation-Incognito
+  acceptance remain open. The six active workflows still match the repository files;
+  the two historical workflows remain disabled. No completed parent plan was
+  identified for removal in this scoped review.
 
 - **2026-11-27** — Shared approval authorization and the Permissions/work-page
   refinement shipped ([FIXED-1578](FIXED_ITEMS.md#fixed-1578--preparation-and-approval-policy-disagreed-across-workflows),

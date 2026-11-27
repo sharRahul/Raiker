@@ -40,7 +40,7 @@ export function memoryWritePosture(gates: CapabilityGateLike[] | null | undefine
     return {
       kind: "gate_off",
       headline:
-        "Memory store is off, so no conversation can propose something to remember. This page stays a viewer until you turn it on.",
+        "Memory store is off, so conversations cannot propose memories. You can still review and manage stored memories here.",
       action: "Turn on Memory store",
     };
   }

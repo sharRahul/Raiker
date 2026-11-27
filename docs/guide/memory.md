@@ -9,6 +9,17 @@ Open **Knowledge → Memory** to review proposals, inspect approved memories,
 control recall, and manage retention. Open **Memory → Memories → See on the map** to see
 approved relationships between governed records.
 
+Memory opens on **What Raiker knows about you**: active approved facts grouped
+by topic, with their scope and **Edit** and **Forget** beside each sentence.
+Suggestions waiting for your decision are counted below the facts. **Memories**
+keeps the full filtered list and each record's history and lifecycle controls.
+
+**Use memory** switches account-wide recall and memory searches on or off.
+Turning it off keeps your stored records and preserves the recall mode you
+chose. This is the account's Incognito boundary; a conversation's own memory
+opt-out stays separate. Turning Use memory back on does not change an Off
+automatic-recall mode into an enabled one.
+
 ## The memory path
 
 ```text
@@ -33,7 +44,7 @@ The stages deliberately have different authority:
 - An **approved relationship** may appear in relationship recall and the
   Knowledge Map. A guessed link remains a proposal until you approve it.
 
-**Memory → Overview** draws the same path as five counts — **Observed**,
+**Memory → Overview → Memory activity and retention** draws the same path as five counts — **Observed**,
 **Suggested**, **Approved**, **Recalled** and **Expired or archived** — each a
 link to where those records live. The counts are different sets, not a funnel:
 a memory you wrote yourself was never observed, and most observations are never
@@ -191,7 +202,7 @@ Memory is filtered before ranking:
 - Archived, forgotten, expired, out-of-scope, or policy-withheld records do not
   enter normal retrieval.
 - Sensitivity rules can withhold a memory even when its words match perfectly.
-- **Incognito session** disables approved-memory and cross-conversation recall
+- Turning **Use memory** off disables approved-memory and cross-conversation recall
   for new conversations and tasks, whatever the recall mode — including the
   assistant's own memory and conversation searches, which answer *withheld:
   Incognito*. Reading one record by its id, and the Memory page, still work. It
@@ -225,13 +236,18 @@ adding is the part where the two genuinely differ.
 
 ## Recall backend and token budget
 
-**Where the controls are.** Memory is for your own facts — what Raiker has been
-allowed to remember, what is waiting on a decision, what has expired. Which
-embedding space recall searches, and building one, are engine configuration and
-live under **Settings → Advanced → Memory engine**. Memory's **Controls** tab
-keeps the one thing you need while reading your memories — whether recall is
-matching meaning or only words — and a link to that page when it is not what you
-wanted.
+**Where the controls are.** **Memory → Controls** holds recall mode, the current
+retrieval status and **Find by meaning**. Old Settings → Memory engine links
+open this tab.
+
+**Find by meaning (stays on this computer)** builds and selects a local index
+in one action, using a local embedding model. When several are available,
+choose one first; when none is available, the page links to Models. The server
+checks the actual profile and loopback endpoint before indexing. Model
+permissions and audit still apply. A built index alone is not proof that
+questions can be embedded: the page continues to report word-based recall
+until query embedding is available. The advanced backend and indexing controls
+remain available for an explicitly chosen provider space.
 
 **Raiker's built-in embedding model.** `nomic-embed-text` (Apache-2.0, 768
 dimensions) is the default semantic space, served by your local Ollama, which
@@ -240,7 +256,7 @@ running and `model_provider_runtime` is set to **Always allow** or **Auto**,
 Raiker indexes new approved memories and managed-file chunks in the background
 every ten minutes through the same governed action as **Index**; under **Ask**
 it waits rather than asking you. `RAIKER_BACKGROUND_INDEX=off` turns it off,
-and the last pass is shown under **Settings → Advanced → Memory engine** (and
+and the last pass is shown under **Memory → Controls** (and
 recorded in `logs/background-index.json`), with a link to the setting that
 would change it when it is waiting. Raiker adds the
 `search_document:` and `search_query:` prefixes the model expects.
@@ -248,7 +264,7 @@ would change it when it is waiting. Raiker adds the
 The default lexical fallback, `raiker-local-hash-v1`, works offline and matches shared
 words. It is lexical rather than meaning-based, so paraphrases may not match.
 
-**Build a meaning-based index** (Settings → Advanced → Memory engine) can create provider- or local-model embeddings
+**Build a meaning-based index** (Memory → Controls) can create provider- or local-model embeddings
 for approved, non-sensitive memories. This is a governed write operation: the
 confirmation names the destination and number of memories before text leaves
 the machine. Re-running it indexes only eligible approved memories not already
@@ -323,7 +339,7 @@ preserving an auditable history.
 
 ## Worth reviewing first
 
-Memory's Overview leads with the records most worth a look, each with the
+Memory's **Overview → Memory activity and retention** lists the records most worth a look, each with the
 reasons that put it there: past or near its review date, personal or
 unclassified, written by Raiker and never edited by you, written when Raiker
 was unsure, replacing an earlier memory, or not recalled for 90 days. Each
@@ -420,7 +436,7 @@ back — it does not count as something the workspace already holds.
 
 ## Retention and observations
 
-**Memory → Overview** summarises approved records by retention, and each row
+**Memory → Overview → Memory activity and retention** summarises approved records by retention, and each row
 opens the records it counts:
 
 | Row | Meaning |

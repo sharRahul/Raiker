@@ -1,6 +1,7 @@
 # RU-11 — Memory as a summary
 
-**Status:** proposed design, 2026-11-27; implementation and live acceptance pending.
+**Status:** approved 2026-11-27; UI and controlled setup implemented, real-model
+recall acceptance pending. See [remaining qualification](TO_BE_FIXED.md#ru-11-remaining-qualification--2026-11-27).
 **Parent:** [Ready to use](READY_TO_USE_PLAN.md#d-memory-ahead-on-control-behind-on-ease).
 **Validation:** [Testing](TESTING.md#regular-use-journeys),
 [live evidence](../architecture/WEB_APP_LIVE_TEST.md).
@@ -127,5 +128,6 @@ justified by the RU-11 review alone.
 
 ## Review boundary
 
-This document is a proposed design, not implementation or test evidence.
-RU-11 remains open until the acceptance checks above pass.
+This document records the approved design. Actual evidence is in the linked
+live report and FIXED_ITEMS; RU-11 remains partly done until every acceptance
+check above passes.

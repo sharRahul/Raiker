@@ -202,6 +202,11 @@ def _embedding_index(ws: Path, _client: TestClient, _h: dict[str, str]) -> Call:
     return "/api/memory/embedding-index", {"provider": "llama.cpp", "model": "local-gguf"}
 
 
+def _local_meaning(ws: Path, client: TestClient, headers: dict[str, str]) -> Call:
+    _embedding_index(ws, client, headers)
+    return "/api/memory/local-meaning", {"provider": "llama.cpp", "model": "local-gguf"}
+
+
 IMPORTED = {"memories": [{"text": "Deploys happen on Thursdays."}]}
 
 
@@ -312,6 +317,7 @@ CASES: Cases = {
         "/api/memory/embedding-backend", {"embedding_backend": "auto"}
     ),
     ("POST", "/api/memory/embedding-index"): patched(_embedding_index, _fake_embedder),
+    ("POST", "/api/memory/local-meaning"): patched(_local_meaning, _fake_embedder),
     ("DELETE", "/api/memory/{memory_id}"): _on_memory(""),
     ("GET", "/api/memory/{memory_id}/source"): _on_memory("/source"),
     ("GET", "/api/memory/{memory_id}/history"): _on_memory("/history"),

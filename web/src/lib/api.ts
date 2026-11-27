@@ -1025,6 +1025,8 @@ export const api = {
   // the acting principal.
   buildMemoryEmbeddingIndex: (provider: string, model: string) =>
     contract.buildMemoryEmbeddingIndex({ provider, model }),
+  enableLocalMeaning: (provider: string, model: string) =>
+    contract.enableLocalMeaningSearch({ provider, model }),
   // MEM-04 — what the runtime captured while it worked. The counts come back
   // with the list because a page that can only count what it received cannot
   // tell an owner whether an empty list means nothing ran or everything was

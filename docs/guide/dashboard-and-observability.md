@@ -160,7 +160,7 @@ text, and a vector the disk has mangled — not a list of the size it says it is
 was simply skipped, so that memory stopped being found by meaning. The report
 now counts them as *Damaged vectors*. **Remove damaged vectors** deletes only
 those vectors; the memories are untouched and wait to be indexed again by
-**Settings → Advanced → Memory engine** with the embedding model you chose. Raiker does not
+**Memory → Controls** with the embedding model you chose. Raiker does not
 send their text anywhere on its own.
 
 **The support bundle is checked after it is redacted.** Raiker re-reads the

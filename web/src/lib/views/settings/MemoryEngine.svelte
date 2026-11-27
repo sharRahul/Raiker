@@ -1,19 +1,8 @@
 <script lang="ts">
   import { failure } from "../../errorCopy";
   import { askConfirm } from "../../confirm.svelte";
-  /**
-   * REM-MEM-03 — the recall engine's controls, out of the personal review.
-   *
-   * Memory's job is the owner's own facts: what Raiker has been allowed to
-   * remember, what is waiting on a decision, what has expired. Which embedding
-   * space recall searches, and building one, are neither — they are engine
-   * configuration, and they sat on the same page as an owner reading back
-   * sentences about themselves.
-   *
-   * Memory keeps what an owner needs there: whether recall is matching meaning
-   * or only words, and the link to this page when it is not what they want.
-   * Nothing is duplicated — this page and that sentence read the same settings.
-   */
+  // RU-11: recalled facts lead the landing view; engine configuration lives
+  // under Memory Controls. Settings deep links forward there.
   import { onMount } from "svelte";
   import { api } from "../../api";
   import { providerName } from "../../format";
@@ -22,14 +11,20 @@
   import Icon from "../../components/Icon.svelte";
   import { backgroundIndexCopy } from "../../backgroundIndex";
 
+  let { onchanged = () => {} }: { onchanged?: () => void | Promise<void> } = $props();
+
   let settings = $state<MemorySettingsView | null>(null);
   let loadError = $state<string | null>(null);
   let actionError = $state<string | null>(null);
   let busy = $state(false);
   let indexProvider = $state("");
   let indexResult = $state<string | null>(null);
+  let localResult = $state<string | null>(null);
+  let localChoice = $state("");
 
   const providers = $derived(settings?.embedding_providers ?? []);
+  const localProviders = $derived(providers.filter((profile) => profile.local_only && !profile.requires_network));
+  const localTarget = $derived(localProviders.find((profile) => profile.space === localChoice) ?? (localProviders.length === 1 ? localProviders[0] : null));
   const indexTarget = $derived(providers.find((provider) => provider.space === indexProvider) ?? null);
   const pending = $derived(providers.some((provider) => (provider.pending_count ?? 0) > 0));
   const background = $derived(backgroundIndexCopy(settings?.background_index));
@@ -44,6 +39,21 @@
     }
   }
 
+  async function enableLocalMeaning(): Promise<void> {
+    if (!localTarget || busy) return;
+    busy = true; actionError = null; localResult = null;
+    try {
+      await api.enableLocalMeaning(localTarget.provider, localTarget.model);
+      await load();
+      await onchanged();
+      localResult = settings?.retrieval?.semantic && settings.retrieval.query_embeddable
+        ? "Find by meaning is ready on this computer."
+        : "Local index prepared. Recall still matches words until query embedding is available; check model authorization in Memory Controls.";
+    } catch (error) {
+      actionError = failure("Could not prepare meaning search", "No successful setup was confirmed.", "Check that the local model is running and its use is authorized, then try again.", error);
+    } finally { busy = false; }
+  }
+
   // MEM-03 — recall searches exactly one embedding space. Reloading rather than
   // assuming is what keeps this page from claiming a backend it did not confirm.
   async function chooseBackend(backend: string): Promise<void> {
@@ -52,6 +62,7 @@
     try {
       await api.setMemoryEmbeddingBackend(backend);
       await load();
+      await onchanged();
     } catch (error) {
       actionError =
         failure("The recall backend was not changed", "Recall keeps searching the space it used.", "Try again.", error);
@@ -81,6 +92,7 @@
       const result = await api.buildMemoryEmbeddingIndex(indexTarget.provider, indexTarget.model);
       indexResult = `Embedded ${result.indexed_count} memories and ${result.indexed_file_chunk_count ?? 0} document passages into ${result.embedding_model}.`;
       await load();
+      await onchanged();
     } catch (error) {
       actionError =
         failure("The index could not be built", "The previous index is still used.", "Try Rebuild again.", error);
@@ -94,11 +106,8 @@
 
 <section class="memory-engine">
   <header class="section-heading">
-    <h2>Memory engine</h2>
-    <p>
-      Which space recall searches, and how one gets built. What Raiker is allowed to
-      remember is <a href="#/memory">Memory</a>; this is the machinery behind it.
-    </p>
+    <h2>Find by meaning</h2>
+    <p>Set up local meaning-based recall, or manage an existing index.</p>
   </header>
 
   {#if loadError}
@@ -107,6 +116,27 @@
     <PageState state="loading" title="Reading the memory engine…" />
   {:else}
     {#if actionError}<p class="notice notice-danger" role="alert">{actionError}</p>{/if}
+
+    <div class="card">
+      <h3>Keep memory search on this computer</h3>
+      {#if localProviders.length > 0}
+        <p class="lead">Build and select a local index of your approved memories and document passages. Your existing model permissions still apply.</p>
+        {#if localProviders.length > 1}
+          <label class="field"><span class="field-label">Local embedding model</span>
+            <select class="select" aria-label="Local embedding model" bind:value={localChoice} disabled={busy}>
+              <option value="">Choose a local model…</option>
+              {#each localProviders as provider (provider.space)}<option value={provider.space}>{provider.model}</option>{/each}
+            </select>
+          </label>
+        {/if}
+        <button type="button" class="btn btn-primary local-action" disabled={busy || !localTarget} onclick={() => void enableLocalMeaning()}>{busy ? "Preparing…" : "Find by meaning (stays on this computer)"}</button>
+        {#if localTarget}<p class="note">Uses {localTarget.model} on this computer.</p>{/if}
+      {:else}
+        <p class="lead">Add a local embedding model in Models before setting up meaning-based recall.</p>
+        <a class="btn btn-ghost" href="#/models?tab=add">Review local models</a>
+      {/if}
+      {#if localResult}<p class="note" role="status" aria-label="Meaning search result">{localResult}</p>{/if}
+    </div>
 
     <div class="card">
       <h3>Recall backend</h3>
@@ -200,6 +230,7 @@
 
 <style>
   .section-heading h2 { margin: 0; }
+  .local-action { margin-top: var(--space-3); white-space: normal; }
   .section-heading p { color: var(--text-2); margin: 0.3rem 0 var(--space-5); }
   .card { margin-bottom: var(--space-4); }
   .card h3 { margin: 0 0 0.3rem; font-size: var(--text-lg); }

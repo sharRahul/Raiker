@@ -123,6 +123,9 @@ EVENT_TYPES = {
     # Payloads are counts/reason codes only; candidate text stays encrypted.
     "memory_relationship_extraction_completed",
     "memory_relationship_extraction_failed",
+    # RU-12 — a lesson a project task's own commands taught, filed for review.
+    # Counts only; the lesson text stays in the encrypted candidate store.
+    "memory_lesson_proposed",
     # B2 — a turn parked for an approval, and the same turn picking up again
     # once the owner resolved it. Counts and ids only; the parked conversation
     # stays in the encrypted store and never enters an event payload.

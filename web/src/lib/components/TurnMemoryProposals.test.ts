@@ -64,4 +64,18 @@ describe("TurnMemoryProposals (RU-10)", () => {
     await vi.waitFor(() => expect(screen.queryByRole("group")).toBeNull());
     expect(calls.find((call) => call.url.endsWith("/decision"))?.body).toMatchObject({ decision: "rejected" });
   });
+
+  it("offers a lesson Raiker's own commands taught, named as a lesson (RU-12)", async () => {
+    stub([
+      proposal({
+        source_role: "raiker_lesson",
+        memory_type: "lesson",
+        scope: "project:alpha",
+        text: "In this project, `npm test -- --runInBand` works where `npm test` failed.",
+      }),
+    ]);
+    render(TurnMemoryProposals, { sessionId: "sess_1", turnId: "turn_1" });
+    expect(await screen.findByText(/Lesson for this project/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Keep" })).toBeInTheDocument();
+  });
 });

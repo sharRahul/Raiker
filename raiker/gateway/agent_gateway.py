@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import json
+import logging
 from pathlib import Path
 from typing import Any
 
@@ -807,6 +808,7 @@ class AgentGateway:
                         client=prompt_envelope.client,
                     )
                 )
+            self._propose_turn_lesson(prompt_envelope)
         await self._adispatch_turn_end_hook(prompt_envelope, response)
         events_path = str(self.writer.path_for_session(prompt_envelope.session_id))
         return AgentResponse(
@@ -821,6 +823,50 @@ class AgentGateway:
             approval=response.approval,
             last_event_id=self.writer.last_event_id,
         )
+
+    def _propose_turn_lesson(self, prompt_envelope: PromptEnvelope) -> None:
+        """RU-12 — a lesson this project task's own commands taught, for the owner to keep."""
+        try:
+            session = self.store.load_session(prompt_envelope.session_id) or {}
+            project_id = str(
+                prompt_envelope.prompt.metadata.get("project_id") or session.get("project_id") or ""
+            ).strip()
+            if not project_id:
+                return
+            from raiker.execution.commands.store import CommandStore
+            from raiker.memory.lessons import propose_turn_lessons
+
+            runs = [
+                {"command": run.safe_display, "exit_code": run.exit_code, "created_at": run.created_at}
+                for run in CommandStore(self.store).list_runs(
+                    self.owner_principal_id, session_id=prompt_envelope.session_id, limit=500
+                )
+                if run.turn_id == prompt_envelope.turn_id
+            ]
+            if not runs:
+                return
+            summary = propose_turn_lessons(
+                self.store,
+                owner_principal_id=self.owner_principal_id,
+                project_id=project_id,
+                session_id=prompt_envelope.session_id,
+                turn_id=prompt_envelope.turn_id,
+                source_event_id=self.writer.last_event_id or "evt_missing",
+                runs=runs,
+            )
+            if summary.proposed or summary.suppressed:
+                self.writer.append(
+                    make_event(
+                        session_id=prompt_envelope.session_id,
+                        turn_id=prompt_envelope.turn_id,
+                        event_type="memory_lesson_proposed",
+                        actor="memory_lesson_observer",
+                        payload={"proposed": summary.proposed, "suppressed": summary.suppressed},
+                        client=prompt_envelope.client,
+                    )
+                )
+        except Exception:  # noqa: BLE001 — a lesson never invalidates a completed turn
+            logging.getLogger(__name__).debug("turn lesson could not be proposed", exc_info=True)
 
     def _finalize_turn(
         self, prompt_envelope: PromptEnvelope, response: AgentResponse

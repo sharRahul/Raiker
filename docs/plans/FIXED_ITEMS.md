@@ -1,5 +1,23 @@
 # Fixed items
 
+## FIXED-1585 — Raiker did not remember what its own work taught
+
+**Severity: Low. Area: Memory / Build (RU-12). Status: Fixed 2026-11-27.**
+A project task that found, by trial and error, how a command has to run in that
+project forgot it by the next task. When a project turn completes, Raiker now
+reads the turn's own command records; a command that failed followed by a
+passing variant of it (same program and leading word, different arguments)
+becomes one deferred *lesson* — "In this project, `npm test -- --runInBand`
+works where `npm test` failed." — scoped `project:<id>`, offered under the
+answer as **Lesson for this project** with Keep / Not this, and stored only on
+Keep through the same decision route as every proposal. The model's prose is
+never the source (FIXED-1548). One lesson per task; a forgotten or pending
+lesson is not proposed again; secret-like text is refused; the Memory Brief
+recalls a kept lesson only in the same project. `memory_lesson_proposed`
+records counts only. Evidence: `tests/test_memory_lessons.py`,
+`web/src/lib/components/TurnMemoryProposals.test.ts` (*offers a lesson*).
+The live two-task journey is not yet run.
+
 ## FIXED-1584 — Conversation Incognito was missing and goal noticing ignored memory opt-out
 
 **Severity: Medium. Area: Memory / Chat / Quiet UI (RU-11). Status: Fixed 2026-11-27.**
@@ -2354,6 +2372,7 @@ file you can open. The two capture sets that remain — `screenshots/pages/` and
 | [FIXED-1581](#fixed-1581--current-documentation-still-described-removed-approval-modes-and-ui) | Medium | Documentation / permissions | Fixed 2026-11-27 |
 | [FIXED-1582](#fixed-1582--memory-opened-on-counts-instead-of-the-facts-raiker-knows) | Medium | Memory / Quiet UI | Fixed 2026-11-27 |
 | [FIXED-1583](#fixed-1583--import-discarded-a-memorys-reviewed-topic) | Medium | Memory / import | Fixed 2026-11-27 |
+| [FIXED-1585](#fixed-1585--raiker-did-not-remember-what-its-own-work-taught) | Low | Memory / Build | Fixed 2026-11-27 |
 | [FIXED-1584](#fixed-1584--conversation-incognito-was-missing-and-goal-noticing-ignored-memory-opt-out) | Medium | Memory / Chat / Quiet UI | Fixed 2026-11-27 |
 | [FIXED-1580](#fixed-1580--permissions-repeated-policy-and-work-pages-exposed-routine-metadata) | Medium | Quiet UI / permission clarity | Fixed 2026-11-27 |
 | [FIXED-1578](#fixed-1578--preparation-and-approval-policy-disagreed-across-workflows) | High | Authorization / Quiet UI | Fixed 2026-11-27 |

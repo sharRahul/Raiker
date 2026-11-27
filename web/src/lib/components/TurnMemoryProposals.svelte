@@ -90,7 +90,8 @@
     <p class="proposal" role="status">Kept. <a href="#/memory?tab=memories">Open Memory</a></p>
   {:else if decided[item.candidate_id] !== "skipped"}
     <div class="proposal" role="group" aria-label="Memory Raiker proposed from this answer">
-      <span>Remember: <strong>“{item.text}”</strong></span>
+      <!-- RU-12 — a lesson comes from this task's own command records, not the model's prose. -->
+      <span>{item.source_role === "raiker_lesson" ? "Lesson for this project" : "Remember"}: <strong>“{item.text}”</strong></span>
       <button
         type="button"
         class="btn btn-soft btn-sm"

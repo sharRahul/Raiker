@@ -59,7 +59,7 @@ build is still owed for every item (the regular-use journeys in
 | RU-09 Four-step first run | Partly done | Model step says which models suit numbers and code ([FIXED-1538](FIXED_ITEMS.md#fixed-1538--first-run-did-not-say-which-models-suit-numbers-and-code)) ; *This machine* facts and the *Posture* choice ([FIXED-1571](FIXED_ITEMS.md#fixed-1571--first-run-set-up-the-device-but-not-the-machine-and-never-asked-for-a-posture)) | A timed first useful answer under ten minutes on Windows and Linux |
 | RU-10 Keep or skip under the answer | Done | [FIXED-1539](FIXED_ITEMS.md#fixed-1539--a-memory-raiker-proposed-could-only-be-kept-from-memory), owner's words only ([FIXED-1548](FIXED_ITEMS.md#fixed-1548--a-sentence-the-model-invented-was-offered-to-keep-as-a-memory)); RT-1125-08 | — |
 | RU-11 Memory as a summary | Done | Summary, inline Edit/Forget, Use memory, saved conversation Incognito and local meaning setup; real embedding and four chat-turn conditions pass ([FIXED-1584](FIXED_ITEMS.md#fixed-1584--conversation-incognito-was-missing-and-goal-noticing-ignored-memory-opt-out)) | None for RU-11; clean-machine timing remains RU-09 |
-| RU-12 Remembers its own work | Open | — | Lessons proposed after a task |
+| RU-12 Remembers its own work | Built | A failed-then-fixed command in a project task is proposed as a project lesson; kept, it is recalled in that project only ([FIXED-1585](FIXED_ITEMS.md#fixed-1585--raiker-did-not-remember-what-its-own-work-taught)) | Live two-task journey |
 | RU-13 Always-on host | Open | — | User service on each platform; delivery with the window closed |
 | RU-14 Pause and Resume a running step | Open | — | Park a turn at the next safe boundary, freeze a command, resume |
 | RU-15 Raiker as an MCP server | Open | — | — |
@@ -255,6 +255,10 @@ is needed for the Memory journey; fixture model authorization is explicit
 propose a *lesson* ("`npm test` needs `--runInBand` in this repository"),
 reviewed like any memory and recalled for the same project.
 *Done when* a lesson kept on one task is recalled on the next in that project.
+*Progress 2026-11-27:* lessons come from the turn's command records, not the
+model's prose: a failing command followed by a passing variant of it becomes one
+deferred `project:<id>` proposal under the answer. Keep-then-recall in the same
+project (and not another) is covered by tests; the live journey is pending.
 
 ### E. Always on, and a Pause that really pauses
 
@@ -331,6 +335,9 @@ chat. Release qualification still requires a live run on the published build.
 
 ## Changelog
 
+- **2026-11-27 (Lessons)** — RU-12 built: project lessons from Raiker's own
+  command records, kept under the answer and recalled in that project only
+  (FIXED-1585). The live two-task journey remains.
 - **2026-11-27 (Memory summary)** — RU-11's landing summary, inline Edit/Forget,
   Use memory and local setup in Memory Controls shipped. Import preserves topics.
   RT-MEM-SUMMARY-01 passes on an isolated Windows host, including real Ollama

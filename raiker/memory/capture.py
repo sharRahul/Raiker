@@ -74,6 +74,8 @@ SOURCE_TYPES: Mapping[str, str] = {
     "knowledge_graph": "graph",
     "vector_get": "memory_index",
     "memory_search": "memory_index",
+    "note_search": "workspace_index",
+    "note_read": "workspace_file",
     "consult_advisor": "advisor",
     "spawn_subagent": "subagent",
     # `create_document` is the one write path whose executor returns the

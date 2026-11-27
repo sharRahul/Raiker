@@ -4906,6 +4906,108 @@ export type NextAction = {
   target: "add" | "models" | "runtime" | "check" | "permissions";
 };
 
+export type NoteBacklinks = {
+  path: string;
+  linked: NoteMention[];
+  unlinked: NoteMention[];
+};
+
+export type NoteFileView = {
+  path: string;
+  name: string;
+  mtime: number;
+  size: number;
+};
+
+export type NoteGraph = {
+  nodes: NoteGraphNode[];
+  edges: NoteGraphEdge[];
+  unresolved: string[];
+};
+
+export type NoteGraphEdge = {
+  source: string;
+  target: string;
+};
+
+export type NoteGraphNode = {
+  path: string;
+  name: string;
+  links_in: number;
+};
+
+export type NoteHeading = {
+  level: number;
+  text: string;
+  line: number;
+};
+
+export type NoteLink = {
+  target: string;
+  heading: string;
+  block: string;
+  alias: string;
+  embed: boolean;
+  line: number;
+  resolved: string | null;
+};
+
+export type NoteMention = {
+  path: string;
+  name: string;
+  line: number;
+  context: string;
+  match: string;
+};
+
+export type NoteResolved = {
+  path: string | null;
+};
+
+export type NoteSearchHit = {
+  path: string;
+  name: string;
+  line: number | null;
+  snippet: string;
+  mtime: number;
+};
+
+export type NoteTagCount = {
+  tag: string;
+  count: number;
+};
+
+export type NoteTask = {
+  text: string;
+  done: boolean;
+  line: number;
+};
+
+export type NoteTrashed = {
+  ok: boolean;
+  trashed: string;
+};
+
+export type NoteView = {
+  path: string;
+  name: string;
+  content: string;
+  mtime: number;
+  properties: Record<string, unknown>;
+  tags: string[];
+  aliases: string[];
+  headings: NoteHeading[];
+  tasks: NoteTask[];
+  links: NoteLink[];
+  links_updated: number;
+};
+
+export type NotesIndex = {
+  root: string;
+  notes: NoteFileView[];
+  tags: NoteTagCount[];
+};
+
 /** The one delivery policy, as every tab and alert reads it. */
 export type NotificationDelivery = {
   quiet_hours: QuietHoursState;
@@ -8371,6 +8473,30 @@ export const contract = {
     call<ServerCheck>("POST", `/api/models/${encodeURIComponent(profileId)}/server-check`, { body }),
   setWeeklyModelBudget: (profileId: string, body: ModelWeeklyBudgetRequest) =>
     call<WeeklyBudgetSet>("PUT", `/api/models/${encodeURIComponent(profileId)}/weekly-budget`, { body }),
+  listNotes: () =>
+    request<NotesIndex>("/api/notes"),
+  noteBacklinks: (query: { path: string }) =>
+    request<NoteBacklinks>(withQuery("/api/notes/backlinks", query)),
+  openDailyNote: () =>
+    call<NoteView>("POST", "/api/notes/daily"),
+  noteGraph: (query: { path?: string; depth?: number } = {}) =>
+    request<NoteGraph>(withQuery("/api/notes/graph", query)),
+  linkNoteMention: (body: Record<string, unknown>) =>
+    call<NoteView>("POST", "/api/notes/link-mention", { body }),
+  trashNote: (query: { path: string }) =>
+    call<NoteTrashed>("DELETE", withQuery("/api/notes/note", query)),
+  readNote: (query: { path: string }) =>
+    request<NoteView>(withQuery("/api/notes/note", query)),
+  createNote: (body: Record<string, unknown>) =>
+    call<NoteView>("POST", "/api/notes/note", { body }),
+  saveNote: (body: Record<string, unknown>) =>
+    call<NoteView>("PUT", "/api/notes/note", { body }),
+  renameNote: (body: Record<string, unknown>) =>
+    call<NoteView>("POST", "/api/notes/rename", { body }),
+  resolveNoteLink: (query: { target: string; from_path?: string }) =>
+    request<NoteResolved>(withQuery("/api/notes/resolve", query)),
+  searchNotes: (query: { q: string }) =>
+    request<NoteSearchHit[]>(withQuery("/api/notes/search", query)),
   listNotifications: (query: { unread_only?: boolean } = {}) =>
     request<NotificationView[]>(withQuery("/api/notifications", query)),
   notificationDelivery: () =>

@@ -966,6 +966,60 @@ TOOL_DEFINITIONS: tuple[ToolDefinition, ...] = (
         arg_schemas=(),
         description="Find files inside the workspace by glob pattern.",
     ),
+    # Raiker Notes — the owner's linked-Markdown notebook (an Obsidian vault
+    # works as is). Read-only: the agent finds and reads notes; it never writes
+    # one without the owner.
+    ToolDefinition(
+        name="note_search",
+        label="Search notes",
+        family=FAMILY_FILE_READ,
+        audit=AUDIT_FULL,
+        risk="low",
+        risk_signals=(),
+        requires_approval=False,
+        model_exposed=True,
+        contract_known=False,
+        capability=None,
+        source_kind="file",
+        delegable=True,
+        read_shaped=True,
+        required_args=("query",),
+        required_list_args=(),
+        optional_args=(),
+        arg_schemas=(
+            ("query", {"type": "string", "description": "Words to find, or operators: file:, path:, tag:, line:(a b), task:, [property:value], -exclude."}),
+        ),
+        description=(
+            "Search the owner's notes (their linked Markdown notebook) and return matching notes "
+            "with a line of context. Use it when the owner refers to their notes, a project page, "
+            "a daily note or something they wrote down. Then read a note with note_read."
+        ),
+    ),
+    ToolDefinition(
+        name="note_read",
+        label="Read a note",
+        family=FAMILY_FILE_READ,
+        audit=AUDIT_FULL,
+        risk="low",
+        risk_signals=(),
+        requires_approval=False,
+        model_exposed=True,
+        contract_known=False,
+        capability=None,
+        source_kind="file",
+        delegable=True,
+        read_shaped=True,
+        required_args=("note",),
+        required_list_args=(),
+        optional_args=(),
+        arg_schemas=(
+            ("note", {"type": "string", "description": "A note's path from note_search, or its name as a wikilink would give it, e.g. 'Raiker' or 'Projects/Raiker'."}),
+        ),
+        description=(
+            "Read one of the owner's notes: its text, properties, tags, the notes it links to and "
+            "the notes that link back to it. Follow links by reading the notes they name."
+        ),
+    ),
     # Governed inside the tool: connector_gmail_runtime gate + decision mode
     # (default `ask` withholds) + owner credential + egress allowlist.
     ToolDefinition(

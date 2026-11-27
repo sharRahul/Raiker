@@ -12,7 +12,7 @@ operation answers with, and whether OpenAPI describes it (OPT-01/OPT-02 —
 * **deferred** — the body has no declared type; a test fails while any is.
 * **special** — a stream, a file or another non-JSON transport; hand-written.
 
-**555 operations: 539 verified, 0 eligible, 0 deferred, 16 special.**
+**567 operations: 551 verified, 0 eligible, 0 deferred, 16 special.**
 
 | Method | Path | Request | Response | Status | Why |
 |---|---|---|---|---|---|
@@ -413,6 +413,18 @@ operation answers with, and whether OpenAPI describes it (OPT-01/OPT-02 —
 | PUT | `/api/models/{profile_id}/routing` | ModelRoutingRequest | RoutingSet | verified | declared RoutingSet |
 | POST | `/api/models/{profile_id}/server-check` | ServerCheckRequest | ServerCheck | verified | declared ServerCheck |
 | PUT | `/api/models/{profile_id}/weekly-budget` | ModelWeeklyBudgetRequest | WeeklyBudgetSet | verified | declared WeeklyBudgetSet |
+| GET | `/api/notes` |  | NotesIndex | verified | declared by cast |
+| GET | `/api/notes/backlinks` |  | NoteBacklinks | verified | declared by cast |
+| POST | `/api/notes/daily` |  | NoteView | verified | declared by cast |
+| GET | `/api/notes/graph` |  | NoteGraph | verified | declared by cast |
+| POST | `/api/notes/link-mention` | dict | NoteView | verified | declared by cast |
+| DELETE | `/api/notes/note` |  | NoteTrashed | verified | declared by cast |
+| GET | `/api/notes/note` |  | NoteView | verified | declared by cast |
+| POST | `/api/notes/note` | dict | NoteView | verified | declared by cast |
+| PUT | `/api/notes/note` | dict | NoteView | verified | declared by cast |
+| POST | `/api/notes/rename` | dict | NoteView | verified | declared by cast |
+| GET | `/api/notes/resolve` |  | NoteResolved | verified | declared by cast |
+| GET | `/api/notes/search` |  | NoteSearchHit[] | verified | declared NoteSearchHit[] |
 | GET | `/api/notifications` |  | NotificationView[] | verified | DashboardService.list_notifications |
 | GET | `/api/notifications/delivery` |  | NotificationDelivery | verified | declared NotificationDelivery |
 | POST | `/api/notifications/held/acknowledge` | AcknowledgeHeldNotificationsRequest | HeldNotificationsAcknowledged | verified | declared HeldNotificationsAcknowledged |

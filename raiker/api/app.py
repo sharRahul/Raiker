@@ -54,6 +54,7 @@ from raiker.api.routes_library import router as library_router
 from raiker.api.routes_limit_rules import router as limit_rules_router
 from raiker.api.routes_local_runtime import router as local_runtime_router
 from raiker.api.routes_memory import router as memory_router
+from raiker.api.routes_notes import router as notes_router
 from raiker.api.routes_models import router as models_router
 from raiker.api.routes_personas import router as personas_router
 from raiker.api.routes_project_limits import router as project_limits_router
@@ -738,6 +739,7 @@ def create_app(
     app.include_router(project_roots_router)
     app.include_router(code_files_router)
     app.include_router(memory_router)
+    app.include_router(notes_router)
     app.include_router(models_router)
     app.include_router(local_runtime_router)
     app.include_router(setup_router)

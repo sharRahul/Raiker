@@ -25615,6 +25615,469 @@
         "title": "NextAction",
         "type": "object"
       },
+      "NoteBacklinks": {
+        "properties": {
+          "linked": {
+            "items": {
+              "$ref": "#/components/schemas/NoteMention"
+            },
+            "title": "Linked",
+            "type": "array"
+          },
+          "path": {
+            "title": "Path",
+            "type": "string"
+          },
+          "unlinked": {
+            "items": {
+              "$ref": "#/components/schemas/NoteMention"
+            },
+            "title": "Unlinked",
+            "type": "array"
+          }
+        },
+        "required": [
+          "path",
+          "linked",
+          "unlinked"
+        ],
+        "title": "NoteBacklinks",
+        "type": "object"
+      },
+      "NoteFileView": {
+        "properties": {
+          "mtime": {
+            "title": "Mtime",
+            "type": "number"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "path": {
+            "title": "Path",
+            "type": "string"
+          },
+          "size": {
+            "title": "Size",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "path",
+          "name",
+          "mtime",
+          "size"
+        ],
+        "title": "NoteFileView",
+        "type": "object"
+      },
+      "NoteGraph": {
+        "properties": {
+          "edges": {
+            "items": {
+              "$ref": "#/components/schemas/NoteGraphEdge"
+            },
+            "title": "Edges",
+            "type": "array"
+          },
+          "nodes": {
+            "items": {
+              "$ref": "#/components/schemas/NoteGraphNode"
+            },
+            "title": "Nodes",
+            "type": "array"
+          },
+          "unresolved": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Unresolved",
+            "type": "array"
+          }
+        },
+        "required": [
+          "nodes",
+          "edges",
+          "unresolved"
+        ],
+        "title": "NoteGraph",
+        "type": "object"
+      },
+      "NoteGraphEdge": {
+        "properties": {
+          "source": {
+            "title": "Source",
+            "type": "string"
+          },
+          "target": {
+            "title": "Target",
+            "type": "string"
+          }
+        },
+        "required": [
+          "source",
+          "target"
+        ],
+        "title": "NoteGraphEdge",
+        "type": "object"
+      },
+      "NoteGraphNode": {
+        "properties": {
+          "links_in": {
+            "title": "Links In",
+            "type": "integer"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "path": {
+            "title": "Path",
+            "type": "string"
+          }
+        },
+        "required": [
+          "path",
+          "name",
+          "links_in"
+        ],
+        "title": "NoteGraphNode",
+        "type": "object"
+      },
+      "NoteHeading": {
+        "properties": {
+          "level": {
+            "title": "Level",
+            "type": "integer"
+          },
+          "line": {
+            "title": "Line",
+            "type": "integer"
+          },
+          "text": {
+            "title": "Text",
+            "type": "string"
+          }
+        },
+        "required": [
+          "level",
+          "text",
+          "line"
+        ],
+        "title": "NoteHeading",
+        "type": "object"
+      },
+      "NoteLink": {
+        "properties": {
+          "alias": {
+            "title": "Alias",
+            "type": "string"
+          },
+          "block": {
+            "title": "Block",
+            "type": "string"
+          },
+          "embed": {
+            "title": "Embed",
+            "type": "boolean"
+          },
+          "heading": {
+            "title": "Heading",
+            "type": "string"
+          },
+          "line": {
+            "title": "Line",
+            "type": "integer"
+          },
+          "resolved": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Resolved"
+          },
+          "target": {
+            "title": "Target",
+            "type": "string"
+          }
+        },
+        "required": [
+          "target",
+          "heading",
+          "block",
+          "alias",
+          "embed",
+          "line",
+          "resolved"
+        ],
+        "title": "NoteLink",
+        "type": "object"
+      },
+      "NoteMention": {
+        "properties": {
+          "context": {
+            "title": "Context",
+            "type": "string"
+          },
+          "line": {
+            "title": "Line",
+            "type": "integer"
+          },
+          "match": {
+            "title": "Match",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "path": {
+            "title": "Path",
+            "type": "string"
+          }
+        },
+        "required": [
+          "path",
+          "name",
+          "line",
+          "context",
+          "match"
+        ],
+        "title": "NoteMention",
+        "type": "object"
+      },
+      "NoteResolved": {
+        "properties": {
+          "path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Path"
+          }
+        },
+        "required": [
+          "path"
+        ],
+        "title": "NoteResolved",
+        "type": "object"
+      },
+      "NoteSearchHit": {
+        "properties": {
+          "line": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Line"
+          },
+          "mtime": {
+            "title": "Mtime",
+            "type": "number"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "path": {
+            "title": "Path",
+            "type": "string"
+          },
+          "snippet": {
+            "title": "Snippet",
+            "type": "string"
+          }
+        },
+        "required": [
+          "path",
+          "name",
+          "line",
+          "snippet",
+          "mtime"
+        ],
+        "title": "NoteSearchHit",
+        "type": "object"
+      },
+      "NoteTagCount": {
+        "properties": {
+          "count": {
+            "title": "Count",
+            "type": "integer"
+          },
+          "tag": {
+            "title": "Tag",
+            "type": "string"
+          }
+        },
+        "required": [
+          "tag",
+          "count"
+        ],
+        "title": "NoteTagCount",
+        "type": "object"
+      },
+      "NoteTask": {
+        "properties": {
+          "done": {
+            "title": "Done",
+            "type": "boolean"
+          },
+          "line": {
+            "title": "Line",
+            "type": "integer"
+          },
+          "text": {
+            "title": "Text",
+            "type": "string"
+          }
+        },
+        "required": [
+          "text",
+          "done",
+          "line"
+        ],
+        "title": "NoteTask",
+        "type": "object"
+      },
+      "NoteTrashed": {
+        "properties": {
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          },
+          "trashed": {
+            "title": "Trashed",
+            "type": "string"
+          }
+        },
+        "required": [
+          "ok",
+          "trashed"
+        ],
+        "title": "NoteTrashed",
+        "type": "object"
+      },
+      "NoteView": {
+        "properties": {
+          "aliases": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Aliases",
+            "type": "array"
+          },
+          "content": {
+            "title": "Content",
+            "type": "string"
+          },
+          "headings": {
+            "items": {
+              "$ref": "#/components/schemas/NoteHeading"
+            },
+            "title": "Headings",
+            "type": "array"
+          },
+          "links": {
+            "items": {
+              "$ref": "#/components/schemas/NoteLink"
+            },
+            "title": "Links",
+            "type": "array"
+          },
+          "links_updated": {
+            "title": "Links Updated",
+            "type": "integer"
+          },
+          "mtime": {
+            "title": "Mtime",
+            "type": "number"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "path": {
+            "title": "Path",
+            "type": "string"
+          },
+          "properties": {
+            "additionalProperties": true,
+            "title": "Properties",
+            "type": "object"
+          },
+          "tags": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Tags",
+            "type": "array"
+          },
+          "tasks": {
+            "items": {
+              "$ref": "#/components/schemas/NoteTask"
+            },
+            "title": "Tasks",
+            "type": "array"
+          }
+        },
+        "required": [
+          "path",
+          "name",
+          "content",
+          "mtime",
+          "properties",
+          "tags",
+          "aliases",
+          "headings",
+          "tasks",
+          "links",
+          "links_updated"
+        ],
+        "title": "NoteView",
+        "type": "object"
+      },
+      "NotesIndex": {
+        "properties": {
+          "notes": {
+            "items": {
+              "$ref": "#/components/schemas/NoteFileView"
+            },
+            "title": "Notes",
+            "type": "array"
+          },
+          "root": {
+            "title": "Root",
+            "type": "string"
+          },
+          "tags": {
+            "items": {
+              "$ref": "#/components/schemas/NoteTagCount"
+            },
+            "title": "Tags",
+            "type": "array"
+          }
+        },
+        "required": [
+          "root",
+          "notes",
+          "tags"
+        ],
+        "title": "NotesIndex",
+        "type": "object"
+      },
       "NotificationDelivery": {
         "description": "The one delivery policy, as every tab and alert reads it.",
         "properties": {
@@ -54777,6 +55240,465 @@
           }
         },
         "summary": "Set Weekly Model Budget"
+      }
+    },
+    "/api/notes": {
+      "get": {
+        "operationId": "list_notes_api_notes_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotesIndex"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "List Notes"
+      }
+    },
+    "/api/notes/backlinks": {
+      "get": {
+        "operationId": "note_backlinks_api_notes_backlinks_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "path",
+            "required": true,
+            "schema": {
+              "title": "Path",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoteBacklinks"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Note Backlinks"
+      }
+    },
+    "/api/notes/daily": {
+      "post": {
+        "description": "Today's note (``Daily/YYYY-MM-DD``), created from ``Templates/Daily.md`` when that exists.",
+        "operationId": "open_daily_note_api_notes_daily_post",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoteView"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Open Daily Note"
+      }
+    },
+    "/api/notes/graph": {
+      "get": {
+        "operationId": "note_graph_api_notes_graph_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "path",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Path"
+            }
+          },
+          {
+            "in": "query",
+            "name": "depth",
+            "required": false,
+            "schema": {
+              "default": 1,
+              "title": "Depth",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoteGraph"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Note Graph"
+      }
+    },
+    "/api/notes/link-mention": {
+      "post": {
+        "description": "Turn an unlinked mention into a link, in place.",
+        "operationId": "link_note_mention_api_notes_link_mention_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": true,
+                "title": "Body",
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoteView"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Link Note Mention"
+      }
+    },
+    "/api/notes/note": {
+      "delete": {
+        "description": "Move a note to the vault's ``.trash`` (restorable), as Obsidian does.",
+        "operationId": "trash_note_api_notes_note_delete",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "path",
+            "required": true,
+            "schema": {
+              "title": "Path",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoteTrashed"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Trash Note"
+      },
+      "get": {
+        "operationId": "read_note_api_notes_note_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "path",
+            "required": true,
+            "schema": {
+              "title": "Path",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoteView"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Read Note"
+      },
+      "post": {
+        "operationId": "create_note_api_notes_note_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": true,
+                "title": "Body",
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoteView"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Note"
+      },
+      "put": {
+        "description": "Save a note; ``expected_mtime`` is the version edited, so a change made elsewhere is not overwritten.",
+        "operationId": "save_note_api_notes_note_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": true,
+                "title": "Body",
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoteView"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Save Note"
+      }
+    },
+    "/api/notes/rename": {
+      "post": {
+        "description": "Rename a note and rewrite every link to it.",
+        "operationId": "rename_note_api_notes_rename_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": true,
+                "title": "Body",
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoteView"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Rename Note"
+      }
+    },
+    "/api/notes/resolve": {
+      "get": {
+        "operationId": "resolve_note_link_api_notes_resolve_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "target",
+            "required": true,
+            "schema": {
+              "title": "Target",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "from_path",
+            "required": false,
+            "schema": {
+              "default": "",
+              "title": "From Path",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoteResolved"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Resolve Note Link"
+      }
+    },
+    "/api/notes/search": {
+      "get": {
+        "operationId": "search_notes_api_notes_search_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "q",
+            "required": true,
+            "schema": {
+              "title": "Q",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/NoteSearchHit"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Search Notes"
       }
     },
     "/api/notifications": {

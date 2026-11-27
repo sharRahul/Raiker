@@ -6,6 +6,8 @@ person in Obsidian can all read, link and edit them with no integration at all.
 Hindsight's is that memory is atomic facts plus the entities that connect them.
 The vault is both, kept in step with Raiker's governed store:
 
+All of it lives in the vault's ``Raiker Memory/`` folder:
+
 * ``Raiker Memory.md`` — the index: every topic and every entity, linked.
 * ``Topics/<Topic>.md`` — one note per kind of memory; each fact is one list
   item ending in a block id (``^mem-…``), so it can be linked and edited.
@@ -38,6 +40,9 @@ from typing import Any
 from raiker.contracts.ids import utc_now
 from raiker.storage.sqlite import SQLiteStore
 
+#: Memory lives in its own folder of the notes vault, so it never overwrites
+#: the owner's own notes (their own `Projects/`, say).
+MEMORY_FOLDER = "Raiker Memory"
 MANIFEST = ".raiker-vault.json"
 INDEX = "Raiker Memory.md"
 INBOX = "Inbox.md"
@@ -270,7 +275,7 @@ def sync_vault(
     """Take in what changed in the vault, then write it back from the store."""
     from raiker.memory.store import get_memory, set_memory_archived, update_memory
 
-    root = Path(vault).expanduser().resolve()
+    root = Path(vault).expanduser().resolve() / MEMORY_FOLDER
     root.mkdir(parents=True, exist_ok=True)
     manifest = _read_manifest(root)
     edited = archived = added = 0

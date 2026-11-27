@@ -76,6 +76,8 @@ ALWAYS_PROJECTED: frozenset[str] = frozenset({
     "skill_load",
     # Remembering and finding.
     "memory_search",
+    "note_search",
+    "note_read",
     "memory_write",
     "conversation_search",
     # How Raiker itself works (TOOL-46): asked about often, and small.

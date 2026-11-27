@@ -71,6 +71,15 @@ class ProposalDecided(TypedDict):
     relationship_proposals: NotRequired[int]
 
 
+class MemoryVaultSynced(TypedDict):
+    ok: bool
+    vault_path: str | None
+    written: int
+    edited: int
+    archived: int
+    added: int
+
+
 class AskBeforeRememberingSet(TypedDict):
     ok: bool
     ask_before_remembering: bool

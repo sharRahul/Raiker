@@ -23034,6 +23034,18 @@
             "title": "Unindexed Memories",
             "type": "integer"
           },
+          "vault_path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Vault Path"
+          },
           "vector_search_exact_limit": {
             "default": 512,
             "title": "Vector Search Exact Limit",
@@ -23183,6 +23195,51 @@
           "expires_at"
         ],
         "title": "MemoryUpdated",
+        "type": "object"
+      },
+      "MemoryVaultSynced": {
+        "properties": {
+          "added": {
+            "title": "Added",
+            "type": "integer"
+          },
+          "archived": {
+            "title": "Archived",
+            "type": "integer"
+          },
+          "edited": {
+            "title": "Edited",
+            "type": "integer"
+          },
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          },
+          "vault_path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Vault Path"
+          },
+          "written": {
+            "title": "Written",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "ok",
+          "vault_path",
+          "written",
+          "edited",
+          "archived",
+          "added"
+        ],
+        "title": "MemoryVaultSynced",
         "type": "object"
       },
       "MfaCodeRequest": {
@@ -52368,6 +52425,66 @@
           }
         },
         "summary": "Rebuild Text Indexes"
+      }
+    },
+    "/api/memory/vault": {
+      "put": {
+        "description": "Keep memory as linked Markdown in a folder (an Obsidian vault), or stop (path null).",
+        "operationId": "set_memory_vault_api_memory_vault_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": true,
+                "title": "Body",
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MemoryVaultSynced"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Set Memory Vault"
+      }
+    },
+    "/api/memory/vault/sync": {
+      "post": {
+        "description": "Take in vault edits and Inbox lines, then write the vault from memory.",
+        "operationId": "sync_memory_vault_api_memory_vault_sync_post",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MemoryVaultSynced"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Sync Memory Vault"
       }
     },
     "/api/memory/vectors/remove-damaged": {

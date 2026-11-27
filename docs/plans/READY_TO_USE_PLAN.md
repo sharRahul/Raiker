@@ -264,6 +264,20 @@ the kept lesson about it, and a lesson whose command fails is archived as stale
 ([FIXED-1586](FIXED_ITEMS.md#fixed-1586--every-memory-waited-for-an-approval)).
 The live two-task journey is pending.
 
+**Decision 2026-11-27 — memory any tool can read, no integrations.** Raiker's
+memory combines Obsidian's layer (linked Markdown with properties, wikilinks and
+block ids, readable and editable by any tool) with Hindsight's (atomic facts,
+entities, and recall by words, meaning, graph and time). It uses neither
+product: the vault is plain files, and recall stays in Raiker's governed store.
+Taken from Hermes Agent: scan memory writes for injection and invisible
+characters, and keep memory bounded. Not taken yet:
+- **Hindsight's rank fusion (RRF).** Raiker's weighted fusion is calibrated by
+  the recall evaluation corpus, so switching means re-calibrating first.
+- **Hindsight's `reflect` and observation consolidation.**
+- **Hermes's frozen per-session memory snapshot**, which keeps the prompt
+  cache warm. A forget must still take effect immediately, so the snapshot
+  would need invalidating whenever a memory changes.
+
 **Decision 2026-11-27 — almost no memory approvals.** Raiker keeps the owner's
 own words and evidence-backed lessons without asking and shows each with Undo,
 as ChatGPT does; it still asks for the model's own sentences, personal
@@ -345,6 +359,9 @@ chat. Release qualification still requires a live run on the published build.
 
 ## Changelog
 
+- **2026-11-27 (Memory vault)** — memory as linked Markdown any tool can read
+  and edit (Obsidian layer), recall by time (Hindsight's fourth leg), and Hermes
+  Agent's injection scan before anything is kept without asking (FIXED-1587).
 - **2026-11-27 (Almost no approvals)** — Raiker keeps trusted memories itself
   with Undo; lessons are model-recorded on verified evidence, fix declared
   checks, come back when their command fails and retire when stale (FIXED-1586).

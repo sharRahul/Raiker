@@ -90,6 +90,15 @@ def _remembered(ws: Path, _client: TestClient, _h: dict[str, str]) -> Call:
     return "/api/memory/remembered?session_id=sess_contract"
 
 
+def _vault(ws: Path, _client: TestClient, _h: dict[str, str]) -> Call:
+    return "/api/memory/vault", {"path": str(ws.parent / "vault")}
+
+
+def _vault_sync(ws: Path, _client: TestClient, _h: dict[str, str]) -> Call:
+    SQLiteStore(ws).set_memory_vault_path(str(ws.parent / "vault"), OWNER)
+    return "/api/memory/vault/sync"
+
+
 def _correction(ws: Path, client: TestClient, h: dict[str, str]) -> Call:
     """QUI-F20 — the owner's correction in a conversation they own."""
     with_turn("")(ws, client, h)
@@ -301,6 +310,8 @@ def _revoke_knowledge_source(ws: Path, client: TestClient, h: dict[str, str]) ->
 CASES: Cases = {
     ("GET", "/api/memory/proposals"): _proposals,
     ("GET", "/api/memory/remembered"): _remembered,
+    ("PUT", "/api/memory/vault"): _vault,
+    ("POST", "/api/memory/vault/sync"): _vault_sync,
     ("POST", "/api/memory/proposals"): _correction,
     ("POST", "/api/memory/proposals/{candidate_id}/decision"): _proposal_decision,
     ("GET", "/api/memory/relationship-proposals"): _relationships("relationship-proposals"),

@@ -148,6 +148,9 @@ class MemorySettingsView(View):
     #: Raiker keeps the owner's own words and evidence-backed lessons without
     #: asking unless this is on.
     ask_before_remembering: bool = False
+    #: The folder memory is kept in as linked Markdown (Obsidian-readable), or
+    #: None for no vault.
+    vault_path: str | None = None
     #: MEM-MODE-02 — the owner's ambient-recall mode. Incognito still wins.
     recall_mode: Literal["off", "brief", "search_when_relevant"] = "search_when_relevant"
     #: MEM-03 — which embedding space recall searches, and what is selectable.

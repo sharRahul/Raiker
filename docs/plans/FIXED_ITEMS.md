@@ -1,5 +1,23 @@
 # Fixed items
 
+## FIXED-1587 — Memory could not be read or traversed outside Raiker
+
+**Severity: Medium. Area: Memory (RU-11, RU-12). Status: Fixed 2026-11-27.**
+Raiker's memory lived only in its encrypted store and its own pages, so Claude
+Code, Hermes Agent or Obsidian could not read, link or add to it without a
+custom integration. Raiker now keeps an opt-in **memory vault**: linked
+Markdown with YAML properties, a note per topic, project and entity, and
+wikilinks from facts to entities. Each fact carries an Obsidian block id, so
+editing its words edits the memory and deleting its line archives it.
+`Inbox.md` takes in new memories from any tool through the auto-keep rules
+(`raiker/memory/vault.py`; `PUT /api/memory/vault`,
+`POST /api/memory/vault/sync`; migration RAIKER-2137 adds `vault_path`).
+Recall gains Hindsight's fourth leg, time (`raiker/memory/temporal.py`). From
+Hermes Agent's memory tool, text is kept without asking only if it passes
+injection and invisible-character scanning (`raiker.security.injection_scan`);
+otherwise it waits for Keep. Evidence: `tests/test_memory_vault.py`,
+`tests/test_memory_temporal_recall.py`, `tests/test_memory_auto_keep.py`.
+
 ## FIXED-1586 — Every memory waited for an approval
 
 **Severity: Medium. Area: Memory / Chat (RU-10, RU-12). Status: Fixed 2026-11-27.**
@@ -2400,6 +2418,7 @@ file you can open. The two capture sets that remain — `screenshots/pages/` and
 | [FIXED-1581](#fixed-1581--current-documentation-still-described-removed-approval-modes-and-ui) | Medium | Documentation / permissions | Fixed 2026-11-27 |
 | [FIXED-1582](#fixed-1582--memory-opened-on-counts-instead-of-the-facts-raiker-knows) | Medium | Memory / Quiet UI | Fixed 2026-11-27 |
 | [FIXED-1583](#fixed-1583--import-discarded-a-memorys-reviewed-topic) | Medium | Memory / import | Fixed 2026-11-27 |
+| [FIXED-1587](#fixed-1587--memory-could-not-be-read-or-traversed-outside-raiker) | Medium | Memory | Fixed 2026-11-27 |
 | [FIXED-1586](#fixed-1586--every-memory-waited-for-an-approval) | Medium | Memory / Chat | Fixed 2026-11-27 |
 | [FIXED-1585](#fixed-1585--raiker-did-not-remember-what-its-own-work-taught) | Low | Memory / Build | Fixed 2026-11-27 |
 | [FIXED-1584](#fixed-1584--conversation-incognito-was-missing-and-goal-noticing-ignored-memory-opt-out) | Medium | Memory / Chat / Quiet UI | Fixed 2026-11-27 |

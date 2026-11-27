@@ -163,6 +163,30 @@
     catch (e) { actionError = failure("Memory use was not updated", "The setting may not have changed.", "Refresh Memory to check it before trying again.", e); }
     finally { busy = false; }
   }
+  let vaultDraft = $state("");
+  let vaultNotice = $state<string | null>(null);
+  async function saveVault(path: string | null) {
+    if (busy) return;
+    busy = true; actionError = null; vaultNotice = null;
+    try {
+      const result = await api.setMemoryVault(path);
+      vaultNotice = path ? `Memory is kept as notes in ${result.vault_path}.` : "No vault is kept. Its notes stay where they are.";
+      await load();
+    } catch (e) {
+      actionError = failure("The vault was not set", "Memory is unchanged.", "Choose a full folder path outside Raiker's own data, then try again.", e);
+    } finally { busy = false; }
+  }
+  async function syncVault() {
+    if (busy) return;
+    busy = true; actionError = null; vaultNotice = null;
+    try {
+      const result = await api.syncMemoryVault();
+      vaultNotice = `Synced: ${result.added} added from Inbox, ${result.edited} edited, ${result.archived} archived.`;
+      await load();
+    } catch (e) {
+      actionError = failure("The vault was not synced", "Memory is unchanged.", "Check the folder is reachable, then sync again.", e);
+    } finally { busy = false; }
+  }
   async function toggleAskFirst() {
     if (!settings || busy) return;
     busy = true; actionError = null;
@@ -851,6 +875,26 @@
     <button class="switch" class:on={settings.ask_before_remembering} role="switch" aria-checked={settings.ask_before_remembering} aria-label="Ask before remembering" disabled={busy} onclick={() => void toggleAskFirst()}><span></span><b>{settings.ask_before_remembering ? "On" : "Off"}</b></button>
   </section>
 
+  <section class="control-card vault-card">
+    <div>
+      <h3>Memory vault</h3>
+      <p>Keep memory as linked Markdown notes in a folder you choose, such as an Obsidian vault. Other tools can read the notes. Edit a fact to correct it, delete its line to archive it, and add new memories to <code>Inbox.md</code>. The notes are not encrypted, though secrets are masked.</p>
+      {#if settings.vault_path}
+        <p class="vault-path">Kept in <code>{settings.vault_path}</code></p>
+        <div class="vault-actions">
+          <button type="button" class="btn btn-soft btn-sm" disabled={busy} onclick={() => void syncVault()}>Sync now</button>
+          <button type="button" class="btn btn-ghost btn-sm" disabled={busy} onclick={() => void saveVault(null)}>Stop keeping a vault</button>
+        </div>
+      {:else}
+        <form class="vault-actions" onsubmit={(event) => { event.preventDefault(); void saveVault(vaultDraft.trim()); }}>
+          <input type="text" aria-label="Vault folder" placeholder="C:\Users\you\Documents\Raiker Memory" bind:value={vaultDraft} disabled={busy} />
+          <button type="submit" class="btn btn-soft btn-sm" disabled={busy || !vaultDraft.trim()}>Keep notes here</button>
+        </form>
+      {/if}
+      {#if vaultNotice}<p class="saved" role="status">{vaultNotice}</p>{/if}
+    </div>
+  </section>
+
   <section class="control-card recall-mode-card">
     <div>
       <h3>Recall mode</h3>
@@ -1009,6 +1053,10 @@
   .page-intro,.control-card,.section-head,.memory-title,.card-actions,.advanced summary { display:flex; align-items:flex-start; justify-content:space-between; gap:var(--space-3); } .page-intro { margin-bottom:var(--space-4); } .control-card h3,.section-head h3,.memory-card h4,.empty h4 { margin:0; } .page-intro p,.control-card p { margin:.25rem 0 0; color:var(--text-2); }
   .control-card { padding:var(--space-4); border:1px solid var(--border); border-radius:var(--r-lg); background:var(--surface); }
   .control-card + .control-card { margin-top:var(--space-3); }
+  .vault-actions { display:flex; flex-wrap:wrap; gap:var(--space-2); align-items:center; margin-top:var(--space-2); }
+  .vault-actions input { flex:1 1 18rem; min-width:0; }
+  .vault-card .saved { color:var(--text-2); font-size:var(--text-sm); }
+  .vault-path code, .vault-card p code { overflow-wrap:anywhere; }
   .recall-mode-card > div { width:100%; }
   .recall-modes { display:grid; gap:var(--space-2); grid-template-columns:repeat(auto-fit, minmax(12rem, 1fr)); margin-top:var(--space-3); }
   .recall-mode-opt { display:grid; gap:.2rem; text-align:left; padding:var(--space-3); border:1px solid var(--border); border-radius:var(--r-md); background:var(--surface); color:var(--text-1); font:inherit; cursor:pointer; transition:border-color var(--motion-fast) var(--ease), background var(--motion-fast) var(--ease); }

@@ -45,9 +45,12 @@ class HybridRetrievalWeights:
     lexical: float = 3.0
     vector: float = 1.0
     graph: float = 1.0
+    #: The time leg (Hindsight's fourth search): a memory learned inside the
+    #: window a query names. Equal to one vector hit, below one exact word.
+    temporal: float = 1.0
 
     def __post_init__(self) -> None:
-        if min(self.lexical, self.vector, self.graph) < 0:
+        if min(self.lexical, self.vector, self.graph, self.temporal) < 0:
             raise ValueError("invalid_hybrid_retrieval_weights")
 
 
@@ -234,6 +237,30 @@ def retrieve_hybrid_memory(
                 score - existing + contribution,
                 sources | {"graph"},
                 {**breakdown, "graph": contribution},
+            )
+    # The time leg. A question that names a time ("last week", "in March",
+    # "2026-11-02") finds what was learned then even when it shares no word or
+    # meaning with it. Newest first and bounded, so a broad window ("this
+    # month") adds a handful of candidates rather than the whole month.
+    from raiker.memory.temporal import in_window, query_window
+
+    window = query_window(query)
+    if window is not None and weights.temporal > 0:
+        timed = [
+            row
+            for row in store.list_approved_memory(
+                limit=500, scope=scope, owner_principal_id=owner_principal_id
+            )
+            if in_window(str(row.get("created_at") or ""), window)
+            and str(row.get("sensitivity") or "") not in {"secret_like", "credential_like"}
+        ][: max(limit * 2, 10)]
+        for row in timed:
+            memory_id = str(row["memory_id"])
+            score, sources, breakdown = candidates.get(memory_id, (0.0, set(), {}))
+            candidates[memory_id] = (
+                score + weights.temporal,
+                sources | {"temporal"},
+                {**breakdown, "temporal": weights.temporal},
             )
     results: list[HybridMemoryResult] = []
     for memory_id, (score, sources, breakdown) in candidates.items():

@@ -5177,6 +5177,9 @@ MEMORY_AUTO_KEEP_MIGRATION_ID = "RAIKER-2137-memory-auto-keep"
 MEMORY_AUTO_KEEP_SQL = """
 ALTER TABLE memory_settings ADD COLUMN ask_before_remembering INTEGER NOT NULL DEFAULT 0
   CHECK (ask_before_remembering IN (0, 1));
+-- The owner's memory vault: a folder of linked Markdown kept in step with
+-- memory. NULL (the default) keeps no vault.
+ALTER TABLE memory_settings ADD COLUMN vault_path TEXT;
 """
 
 PERSONAS_MIGRATION_ID = "RAIKER-2134-personas"

@@ -1014,6 +1014,9 @@ export const api = {
   setAskBeforeRemembering: (ask: boolean) =>
     contract.setAskBeforeRemembering({ ask_before_remembering: ask }),
   rememberedInSession: (sessionId: string) => contract.listRememberedInSession({ session_id: sessionId }),
+  // Memory as linked Markdown in a folder (an Obsidian vault); null stops it.
+  setMemoryVault: (path: string | null) => contract.setMemoryVault({ path }),
+  syncMemoryVault: () => contract.syncMemoryVault(),
   // MEM-MODE-02 — Off, Brief only or Search when relevant. Incognito still
   // wins on the server; this records the owner's choice and nothing more.
   setMemoryRecallMode: (mode: MemoryRecallMode) =>

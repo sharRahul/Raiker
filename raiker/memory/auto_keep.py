@@ -11,7 +11,8 @@ instead of a click per fact:
   lessons backed by the task's own records.
 * **Still asked:** anything the model wrote (it may be invented, FIXED-1548),
   personal identifiers (email, phone, address), and a lesson that would change
-  a project's declared check — the "almost" in almost zero approvals.
+  a project's declared check, and text that reads like an instruction to the
+  agent or hides invisible characters — the "almost" in almost zero approvals.
 * **Never kept:** secret- or credential-like text, and anything in Incognito or
   with memory off (the gateway files no proposal at all there).
 * A proposal that repeats a memory Raiker already has is closed, not kept twice.
@@ -30,7 +31,9 @@ from raiker.memory.policy import MemorySensitivity, classify_memory_sensitivity
 from raiker.storage.sqlite import SQLiteStore
 
 #: Proposal sources whose words are trusted enough to keep without asking.
-AUTO_KEEP_ROLES = frozenset({"user", "owner_correction", "raiker_lesson"})
+#: `vault_note` is a line added to the memory vault's Inbox: the owner's vault,
+#: written by the owner or by an agent working for them, and still scanned.
+AUTO_KEEP_ROLES = frozenset({"user", "owner_correction", "raiker_lesson", "vault_note"})
 _ASK_SENSITIVITIES = frozenset({MemorySensitivity.PERSONAL})
 _NEVER_SENSITIVITIES = frozenset({MemorySensitivity.SECRET_LIKE, MemorySensitivity.CREDENTIAL_LIKE})
 AUTO_KEEP_REASON = "auto_kept"
@@ -50,6 +53,13 @@ def auto_keep_decision(candidate: dict[str, Any], *, asks_first: bool) -> str:
     if sensitivity in _NEVER_SENSITIVITIES:
         return "never"
     if asks_first or sensitivity in _ASK_SENSITIVITIES:
+        return "ask"
+    from raiker.security.injection_scan import scan_untrusted_text
+
+    if scan_untrusted_text(str(candidate.get("text") or "")):
+        # Hermes Agent blocks memory writes that read like an injection or carry
+        # invisible characters. A kept memory reaches every later turn, so text
+        # that reads like an instruction to the agent waits for the owner.
         return "ask"
     if str(candidate.get("memory_type") or "") == "check_fix":
         # Keep changes the project's declared checks: a settings change, asked.

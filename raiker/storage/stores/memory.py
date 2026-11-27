@@ -205,6 +205,24 @@ class MemoryStore:
         )
         return bool(row["ask_before_remembering"]) if row is not None else False
 
+    def memory_vault_path(self: SQLiteStore, owner_principal_id: str) -> str | None:
+        row = self._row(
+            "SELECT vault_path FROM memory_settings WHERE scope_id = ?",
+            (f"{self.MEMORY_SETTINGS_SCOPE}:{owner_principal_id}",),
+        )
+        return str(row["vault_path"]) if row is not None and row["vault_path"] else None
+
+    def set_memory_vault_path(self: SQLiteStore, path: str | None, owner_principal_id: str) -> None:
+        self._execute(
+            """
+            INSERT INTO memory_settings (scope_id, incognito, vault_path, updated_at)
+            VALUES (?, 0, ?, ?)
+            ON CONFLICT(scope_id) DO UPDATE SET vault_path = excluded.vault_path,
+              updated_at = excluded.updated_at
+            """,
+            (f"{self.MEMORY_SETTINGS_SCOPE}:{owner_principal_id}", path, utc_now()),
+        )
+
     def set_ask_before_remembering(self: SQLiteStore, ask: bool, owner_principal_id: str) -> None:
         self._execute(
             """

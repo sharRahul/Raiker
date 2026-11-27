@@ -810,6 +810,7 @@ class AgentGateway:
                 )
             self._propose_turn_lesson(prompt_envelope)
             self._auto_keep_turn(prompt_envelope)
+            self._sync_memory_vault()
         await self._adispatch_turn_end_hook(prompt_envelope, response)
         events_path = str(self.writer.path_for_session(prompt_envelope.session_id))
         return AgentResponse(
@@ -843,6 +844,21 @@ class AgentGateway:
             }
         except Exception:  # noqa: BLE001 — unknown means withheld
             return True
+
+    def _sync_memory_vault(self) -> None:
+        """Keep the owner's memory vault in step after each remembering turn."""
+        try:
+            path = self.store.memory_vault_path(self.owner_principal_id)
+            if path is None:
+                return
+            from raiker.memory.vault import sync_vault
+
+            sync_vault(
+                self.store, path, workspace_root=self.workspace_root,
+                owner_principal_id=self.owner_principal_id,
+            )
+        except Exception:  # noqa: BLE001 - the vault is a copy; memory stands without it
+            logging.getLogger(__name__).debug("memory vault sync failed", exc_info=True)
 
     def _auto_keep_turn(self, prompt_envelope: PromptEnvelope) -> None:
         """Keep this turn's trusted proposals without asking; the answer shows Undo."""

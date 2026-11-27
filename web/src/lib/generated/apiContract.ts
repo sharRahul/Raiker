@@ -4491,6 +4491,7 @@ export type MemoryScopeChanged = {
 export type MemorySettingsView = {
   incognito: boolean;
   ask_before_remembering: boolean;
+  vault_path: string | null;
   recall_mode: "off" | "brief" | "search_when_relevant";
   embedding_backend: string;
   retrieval: EmbeddingSpaceView | null;
@@ -4527,6 +4528,15 @@ export type MemoryUpdated = {
   memory_id: string;
   search_enabled: boolean;
   expires_at: string | null;
+};
+
+export type MemoryVaultSynced = {
+  ok: boolean;
+  vault_path: string | null;
+  written: number;
+  edited: number;
+  archived: number;
+  added: number;
 };
 
 export type MfaCodeRequest = {
@@ -8235,6 +8245,10 @@ export const contract = {
     request<MemorySettingsView>("/api/memory/settings"),
   rebuildTextIndexes: () =>
     call<TextIndexesRebuilt>("POST", "/api/memory/text-indexes/rebuild"),
+  setMemoryVault: (body: Record<string, unknown>) =>
+    call<MemoryVaultSynced>("PUT", "/api/memory/vault", { body }),
+  syncMemoryVault: () =>
+    call<MemoryVaultSynced>("POST", "/api/memory/vault/sync"),
   removeDamagedVectors: () =>
     call<DamagedVectorsRemoved>("POST", "/api/memory/vectors/remove-damaged"),
   forgetMemory: (memoryId: string) =>

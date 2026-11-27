@@ -49,6 +49,7 @@ from raiker.api.wire.memory import (
     MemoryScopeChanged,
     MemorySource,
     MemoryUpdated,
+    MemoryVaultSynced,
     ObservationsDeleted,
     ObservationsView,
     ProposalDecided,
@@ -515,6 +516,51 @@ async def set_ask_before_remembering(
     if not result.ok:
         raise refusal(status.HTTP_403_FORBIDDEN, result.reason_code)
     answer = cast(AskBeforeRememberingSet, {"ok": True, **result.data})
+    return serialize_dto(answer)
+
+
+@router.put("/api/memory/vault")
+async def set_memory_vault(
+    request: Request,
+    body: dict[str, Any],
+    auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+) -> dict[str, Any]:
+    """Keep memory as linked Markdown in a folder (an Obsidian vault), or stop (path null)."""
+    path = body.get("path")
+    owner = auth_data[0].principal_id
+    result = await asyncio.to_thread(
+        lambda: _service(request).set_memory_vault(str(path) if path else None, owner)
+    )
+    if not result.ok:
+        raise refusal(
+            status.HTTP_403_FORBIDDEN if result.reason_code == "not_authorized_human"
+            else status.HTTP_409_CONFLICT,
+            result.reason_code,
+        )
+    answer = cast(MemoryVaultSynced, {
+        "ok": True, "written": 0, "edited": 0, "archived": 0, "added": 0, **result.data,
+    })
+    return serialize_dto(answer)
+
+
+@router.post("/api/memory/vault/sync")
+async def sync_memory_vault(
+    request: Request,
+    auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+) -> dict[str, Any]:
+    """Take in vault edits and Inbox lines, then write the vault from memory."""
+    service = _service(request)
+    owner = auth_data[0].principal_id
+    result = await asyncio.to_thread(lambda: service.sync_memory_vault(owner))
+    if not result.ok:
+        raise refusal(
+            status.HTTP_403_FORBIDDEN if result.reason_code == "not_authorized_human"
+            else status.HTTP_409_CONFLICT,
+            result.reason_code,
+        )
+    answer = cast(MemoryVaultSynced, {
+        "ok": True, "vault_path": service.store.memory_vault_path(owner), **result.data,
+    })
     return serialize_dto(answer)
 
 

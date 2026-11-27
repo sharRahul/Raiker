@@ -85,6 +85,31 @@ project whose memory is off keep nothing and offer nothing. Something Raiker
 already remembers is not kept twice. To approve everything yourself, turn on
 **Ask before remembering** in Memory › Controls.
 
+## The memory vault
+
+Raiker can keep its memory as linked Markdown notes in a folder you choose, such
+as an Obsidian vault. Every tool that reads files can then use it: Claude Code,
+Hermes Agent, a script, or you in Obsidian. No plugin or integration is needed.
+Turn it on in **Memory › Controls › Memory vault** with a full folder path.
+
+- `Raiker Memory.md` links every topic and entity.
+- `Topics/` has one note per kind of memory (Preferences, Facts, Lessons…).
+  `Projects/` has one note per project.
+- `Entities/` has a note per person, place or thing, with each approved
+  relationship and a link to the fact that is its evidence. Facts link the
+  entities they name, so backlinks and Obsidian's graph show the connections.
+- Each fact is one list item ending in a block id such as `^mem-3f2a…`. Edit
+  its words to correct the memory. Delete the line to archive it; you can
+  restore it from Memory.
+- Add a new memory as a list item in `Inbox.md`. Raiker takes it in on the
+  next sync, under the same rules as Chat: text that reads like an instruction
+  to the agent, or holds personal identifiers, waits for your Keep.
+
+Raiker syncs after each answer that remembers something, and on **Sync now**.
+The notes are plain files and are not encrypted, unlike Raiker's own store.
+Secrets are masked, an edit that contains a mask is never written back, and
+secret-like memories stay out of the vault.
+
 ## Reviewing what Raiker proposes
 
 The **Pending review** section shows the proposed text, scope, sensitivity, and
@@ -124,6 +149,13 @@ again in a later task, its result carries the lesson, so the next try is the one
 that works. When the recommended command itself fails, the lesson is out of date
 and Raiker archives it (restore it from Memory). A lesson about one of the
 project's declared checks asks first, because keeping it fixes the check.
+
+### Recall by time
+
+Recall searches four ways at once: by words, by meaning, through the entity
+graph, and by **time**. A question that names a time, such as *yesterday*,
+*last week*, *in March*, *past 3 days* or *2026-11-02*, also finds what Raiker
+learned then, even when it shares no words with the memory.
 
 ## The Knowledge Map
 

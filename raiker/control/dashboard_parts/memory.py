@@ -401,6 +401,56 @@ class MemoryService:
             session_id=session_id,
         )
 
+    def set_memory_vault(
+        self: DashboardService, path: str | None, acting_principal_id: str | None
+    ) -> ControlResult:
+        """Keep (or stop keeping) a linked-Markdown copy of memory in *path*."""
+        if not self._is_human(acting_principal_id):
+            return ControlResult(ok=False, reason_code="not_authorized_human")
+        from pathlib import Path
+
+        owner = acting_principal_id or ""
+        if not path or not path.strip():
+            self.store.set_memory_vault_path(None, owner)
+            return ControlResult(ok=True, data={"vault_path": None})
+        folder = Path(path.strip()).expanduser()
+        if not folder.is_absolute():
+            return ControlResult(ok=False, reason_code="memory_vault_path_not_absolute")
+        internal = (Path(self.workspace_root) / ".raiker").resolve()
+        resolved = folder.resolve()
+        if resolved == internal or internal in resolved.parents:
+            return ControlResult(ok=False, reason_code="memory_vault_path_internal")
+        try:
+            resolved.mkdir(parents=True, exist_ok=True)
+        except OSError:
+            return ControlResult(ok=False, reason_code="memory_vault_path_unwritable")
+        self.store.set_memory_vault_path(str(resolved), owner)
+        synced = self.sync_memory_vault(owner)
+        return ControlResult(
+            ok=synced.ok, reason_code=synced.reason_code,
+            data={"vault_path": str(resolved), **(synced.data or {})},
+        )
+
+    def sync_memory_vault(self: DashboardService, acting_principal_id: str | None) -> ControlResult:
+        if not self._is_human(acting_principal_id):
+            return ControlResult(ok=False, reason_code="not_authorized_human")
+        owner = acting_principal_id or ""
+        path = self.store.memory_vault_path(owner)
+        if path is None:
+            return ControlResult(ok=False, reason_code="memory_vault_not_set")
+        if self.store.is_memory_incognito(owner):
+            return ControlResult(ok=False, reason_code="memory_off")
+        from raiker.memory.vault import sync_vault
+
+        try:
+            result = sync_vault(self.store, path, workspace_root=self.workspace_root, owner_principal_id=owner)
+        except OSError:
+            return ControlResult(ok=False, reason_code="memory_vault_unreachable")
+        return ControlResult(ok=True, data={
+            "written": result.written, "edited": result.edited,
+            "archived": result.archived, "added": result.added,
+        })
+
     def set_ask_before_remembering(
         self: DashboardService, ask: bool, acting_principal_id: str | None
     ) -> ControlResult:
@@ -1483,6 +1533,7 @@ class MemoryService:
             incognito=self.store.is_memory_incognito(acting_principal_id),
             ask_before_remembering=bool(acting_principal_id)
             and self.store.asks_before_remembering(acting_principal_id or ""),
+            vault_path=self.store.memory_vault_path(acting_principal_id) if acting_principal_id else None,
             recall_mode=cast(
                 Literal["off", "brief", "search_when_relevant"],
                 self.store.get_memory_recall_mode(acting_principal_id),

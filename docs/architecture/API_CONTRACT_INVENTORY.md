@@ -12,7 +12,7 @@ operation answers with, and whether OpenAPI describes it (OPT-01/OPT-02 —
 * **deferred** — the body has no declared type; a test fails while any is.
 * **special** — a stream, a file or another non-JSON transport; hand-written.
 
-**553 operations: 537 verified, 0 eligible, 0 deferred, 16 special.**
+**555 operations: 539 verified, 0 eligible, 0 deferred, 16 special.**
 
 | Method | Path | Request | Response | Status | Why |
 |---|---|---|---|---|---|
@@ -350,6 +350,8 @@ operation answers with, and whether OpenAPI describes it (OPT-01/OPT-02 —
 | GET | `/api/memory/remembered` |  | RememberedMemory[] | verified | declared RememberedMemory[] |
 | GET | `/api/memory/settings` |  | MemorySettingsView | verified | DashboardService.get_memory_settings |
 | POST | `/api/memory/text-indexes/rebuild` |  | TextIndexesRebuilt | verified | declared by cast |
+| PUT | `/api/memory/vault` | dict | MemoryVaultSynced | verified | declared by cast |
+| POST | `/api/memory/vault/sync` |  | MemoryVaultSynced | verified | declared by cast |
 | POST | `/api/memory/vectors/remove-damaged` |  | DamagedVectorsRemoved | verified | declared by cast |
 | DELETE | `/api/memory/{memory_id}` |  | MemoryForgotten | verified | declared by cast |
 | PUT | `/api/memory/{memory_id}` | dict | MemoryUpdated | verified | declared by cast |

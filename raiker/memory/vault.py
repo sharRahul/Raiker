@@ -295,6 +295,12 @@ def sync_vault(
             if _checksum(text) != known.get("checksum") and text and text != entry.text:
                 if "[REDACTED" in text:
                     continue  # never write a mask back over the owner's words
+                if _edit_needs_owner(text):
+                    # The same gate as an Inbox line: an edit that reads like an
+                    # instruction, hides invisible characters or adds secrets or
+                    # personal identifiers waits for Keep as a correction.
+                    _file_correction(store, owner_principal_id, memory_id, text)
+                    continue
                 update_memory(
                     memory_id, workspace_root=workspace_root, text=text, store=store,
                     owner_principal_id=owner_principal_id,
@@ -304,6 +310,35 @@ def sync_vault(
     added = _take_into_memory(store, root, workspace_root=workspace_root, owner_principal_id=owner_principal_id)
     written, _ = export_vault(store, root, owner_principal_id=owner_principal_id)
     return VaultSync(written=written, edited=edited, archived=archived, added=added)
+
+
+def _edit_needs_owner(text: str) -> bool:
+    from raiker.memory.policy import MemorySensitivity, classify_memory_sensitivity
+    from raiker.security.injection_scan import scan_untrusted_text
+
+    return bool(scan_untrusted_text(text)) or classify_memory_sensitivity(text) in {
+        MemorySensitivity.PERSONAL, MemorySensitivity.SECRET_LIKE, MemorySensitivity.CREDENTIAL_LIKE,
+    }
+
+
+def _file_correction(store: SQLiteStore, owner_principal_id: str, memory_id: str, text: str) -> None:
+    from raiker.memory.candidates import MemoryCandidate
+    from raiker.memory.policy import classify_memory_sensitivity
+
+    if store.memory_candidate_text_pending(text, owner_principal_id=owner_principal_id):
+        return
+    material = f"{owner_principal_id}\0{memory_id}\0{text}"
+    store.insert_memory_candidate(
+        MemoryCandidate(
+            candidate_id="memcand_" + hashlib.sha256(material.encode()).hexdigest()[:24],
+            source_event_id="evt_vault", memory_type="fact", scope="user", text=text[:2_000],
+            sensitivity=classify_memory_sensitivity(text).value, confidence=0.9,
+            decision="deferred", created_at=utc_now(), source_session_id="vault",
+            source_turn_id=f"vault_edit_{memory_id}", source_role="vault_edit",
+            extractor_version="vault-edit-v1",
+        ),
+        owner_principal_id=owner_principal_id,
+    )
 
 
 def _take_into_memory(

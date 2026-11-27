@@ -18,10 +18,10 @@ export const NAV_GROUPS: NavGroup[] = [
     // describe what you want and a model answers. It was last in the group, next
     // to Messaging, which put a making surface among the plumbing.
     { id: "design", label: "Design", icon: "design", hint: "Create and edit images with a connected model" },
-    // Quiet UI — Threads, Tasks and Projects were three rail rows for one
+    // Quiet UI — Chats, Tasks and Projects were three rail rows for one
     // question, "what do I have going". They are one page with three tabs now;
     // their old addresses open the matching tab (ROUTE_ALIASES).
-    { id: "work", label: "Work", icon: "tasks", hint: "Threads, goals, tasks and projects" },
+    { id: "work", label: "Work", icon: "tasks", hint: "Chats, goals, tasks and projects" },
     // Memory carries the Knowledge Map as a tab, for the same reason.
     { id: "memory", label: "Memory", icon: "activity", hint: "What Raiker remembers" },
     // A decision waiting on you is the work, not configuration. It has a
@@ -69,7 +69,7 @@ export const SIDEBAR_GROUP_IDS: NavGroupId[] = ["core"];
  *
  * Grouping and route registration are one thing; what the rail is worth
  * spending a permanent row on is another, and they were the same list. Core
- * held nine peers — Workbench, Chat, Build, Design, Threads, Tasks, Projects,
+ * held nine peers — Workbench, Chat, Build, Design, Chats, Tasks, Projects,
  * Approvals, Messaging — so before starting work the owner had to learn nine
  * product nouns and decide which of them they were in. A rail is not an index.
  *
@@ -211,7 +211,7 @@ export const HUB_TABS: Record<string, string[]> = {
   // technical as one segmented list. Overview is gone: with the catalogue in the
   // Add connection dialog, Services is short enough to be the overview.
   connections: ["services", "channels", "advanced"],
-  // QUI-L11 — Sessions moved to Work › Threads (`#/sessions?session=…` opens a
+  // QUI-L11 — Sessions moved to Work › Chats (`#/sessions?session=…` opens a
   // conversation's record there); `#/observe?tab=sessions` forwards with it.
   observe: ["overview", "activity", "checkpoints", "work", "notifications"],
   // Memory carried approved records, proposals, observations, a document

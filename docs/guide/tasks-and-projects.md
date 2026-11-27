@@ -124,7 +124,7 @@ carries **Thread · N** once there is something to read; it opens in Chat, where
 you can see what each cycle actually did and **reply**. A reply is not a note
 filed somewhere — the next cycle runs in that same conversation and reads it, so
 replying is how you steer a routine without editing its instructions. Routine
-threads also appear on **Threads** beside your own conversations.
+threads also appear on **Chats** beside your own conversations.
 
 **A task's instructions are checked when you save it.** A routine runs while
 you are not watching, and instructions pasted from an email or a page can carry
@@ -403,7 +403,7 @@ into it except a block you pin.
 ## A conversation's record and a project's activity
 
 A conversation's record — its turns, the events of each and their evidence —
-opens in **Work › Threads** (links that used to open Diagnostics › Sessions land
+opens in **Work › Chats** (links that used to open Diagnostics › Sessions land
 there, with **← All threads** to go back). A project's **Evidence** section
 lists its checkpoints with **Open Recovery for this project**, and its
 **Activity**: what happened in the project's chats, newest first, from the same
@@ -570,7 +570,7 @@ As of 2026-08-08, one edge remains here:
 Three limits this section used to list have shipped and are gone from it: a
 background-agent run now ends with a user-visible reason (**FIXED-13**), a
 task run no longer appears among the owner's own conversations — those are on
-**Threads**, and task sessions are in Diagnostics → Sessions (**FIXED-15**) —
+**Chats**, and task sessions are in Diagnostics → Sessions (**FIXED-15**) —
 and approving a task the agent proposed now creates it (**FIXED-106**).
 
 ## Using Raiker as a personal agent

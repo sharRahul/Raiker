@@ -388,7 +388,7 @@ provider card's own secure field.
 | **Model** | *Where should I think?* Three answers. **On this computer** shows the model size this device can run and opens the local runtimes; **An account I have** opens the hosted providers (Anthropic, OpenAI, Google and others), each with its own secure key field; **Decide later** moves on, and Chat asks for a model when you first send. When a runtime on this machine already names a model, or an account is already connected, it is recommended above the three. The model you choose is checked, and a model you already chose as the default on Models counts as your choice. Once a connected provider has listed its models, the foot of the step reads *Choose a default model to continue to Privacy* beside **Continue**, which waits until you pick one (from a provider's **Choose a model**) and then saves it and opens Privacy; with a default already chosen, **Continue** is ready at once. **Decide later** stays at the foot only while no connected provider has a model to choose. **Advanced setup** opens [Models](connecting-a-model.md); you do not need it to finish. |
 | **Privacy** | *Here is how I'll work for you.* Two cards. **How I'll ask**: *I'll research and prepare on my own. I'll ask before I send, delete, pay or share anything.* — then a choice of posture: **Ask first**, **Work in the sandbox** (selected when its measured boundary and saved policy permit it) or **Read-only**, applied on **Continue** the way [Permissions](permissions-and-runtime-modes.md#postures) applies it, and changeable there any time. **Where your data goes**: requests go only to the model you choose and the providers you connect; when the model you chose runs off this device it names where its requests go. To keep every request on this device, choose a model that runs here ([FIXED-947](../plans/FIXED_ITEMS.md#fixed-947--local-only-was-a-setup-answer-nothing-enforced-was-bug-345)). No service asks to be connected here: connections are made when a task needs them. |
 | **Check** *(source checkouts only)* | Raiker checks its own parts from inside: the host, the interface, the encrypted database, the data format, long-term memory storage, the permission registry, the governed command runner and the credential vault — then makes one short request to the model you chose. A part that is not working says how to fix it; **Check again** reruns it. |
-| **Start** | *You're set. What should we do first?* — or, when you deferred the model, *Setup is saved. Chat and Build need a model before they can answer.* with **Choose a model**. Type a first task, or use one of four starters (*Summarise a document*, *Plan my week*, *Fix a bug in a repository*, *Make an image*). The first message opens Chat and that conversation is kept in Threads as *Getting started*. **Go to Home** finishes without sending anything. |
+| **Start** | *You're set. What should we do first?* — or, when you deferred the model, *Setup is saved. Chat and Build need a model before they can answer.* with **Choose a model**. Type a first task, or use one of four starters (*Summarise a document*, *Plan my week*, *Fix a bug in a repository*, *Make an image*). The first message opens Chat and that conversation is kept in Chats as *Getting started*. **Go to Home** finishes without sending anything. |
 
 **Work in the sandbox** is offered only after the command sandbox's probe
 passes, not merely after installation. It is selected by default when measured
@@ -483,14 +483,14 @@ is worse than no claim, because you would act on it.
 
 **Sessions is inside Diagnostics**, not a destination of its own: it is the
 complete record of every conversation *and* every task run, which is why
-**Threads** — the board you pick work up from — lists conversations and the
+**Chats** — the board you pick work up from — lists conversations and the
 threads your routines are advancing, and nothing else.
 
 **The interface is deliberately quiet.** Pages open with their content, not a
 sentence about it: a page's one-line description is its title's tooltip, the
 way into its help article is the **?** in the top bar, and an empty list shows
 its title and the action that fills it. Pages that answered one question are one page
-with tabs — **Work** holds Threads, Tasks and Projects; **Memory** holds the
+with tabs — **Work** holds Chats, Tasks and Projects; **Memory** holds the
 Knowledge Map; **Connections** holds messaging Channels. A page that lists
 things is a list on the left with the chosen item's detail beside it, and
 adding something is one dialog — **Add connection**, **Add channel**, **Add
@@ -500,7 +500,7 @@ Five destinations are tabbed, and Settings has its own rail:
 
 | Destination | Tabs |
 |---|---|
-| Work | Threads, Tasks, Projects |
+| Work | Chats, Tasks, Projects |
 | Memory | Overview, Memories, Suggestions, Sources, Controls (the map opens from Memories) |
 | Connections | Services, Channels, Advanced (MCP servers, Skills, Hooks, Plugins) |
 | Diagnostics | Overview, Sessions, Audit log, Checkpoints, Work in action, Notifications |

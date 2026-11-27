@@ -91,9 +91,14 @@ describe("CapabilitiesView — what each switch actually decides", () => {
     const pane = detail("Shell commands");
     expect(pane.getByText("Can Raiker use this?")).toBeInTheDocument();
     expect(pane.getByText("When Raiker wants to use it")).toBeInTheDocument();
+    const headings = pane.getAllByRole("heading", { level: 3 }).map((item) => item.textContent);
+    expect(headings).toEqual(["Can Raiker use this?", "When Raiker wants to use it"]);
     const group = pane.getByRole("group", { name: /when Raiker wants to use/i });
     expect(within(group).getByRole("button", { name: "Never" })).toBeInTheDocument();
     expect(within(group).queryByRole("button", { name: "Deny" })).not.toBeInTheDocument();
+    expect(within(group).queryByRole("button", { name: "Automatic" })).not.toBeInTheDocument();
+    await fireEvent.click(pane.getByText("Advanced rule"));
+    await waitFor(() => expect(within(group).getByRole("button", { name: "Automatic" })).toBeInTheDocument());
   });
 
   it("shows each permission's policy as text on its row, with no control on the row", async () => {
@@ -307,6 +312,9 @@ describe("Permissions — summaries, shortcuts and review", () => {
   it("opens the permission a goal sentence names, with focus on its control", async () => {
     stubFetch({ "GET /api/capability-gates": AUTO_GATES });
     render(CapabilitiesView, { principal: "prin_owner" });
+    const disclosure = await screen.findByText("Permission summary");
+    expect(disclosure.closest("details")).not.toHaveAttribute("open");
+    await fireEvent.click(disclosure);
     const goals = await screen.findByRole("region", { name: "What Raiker can do for you" });
     await fireEvent.click(within(goals).getAllByRole("button", { name: /Change: .*commands/i })[0]);
     expect(await screen.findByRole("article", { name: "Shell commands" })).toBeInTheDocument();
@@ -433,7 +441,7 @@ describe("Permissions — Select several", () => {
     const bulk = within(screen.getByRole("toolbar", { name: "Bulk capability actions" }));
     await fireEvent.click(bulk.getByRole("button", { name: "Never" }));
     expect(screen.getByRole("checkbox", { name: /^Select (?!Shell)/ })).toBeDisabled();
-    expect(screen.getByRole("button", { name: "Refresh capabilities" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Refresh permissions" })).toBeDisabled();
     finish({ ok: true, status: 200, json: async () => ({ ok: true }) } as Response);
     await waitFor(() => expect(screen.getByRole("checkbox", { name: /^Select (?!Shell)/ })).toBeEnabled());
     expect(screen.getByRole("checkbox", { name: "Select Shell commands" })).not.toBeChecked();
@@ -447,7 +455,7 @@ describe("Permissions — Select several", () => {
     await fireEvent.click(screen.getByRole("checkbox", { name: "Select Shell commands" }));
     expect(screen.getByText("1 selected")).toBeInTheDocument();
     routes["GET /api/capability-gates"] = TWO.map(gate => ({ ...gate, can_current_principal_change: false }));
-    await fireEvent.click(screen.getByRole("button", { name: "Refresh capabilities" }));
+    await fireEvent.click(screen.getByRole("button", { name: "Refresh permissions" }));
     await waitFor(() => expect(screen.getByText("0 selected")).toBeInTheDocument());
     expect(screen.getByRole("checkbox", { name: "Select Shell commands" })).toBeDisabled();
   });
@@ -486,6 +494,9 @@ describe("CapabilitiesView — posture by goal", () => {
     stubFetch({ "GET /api/capability-gates": GATES });
     render(CapabilitiesView, { props: { principal: "prin_owner" } });
 
+    const disclosure = await screen.findByText("Permission summary");
+    expect(disclosure.closest("details")).not.toHaveAttribute("open");
+    await fireEvent.click(disclosure);
     const goals = await screen.findByRole("region", { name: "What Raiker can do for you" });
     expect(within(goals).getByText("Can run commands and code after asking you")).toBeInTheDocument();
     expect(within(goals).getByText("Can read web pages after asking you")).toBeInTheDocument();
@@ -502,7 +513,7 @@ describe("CapabilitiesView — posture by goal", () => {
     });
     render(CapabilitiesView);
     const panel = await screen.findByTestId("postures");
-    expect(panel).toHaveTextContent("Now: Ask first.");
+    await waitFor(() => expect(within(panel).getByRole("radio", { name: /^Ask first/ })).toBeChecked());
     await waitFor(() => expect(within(panel).getByRole("radio", { name: /Work in the sandbox/ })).toBeDisabled());
     expect(panel).toHaveTextContent(/stays on Ask first/);
     const readOnly = within(panel).getByRole("radio", { name: /Read-only/ });
@@ -523,7 +534,7 @@ describe("CapabilitiesView — posture by goal", () => {
     const sandbox = within(panel).getByRole("radio", { name: /Work in the sandbox/ });
     await waitFor(() => expect(sandbox).toBeEnabled());
     await fireEvent.click(sandbox);
-    await fireEvent.click(within(panel).getByRole("button", { name: "Apply" }));
+    await fireEvent.click(within(panel).getByRole("button", { name: "Save changes" }));
     await waitFor(() =>
       expect(fetchMock.mock.calls.some(([u, init]) => String(u).includes("/api/capability-modes/shell_execution/allow") && (init as RequestInit | undefined)?.method === "POST")).toBe(true),
     );
@@ -540,12 +551,12 @@ describe("CapabilitiesView — posture by goal", () => {
     });
     render(CapabilitiesView);
     const panel = await screen.findByTestId("postures");
-    await waitFor(() => expect(panel).toHaveTextContent("Your own mix"));
+    await waitFor(() => expect(panel).toHaveTextContent("Custom rules are active"));
     await fireEvent.click(within(panel).getByRole("radio", { name: /Work in the sandbox/ }));
-    await fireEvent.click(within(panel).getByRole("button", { name: "Apply" }));
+    await fireEvent.click(within(panel).getByRole("button", { name: "Save changes" }));
     await waitFor(() => expect(fetchMock.mock.calls.some(([url, init]) =>
       String(url).endsWith("/api/settings/composer-approval-mode") && (init as RequestInit | undefined)?.method === "PUT",
     )).toBe(true));
-    await waitFor(() => expect(panel).toHaveTextContent("Now: Work in the sandbox."));
+    await waitFor(() => expect(within(panel).getByRole("radio", { name: /Work in the sandbox/ })).toBeChecked());
   });
 });

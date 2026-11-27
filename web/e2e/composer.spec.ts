@@ -10,7 +10,7 @@
 // Nothing ran it, so the drift was invisible. The assertions below are written
 // against the surfaces as they are now, and the suite is in CI so the next
 // redesign cannot silently outrun it.
-import { expect, test } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
 import { capture } from "./capture";
 import { HOME_GREETING } from "./home";
 import AxeBuilder from "@axe-core/playwright";
@@ -24,6 +24,15 @@ const dist = join(import.meta.dirname, "..", "dist");
 // capture this suite has taken was written to `/home/user/output/playwright`
 // where nothing looks for it and git cannot see it.
 const shots = join(import.meta.dirname, "..", "..", "output", "playwright");
+async function closeMobileNavigation(page: Page): Promise<void> {
+  if ((page.viewportSize()?.width ?? 1440) >= 600) return;
+  const close = page.getByRole("banner").getByRole("button", { name: "Close navigation", exact: true });
+  if (await close.isVisible()) await close.click();
+  await expect.poll(async () => {
+    const box = await page.locator("#all-navigation").boundingBox();
+    return box === null ? 0 : box.x + box.width;
+  }).toBeLessThanOrEqual(1);
+}
 const model = {
   profile_id: "anthropic-hosted", provider: "anthropic", model: "claude-sonnet-4-5",
   default_state: "enabled_runtime", local_only: false, requires_network: true,
@@ -44,6 +53,69 @@ const imageModel = {
   selected: false, supports_reasoning: false, supports_reasoning_effort: false,
   reasoning_effort_values: [] as string[],
 };
+
+test("permissions refinement visual inventory", async ({ page }) => {
+  const stage = process.env.RAIKER_UI_CAPTURE_STAGE ?? "after";
+  for (const width of [1440, 390]) {
+    await page.setViewportSize({ width, height: 900 });
+    for (const route of ["capabilities", "chat", "build", "design", "work"]) {
+      await page.goto(`http://127.0.0.1:8765/#/${route}`);
+      await expect(page.locator("main")).toBeVisible();
+      await closeMobileNavigation(page);
+      for (const theme of ["light", "dark"]) {
+        await page.evaluate((value) => { document.documentElement.dataset.theme = value; }, theme);
+        await capture(page, join(shots, `permissions-${stage}-${route}-${width}-${theme}.png`));
+      }
+    }
+  }
+});
+
+test("work details opens from the keyboard and keeps scope visible", async ({ page }) => {
+  await page.route("**/api/code/repos", (route) => route.fulfill({ json: {
+    repos: [{ repo_id: "repo_ui", kind: "local", label: "Pricing", selected: true,
+      local_subpath: "pricing", local_exists: true, github_owner: null, github_repo: null, branch: "main" }],
+    selected_repo_id: "repo_ui", github_gate_state: "enabled_runtime", github_decision_mode: "ask",
+    github_token_configured: false, note: "",
+  } }));
+  await page.route("**/api/code/repos/repo_ui/target", (route) => route.fulfill({ json: {
+    repo_id: "repo_ui", repo_kind: "local", label: "Pricing", state: "ready", host: "this_computer",
+    folder: "pricing", folder_exists: true, git: true, branch: "main", head: "abc1234",
+    identity: "folder:pricing", environment: "local_native", code_placement: "sandbox",
+    fingerprint: "f".repeat(64), authority: { repository: null, delegations: [], git_credential: false },
+  } }));
+  for (const width of [1440, 390]) {
+    await page.setViewportSize({ width, height: 900 });
+    await page.goto("http://127.0.0.1:8765/#/build");
+    await closeMobileNavigation(page);
+    const target = page.getByTestId("build-target");
+    await expect(target.locator(".summary")).toHaveText("main");
+    await expect(target.locator(".where")).toBeVisible();
+    const summary = target.locator("summary");
+    await summary.focus();
+    await page.keyboard.press("Enter");
+    await expect(target.locator("details")).toHaveAttribute("open", "");
+    await expect(target.locator(".target-detail")).toContainText("Commit: abc1234");
+    const box = await target.locator(".target-detail").boundingBox();
+    expect(box).not.toBeNull();
+    expect(box!.x).toBeGreaterThanOrEqual(0);
+    expect(box!.x + box!.width).toBeLessThanOrEqual(width + 1);
+    await capture(page, join(shots, `permissions-work-details-${width}.png`));
+    await page.keyboard.press("Enter");
+    await expect(target.locator("details")).not.toHaveAttribute("open");
+  }
+});
+
+test("permissions remain usable at doubled zoom", async ({ page }) => {
+  await page.goto("http://127.0.0.1:8765/#/capabilities");
+  await page.evaluate(() => { document.documentElement.style.zoom = "2"; });
+  await expect(page.getByRole("heading", { name: "Default mode" })).toBeVisible();
+  const summary = page.getByText("Permission summary", { exact: true });
+  await summary.focus();
+  await page.keyboard.press("Enter");
+  await expect(summary.locator("..")).toHaveAttribute("open", "");
+  expect(await page.locator("main").evaluate((el) => el.scrollWidth <= el.clientWidth)).toBe(true);
+  await capture(page, join(shots, "permissions-zoom-200.png"));
+});
 
 test.beforeEach(async ({ page }) => {
   await page.addInitScript(() => {
@@ -356,7 +428,7 @@ test("minimal composers fit representative iPhone, Android, and tablet viewports
         const terminal = page.getByRole("button", { name: "Governed terminal" });
         await expect(terminal).toBeVisible();
         await expect(terminal.locator(".rail-label")).toBeHidden();
-        await expect(page.getByText("Auto follows your Permissions.")).toBeVisible();
+        await expect(page.getByText("Some actions are restricted.")).toBeVisible();
       }
     }
 

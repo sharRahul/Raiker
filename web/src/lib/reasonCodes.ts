@@ -308,8 +308,8 @@ const PREFIX_CODES: Record<string, ReasonCopy> = {
   interrupt_target_not_found: { plain: "The turn to interrupt has already ended.", remediation: "Nothing more is needed." },
   retry_source_not_in_session: { plain: "The answer to retry is not in this conversation.", remediation: "Open the conversation it belongs to and retry there." },
   // Things that are gone.
-  session_not_found: { plain: "This conversation no longer exists.", remediation: "Open another one from Sessions." },
-  unknown_session: { plain: "This conversation no longer exists.", remediation: "Open another one from Sessions." },
+  session_not_found: { plain: "This conversation no longer exists.", remediation: "Open another one from Chats." },
+  unknown_session: { plain: "This conversation no longer exists.", remediation: "Open another one from Chats." },
   turn_not_found: { plain: "That message is no longer in the conversation.", remediation: "Reload the conversation." },
   unknown_turn: { plain: "That message is no longer in the conversation.", remediation: "Reload the conversation." },
   task_not_found: { plain: "This task no longer exists.", remediation: "Reopen Tasks to see the current list." },

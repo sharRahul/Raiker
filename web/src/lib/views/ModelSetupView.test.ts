@@ -617,7 +617,7 @@ describe("first-run setup", () => {
     });
   });
 
-  it("ends on the first task, kept in Threads as Getting started (QUI-W05)", async () => {
+  it("ends on the first task, kept in Chats as Getting started (QUI-W05)", async () => {
     const fetchMock = stubFetch({
       "GET /api/setup": {
         ...required,

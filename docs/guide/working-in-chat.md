@@ -108,7 +108,7 @@ Outside the composer, on the page itself:
 
 | Control | `aria-label` | What it does |
 |---|---|---|
-| **Title** | — | The conversation's name, at the left of the header. The pen beside it (`Rename conversation`) renames it in place; Enter keeps the new name, Escape keeps the old one. The same name appears in Work → Threads and in the sidebar. |
+| **Title** | — | The conversation's name, at the left of the header. The pen beside it (`Rename conversation`) renames it in place; Enter keeps the new name, Escape keeps the old one. The same name appears in Work → Chats and in the sidebar. |
 | **New chat** | — | Start a fresh conversation. Shown once there is a conversation to leave. |
 | **⋯** | `Conversation actions` | Three groups. **Conversation**: **Export conversation…** and **Print / Save as PDF** (both also in Build). **Evidence**: every governed step in this conversation; each answer's own evidence is under it. **Continuity**: **Background work**, and a pointer to the per-message actions below. |
 | **Background** | `Background work: 2 running, 1 failed today` | Opens the background-work rail. Shown only while work is running, waiting or failed in the last day; **⋯ → Background work** opens the rail at any time. Its label counts what is running and marks work that failed, read from the same list the rail shows. |
@@ -567,18 +567,18 @@ earlier messages** above them; the turn you were reading stays where it was.
 Search, a Retry's original turn and a link to an exchange bring the turn they
 need into view on their own.
 
-**Threads is where your conversations are.** The sidebar lists your five most
+**Chats is where your conversations are.** The sidebar lists your five most
 recent chats under **Chat**, newest first, so going back to one is a click from
 anywhere; a routine's thread is not listed there. The names come from the same
-thread list Work → Threads reads, and the list is hidden when the sidebar is
+thread list Work → Chats reads, and the list is hidden when the sidebar is
 collapsed to icons.
 
-**Work → Threads** is the board: everything you have going, pinned first and then
+**Work → Chats** is the board: everything you have going, pinned first and then
 newest — the conversations you started **and** the threads your routines are
 advancing on their own. Each row names the project it sits in and says what it
 is blocked on; a routine's row says how often it runs.
 
-**Searching Threads** finds a conversation by the words in its title or its
+**Searching Chats** finds a conversation by the words in its title or its
 messages, with the exchange that matched. Where your embedding model may run
 (Settings › Memory), a search that finds few chats by words also looks for
 recent conversations that are *about* the same thing in other words — searching
@@ -642,9 +642,9 @@ live there too, which is why they are not among your own conversations. It is
 for reading the record rather than for picking work up or filing it away — a
 session there offers one **Resume in …** link, naming the surface that
 conversation belongs to, and its `⋯` menu offers Copy local link, a link to
-Threads, and Delete.
+Chats, and Delete.
 Tags show there and can be filtered on, because finding a record is what that
-page is for; changing them is done on Threads. **Delete** stays in Sessions
+page is for; changing them is done on Chats. **Delete** stays in Sessions
 deliberately: it removes the governed record itself, so it sits beside the
 evidence it removes rather than among the controls that only tidy.
 

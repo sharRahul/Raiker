@@ -1,14 +1,12 @@
 # Permissions and the runtime
 
-Raiker has two controls over what the agent may do:
+**Permissions** are standing rules: what Raiker can access and when it must
+ask. **Approvals** are decisions about a particular proposed action, such as
+sending a message or applying a change. Giving access to an app or tool does
+not approve every action it can perform.
 
-1. **Capability gate** — the individual switch, per capability, per account.
-2. **Decision mode** — per capability, how the agent must ask before doing
-   something it is already allowed to do.
-
-Behind both sits one runtime, and one question about it: is it accepting
-executions at all? That is the danger-zone switch, not a fifth thing to
-configure before your gates mean anything.
+The runtime checks both before executing. It also enforces the sandbox,
+scope, explicit restrictions and any required human confirmation.
 
 ---
 
@@ -23,22 +21,18 @@ permission was changed somewhere else since this page loaded, so nothing was
 changed* — and the page re-reads the current setting, so an old page can never
 quietly undo a newer decision, such as a permission you tightened elsewhere.
 
-**Posture** leads: one sentence saying how many of your permissions are
-available to Raiker and how many are set to act without asking you, with the
-counts beneath it as the page's status filter — **All**, **Available**,
-**Unavailable**, **Needs review**, and **Selected** once you have selected
-something. Availability describes the capability gate; policy, decision mode and
-runtime checks still determine whether an action can execute.
+**Default mode** leads: choose **Ask first**, **Work in the sandbox**, or
+**Read-only**, review the changes, then **Save changes**. This applies across
+Chat, Build and Design. Sandbox mode is available only while containment is
+measured as enforced; it does not turn permissions on.
 
-**What Raiker can do for you** follows: the same posture said by goal, one
-read-only line each — *Can edit project files after asking you*, *Can read web
-pages without asking*, *Cannot send messages and email*. Each line is the most
-open way the goal can be reached among the capabilities that answer it, and
-says *(1 of 3 ways)* when only some of them can run; a capability that is off,
-not ready or set to **Never** counts as a way Raiker cannot. A mode the page
-does not recognise makes the line say it is unknown rather than read it as
-permission, and a goal this runtime reports nothing for is left out rather than
-called impossible. **Change** opens the row that decides it.
+**Permission summary** is closed until opened. It summarizes access by task,
+such as editing files or reading web pages. **Change** opens the permission
+behind a summary. An unknown setting is shown as unknown, not as permission.
+The **Set up for Build** action reviews and enables the required tools; your
+approval rules still apply. In sandbox mode, copied edits and tests can proceed
+without per-step approval. Applying changes and pushing require their ordinary
+authority.
 
 Below it the page is a list and a detail. The rail on the left chooses a
 category — **Overview**, then ten families of what each permission is for
@@ -61,8 +55,10 @@ A row states what is on and what happens — `On · Ask me`, `Off · Never` —
 without being opened. Open it to read what the capability does, whether Raiker
 may use it on this account, what happens when Raiker wants to, and a **Why**
 when this switch does not decide the matter by itself. Turn it on or off from
-there. The decision controls are **Ask me**, **Allow**, **Automatic** and
-**Never**; broader access continues through the confirmation dialog and
+there. The common decision controls are **Ask me**, **Allow** and **Never**.
+**Advanced rule** also offers **Automatic**, which stays visible when already
+selected. **Scope and safeguards** reveals the detailed authority and network
+requirements. An approval rule never turns access on; broader access continues through the confirmation dialog and
 server-side authorization checks.
 
 **How your permissions apply** sits under **Advanced**, closed. It is the

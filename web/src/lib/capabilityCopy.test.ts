@@ -31,7 +31,7 @@ describe("decision modes", () => {
     // REM-PERM-02 — the copy lives in `permissionLanguage`, which is the one
     // owner vocabulary. `DECISION_MODE_COPY` was a second set of words for the
     // same four values that nothing rendered, and is gone.
-    expect(BEHAVIOUR_COPY.ask.hint.toLowerCase()).toContain("default");
+    expect(BEHAVIOUR_COPY.ask.hint).toBe("Raiker asks before using this permission.");
   });
 
   it("validates decision mode strings", () => {

@@ -134,7 +134,7 @@
       if (id !== requestId) return;
       page = null;
       threads = [];
-      loadError = failure("Threads could not be read", "No conversation was changed.", "Search again in a moment.", error);
+      loadError = failure("Chats could not be read", "No conversation was changed.", "Search again in a moment.", error);
     } finally {
       if (id === requestId) {
         searching = false;
@@ -507,7 +507,7 @@
             </ul>
           {/if}
           <!-- REM-THREAD-03 — the other job, kept out of the row's own reading
-               order. Threads resumes work; the inspector verifies how it ran,
+               order. Chats resumes work; the inspector verifies how it ran,
                and it is a link rather than the destination of the row. -->
           <span class="row-links">
             {#if thread.task_id}

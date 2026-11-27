@@ -57,7 +57,7 @@ export interface BehaviourCopy {
 export const BEHAVIOUR_COPY: Record<DecisionMode, BehaviourCopy> = {
   ask: {
     label: "Ask me",
-    hint: "Raiker stops and waits for your approval every time (default).",
+    hint: "Raiker asks before using this permission.",
   },
   allow: {
     label: "Allow",
@@ -65,7 +65,7 @@ export const BEHAVIOUR_COPY: Record<DecisionMode, BehaviourCopy> = {
   },
   auto: {
     label: "Automatic",
-    hint: "Raiker goes ahead and may chain further steps of its own. The most permissive.",
+    hint: "Raiker may continue through related steps within its authorized scope. Runtime restrictions still apply.",
   },
   deny: {
     label: "Never",

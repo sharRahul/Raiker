@@ -2,7 +2,7 @@
   /**
    * Quiet UI — everything the owner has going, on one page.
    *
-   * Threads, Tasks and Projects were three rail rows answering one question.
+   * Chats, Tasks and Projects were three rail rows answering one question.
    * The Library (QUI-F15) is the fifth tab: what all that work made.
    * They are tabs of this page now; each tab is the page it used to be, and
    * the old addresses (`#/tasks`, `#/projects`, `#/search-chat`) open the
@@ -32,7 +32,7 @@
     onchanged?: () => void;
   } = $props();
 
-  const LABELS: Record<string, string> = { threads: "Threads", goals: "Goals", tasks: "Tasks", projects: "Projects", library: "Library" };
+  const LABELS: Record<string, string> = { threads: "Chats", goals: "Goals", tasks: "Tasks", projects: "Projects", library: "Library" };
   const tabs = HUB_TABS.work.map((id) => ({ id, label: LABELS[id] ?? id }));
 
   function selectTab(next: string) {
@@ -52,7 +52,7 @@
     <LibraryView />
   {:else if sessionId}
     <!-- QUI-L11 — a conversation's record (its turns, events and evidence),
-         moved here from Diagnostics › Sessions; Threads is one link away. -->
+         moved here from Diagnostics › Sessions; Chats is one link away. -->
     <p class="back"><a href="#/work?tab=threads">← All threads</a></p>
     <div class="record-only">
       <SessionsView {sessionId} />
@@ -66,7 +66,7 @@
   .back { margin: 0 0 var(--space-3); font-size: var(--text-sm); }
   .back a { color: var(--text-2); text-decoration: none; }
   .back a:hover { color: var(--text-1); }
-  /* Threads is the list here; only the conversation's record is drawn. */
+  /* Chats is the list here; only the conversation's record is drawn. */
   .record-only :global(.head-row),
   .record-only :global(.bulk-bar),
   .record-only :global(.list-card) { display: none; }

@@ -28,12 +28,12 @@ describe("Sessions recovery (QUI-G06)", () => {
     const routes: Record<string, unknown> = { "GET /api/sessions": { __status: 503 } };
     stubFetch(routes);
     render(SessionsView);
-    expect(await screen.findByText(/sessions could not be read \(HTTP 503\)\. Which conversations exist is unknown/i)).toBeInTheDocument();
+    expect(await screen.findByText(/chats could not be loaded \(HTTP 503\)\. Which conversations exist is unknown/i)).toBeInTheDocument();
     routes["GET /api/sessions"] = [SESSION];
-    await fireEvent.click(screen.getByRole("button", { name: "Retry sessions" }));
+    await fireEvent.click(screen.getByRole("button", { name: "Retry chats" }));
     expect(await screen.findByText("Second chat")).toBeInTheDocument();
     routes["GET /api/sessions"] = { __status: 500 };
-    await fireEvent.click(screen.getByRole("button", { name: "Refresh sessions" }));
+    await fireEvent.click(screen.getByRole("button", { name: "Refresh chats" }));
     expect(await screen.findByText(/the list below may be out of date/i)).toBeInTheDocument();
     expect(screen.getByText("Second chat")).toBeInTheDocument();
   });
@@ -53,7 +53,7 @@ describe("Sessions recovery (QUI-G06)", () => {
     const routes: Record<string, unknown> = { "GET /api/sessions": [SESSION], "GET /api/sessions/sess_b": { __status: 500 } };
     stubFetch(routes);
     render(SessionsView, { sessionId: "sess_b" });
-    expect(await screen.findByText(/this session could not be opened \(HTTP 500\)/i)).toBeInTheDocument();
+    expect(await screen.findByText(/this chat could not be opened \(HTTP 500\)/i)).toBeInTheDocument();
     routes["GET /api/sessions/sess_b"] = { session: SESSION, turns: [] };
     await fireEvent.click(screen.getByRole("button", { name: "Open it again" }));
     expect(await screen.findByRole("heading", { name: "Second chat" })).toBeInTheDocument();

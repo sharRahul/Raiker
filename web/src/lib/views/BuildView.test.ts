@@ -833,7 +833,8 @@ describe("Build project requirement", () => {
     stubFetch(baseRoutes());
     await renderBuildWithProject();
 
-    expect(await screen.findByText(/filed in/i)).toBeVisible();
+    expect(await screen.findByText(/Project: Landing page/)).toBeVisible();
+    expect(screen.getByText(/Folder details unavailable/)).toBeVisible();
     expect(sendButton()).toBeDisabled();
   });
 
@@ -1275,11 +1276,12 @@ describe("the execution boundary Build names", () => {
     // a managed project's commands run at the workspace root.
     stubFetch(baseRoutes({ "GET /api/build/boundary": boundaryView({ works_in: "my-workspace" }) }));
     await renderBuildWithProject();
-    await waitFor(() =>
-      expect(
-        document.querySelector(".project-boundary")?.textContent?.replace(/\s+/g, " ").trim(),
-      ).toBe("Filed in Landing page · works in my-workspace"),
-    );
+    const context = screen.getByRole("button", { name: /^Context for this turn/ });
+    await fireEvent.click(context);
+    const inspector = await screen.findByRole("dialog", { name: "Context for this turn" });
+    expect(inspector).toHaveTextContent("Alpha");
+    expect(inspector).toHaveTextContent("my-workspace");
+    expect(document.querySelector(".project-boundary:not(.boundary-refusal)")).toBeNull();
     expect(screen.queryByText(/Working in/)).toBeNull();
   });
 

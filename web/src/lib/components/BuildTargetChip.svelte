@@ -65,7 +65,7 @@
     if (target.state === "remote_only") return "GitHub · no checkout";
     if (!target.git) return "No git history";
     const branch = target.branch || "detached";
-    return target.head ? `${branch} · ${target.head}` : branch;
+    return branch;
   });
 
   const OPERATION: Record<string, string> = {
@@ -92,6 +92,7 @@
       `Folder: ${target.folder}`,
       `Repository: ${target.identity || "not recorded"}`,
       `Branch: ${target.branch || (target.git ? "detached" : "none")}`,
+      `Commit: ${target.head || "none"}`,
       `Commands run in: ${target.environment || "unknown"} (${where})`,
       `Target fingerprint: ${target.fingerprint.slice(0, 12)}`,
     ];
@@ -115,7 +116,7 @@
 </script>
 
 {#if target !== null && target.state !== "folder_missing" && target.state !== "no_repository"}
-  <span
+  <div
     class="target-chip"
     data-testid="build-target"
     data-state={target.state}
@@ -126,28 +127,27 @@
     <Icon name="branch" size="sm" />
     <span class="summary">{summary}</span>
     <span class="where" data-placement={target.code_placement}>{where}</span>
-    {#if delegated}
+    {#if delegations.length > 0}
       <span class="delegated" data-delegated={delegations.length > 0 ? "yes" : "no"}>{delegated}</span>
     {/if}
-  </span>
+    <details class="work-details">
+      <summary>Work details</summary>
+      <div class="target-detail">{detail}</div>
+    </details>
+  </div>
 {/if}
 
 <style>
   .target-chip {
-    display: inline-flex;
+    display: flex;
+    flex-wrap: wrap;
     align-items: center;
     gap: 0.35rem;
     min-width: 0;
-    padding: 0.15rem 0.55rem;
-    border: 1px solid var(--neutral-border);
-    border-radius: var(--r-pill);
-    background: var(--surface);
     color: var(--text-2);
     font-size: var(--text-xs);
-    white-space: nowrap;
   }
   .summary {
-    font-family: var(--font-mono);
     overflow: hidden;
     text-overflow: ellipsis;
   }
@@ -169,10 +169,19 @@
   .delegated[data-delegated="yes"] {
     color: var(--text-2);
   }
-  @media (max-width: 640px) {
-    .where,
-    .delegated {
-      display: none;
-    }
+  .work-details { position: relative; }
+  .work-details[open] { flex-basis: 100%; }
+  .work-details summary { cursor: pointer; color: var(--text-2); }
+  .target-detail {
+    margin-top: var(--space-2);
+    max-width: min(30rem, calc(100vw - 3rem));
+    padding: var(--space-3);
+    border: 1px solid var(--border);
+    border-radius: var(--r-sm);
+    background: var(--raised);
+    color: var(--text-1);
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    line-height: 1.6;
   }
 </style>

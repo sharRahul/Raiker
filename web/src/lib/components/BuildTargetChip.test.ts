@@ -2,7 +2,7 @@
  * BR-D02 — Build's header states where a turn would run, from the server's
  * target description, and nothing when there is no target to state.
  */
-import { render, screen } from "@testing-library/svelte";
+import { fireEvent, render, screen } from "@testing-library/svelte";
 import { describe, expect, it } from "vitest";
 import BuildTargetChip from "./BuildTargetChip.svelte";
 import { stubFetch } from "../test-helpers";
@@ -31,6 +31,17 @@ function target(overrides: Record<string, unknown>): Record<string, unknown> {
 }
 
 describe("BuildTargetChip", () => {
+  it("keeps technical target evidence in keyboard-accessible Work details", async () => {
+    stubFetch({ [ROUTE]: target({}) });
+    render(BuildTargetChip, { repoId: "repo_1" });
+    const summary = await screen.findByText("Work details");
+    const disclosure = summary.closest("details");
+    expect(disclosure).not.toHaveAttribute("open");
+    expect(summary).not.toHaveTextContent("abc1234");
+    await fireEvent.click(summary);
+    expect(disclosure).toHaveAttribute("open");
+    expect(disclosure).toHaveTextContent("Target fingerprint: ffffffffffff");
+  });
   it("reports an unavailable sandbox without suggesting host execution", async () => {
     stubFetch({ [ROUTE]: target({ code_placement: "unavailable" }) });
     render(BuildTargetChip, { repoId: "repo_1" });
@@ -41,7 +52,9 @@ describe("BuildTargetChip", () => {
     stubFetch({ [ROUTE]: target({}) });
     render(BuildTargetChip, { repoId: "repo_1" });
     const chip = await screen.findByTestId("build-target");
-    expect(chip).toHaveTextContent("main · abc1234");
+    expect(chip.querySelector(".summary")).toHaveTextContent("main");
+    expect(chip.querySelector(".summary")).not.toHaveTextContent("abc1234");
+    expect(chip.getAttribute("title")).toContain("Commit: abc1234");
     expect(chip).toHaveTextContent("Sandbox");
     expect(chip.getAttribute("title")).toContain("Repository: https://github.com/o/app.git");
     expect(chip.getAttribute("title")).toContain("Target fingerprint: ffffffffffff");
@@ -90,7 +103,7 @@ describe("BuildTargetChip", () => {
     stubFetch({ [ROUTE]: target({ authority: { repository: "github.com/o/app", git_credential: false, delegations: [] } }) });
     render(BuildTargetChip, { repoId: "repo_1" });
     const plain = await screen.findByTestId("build-target");
-    expect(plain).toHaveTextContent("Writes ask you");
+    expect(plain.getAttribute("title")).toContain("every push, branch, commit and pull request asks you first");
     expect(plain.getAttribute("title")).toContain("Git credential: none selected");
   });
 

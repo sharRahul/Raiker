@@ -1116,7 +1116,7 @@
     <dl class="meta">
       <div><dt>Capability</dt><dd>{capabilityLabel(selected.approval.capability)}</dd></div>
       <div><dt>Risk</dt><dd>{selected.approval.risk_level}</dd></div>
-      <div><dt>Session</dt><dd><a class="mono" href={`#/sessions?session=${encodeURIComponent(selected.approval.session_id)}`}>View session</a></dd></div>
+      <div><dt>Chat</dt><dd><a class="mono" href={`#/sessions?session=${encodeURIComponent(selected.approval.session_id)}`}>Open chat</a></dd></div>
       <div><dt>Requested</dt><dd>{relativeTime(selected.approval.created_at)}</dd></div>
       <div><dt>Proposed by</dt><dd><IdentityChip identity={selected.approval.proposed_by} /></dd></div>
       {#if selected.approval.queue_total > 1}

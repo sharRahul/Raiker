@@ -51,7 +51,6 @@
   import {
     BEHAVIOUR_COPY,
     permissionAttention,
-    permissionPosture,
     rowSummary,
   } from "../permissionLanguage";
   import {
@@ -533,7 +532,6 @@
   // summary said nothing at all. Ranked by authority instead — see
   // `authorityMatrixGates`.
   const authorityGates = $derived(authorityMatrixGates(governedGates));
-  const posture = $derived(permissionPosture(governedGates));
   const goals = $derived(goalSummaries(effective));
 
 
@@ -739,7 +737,7 @@
      control at a time. -->
 <header class="perm-head">
   <p class="lede" data-testid="permission-profile">
-    {#if gates !== null}{posture.sentence}{:else}Choose what Raiker can use, and when it should ask you.{/if}
+    Choose what Raiker can access. Review individual actions in Approvals.
   </p>
   <div class="head-actions">
     <button
@@ -747,7 +745,7 @@
       class="btn btn-ghost btn-sm"
       onclick={load}
       disabled={refreshing || mutationBusy}
-      aria-label="Refresh capabilities"
+      aria-label="Refresh permissions"
     >
       <Icon name="refresh" size="sm" />
       {refreshing ? "Refreshing…" : "Refresh"}
@@ -809,14 +807,13 @@
       {#if category === OVERVIEW_ID}
         {#if effective.length > 0}
           <section class="panel posture" aria-labelledby="posture-h" data-testid="postures">
-            <h2 id="posture-h">How much Raiker asks</h2>
+            <h2 id="posture-h">Default mode</h2>
             <p class="preset-lede">
               {activePosture === "custom"
-                ? "Your own mix: permissions are set one by one below."
-                : `Now: ${POSTURES.find((p) => p.id === activePosture)?.label}.`}
-              A posture changes only whether Raiker asks; it never turns a permission on.
+                ? "Custom rules are active."
+                : "Applies across Chat, Build and Design."}
             </p>
-            <div class="posture-options" role="radiogroup" aria-label="Posture">
+            <div class="posture-options" role="radiogroup" aria-label="Default mode">
               {#each POSTURES as posture (posture.id)}
                 {@const blocked = posture.id === "sandbox" && !sandboxReady}
                 <label class="posture-option" class:active={activePosture === posture.id}>
@@ -849,7 +846,7 @@
               </p>
               {#if postureDiff.length > 0}
                 <details class="posture-list">
-                  <summary>Which ones</summary>
+                  <summary>Review changes</summary>
                   <ul>
                     {#each postureDiff as change (change.capability)}
                       <li>{capabilityLabel(change.capability)} → {BEHAVIOUR_COPY[change.to].label}</li>
@@ -859,7 +856,7 @@
               {/if}
               <div class="posture-actions">
                 <button type="button" class="btn btn-primary btn-sm" disabled={mutationBusy || (postureDiff.length === 0 && !postureModeDiff)} onclick={() => void applyPosture()}>
-                  {postureBusy ? "Applying…" : "Apply"}
+                  {postureBusy ? "Saving…" : "Save changes"}
                 </button>
                 <button type="button" class="btn btn-ghost btn-sm" disabled={postureBusy} onclick={() => (postureChoice = null)}>Cancel</button>
               </div>
@@ -870,8 +867,9 @@
         {#if goals.some((goal) => goal.verdict !== "not_reported")}
           <!-- UX-PERM-05 — the posture by goal, read-only, in seven plain
                sentences; Change opens the permission that decides it. -->
-          <section class="panel goals" aria-label="What Raiker can do for you">
-            <h2>What Raiker can do for you</h2>
+          <details class="panel permission-summary">
+            <summary>Permission summary</summary>
+            <section class="goals" aria-label="What Raiker can do for you">
             <ul class="goal-list">
               {#each goals.filter((goal) => goal.verdict !== "not_reported") as goal (goal.id)}
                 <li class="goal goal-{goal.verdict}">
@@ -890,7 +888,8 @@
                 </li>
               {/each}
             </ul>
-          </section>
+            </section>
+          </details>
         {/if}
 
         {#if !presetDone && presetPending.length > 0}
@@ -900,8 +899,7 @@
               <div>
                 <h2>Set up for Build</h2>
                 <p class="preset-lede">
-                  Building needs {BUILD_PRESET.length} permissions. Raiker still asks
-                  before each change — this turns them on, not off.
+                  Enable project editing and test commands. Your approval rules still apply.
                 </p>
               </div>
               <div class="preset-actions">
@@ -928,7 +926,7 @@
                 <input type="checkbox" bind:checked={presetUnderstood} />
                 <span>
                   I understand Build can run commands, such as my tests, in a sandboxed copy of the project.
-                  Each command asks me first, and nothing runs where the sandbox is not enforced.
+                  In sandbox mode, copied edits and tests can run without asking. Applying changes and pushing still need approval unless covered by a specific grant.
                 </span>
               </label>
             {/if}
@@ -989,7 +987,7 @@
           <section class="panel approval-mode-panel" aria-labelledby="approval-mode-h">
             <h3 id="approval-mode-h">When something needs your decision</h3>
             <p class="posture-note-text">
-              For every conversation on this account. A conversation set to Careful still asks.
+              Applies across Chat, Build and Design. A chat can use stricter rules.
             </p>
             <ApprovalModeControl placement="down" onchange={(mode) => (composerMode = mode)} />
           </section>
@@ -1045,7 +1043,7 @@
             <span>
               Most capabilities with a real executor start <strong>off</strong> on this account until
               you turn them on. A new account starts with a small set of local, reversible ones
-              available — and every one of them still asks.
+              available. Your approval rules decide when Raiker asks.
             </span>
           </p>
         {/if}
@@ -1246,7 +1244,8 @@
   .goal-unknown :global(svg),.goal-automatic :global(svg) { color:var(--warn,var(--text-3)); }
   .goal-sentence { flex:1; min-width:0; color:var(--text-1); font-size:var(--text-sm); }
   .goal-never .goal-sentence { color:var(--text-2); }
-  .goals h2 { margin:0; font-size:var(--text-md); }
+  .permission-summary > summary { cursor: pointer; font-weight: 600; }
+  .permission-summary > section { margin-top: var(--space-3); }
   .posture {
     display: grid;
     gap: var(--space-3);

@@ -414,7 +414,7 @@
       historyError = failure(
         "This conversation did not load",
         "Nothing in it was changed.",
-        "Reload the page, or open it again from Threads.",
+        "Reload the page, or open it again from Chats.",
         e,
       );
     } finally {
@@ -487,6 +487,11 @@
   /** True until the first standing-permissions read answers, either way. */
   let standingPending = $state(true);
   const standingNote = $derived(standingPostureNote(mode, standingModes, standingPending));
+  const standingNeedsAttention = $derived(
+    standingModes === null || BUILD_WRITE_CAPABILITIES.some(
+      (capability) => !["allow", "auto"].includes(standingModes?.[capability] ?? ""),
+    ),
+  );
 
   // ── Repository ───────────────────────────────────────────────────────
   let repos = $state<CodeReposView | null>(null);
@@ -2009,7 +2014,7 @@
       onProjectsChanged?.();
     } catch (error) {
       projectNotice =
-        failure("This chat was not moved", "It stays where it was.", "Try again, or move it from Work › Threads.", error);
+        failure("This chat was not moved", "It stays where it was.", "Try again, or move it from Work › Chats.", error);
     }
   }
 
@@ -2698,13 +2703,8 @@
             {boundary.refusal.summary}
             <a class="link-button" href={boundary.refusal.action_href}>{boundary.refusal.action_label}</a>
           </p>
-        {:else if projectReady}
-          <!-- BUG-316 — the project files the conversation; the folder work
-               happens in is the server's answer, which is the workspace. -->
-          <p class="project-boundary" role="status">
-            Filed in <strong>{selectedProject?.name}</strong>{#if boundary}&#32;·
-              works in <strong>{boundary.works_in}</strong>{/if}
-          </p>
+        {:else if projectReady && boundary === null}
+          <p class="project-boundary" role="status">Project: {selectedProject?.name} · Folder details unavailable</p>
         {/if}
     </div>
 
@@ -2768,10 +2768,10 @@
              the composer keeps only the line the picker cannot know: for Auto,
              what the owner's standing permissions actually allow. Auto promises
              nothing it has not read. -->
-        {#if standingNote !== null}
+        {#if standingNote !== null && standingNeedsAttention}
           <p class="line-notice" role="status">
             <span class="standing-wide">{standingNote} <a href="#/capabilities">Change in Permissions →</a></span>
-            <span class="standing-compact">Auto follows your Permissions.</span>
+            <span class="standing-compact">{standingModes === null ? "Permission rules unavailable." : "Some actions are restricted."}</span>
           </p>
         {/if}
 
@@ -3474,7 +3474,6 @@
     font-size: var(--text-xs);
     color: var(--text-3);
   }
-  .project-boundary strong { color: var(--text-1); }
 
 
   /* Compact screens preserve the transcript width and float background work as

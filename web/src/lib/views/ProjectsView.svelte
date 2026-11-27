@@ -1232,10 +1232,10 @@
                   {#if isRedacted(entry.session_id)}
                     <!-- A redacted id addresses nothing; a link here would be
                          dead, so the fact is stated instead. -->
-                    <span title="The server redacted this identifier.">Session withheld</span>
+                    <span title="The server redacted this identifier.">Chat unavailable</span>
                   {:else}
                     <a href={`#/sessions?session=${encodeURIComponent(entry.session_id)}`}>
-                      Session {shortId(entry.session_id)}
+                      Chat {shortId(entry.session_id)}
                     </a>
                     {#if entry.turn_id}
                       ·

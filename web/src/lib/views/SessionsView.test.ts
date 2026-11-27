@@ -84,7 +84,7 @@ describe("SessionsView organisation", () => {
     await waitFor(() => expect(screen.getByText("Second chat")).toBeInTheDocument());
     const row = screen.getByText("Second chat").closest("tr")!;
     await fireEvent.click(
-      within(row as HTMLElement).getByRole("button", { name: /session actions/i }),
+      within(row as HTMLElement).getByRole("button", { name: /chat actions/i }),
     );
     for (const gone of [/^pin$/i, /^rename$/i, /^archive$/i, /move to project/i]) {
       expect(within(row as HTMLElement).queryByRole("menuitem", { name: gone })).toBeNull();
@@ -106,7 +106,7 @@ describe("SessionsView organisation", () => {
     await waitFor(() => expect(screen.getByText("Second chat")).toBeInTheDocument());
     // Delete lives in the row's session menu.
     const row = screen.getByText("Second chat").closest("tr")!;
-    await fireEvent.click(within(row as HTMLElement).getByRole("button", { name: /session actions/i }));
+    await fireEvent.click(within(row as HTMLElement).getByRole("button", { name: /chat actions/i }));
     await fireEvent.click(within(row as HTMLElement).getByRole("menuitem", { name: /delete/i }));
 
     // The DELETE call must carry the confirmation header. `request()` wraps
@@ -261,28 +261,28 @@ describe("SessionsView organisation", () => {
     await waitFor(() => expect(screen.getByText("Archived chat")).toBeInTheDocument());
 
     // BUG-303 — an archived conversation still has evidence to read, so the
-    // inspector still reaches it. Restoring it is done on Threads, where
+    // inspector still reaches it. Restoring it is done on Chats, where
     // archiving it was.
     const row = screen.getByText("Archived chat").closest("tr")!;
     await fireEvent.click(
-      within(row as HTMLElement).getByRole("button", { name: /session actions/i }),
+      within(row as HTMLElement).getByRole("button", { name: /chat actions/i }),
     );
     expect(within(row as HTMLElement).queryByRole("menuitem", { name: /unarchive/i })).toBeNull();
     expect(
-      within(row as HTMLElement).getByRole("menuitem", { name: /organise in threads/i }),
+      within(row as HTMLElement).getByRole("menuitem", { name: /organise in chats/i }),
     ).toHaveAttribute("href", "#/search-chat");
   });
 
   // REM-SESSIONS — the row used to carry an "Open" link straight into Chat,
   // which made the evidence inspector a second place to resume a conversation.
-  // Resuming lives in Threads; the row here opens the record.
+  // Resuming lives in Chats; the row here opens the record.
   it("offers no per-row way to resume a conversation", async () => {
     stubFetch(SESSIONS_ROUTE);
     render(SessionsView);
 
     await waitFor(() => expect(screen.getByText("Second chat")).toBeInTheDocument());
     expect(screen.queryByRole("link", { name: "Open Second chat in chat" })).toBeNull();
-    expect(screen.getByRole("button", { name: "Refresh sessions" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Refresh chats" })).toBeInTheDocument();
   });
 
   it("links a session detail to its audit events and checkpoints", async () => {

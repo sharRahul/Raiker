@@ -1,5 +1,25 @@
 # Fixed items
 
+## FIXED-1580 — Permissions repeated policy and work pages exposed routine metadata
+
+**Severity: Medium. Area: Quiet UI / permission clarity. Status: Fixed 2026-11-27.**
+Permissions now distinguishes standing access from a specific action approval,
+leads with Default mode, and collapses repeated task summaries. Access precedes
+approval rules; Automatic is an advanced choice, with an existing Automatic
+setting still visible. Scope and safeguards remains inspectable. Misleading
+claims that every copied edit and command always asks were corrected; saving
+an approval rule does not enable access.
+
+Build keeps branch, execution boundary and active delegation visible and moves
+hashes and detailed evidence into keyboard-accessible Work details. The detail
+expands in flow after a browser test caught a floating version outside the
+viewport. Duplicate healthy project/folder prose was removed; unreadable folder
+details and blockers remain explicit. Chat's activity link and Design's research
+note use plain language. Conversation history uses Chats consistently without
+changing route IDs, API schemas, device sessions or app-specific threads.
+Real-account Permissions and local-model approval journeys passed. See the
+[live record](../architecture/WEB_APP_LIVE_TEST.md#result--2026-11-27-permissions-and-work-page-refinement).
+
 ## FIXED-1578 — Preparation and approval policy disagreed across workflows
 
 **Severity: High. Area: Authorization / Quiet UI. Status: Fixed 2026-11-27.**
@@ -2266,6 +2286,7 @@ file you can open. The two capture sets that remain — `screenshots/pages/` and
 | [FIXED-1575](#fixed-1575--the-sandbox-posture-trusted-installation-instead-of-enforcement) | High | Permissions / first run (RU-07) | Fixed 2026-11-26 |
 | [FIXED-1576](#fixed-1576--github-retained-two-active-workflows-after-their-files-were-removed) | Low | CI / maintenance | Fixed 2026-11-26 |
 | [FIXED-1577](#fixed-1577--the-mxc-assessment-had-no-current-windows-measurement) | Medium | Native sandbox evaluation (RU-05) | Fixed 2026-11-26 |
+| [FIXED-1580](#fixed-1580--permissions-repeated-policy-and-work-pages-exposed-routine-metadata) | Medium | Quiet UI / permission clarity | Fixed 2026-11-27 |
 | [FIXED-1578](#fixed-1578--preparation-and-approval-policy-disagreed-across-workflows) | High | Authorization / Quiet UI | Fixed 2026-11-27 |
 | [FIXED-1579](#fixed-1579--a-reviewed-grant-could-be-spent-after-its-state-changed) | High | Bounded authorization | Fixed 2026-11-27 |
 | [FIXED-1573](#fixed-1573--health-called-word-only-recall-search-by-meaning--done) | Medium | Health (RU-08) | Fixed 2026-11-26 |

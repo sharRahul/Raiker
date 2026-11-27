@@ -53,6 +53,7 @@
   const available = $derived(isAvailable(gate));
   const why = $derived(unsetResolutionNote(gate));
   const reach = $derived(sideEffectChip(gate));
+  let advancedRules = $state(false);
 </script>
 
 <article class="permission-detail" aria-label={label}>
@@ -75,18 +76,6 @@
 
   <p class="description">{capabilityDescription(gate.capability)}</p>
 
-  <section aria-label={BEHAVIOUR_QUESTION}>
-    <h3>{BEHAVIOUR_QUESTION}</h3>
-    <ToolControlBoard
-      gates={[gate]}
-      showLabel={false}
-      {modes}
-      busyCapability={busy ? gate.capability : null}
-      onDecision={(capability, mode) => onDecision(capability, mode)}
-    />
-    <p class="note">{behaviourCopy(gate.decision_mode).hint}</p>
-  </section>
-
   <section aria-label={AVAILABILITY_QUESTION}>
     <h3>{AVAILABILITY_QUESTION}</h3>
     <p class="note">{availabilityAnswer(gate, available)}</p>
@@ -107,7 +96,29 @@
     </div>
   </section>
 
+  <section aria-label={BEHAVIOUR_QUESTION}>
+    <h3>{BEHAVIOUR_QUESTION}</h3>
+    <ToolControlBoard
+      gates={[gate]}
+      showLabel={false}
+      showAutomatic={advancedRules || gate.decision_mode === "auto"}
+      {modes}
+      busyCapability={busy ? gate.capability : null}
+      onDecision={(capability, mode) => onDecision(capability, mode)}
+    />
+    <p class="note">{behaviourCopy(gate.decision_mode).hint}</p>
+    {#if !available}<p class="note">This rule does not turn access on.</p>{/if}
+    {#if gate.decision_mode !== "auto"}
+      <details class="advanced-rule" ontoggle={(event) => (advancedRules = event.currentTarget.open)}>
+        <summary>Advanced rule</summary>
+        <p class="note">Automatic can continue related steps within the authorized scope.</p>
+      </details>
+    {/if}
+  </section>
+
   {#if gate.ungoverned_consequence || gate.authority_requirement || gate.network_boundary || why}
+    <details class="scope-details">
+      <summary>Scope and safeguards</summary>
     <dl class="facts">
       {#if gate.ungoverned_consequence}
         <dt>If it ran without you</dt>
@@ -126,6 +137,7 @@
         <dd>{why}</dd>
       {/if}
     </dl>
+    </details>
   {/if}
 </article>
 
@@ -213,6 +225,8 @@
     padding-top: var(--space-3);
     border-top: 1px solid var(--border);
   }
+  details summary { cursor: pointer; color: var(--text-2); font-size: var(--text-sm); }
+  details[open] summary { margin-bottom: var(--space-2); }
   .facts dt {
     color: var(--text-2);
     font-size: var(--text-xs);

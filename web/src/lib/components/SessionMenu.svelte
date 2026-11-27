@@ -3,7 +3,7 @@
    * What the evidence inspector may do to a conversation.
    *
    * BUG-303 — organising conversations (rename, move, pin, archive) is on
-   * Threads, where work is resumed; this inspector's job is audit.
+   * Chats, where work is resumed; this inspector's job is audit.
    *
    * **Delete** is here, deliberately. It removes the audit record — the turns and
    * the governed events — and it belongs beside the evidence it removes rather
@@ -71,7 +71,7 @@
     bind:this={triggerEl}
     type="button"
     class="trigger icon-button"
-    aria-label={`Session actions for ${title}`}
+    aria-label={`Chat actions for ${title}`}
     aria-expanded={open}
     onclick={toggle}
   >•••</button>
@@ -86,7 +86,7 @@
     >
       <button class="menu-item" type="button" role="menuitem" onclick={copyLocalLink}>Copy local link</button>
       <!-- Where the library went, said once rather than left to be discovered. -->
-      <a class="menu-item" role="menuitem" href="#/search-chat">Organise in Threads</a>
+      <a class="menu-item" role="menuitem" href="#/search-chat">Organise in Chats</a>
       <button type="button" role="menuitem" class="menu-item danger" onclick={onDelete}>Delete</button>
     </div>
   {/if}

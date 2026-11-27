@@ -6,7 +6,7 @@ import { stubFetch, stubFetchPending } from "../test-helpers";
 /**
  * REM-LIVE — the animated floor is a choice now, and the list is the default.
  *
- * It was the only way to read this page, it duplicated what Tasks and Threads
+ * It was the only way to read this page, it duplicated what Tasks and Chats
  * already show, and it honoured no reduced-motion preference. The records it
  * draws are real, so it is kept rather than deleted — behind a press.
  */

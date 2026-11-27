@@ -164,7 +164,7 @@
       what: "Conversations and their turns",
       detail: "Every message, tool call and result, in the encrypted store.",
       where: "#/search-chat",
-      whereLabel: "Threads",
+      whereLabel: "Chats",
     },
     {
       what: "The model's working",

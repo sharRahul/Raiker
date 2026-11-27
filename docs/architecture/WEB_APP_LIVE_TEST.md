@@ -1,5 +1,36 @@
 # Web App Live Test — model backends
 
+## Result — 2026-11-27 Permissions and work-page refinement
+
+**RT-PERMISSIONS-UI-01 passed against the real isolated Raiker account.**
+The browser signed in, opened Permissions, expanded/collapsed Permission
+summary from the keyboard, inspected the Shell commands detail and verified
+that access precedes approval rules. Work history exposes the Chats tab.
+The final detail recapture passed in 29.9 seconds at 1440 and 390 px, light and dark;
+no permission was broadened by this case. Spec:
+`web/e2e/permissions-refinement-live.spec.ts`.
+
+**RT-APPROVAL-UI-01 passed again with a real local model** (55.6 seconds):
+the synthetic copied-file proposal exposed Approve once, Don't do this and
+Allow for this task at desktop/phone widths. The case declined it. No
+consequential action was accepted. Spec: `approval-redesign-live.spec.ts`.
+
+The deterministic browser suite also covers target disclosure with a branch,
+execution boundary and exact evidence, keyboard opening/closing, and
+responsive placement. Its first run caught an off-screen floating detail;
+the replacement expands in the header and passes the viewport assertions.
+Before/after inventory covers Permissions, Chat, Build, Design and Work in
+both themes and widths. These use API fixtures and are not claimed as provider
+qualification. Evidence is local under `output/playwright/`:
+`permissions-before-*`, `permissions-after-*`, `permissions-work-details-*`,
+`permissions-live-*` and `permissions-zoom-200.png`. Mobile captures close
+navigation and wait for it to move off-screen before shooting.
+
+All 313 unit-test files passed (2,975 tests, one skipped), as did the 31-case
+deterministic browser suite, Svelte check, ESLint and production build. GitHub
+verification is attached to the delivering commit. Native-account, clean-machine and full repository Apply/push release
+gates retain their status in the readiness and approval plans.
+
 ## Result — 2026-11-27 shared approval redesign
 
 **RT-APPROVAL-PREP-01 passed against the real WSL2 runtime.** The synthetic

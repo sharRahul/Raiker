@@ -11,7 +11,7 @@ tablets, and a full sidebar on wider screens.
 | Home | **Home** | A composer that opens a new chat, then the live view of running work, agents, schedules, decisions that need you, and this week's finished work |
 | Work | **Chat** | Conversations, attachments, sources, memory, and approvals |
 | Work | **Build** | Repository-aware planning, edits, commands, commits, and pushes |
-| Work | **Work** → Threads | Everything you have going — chats and routines — and a full-text search across it |
+| Work | **Work** → Chats | Everything you have going — chats and routines — and a full-text search across it |
 | Work | **Work** → Tasks, Projects | One-off, scheduled, repeating, and organized work |
 | Work | **Memory** | Review durable facts Raiker may recall, and approve additions or removals |
 | Work | **Memory** → Map | Explore indexed sources and the citations connecting them (the Knowledge Map) |
@@ -62,7 +62,7 @@ Use **Diagnostics** when you need evidence rather than a summary:
   its turns, and the governed events behind each turn. Opening a turn offers
   **Open in the conversation**, which lands on that exchange, and a session
   offers one **Resume in …** link naming the surface that conversation was done
-  on. To pick work back up, use **Threads** — Sessions is for reading the record.
+  on. To pick work back up, use **Chats** — Sessions is for reading the record.
 - **Activity / Audit log** records governed steps and can be filtered and
   exported when the audit-export capability is enabled.
 
@@ -277,7 +277,7 @@ meaning-aware embedding model, so paraphrases without shared terms can be missed
 See [Known limits](../architecture/KNOWN_LIMITS.md).
 
 **Overview → Health, in detail** compares every index and projection memory
-depends on — including the conversation index behind Threads — against the
+depends on — including the conversation index behind Chats — against the
 table that owns the content. It reports `clean` or names the drift, **Rescan**
 runs it again on request, and the one repair it offers appears only beside the
 finding it repairs. See [Memory](memory.md#checking-the-indexes).

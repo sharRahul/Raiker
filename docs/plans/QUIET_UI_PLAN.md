@@ -48,6 +48,11 @@ step drawer, Continue from last step) shipped the same day; see
 Their implemented slices have live evidence; the unrelated open items and
 release acceptance gates retain their status.
 
+**2026-11-27 refinement:** Permissions now separates standing access from
+action approvals and discloses routine summaries and technical details. Work
+history uses Chats; Build target evidence is under Work details. The completed
+design and verification record is [Permissions and work-page simplification](../architecture/PERMISSIONS_UI_REFINEMENT.md).
+
 ## Product identity
 
 Raiker is a personal, governed AI workspace. It should feel calm and effortless

@@ -2,7 +2,7 @@
  * BUG-306 / REM-CHAT-02 — one command set behind every conversation menu.
  *
  * Two things are held here. The bookkeeping half: a command's label, its
- * confirmation and its failure sentence come from one place, so Chat, Threads
+ * confirmation and its failure sentence come from one place, so Chat, Chats
  * and the session detail cannot describe the same refusal differently.
  *
  * And the half that is not bookkeeping. **Retry re-sends a prompt**, so a turn

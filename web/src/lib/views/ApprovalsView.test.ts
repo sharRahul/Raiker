@@ -227,7 +227,7 @@ describe("ApprovalsView", () => {
     // Scoped to the panel: the queue table also has a "Requested" column.
     const details = provenance.closest("details") as HTMLElement;
     expect(within(details).getByText("Requested")).toBeInTheDocument();
-    expect(within(details).getByText("Session")).toBeInTheDocument();
+    expect(within(details).getByText("Chat")).toBeInTheDocument();
     expect(within(details).getByText("Proposed by")).toBeInTheDocument();
   });
 
@@ -554,7 +554,7 @@ describe("ApprovalsView", () => {
     await screen.findAllByText("Write file");
     expect(within(screen.getByRole("listbox")).getAllByRole("option")).toHaveLength(1);
     await openFirst();
-    expect(await screen.findByRole("link", { name: "View session" })).toHaveAttribute(
+    expect(await screen.findByRole("link", { name: "Open chat" })).toHaveAttribute(
       "href",
       `#/sessions?session=${PENDING.session_id}`,
     );

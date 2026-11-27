@@ -36,13 +36,13 @@
   let actionError = $state<string | null>(null);
   let deleting = $state(false);
 
-  // BUG-303 — tags are *read* here and edited on Threads. Filtering by one is
+  // BUG-303 — tags are *read* here and edited on Chats. Filtering by one is
   // finding a record, which is this page's job; applying one is filing a
   // conversation, which is not.
   let tagFilter = $state("");
 
   // Likewise the archived scope: an archived conversation still has evidence to
-  // read, so the inspector can still reach it. Archiving is done on Threads.
+  // read, so the inspector can still reach it. Archiving is done on Chats.
   let showArchived = $state(false);
 
   // Pinned sessions first, then most-recently-updated. The sort is display-only
@@ -100,7 +100,7 @@
   });
 
   // BUG-303 — this page is audit; organising conversations (pin, rename,
-  // archive, move, tags) is on Threads. What stays is Delete, which removes the
+  // archive, move, tags) is on Chats. What stays is Delete, which removes the
   // audit record itself.
 
   async function deleteOne(id: string) {
@@ -116,7 +116,7 @@
       actionError = failure(
         "Deleting this conversation was not confirmed",
         "It may already be deleted.",
-        "Choose Retry sessions and check whether it is still listed before deleting again.",
+        "Choose Retry chats and check whether it is still listed before deleting again.",
         e,
       );
     } finally {
@@ -147,7 +147,7 @@
       actionError = failure(
         "Deleting the selected conversations was not confirmed",
         "Some or all of them may already be deleted.",
-        "Choose Retry sessions and check which are still listed before deleting again.",
+        "Choose Retry chats and check which are still listed before deleting again.",
         e,
       );
     } finally {
@@ -165,9 +165,9 @@
     } catch (e) {
       // QUI-G06 — keep the rows already read; a failed refresh does not delete them.
       loadError = failure(
-        "Sessions could not be read",
+        "Chats could not be loaded",
         sessions === null ? "Which conversations exist is unknown." : "The list below may be out of date.",
-        "Choose Retry sessions to read them again.",
+        "Choose Retry chats to read them again.",
         e,
       );
     }
@@ -187,7 +187,7 @@
     } catch (e) {
       detail = null;
       detailError = failure(
-        "This session could not be opened",
+        "This chat could not be opened",
         "Its turns and events are unavailable; nothing was changed.",
         "Choose Open it again.",
         e,
@@ -240,7 +240,7 @@
       <input type="checkbox" bind:checked={showArchived} aria-label="Show archived sessions" />
       Show archived
     </label>
-    <button type="button" class="btn btn-ghost btn-sm" onclick={load} aria-label="Refresh sessions">
+    <button type="button" class="btn btn-ghost btn-sm" onclick={load} aria-label="Refresh chats">
       <Icon name="refresh" size="sm" />
       Refresh
     </button>
@@ -250,7 +250,7 @@
 {#if loadError}
   <div class="read-recovery">
     <PageState state="error" title="Couldn't load sessions" detail={loadError} />
-    <button type="button" class="btn btn-sm" onclick={() => void load()}>Retry sessions</button>
+    <button type="button" class="btn btn-sm" onclick={() => void load()}>Retry chats</button>
   </div>
 {/if}
 {#if sessions === null && loadError}
@@ -291,7 +291,7 @@
   {#if actionError}
     <div class="read-recovery">
       <p class="error" role="alert">{actionError}</p>
-      <button type="button" class="btn btn-sm" onclick={() => { actionError = null; void load(); }}>Retry sessions</button>
+      <button type="button" class="btn btn-sm" onclick={() => { actionError = null; void load(); }}>Retry chats</button>
     </div>
   {/if}
 
@@ -301,7 +301,7 @@
         <thead>
           <tr>
             <th class="check-col"><input type="checkbox" checked={allVisibleSelected} onchange={toggleSelectAll} aria-label="Select all sessions" /></th>
-            <th>Session</th>
+            <th>Chat</th>
             <th>Status</th>
             <th>Turns</th>
             <th>Tags</th>
@@ -338,7 +338,7 @@
                 </button>
                 <span class="title-sub">
                   <!-- REM-SESSIONS — the row opens the record, and nothing
-                       else; resuming lives in Threads, which sends each thread
+                       else; resuming lives in Chats, which sends each thread
                        to the surface that owns it. -->
                   <span class="mono sub">{shortId(s.session_id)}</span>
                 </span>
@@ -355,7 +355,7 @@
                 {/each}
               </td>
               <td onclick={() => openSession(s.session_id)}>{s.turn_count}</td>
-              <!-- BUG-303 — read-only here. The editor is on Threads. -->
+              <!-- BUG-303 — read-only here. The editor is on Chats. -->
               <td class="tags-col" onclick={() => openSession(s.session_id)}>
                 <span class="tag-chips">
                   {#each s.tags as t (t)}

@@ -695,7 +695,7 @@ describe("ProjectsView context home", () => {
     await fireEvent.click(await screen.findByRole("button", { name: "Inspect brief.md" }));
 
     expect(await screen.findByText("Provenance")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: /session sess_alpha/i })).toHaveAttribute(
+    expect(screen.getByRole("link", { name: /chat sess_alpha/i })).toHaveAttribute(
       "href",
       "#/sessions?session=sess_alpha",
     );

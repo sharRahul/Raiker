@@ -1131,7 +1131,7 @@
       historyError = failure(
         "This conversation did not load",
         "Nothing in it was changed.",
-        "Reload the page, or open it again from Threads.",
+        "Reload the page, or open it again from Chats.",
         e,
       );
     } finally {
@@ -1821,7 +1821,7 @@
   /**
    * QUI-C01 — the conversation's title, shown and renamed in the header.
    *
-   * It is the same title Work › Threads and the sidebar show, renamed through
+   * It is the same title Work › Chats and the sidebar show, renamed through
    * the same `PUT /api/sessions/{id}/rename`. A failed rename keeps the old
    * title and says so; it never shows a name the runtime did not store.
    */
@@ -1839,7 +1839,7 @@
     }
   }
 
-  /** QUI-W05 — the first task from setup is kept in Threads as "Getting started". */
+  /** QUI-W05 — the first task from setup is kept in Chats as "Getting started". */
   async function nameHandedOffChat(id: string, title: string) {
     handoffTitle = null;
     try {
@@ -2016,7 +2016,7 @@
           : `Filed under ${projects?.projects.find((project) => project.project_id === target)?.name ?? "the project"}. Recall still draws on all your memory.`;
       onProjectsChanged?.();
     } catch (error) {
-      projectNotice = failure("This chat was not moved", "It stays where it was.", "Try again, or move it from Work › Threads.", error);
+      projectNotice = failure("This chat was not moved", "It stays where it was.", "Try again, or move it from Work › Chats.", error);
     }
   }
 
@@ -2341,9 +2341,9 @@
                   role="menuitem"
                   href={evidenceLink(sessionId)}
                   onclick={() => (conversationMenuOpen = false)}
-                >Every governed step in this conversation</a>
+                >View activity</a>
               {:else}
-                <button type="button" role="menuitem" disabled>Every governed step in this conversation</button>
+                <button type="button" role="menuitem" disabled>View activity</button>
               {/if}
             </div>
             <div role="group" aria-label="Continuity">

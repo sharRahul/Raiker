@@ -17,7 +17,7 @@ afterEach(() => {
 describe("SessionMenu", () => {
   it("dismisses with Escape and restores focus to the actions trigger", async () => {
     render(SessionMenu, { sessionId: "ses_1", title: "Brief", onDelete: vi.fn() });
-    const trigger = screen.getByRole("button", { name: /session actions/i });
+    const trigger = screen.getByRole("button", { name: /chat actions/i });
     await fireEvent.click(trigger);
     const menu = screen.getByRole("menu", { name: /actions for brief/i });
     screen.getByRole("menuitem", { name: /copy local link/i }).focus();
@@ -37,7 +37,7 @@ describe("SessionMenu", () => {
     const onDelete = vi.fn();
     render(SessionMenu, { sessionId: "ses_1", title: "Brief", onDelete });
 
-    await fireEvent.click(screen.getByRole("button", { name: /session actions/i }));
+    await fireEvent.click(screen.getByRole("button", { name: /chat actions/i }));
     await fireEvent.click(screen.getByRole("menuitem", { name: /copy local link/i }));
     await fireEvent.click(screen.getByRole("menuitem", { name: /delete/i }));
 
@@ -47,7 +47,7 @@ describe("SessionMenu", () => {
       expect(screen.queryByRole("menuitem", { name: gone })).not.toBeInTheDocument();
     }
     // And it says where they went, rather than leaving that to be discovered.
-    expect(screen.getByRole("menuitem", { name: /organise in threads/i })).toHaveAttribute(
+    expect(screen.getByRole("menuitem", { name: /organise in chats/i })).toHaveAttribute(
       "href",
       "#/search-chat",
     );
@@ -59,7 +59,7 @@ describe("SessionMenu", () => {
     // below the bottom of it — with Delete, the only destructive control on
     // the page, off-screen.
     render(SessionMenu, { sessionId: "ses_1", title: "Brief", onDelete: vi.fn() });
-    const trigger = screen.getByRole("button", { name: /session actions/i });
+    const trigger = screen.getByRole("button", { name: /chat actions/i });
     await fireEvent.click(trigger);
 
     // The stylesheet makes it `position: fixed`; what the component supplies,
@@ -73,7 +73,7 @@ describe("SessionMenu", () => {
 
   it("closes when the page moves under it", async () => {
     render(SessionMenu, { sessionId: "ses_1", title: "Brief", onDelete: vi.fn() });
-    await fireEvent.click(screen.getByRole("button", { name: /session actions/i }));
+    await fireEvent.click(screen.getByRole("button", { name: /chat actions/i }));
     expect(screen.getByRole("menu", { name: /actions for brief/i })).toBeVisible();
 
     await fireEvent.scroll(window);

@@ -15,6 +15,7 @@
     busyCapability = null,
     modes = {},
     showLabel = true,
+    showAutomatic = true,
   }: {
     gates: CapabilityGate[];
     onDecision: (capability: string, mode: DecisionMode) => void;
@@ -23,6 +24,7 @@
     /** Optimistic overrides applied after a confirmed set, keyed by capability. */
     modes?: Record<string, DecisionMode>;
     showLabel?: boolean;
+    showAutomatic?: boolean;
   } = $props();
 
   // Decision controls exist only for real, changeable tools: a deferred
@@ -48,7 +50,7 @@
       role="group"
       aria-label={`When Raiker wants to use ${capabilityLabel(gate.capability)}`}
     >
-      {#each DECISION_MODES as mode (mode)}
+      {#each DECISION_MODES.filter((mode) => mode !== "auto" || showAutomatic) as mode (mode)}
         <button
           type="button"
           class="mode-btn"

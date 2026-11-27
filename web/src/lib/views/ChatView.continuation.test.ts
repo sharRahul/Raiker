@@ -286,7 +286,7 @@ describe("ChatView — conversation export (BUG-22)", () => {
     );
     expect(groups).toEqual(["Conversation", "Evidence", "Continuity"]);
     expect(
-      screen.getByRole("menuitem", { name: "Every governed step in this conversation" }),
+      screen.getByRole("menuitem", { name: "View activity" }),
     ).toHaveAttribute("href", "#/sessions?session=sess_1");
     await fireEvent.click(screen.getByRole("menuitem", { name: "Background work" }));
     expect(await screen.findByRole("complementary", { name: "Background work" })).toBeInTheDocument();

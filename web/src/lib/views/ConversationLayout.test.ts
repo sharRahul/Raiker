@@ -86,7 +86,8 @@ describe("stacked conversation layout", () => {
     const source = readFileSync(resolve(process.cwd(), "src", "lib", "views", "BuildView.svelte"), "utf8");
     expect(source).toMatch(/:global\(\.command-pane:not\(\.expanded\)\) \{ display: none; \}/);
     expect(source).toMatch(/\.standing-wide \{ display: none; \}/);
-    expect(source).toContain("Auto follows your Permissions.");
+    expect(source).toContain("Some actions are restricted.");
+    expect(source).toContain("standingNeedsAttention");
     // What gates sending is not secondary chrome. The project picker stays.
     expect(source).not.toMatch(/\.project-picker,[^\n]*display: none/);
   });

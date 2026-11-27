@@ -36,7 +36,7 @@ describe("nav model", () => {
   });
 
   it("folds pages that answered one question into one page with tabs (Quiet UI)", () => {
-    // Threads, Tasks and Projects are tabs of Work; the Knowledge Map is a tab
+    // Chats, Tasks and Projects are tabs of Work; the Knowledge Map is a tab
     // of Memory; Messaging is a tab of Extensions. Every old address still
     // opens the matching tab.
     // PA-D06 — Goals joined them: a goal's steps are tasks.
@@ -162,7 +162,7 @@ describe("nav model", () => {
     // The route still resolves rather than falling through to the Workbench.
     expect(routeFromHash("#/diagnostics?session=sess_1")).toBe("observe");
     expect(tabFromHash("#/diagnostics?session=sess_1")).toBe("overview");
-    // QUI-L11 — a conversation's record lives in Work › Threads now.
+    // QUI-L11 — a conversation's record lives in Work › Chats now.
     expect(routeFromHash("#/sessions?session=sess_1")).toBe("work");
     expect(tabFromHash("#/sessions?session=sess_1")).toBe("threads");
     expect(routeFromHash("#/observe?tab=sessions&session=sess_1")).toBe("work");

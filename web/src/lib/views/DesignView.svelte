@@ -206,9 +206,9 @@
         } catch (error) {
           if (error instanceof ApiError && alreadyResumedElsewhere(error.reasonCode)) {
             researchWaiting = false;
-            researchError = "Continued in another tab. Open this conversation in Threads to see the result.";
+            researchError = "Continued in another tab. Open this conversation in Chats to see the result.";
           } else {
-            researchError = recoveryFailure("Research could not continue", "The recorded decision is kept.", "Open the conversation in Threads to continue.", error);
+            researchError = recoveryFailure("Research could not continue", "The recorded decision is kept.", "Open the conversation in Chats to continue.", error);
           }
         } finally {
           researching = false;
@@ -542,7 +542,7 @@
         researchSourcesNote = recoveryFailure(
           "The pages this research read could not be listed",
           "The findings are kept; they cannot be opened as sources here.",
-          "Open the conversation in Threads to see its sources.",
+          "Open the conversation in Chats to see its sources.",
           error,
         );
       }
@@ -1004,8 +1004,7 @@
           {/if}
         </p>
         <p class="research-note">
-          Gathered by a governed research turn. It read pages; it did not draw
-          anything, and image generation gained no network access from it.
+          Research uses web sources. Image generation uses separate permissions.
         </p>
       {/if}
     </section>

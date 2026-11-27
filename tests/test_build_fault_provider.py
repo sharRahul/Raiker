@@ -51,7 +51,8 @@ def test_a_provider_failing_after_an_accepted_write_never_verifies(
     project = client.post("/api/projects", json={"name": "Faults"}, headers=headers).json()["project_id"]
     parked = client.post(
         "/api/prompts",
-        json={"text": "Create notes.txt.", "surface": "build", "project_id": project, "capability_modes": {}},
+        json={"text": "Create notes.txt.", "surface": "build", "project_id": project,
+              "capability_modes": {}, "approval_mode": "manual"},
         headers=headers,
     ).json()
     assert parked["status"] == "needs_approval", parked
@@ -64,7 +65,9 @@ def test_a_provider_failing_after_an_accepted_write_never_verifies(
     assert resumed.status_code == 200, resumed.text
     assert resumed.json()["status"] != "completed" or calls["n"] >= 2
 
-    written = [path for path in workspace.rglob("notes.txt") if ".raiker" not in path.parts]
+    from tests.test_bug_346_accepted_build_write import _written
+
+    written = _written(workspace, str(parked["session_id"]))
     assert len(written) == 1
     outcome = client.get(
         f"/api/sessions/{parked['session_id']}/turns/{parked['turn_id']}/outcome", headers=headers

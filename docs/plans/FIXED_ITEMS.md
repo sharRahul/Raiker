@@ -27,6 +27,10 @@ claim that the complete release journey or clean-machine gate passed. The real
 tests. Build read-back uses current owner authority and pinned task-copy I/O;
 missing or unreadable evidence cannot verify a result. Local task drafts can
 be recorded without per-step approval; scheduling or running them is excluded.
+Legacy managed projects retain workspace-relative paths rather than routing
+writes into protected `.raiker` metadata. Approval-queue and fault fixtures
+select Ask first explicitly and verify accepted edits in the session copy,
+with the source unchanged.
 See the [live record](../architecture/WEB_APP_LIVE_TEST.md#result--2026-11-27-shared-approval-redesign)
 and [active qualification plan](APPROVAL_REDESIGN.md).
 

@@ -44,6 +44,7 @@ from tests.test_turn_resume_after_approval import (  # reuse the B2 harness verb
     _identity_for,
     _orchestrator,
     _park_turn,
+    _task_path,
 )
 
 
@@ -232,7 +233,7 @@ class TestTheQueueIsDrainedOnResume:
         assert body["approval"]["queue_total"] == 3
         assert body["approval"]["queued_calls"] == 1
         assert scripted_model.calls == calls_before
-        assert (workspace / "one.md").read_text(encoding="utf-8") == "# One\n"
+        assert _task_path(workspace, _envelope_used.session_id, "one.md").read_text(encoding="utf-8") == "# One\n"
 
     def test_the_whole_batch_can_be_walked_to_the_end(
         self, workspace: Path, headers: dict[str, str], scripted_model: ScriptedRouter
@@ -264,7 +265,7 @@ class TestTheQueueIsDrainedOnResume:
 
         assert body["status"] == "completed"
         for name, text in (("one", "# One\n"), ("two", "# Two\n"), ("three", "# Three\n")):
-            assert (workspace / f"{name}.md").read_text(encoding="utf-8") == text
+            assert _task_path(workspace, _envelope_used.session_id, f"{name}.md").read_text(encoding="utf-8") == text
 
     def test_a_rejection_still_walks_the_rest_of_the_batch(
         self, workspace: Path, headers: dict[str, str], scripted_model: ScriptedRouter

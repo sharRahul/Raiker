@@ -93,6 +93,7 @@ def _build_turn(client: TestClient, headers: dict[str, str]) -> dict[str, Any]:
         json={
             "text": "Create notes.txt containing one line.",
             "surface": "build",
+            "approval_mode": "manual",
             "project_id": project.json()["project_id"],
             # Build's default mode sends no per-turn modes: standing permissions apply.
             "capability_modes": {},
@@ -117,8 +118,13 @@ def _write_rows(workspace: Path, session_id: str) -> list[dict[str, Any]]:
         ]
 
 
-def _written(workspace: Path) -> list[Path]:
-    return [path for path in workspace.rglob("notes.txt") if ".raiker" not in path.parts]
+def _written(workspace: Path, session_id: str) -> list[Path]:
+    from raiker.execution.commands.backends.native import task_workspace_registry
+    from raiker.execution.task_tree import TaskTree
+
+    assert not [path for path in workspace.rglob("notes.txt") if ".raiker" not in path.parts]
+    tree = TaskTree.for_session(task_workspace_registry(workspace), session_id)
+    return [] if tree is None else [path for _, root in tree.copy_roots() for path in root.rglob("notes.txt")]
 
 
 def _last_tool_outcome(model: ScriptedRouter) -> dict[str, Any]:
@@ -162,7 +168,7 @@ class TestWithTheBuildSetupOn:
         assert resumed.json()["status"] == "completed", resumed.json()
         assert _last_tool_outcome(scripted_model)["status"] == "success"
 
-        written = _written(workspace)
+        written = _written(workspace, session_id)
         assert len(written) == 1, written
         assert written[0].read_text(encoding="utf-8") == "hello from Build\n"
 
@@ -231,7 +237,7 @@ class TestWithTheRelayOff:
         # Governance is unchanged: the owner's off switch still wins.
         assert body["executes_action"] is False
         assert body["not_executed_reason"] == f"metadata_only:{RELAY}"
-        assert _written(workspace) == []
+        assert _written(workspace, str(parked["session_id"])) == []
 
         resumed = client.post(f"/api/approvals/{approval_id}/resume", headers=headers)
         assert resumed.status_code == 200, resumed.text

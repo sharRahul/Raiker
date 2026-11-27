@@ -44,7 +44,8 @@ def test_a_refused_write_is_reported_whatever_the_model_claims(
     project = client.post("/api/projects", json={"name": "Honesty"}, headers=headers).json()["project_id"]
     answer = client.post(
         "/api/prompts",
-        json={"text": "Create notes.txt.", "surface": "build", "project_id": project, "capability_modes": {}},
+        json={"text": "Create notes.txt.", "surface": "build", "project_id": project,
+              "capability_modes": {}, "approval_mode": "manual"},
         headers=headers,
     ).json()
 

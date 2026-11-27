@@ -1566,7 +1566,9 @@ class RuntimeOrchestrator:
                 grants = store.list_brain_source_grants(owner)
                 authority = authority_for_project(project, grants, self.workspace_root)
                 root = resolve_project_root(project, grants, self.workspace_root)
-                if root.path is not None and not root.missing:
+                # Legacy managed projects keep workspace-relative tool paths;
+                # their metadata folder under .raiker is never a writable root.
+                if root.kind == "attached" and root.path is not None and not root.missing:
                     task_root = root.path
         authority = self._task_tree_authority(envelope, owner, authority, task_root)
         self.tool_broker.path_authority = authority

@@ -92,7 +92,8 @@ def test_build_proposes_the_declared_check_after_the_model_finishes(
 
     resp = client.post(
         "/api/prompts",
-        json={"text": "Create pricing.py.", "surface": "build", "project_id": pid, "capability_modes": {}},
+        json={"text": "Create pricing.py.", "surface": "build", "project_id": pid,
+              "capability_modes": {}, "approval_mode": "manual"},
         headers=headers,
     )
     assert resp.status_code == 200, resp.text

@@ -116,7 +116,7 @@ def _envelope(prompt: str) -> PromptEnvelope:
         client=ClientMetadata(type="test_harness", name="tests", version="0.0.0"),
         user=UserMetadata(),
         prompt=PromptPayload(text=prompt),
-        options=PromptOptions(max_tool_calls=10),
+        options=PromptOptions(max_tool_calls=10, approval_mode="manual"),
     )
 
 
@@ -126,6 +126,16 @@ def _write_call() -> ToolCallProposal:
         tool_name="write_file",
         arguments={"path": "report.md", "text": "# Report\n"},
     )
+
+
+def _task_path(workspace: Path, session_id: str, path: str) -> Path:
+    from raiker.execution.commands.backends.native import task_workspace_registry
+    from raiker.execution.task_tree import TaskTree
+
+    tree = TaskTree.for_session(task_workspace_registry(workspace), session_id)
+    assert tree is not None
+    assert not (workspace / path).exists()
+    return tree.to_copy(workspace / path, create=False)
 
 
 def _event_types(orchestrator: RuntimeOrchestrator, session_id: str) -> list[str]:
@@ -331,7 +341,7 @@ class TestResumeAfterApproval:
             "queue_total": 1,
             "queued_calls": 0,
         }
-        assert (workspace / "report.md").read_text(encoding="utf-8") == "# Report\n"
+        assert _task_path(workspace, envelope.session_id, "report.md").read_text(encoding="utf-8") == "# Report\n"
 
         resumed = client.post(f"/api/approvals/{approval_id}/resume", headers=headers)
         assert resumed.status_code == 200, resumed.text
@@ -621,7 +631,7 @@ def test_a_parked_run_carries_its_spend_and_the_resumed_turn_meters_from_it(
     orchestrator = _orchestrator(tmp_path, router)
     base = _envelope("Write the quarterly report to report.md")
     envelope = PromptEnvelope(
-        **{**base.__dict__, "options": PromptOptions(max_tool_calls=10, max_cost_usd=0.5)}
+            **{**base.__dict__, "options": PromptOptions(max_tool_calls=10, max_cost_usd=0.5, approval_mode="manual")}
     )
     response = asyncio.run(
         orchestrator.ahandle(envelope, identity=_identity_for(tmp_path, orchestrator, envelope))

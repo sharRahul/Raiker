@@ -194,5 +194,5 @@ def test_the_models_lesson_is_filed_only_on_this_tasks_evidence(
     assert record("npm install", "pnpm install", text="token: " + "x" * 30) == "lesson_secret_like"
     assert record("npm install", "pnpm install") == "recorded"
     [proposal] = service.list_memory_proposals(OWNER)
-    assert proposal["text"] == "This repo uses pnpm. Run `pnpm install` instead of `npm install`."
+    assert proposal["text"] == "In this project, run `pnpm install` instead of `npm install`."
     assert len(_keep(service).kept) == 1  # type: ignore[attr-defined]

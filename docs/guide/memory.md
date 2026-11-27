@@ -115,10 +115,11 @@ prompt, or bypass an approval gate.
 ### Lessons from Raiker's own work
 
 When a command fails during a project task and a different one works, Raiker
-records a lesson — in its own words, but only when the task's records show the
-failing command, the working one after it, and no file changed in between. It
-ends with the commands, e.g. *This repo uses pnpm. Run `pnpm install` instead of
-`npm install`.* It is kept for that project only. When the failing command runs
+records a lesson — only when the task's records show the
+failing command, the working one after it, and no file changed in between. It is
+written from the commands alone, e.g. *In this project, run `pnpm install`
+instead of `npm install`.* — never in the model's words, since it is kept
+without asking and read by every later task. It is kept for that project only. When the failing command runs
 again in a later task, its result carries the lesson, so the next try is the one
 that works. When the recommended command itself fails, the lesson is out of date
 and Raiker archives it (restore it from Memory). A lesson about one of the

@@ -1796,7 +1796,7 @@ TOOL_DEFINITIONS: tuple[ToolDefinition, ...] = (
             ("passed_command", {"type": "string", "description": "The command that then passed, exactly as run."}),
         ),
         description=(
-            "Record one lesson this task taught about how this project works, so the next task "
+            "Record that a command failed here and another fixed it, so the next task "
             "here starts with it. Use it after a command failed and a different command fixed it "
             "without changing any file, e.g. text 'Tests need --runInBand here', failed_command "
             "'npm test', passed_command 'npm test -- --runInBand'. Give both commands exactly as "

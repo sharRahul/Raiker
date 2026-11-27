@@ -286,7 +286,10 @@ def record_lesson(
         return "lesson_not_backed_by_this_task"
     memory_type = LESSON_MEMORY_TYPE
     is_check = failed_command.strip() in _declared_checks(store, project_id)
-    text = lesson_text(text, failed=failed_command.strip(), passed=passed_command.strip(), check=is_check)
+    # Kept without asking, so only Raiker's own sentence is stored: the model's
+    # wording could carry an instruction into every later task in the project.
+    # What survives is the two commands, and both are verified above.
+    text = lesson_text("", failed=failed_command.strip(), passed=passed_command.strip(), check=is_check)
     if is_check:
         memory_type = CHECK_FIX_MEMORY_TYPE
     if store.memory_text_forgotten(text, owner_principal_id=owner_principal_id):

@@ -41,6 +41,9 @@ Ruff, Mypy (1,342 files), Svelte check, ESLint, production build and documentati
 contracts passed. The full web unit run passed 314 files (2,982 tests, one
 skipped); focused tests were repeated for subsequent engine refresh changes.
 The deterministic browser suite also passed all 31 cases (19.4 seconds).
+The first GitHub Python check flagged the fixture's public `confirm` phrase as
+S106; its exact finding was reviewed in `.github/sast-exceptions.json`, following
+the existing live-fixture convention. No scanner or runtime gate was disabled.
 
 ## Result — 2026-11-27 Permissions and work-page refinement
 

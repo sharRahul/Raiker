@@ -2,6 +2,14 @@
   "_comment": "DEC-24 step 7 — static-analysis findings that were read and are not defects. Each names an owner, a reason and an expiry; an expired or unused entry fails scripts/scan_sast.py. Renew by re-reading the code.",
   "exceptions": [
     {
+      "path": "scripts/live_memory_summary_harness.py",
+      "rule": "S106",
+      "fingerprint": "ed24357182210fa7",
+      "owner": "Raiker maintainers",
+      "reason": "The public confirmation phrase for a capability transition in a disposable live-test workspace, not a password or credential; the human principal and runtime gate checks still apply",
+      "expires": "2027-05-27"
+    },
+    {
       "path": "raiker/storage/stores/conversations.py",
       "rule": "S608",
       "fingerprint": "c1a0ceb843c8c00f",

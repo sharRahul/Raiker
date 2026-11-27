@@ -1017,6 +1017,22 @@ export const api = {
   // Memory as linked Markdown in a folder (an Obsidian vault); null stops it.
   setMemoryVault: (path: string | null) => contract.setMemoryVault({ path }),
   syncMemoryVault: () => contract.syncMemoryVault(),
+  // Raiker Notes — the owner's linked-Markdown notebook.
+  notes: {
+    list: () => contract.listNotes(),
+    read: (path: string) => contract.readNote({ path }),
+    save: (path: string, content: string, expectedMtime: number | null) =>
+      contract.saveNote({ path, content, expected_mtime: expectedMtime }),
+    create: (path: string, content = "") => contract.createNote({ path, content }),
+    trash: (path: string) => contract.trashNote({ path }),
+    rename: (from: string, to: string) => contract.renameNote({ from, to }),
+    backlinks: (path: string) => contract.noteBacklinks({ path }),
+    linkMention: (source: string, line: number, target: string) => contract.linkNoteMention({ source, line, target }),
+    graph: (path?: string, depth = 1) => contract.noteGraph(path ? { path, depth } : { depth }),
+    search: (q: string) => contract.searchNotes({ q }),
+    daily: () => contract.openDailyNote(),
+    resolve: (target: string, fromPath = "") => contract.resolveNoteLink({ target, from_path: fromPath }),
+  },
   // MEM-MODE-02 — Off, Brief only or Search when relevant. Incognito still
   // wins on the server; this records the owner's choice and nothing more.
   setMemoryRecallMode: (mode: MemoryRecallMode) =>

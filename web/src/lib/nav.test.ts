@@ -74,6 +74,7 @@ describe("nav model", () => {
       "design",
       "work",
       "memory",
+      "notes",
       "approvals",
     ]);
   });

@@ -24,6 +24,8 @@ export const NAV_GROUPS: NavGroup[] = [
     { id: "work", label: "Work", icon: "tasks", hint: "Chats, goals, tasks and projects" },
     // Memory carries the Knowledge Map as a tab, for the same reason.
     { id: "memory", label: "Memory", icon: "activity", hint: "What Raiker remembers" },
+    // Raiker Notes — a linked-Markdown notebook (Obsidian-compatible).
+    { id: "notes", label: "Notes", icon: "file", hint: "Linked notes, backlinks and daily notes" },
     // A decision waiting on you is the work, not configuration. It has a
     // counted button in the top bar; this row is its address.
     { id: "approvals", label: "Approvals", icon: "approvals", hint: "Decisions waiting on you" },
@@ -99,6 +101,7 @@ export const SIDEBAR_ITEM_IDS: string[] = [
   "design",
   "work",
   "memory",
+  "notes",
 ];
 
 /**
@@ -162,6 +165,7 @@ export const PRODUCT_AREAS: Record<string, ProductArea> = {
   design: "work",
   work: "work",
   memory: "work",
+  notes: "work",
   approvals: "review",
   models: "connect",
   connections: "connect",

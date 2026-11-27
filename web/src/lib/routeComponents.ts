@@ -24,6 +24,7 @@ import type { Component } from "svelte";
 export type LazyRouteId =
   | "work"
   | "memory"
+  | "notes"
   | "approvals"
   | "brain"
   | "sessions"
@@ -48,6 +49,7 @@ type Loader = () => Promise<{ default: RouteComponent }>;
 const LOADERS: Record<LazyRouteId, Loader> = {
   work: () => import("./views/WorkView.svelte"),
   memory: () => import("./views/MemoryView.svelte"),
+  notes: () => import("./views/NotesView.svelte"),
   approvals: () => import("./views/ApprovalsView.svelte"),
   brain: () => import("./views/BrainView.svelte"),
   sessions: () => import("./views/SessionsView.svelte"),

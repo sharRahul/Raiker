@@ -102,7 +102,7 @@
       ? "work-surface" as const
       : current === "models" || current === "connections" || current === "observe" ||
             current === "home" || current === "work" ||
-            current === "memory" || current === "approvals" ||
+            current === "memory" || current === "notes" || current === "approvals" ||
             current === "capabilities"
           ? "operational" as const
           : "workspace" as const,
@@ -479,6 +479,8 @@
                 onchanged: refreshProjects,
               }}
             />
+          {:else if current === "notes"}
+            <LazyRoute route="notes" props={{}} />
           {:else if current === "memory"}
             <LazyRoute route="memory" props={{ tab: currentTab ?? "overview", filter: currentFilter, record: currentRecord }} />
           {:else if current === "approvals"}

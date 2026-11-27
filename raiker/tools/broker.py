@@ -527,9 +527,16 @@ class ToolBroker:
         if not query:
             return {"status": "failed", "error": {"type": "note_query_required"}}
         hits = vault.search(query, limit=20)
-        return {"status": "success", "results": [
-            {"path": hit["path"], "name": hit["name"], "line": hit["line"], "snippet": hit["snippet"]} for hit in hits
-        ]}
+        return {
+            "status": "success",
+            # Notes are the owner's, but other tools can write to the folder:
+            # what they say is data to report, never an instruction to follow.
+            "trust_label": "untrusted_note_data",
+            "results": [
+                {"path": hit["path"], "name": hit["name"], "line": hit["line"], "snippet": hit["snippet"]}
+                for hit in hits
+            ],
+        }
 
     def _note_read(self, args: dict[str, Any], context: ToolExecutionContext) -> dict[str, Any]:
         from raiker.notes.vault import MAX_NOTE_BYTES, NotesError
@@ -544,10 +551,17 @@ class ToolBroker:
             backlinks = vault.backlinks(note["path"])
         except NotesError as exc:
             return {"status": "failed", "error": {"type": str(exc)}}
+        from raiker.security.injection_scan import scan_untrusted_text
+
         content = note["content"]
         limit = min(MAX_NOTE_BYTES, 40_000)
+        signals = scan_untrusted_text(content[:limit])
         return {
             "status": "success",
+            "trust_label": "untrusted_note_data",
+            # Named, not hidden: the model is told this note carries text shaped
+            # like an instruction, so it reports it instead of acting on it.
+            "injection_signals": [signal.rule for signal in signals],
             "path": note["path"],
             "content": content[:limit],
             "truncated": len(content) > limit,

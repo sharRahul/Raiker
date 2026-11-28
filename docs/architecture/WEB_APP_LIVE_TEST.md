@@ -3379,3 +3379,20 @@ is preserved as `approvals-empty-centered/kb-05-before.png`.
 The [human tester guide](../guide/human-beta-testing.md) is a handoff artifact,
 not a passing human run. Physical microphone, real NVDA, consent and subjective
 readability results remain **not run** until a tester returns their report.
+
+## Result — 2026-11-28 (Raiker as an MCP server)
+
+Windows 11, source checkout, real subprocess over stdio. A scratch workspace
+had its owner bootstrapped first.
+
+| # | Case | Expected | Result |
+|---|---|---|---|
+| MCP-1 | `initialize` with `2025-06-18` | Same revision agreed, `tools` capability, data-not-instructions note | Pass |
+| MCP-2 | `tools/list` | Seven tools, each `readOnlyHint: true`, no write or forget | Pass |
+| MCP-3 | `tools/call memory_search` | Broker decision `allow`, hybrid retrieval result | Pass |
+| MCP-4 | `/memory-store` from the terminal for comparison | `approval_required`; MCP offers no write | Pass |
+| MCP-5 | Any call before an owner exists | `denied`, `machine_identity_delegation_mismatch` | Pass (unit) |
+| MCP-6 | Garbage line on stdin | `-32700` reply, session continues | Pass (unit) |
+
+There is no UI for this feature, so no screenshot. The transcript is in FIXED-1590's evidence.
+

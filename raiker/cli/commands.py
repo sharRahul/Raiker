@@ -1620,7 +1620,10 @@ def _broker_command_result(title: str, result: object) -> str:
 
 
 def _run_terminal_tool_action(
-    action: ToolAction, *, workspace_root: str | Path = "."
+    action: ToolAction,
+    *,
+    workspace_root: str | Path = ".",
+    client: ClientMetadata | None = None,
 ) -> tuple[ToolResult, PolicyDecision]:
     store = SQLiteStore(workspace_root)
     session_id = new_id("sess_")
@@ -1670,7 +1673,7 @@ def _run_terminal_tool_action(
             session_id=session_id,
             turn_id=turn_id,
             machine_identity=identity,
-            client=terminal_client(),
+            client=client or terminal_client(),
         )
     finally:
         lifecycle.finish(identity)

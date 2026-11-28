@@ -1,3 +1,13 @@
+## Windows-only test failures seen during RU-15 — 2026-11-28
+
+On the Windows test PC, with a clean checkout of `fc95a5c7` (before RU-15),
+these fail locally while Linux CI passes them:
+`tests/test_mcp_agent_tools.py` (*an allowing mode reports the tools the agent
+can call*, *another account is told nothing about this owner's servers*, *a
+disabled gate offers nothing*) and `tests/test_design_brand_guide.py` (*colours
+a guide only shows are read from its swatches*, *the route adds swatch colours
+after the stated ones*). Classify them on Windows before changing either area.
+
 ## Windows test-runner qualification — 2026-11-27
 
 RU-11 is completed as

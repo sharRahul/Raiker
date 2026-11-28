@@ -1,5 +1,27 @@
 # Fixed items
 
+## FIXED-1590 — Other agents could not reach Raiker's memory, notes or tasks
+
+**Severity: Medium. Area: Interoperability (RU-15). Status: Fixed 2026-11-28.**
+Claude, ChatGPT, Cursor and Hermes Agent can all use MCP servers, but Raiker
+only consumed them. `raiker mcp-serve --workspace <folder>` now speaks MCP over
+stdio (revisions 2026-07-28 back to 2024-11-05) and offers seven read-only
+tools: `memory_search`, `memory_get`, `note_search`, `note_read`,
+`conversation_search`, `library_list` and `tasks_list`.
+
+- Each memory, note or conversation read is a `ToolBroker` action with its own
+  machine identity and policy decision, attributed to the `raiker-mcp-server`
+  client, so it appears in the audit as any terminal read does.
+- Library and task reads are served as Raiker's screens serve them and each
+  records an `mcp_read` event.
+- With no owner bootstrapped, every call is refused.
+- No write is offered: a write needs an approval the calling agent cannot
+  give. Results keep Raiker's untrusted-data labels, and the server's
+  instructions tell the caller to treat them as data, not instructions.
+
+Evidence: `tests/test_mcp_server.py` (nine cases); live stdio session in the
+[live record](../architecture/WEB_APP_LIVE_TEST.md#result--2026-11-28-raiker-as-an-mcp-server).
+
 ## FIXED-1589 — Lessons were never filed or recalled in a real project
 
 **Severity: High. Area: Memory / Build (RU-12). Status: Fixed 2026-11-28.**
@@ -2477,6 +2499,7 @@ file you can open. The two capture sets that remain — `screenshots/pages/` and
 | [FIXED-1582](#fixed-1582--memory-opened-on-counts-instead-of-the-facts-raiker-knows) | Medium | Memory / Quiet UI | Fixed 2026-11-27 |
 | [FIXED-1583](#fixed-1583--import-discarded-a-memorys-reviewed-topic) | Medium | Memory / import | Fixed 2026-11-27 |
 | [FIXED-1587](#fixed-1587--memory-could-not-be-read-or-traversed-outside-raiker) | Medium | Memory | Fixed 2026-11-27 |
+| [FIXED-1590](#fixed-1590--other-agents-could-not-reach-raikers-memory-notes-or-tasks) | Medium | Interoperability | Fixed 2026-11-28 |
 | [FIXED-1589](#fixed-1589--lessons-were-never-filed-or-recalled-in-a-real-project) | High | Memory / Build | Fixed 2026-11-28 |
 | [FIXED-1588](#fixed-1588--the-notes-handoff-needed-safe-editing-tests-and-a-consistent-folder-control) | Medium | Notes / Quiet UI | Fixed 2026-11-28 |
 | [FIXED-1586](#fixed-1586--every-memory-waited-for-an-approval) | Medium | Memory / Chat | Fixed 2026-11-27 |

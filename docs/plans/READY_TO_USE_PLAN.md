@@ -62,7 +62,7 @@ build is still owed for every item (the regular-use journeys in
 | RU-12 Remembers its own work | Built | Lessons from a project task's own command records, kept with Undo and recalled in that project unless its memory is disabled; the failing command's result carries the lesson ([FIXED-1585](FIXED_ITEMS.md#fixed-1585--raiker-did-not-remember-what-its-own-work-taught), [FIXED-1589](FIXED_ITEMS.md#fixed-1589--lessons-were-never-filed-or-recalled-in-a-real-project)) | Live two-task journey |
 | RU-13 Always-on host | Open | — | User service on each platform; delivery with the window closed |
 | RU-14 Pause and Resume a running step | Open | — | Park a turn at the next safe boundary, freeze a command, resume |
-| RU-15 Raiker as an MCP server | Open | — | — |
+| RU-15 Raiker as an MCP server | Done | `raiker mcp-serve`: seven read-only tools over stdio, each read governed and audited ([FIXED-1590](FIXED_ITEMS.md#fixed-1590--other-agents-could-not-reach-raikers-memory-notes-or-tasks)) | Writes over MCP need an approval channel the caller can wait on; not planned |
 | RU-16 Import another agent's setup | Done | `AGENTS.md`/`CLAUDE.md`/`.cursorrules` ([FIXED-1536](FIXED_ITEMS.md#fixed-1536--a-projects-agentsmd-or-claudemd-was-ignored), [FIXED-1542](FIXED_ITEMS.md#fixed-1542--a-projects-cursorrules-was-ignored)), Hermes and Markdown memory ([FIXED-1541](FIXED_ITEMS.md#fixed-1541--another-agents-markdown-memory-could-not-be-imported)), Claude Desktop / Cursor `mcpServers` paste ([FIXED-1561](FIXED_ITEMS.md#fixed-1561--an-owner-could-not-add-a-local-mcp-server-and-none-could-drive-an-application)) ; the `.cursor/rules` folder ([FIXED-1569](FIXED_ITEMS.md#fixed-1569--a-projects-cursorrules-folder-was-ignored)); ChatGPT and Claude `conversations.json` ([FIXED-1572](FIXED_ITEMS.md#fixed-1572--chatgpt-and-claude-conversation-exports-could-not-be-imported)) | — |
 | RU-17 Move to another machine | Open | — | Encrypted export and first-run import |
 | RU-21 A project for Build has a folder | Done | Bare commands run in the project ([FIXED-1549](FIXED_ITEMS.md#fixed-1549--a-projects-command-with-no-folder-ran-at-the-workspace-root)); **Create project** makes `~/Raiker Projects/<name>` ([FIXED-1559](FIXED_ITEMS.md#fixed-1559--a-new-project-had-no-folder-outside-raikers-data)); RT-1125-11 | RU-J4 on a published build |
@@ -320,6 +320,7 @@ history intact (the last row of BUG-355).
 **RU-15 · Raiker as an MCP server. P2, M.** Other agents (Claude, ChatGPT,
 Cursor, Hermes Agent) can call Raiker's memory search, Library and tasks over
 MCP; every call enters the same gateway, approvals and audit.
+*Done 2026-11-28:* `raiker mcp-serve` ([FIXED-1590](FIXED_ITEMS.md#fixed-1590--other-agents-could-not-reach-raikers-memory-notes-or-tasks)).
 
 **RU-16 · Import another agent's setup. P1, M.** Read `AGENTS.md`, `CLAUDE.md`
 and `.cursor/rules` as RAIKER.md does — reviewed by digest before use — and
@@ -374,6 +375,9 @@ chat. Release qualification still requires a live run on the published build.
 - **2026-11-27 (Almost no approvals)** — Raiker keeps trusted memories itself
   with Undo; lessons are model-recorded on verified evidence, fix declared
   checks, come back when their command fails and retire when stale (FIXED-1586).
+- **2026-11-28 (MCP server)** — RU-15 done: `raiker mcp-serve` serves
+  memory, notes, conversations, Library and tasks to other agents, read-only,
+  through the broker and audit (FIXED-1590).
 - **2026-11-27 (Lessons)** — RU-12 built: project lessons from Raiker's own
   command records, kept under the answer and recalled in that project only
   (FIXED-1585). The live two-task journey remains.

@@ -338,15 +338,18 @@ def lesson_for_command(
 ) -> str | None:
     """Recall at the moment it matters, and retire a lesson the project outgrew.
 
-    * The command just **failed** and a kept lesson says what works instead:
-      the note goes back with the result, so the model's next call is the one
-      that works — instead of hoping the lesson was among the brief's few items.
-    * The command a lesson recommends just **failed**: the lesson is stale, so
-      it is archived (restorable from Memory) and the note says so.
+    * The command a kept lesson warns about just **failed**: the note goes back
+      with the result, so the model's next call is the one that works, instead
+      of hoping the lesson was among the brief's few items.
+    * That same command just **passed**: the workaround is no longer needed,
+      so the lesson is archived as out of date (restorable from Memory).
+
+    The recommended command failing proves nothing about the lesson (its tests
+    may simply be failing), so it never retires one.
     """
     from raiker.memory.store import set_memory_archived
 
-    if exit_code in (None, 0) or not command.strip() or not project_id:
+    if exit_code is None or not command.strip() or not project_id:
         return None
     command = command.strip()
     rows = store.list_approved_memory(
@@ -358,10 +361,10 @@ def lesson_for_command(
         if str(row.get("memory_type") or "") not in {LESSON_MEMORY_TYPE, CHECK_FIX_MEMORY_TYPE}:
             continue
         pair = parse_lesson(str(row.get("text") or ""))
-        if pair is None:
+        if pair is None or pair[0] != command:
             continue
         failed, passed = pair
-        if command == passed:
+        if exit_code == 0:
             set_memory_archived(
                 str(row["memory_id"]), archived=True, workspace_root=workspace_root,
                 store=store, owner_principal_id=owner_principal_id,
@@ -371,9 +374,9 @@ def lesson_for_command(
                 {"auto": True, "reason": "lesson_stale", "command": command},
             )
             note = (
-                f"A kept lesson recommended `{passed}`, which just failed; Raiker archived that "
-                "lesson as out of date."
+                f"`{failed}` works here now, so the kept lesson recommending `{passed}` "
+                "was archived as out of date."
             )
-        elif command == failed and note is None:
+        elif note is None:
             note = f"A kept lesson for this project says `{passed}` works where `{failed}` fails."
     return note

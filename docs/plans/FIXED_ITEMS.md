@@ -1,5 +1,33 @@
 # Fixed items
 
+## FIXED-1589 — Lessons were never filed or recalled in a real project
+
+**Severity: High. Area: Memory / Build (RU-12). Status: Fixed 2026-11-28.**
+A review of RU-12 on main found three faults that the tests missed, because the
+tests used a stand-in project and a stand-in command payload:
+
+- **Filing:** the gateway read `memory_enabled` from the `projects` row, which
+  has no such column. Every real project looked memory-off, so no automatic
+  lesson was ever proposed. It now reads the effective project context. Only
+  an explicitly disabled project keeps no lessons; the `record_lesson` tool
+  follows the same rule.
+- **Recall:** project memory defaults to `inherit`, which means off, so a kept
+  lesson never reached the next task's brief. The brief now admits a project's
+  lessons (`lesson`, `check_fix`) for that project unless its memory is
+  disabled, as Claude Code and Hermes Agent keep project memory on by default.
+  Other project memories keep their opt-in.
+- **Recall at the failing command:** the hook looked for `exit_code` in the
+  tool payload, but a foreground run reports `returncode`, so it never fired.
+  It now reads the action's own command record.
+
+The stale-lesson rule was also wrong: it archived a lesson whenever the
+recommended command failed, which a real test failure does. A lesson is now
+archived only when the command it warns about passes again, which shows the
+workaround is no longer needed. Evidence: `tests/test_memory_lessons.py`
+(*a default project files and recalls lessons*),
+`tests/test_memory_auto_keep.py` (*the orchestrator reads the command record*,
+*retires when stale*).
+
 ## FIXED-1588 — The Notes handoff needed safe editing tests and a consistent folder control
 
 **Severity: Medium. Area: Notes / Quiet UI. Status: Fixed 2026-11-28.**
@@ -2449,6 +2477,7 @@ file you can open. The two capture sets that remain — `screenshots/pages/` and
 | [FIXED-1582](#fixed-1582--memory-opened-on-counts-instead-of-the-facts-raiker-knows) | Medium | Memory / Quiet UI | Fixed 2026-11-27 |
 | [FIXED-1583](#fixed-1583--import-discarded-a-memorys-reviewed-topic) | Medium | Memory / import | Fixed 2026-11-27 |
 | [FIXED-1587](#fixed-1587--memory-could-not-be-read-or-traversed-outside-raiker) | Medium | Memory | Fixed 2026-11-27 |
+| [FIXED-1589](#fixed-1589--lessons-were-never-filed-or-recalled-in-a-real-project) | High | Memory / Build | Fixed 2026-11-28 |
 | [FIXED-1588](#fixed-1588--the-notes-handoff-needed-safe-editing-tests-and-a-consistent-folder-control) | Medium | Notes / Quiet UI | Fixed 2026-11-28 |
 | [FIXED-1586](#fixed-1586--every-memory-waited-for-an-approval) | Medium | Memory / Chat | Fixed 2026-11-27 |
 | [FIXED-1585](#fixed-1585--raiker-did-not-remember-what-its-own-work-taught) | Low | Memory / Build | Fixed 2026-11-27 |

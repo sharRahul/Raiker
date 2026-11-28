@@ -900,8 +900,11 @@ class AgentGateway:
             if not project_id:
                 return
             # A project whose memory is off keeps no lessons, as it recalls none.
-            project = self.store.load_project(project_id)
-            if project is not None and not bool(project.get("memory_enabled")):
+            # The effective context, not the projects row (which has no memory
+            # column): a project whose memory is explicitly disabled keeps no
+            # lessons; "inherit" keeps them, as recall admits them there.
+            context = self.store.load_effective_project_context(project_id)
+            if str(context.get("memory_mode") or "inherit") == "disabled":
                 return
             from raiker.execution.commands.store import CommandStore
             from raiker.memory.lessons import propose_turn_lessons

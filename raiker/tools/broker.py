@@ -586,11 +586,13 @@ class ToolBroker:
             return {"status": "failed", "error": {"type": "lesson_needs_project"}}
         from raiker.goals.store import session_memory_withheld
 
-        project = self.store.load_project(project_id) or {}
+        memory_mode = str(
+            self.store.load_effective_project_context(project_id).get("memory_mode") or "inherit"
+        )
         if (
             self.store.is_memory_incognito(context.owner_principal_id)
             or session_memory_withheld(self.store, context.session_id) in {"incognito", "unreadable"}
-            or not bool(project.get("memory_enabled", True))
+            or memory_mode == "disabled"
         ):
             # Incognito and memory off create no memory, as they recall none.
             return {"status": "failed", "error": {"type": "lesson_memory_off"}}

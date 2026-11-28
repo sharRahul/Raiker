@@ -174,8 +174,9 @@ written from the commands alone, e.g. *In this project, run `pnpm install`
 instead of `npm install`.* — never in the model's words, since it is kept
 without asking and read by every later task. It is kept for that project only. When the failing command runs
 again in a later task, its result carries the lesson, so the next try is the one
-that works. When the recommended command itself fails, the lesson is out of date
-and Raiker archives it (restore it from Memory). A lesson about one of the
+that works. When the command the lesson warns about passes again, the workaround is no
+longer needed and Raiker archives the lesson (restore it from Memory). A lesson
+is recalled in its project unless that project's memory is turned off. A lesson about one of the
 project's declared checks asks first, because keeping it fixes the check.
 
 ### Recall by time

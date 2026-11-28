@@ -208,10 +208,34 @@ def test_a_project_with_memory_off_keeps_no_lesson(
 ) -> None:
     from raiker.gateway.agent_gateway import AgentGateway
 
+    service.store.create_project("alpha", "Alpha", "alpha")
+    service.store.save_project_context("alpha", instructions="", attachment_ids=[], memory_mode="disabled")
     gateway = _gateway(service, monkeypatch, {"project_id": "alpha"})
-    monkeypatch.setattr(
-        type(service.store), "load_project",
-        lambda self, pid, user_id=None: {"project_id": pid, "memory_enabled": 0},
-    )
     AgentGateway._propose_turn_lesson(gateway, _envelope())  # type: ignore[arg-type]
     assert service.list_memory_proposals(OWNER) == []
+
+
+def test_a_default_project_files_and_recalls_lessons_but_a_disabled_one_does_not(
+    service: DashboardService, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from raiker.gateway.agent_gateway import AgentGateway
+
+    service.store.create_project("alpha", "Alpha", "alpha")  # memory "inherit"
+    gateway = _gateway(service, monkeypatch, {"project_id": "alpha"})
+    AgentGateway._propose_turn_lesson(gateway, _envelope())  # type: ignore[arg-type]
+    [proposal] = service.list_memory_proposals(OWNER)
+    assert service.decide_memory_proposal(
+        str(proposal["candidate_id"]), decision="approved", edited_text=None, reason=None,
+        expected_decision="deferred", acting_principal_id=OWNER,
+    ).ok
+    # Recalled for the lesson's project even though project memory was never opted in.
+    recalled = build_memory_brief(
+        service.store, owner_principal_id=OWNER, project_id=None, lesson_project_id="alpha"
+    )
+    assert ["--runInBand" in item.text for item in recalled.items] == [True]
+
+    service.store.create_project("beta", "Beta", "beta")
+    service.store.save_project_context("beta", instructions="", attachment_ids=[], memory_mode="disabled")
+    beta = _gateway(service, monkeypatch, {"project_id": "beta"})
+    AgentGateway._propose_turn_lesson(beta, _envelope())  # type: ignore[arg-type]
+    assert all(row["scope"] != "project:beta" for row in service.list_memory_proposals(OWNER))

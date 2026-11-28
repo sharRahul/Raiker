@@ -1580,9 +1580,6 @@ class RuntimeOrchestrator:
         """RU-12 — a failed command comes back with the kept lesson about it, if any."""
         if action.tool_name not in {"shell", "run_command"} or not isinstance(payload, dict):
             return payload
-        exit_code = payload.get("exit_code")
-        if not isinstance(exit_code, int) or exit_code == 0:
-            return payload
         store = getattr(self.tool_broker, "store", None)
         if store is None:
             return payload
@@ -1601,9 +1598,23 @@ class RuntimeOrchestrator:
                 or session_memory_withheld(store, envelope.session_id)
             ):
                 return payload
-            command = str(
-                payload.get("safe_display") or (action.arguments or {}).get("command") or ""
+            # The command record is the truth: the payload's shape differs by
+            # backend (a foreground run reports `returncode`, a background one
+            # `exit_code`), but every governed run is recorded with the same
+            # redacted display a lesson was written from.
+            from raiker.execution.commands.store import CommandStore
+
+            run = next(
+                (
+                    item
+                    for item in CommandStore(store).list_runs(owner, session_id=envelope.session_id, limit=50)
+                    if item.action_id == action.action_id
+                ),
+                None,
             )
+            if run is None or run.exit_code is None:
+                return payload
+            command, exit_code = run.safe_display, run.exit_code
             note = lesson_for_command(
                 store, workspace_root=self.workspace_root, owner_principal_id=owner,
                 project_id=project_id, command=command, exit_code=exit_code,

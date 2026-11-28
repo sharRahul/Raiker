@@ -1,3 +1,23 @@
+## RU-12 live run — found, not fixed (2026-11-28)
+
+- **A chat could not be moved into a project.** After a Build repository folder
+  was removed, *New chat* showed *This chat was not moved (HTTP 403,
+  unknown_session)*. `PUT /api/sessions/{id}/project` was sent for a session
+  that had never been created. The UI should not try to move a session that
+  doesn't exist.
+- **Two folder rules disagree.** Build's *Local folder* must be inside the
+  workspace, while *Projects → Attach existing folder* refuses one inside it
+  (`attach_path_inside_workspace`). An owner trying the same folder in both
+  places hits one refusal or the other.
+- **A command row shows only the program.** Build's activity reads *Run
+  command · python3* for `python3 run.py --mode=ci`. The arguments are what
+  differ between the failing and the passing run.
+- **A non-zero exit reads as a runtime fault.** A command that exited 2 shows
+  *failed — runtime_execution_failed*, which reads as if Raiker broke.
+- **The Memory banner contradicts the lessons.** *Memory store is off, so
+  conversations cannot propose memories* sits above a lesson Raiker just
+  proposed and kept.
+
 ## Windows-only test failures seen during RU-15 — 2026-11-28
 
 On the Windows test PC, with a clean checkout of `fc95a5c7` (before RU-15),

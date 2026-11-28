@@ -895,6 +895,29 @@ describe("ModelsView state grammar", () => {
     expect(alert).toHaveTextContent(/Models could not be read \(HTTP 404/i);
   });
 
+  it("does not say a cloud-tagged Ollama model keeps data on this computer", async () => {
+    // Found 2026-11-28 (RU-12 live run): the card said *Sent to ollama.com*
+    // and, one line below, *Nothing you send leaves this computer*.
+    stubFetch({
+      "GET /api/models": models({
+        profiles: [
+          profile({
+            profile_id: "ollama-local-openai-compatible",
+            provider: "ollama",
+            model: "gpt-oss:120b-cloud",
+            local_only: true,
+            off_machine: false,
+            configured: true,
+            selected: true,
+          }),
+        ],
+      }),
+    });
+    render(ModelsView, {});
+    expect(await screen.findByText(/What you send leaves this computer, and provider pricing may apply/)).toBeTruthy();
+    expect(screen.queryByText(/Nothing you send leaves this computer/)).toBeNull();
+  });
+
   it("does not describe an API-key provider as having no API cost", async () => {
     stubFetch({
       "GET /api/models": models({

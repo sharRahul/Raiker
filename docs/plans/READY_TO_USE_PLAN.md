@@ -59,7 +59,7 @@ build is still owed for every item (the regular-use journeys in
 | RU-09 Four-step first run | Partly done | Model step says which models suit numbers and code ([FIXED-1538](FIXED_ITEMS.md#fixed-1538--first-run-did-not-say-which-models-suit-numbers-and-code)) ; *This machine* facts and the *Posture* choice ([FIXED-1571](FIXED_ITEMS.md#fixed-1571--first-run-set-up-the-device-but-not-the-machine-and-never-asked-for-a-posture)) | A timed first useful answer under ten minutes on Windows and Linux |
 | RU-10 Keep or skip under the answer | Done | [FIXED-1539](FIXED_ITEMS.md#fixed-1539--a-memory-raiker-proposed-could-only-be-kept-from-memory), owner's words only ([FIXED-1548](FIXED_ITEMS.md#fixed-1548--a-sentence-the-model-invented-was-offered-to-keep-as-a-memory)); RT-1125-08 | — |
 | RU-11 Memory as a summary | Done | Summary, inline Edit/Forget, Use memory, saved conversation Incognito and local meaning setup; real embedding and four chat-turn conditions pass ([FIXED-1584](FIXED_ITEMS.md#fixed-1584--conversation-incognito-was-missing-and-goal-noticing-ignored-memory-opt-out)) | None for RU-11; clean-machine timing remains RU-09 |
-| RU-12 Remembers its own work | Built | Lessons from a project task's own command records, kept with Undo and recalled in that project unless its memory is disabled; the failing command's result carries the lesson ([FIXED-1585](FIXED_ITEMS.md#fixed-1585--raiker-did-not-remember-what-its-own-work-taught), [FIXED-1589](FIXED_ITEMS.md#fixed-1589--lessons-were-never-filed-or-recalled-in-a-real-project)) | Live two-task journey |
+| RU-12 Remembers its own work | Done | Lessons from a project task's own command records, kept with Undo and recalled in that project unless its memory is disabled; the failing command's result carries the lesson ([FIXED-1585](FIXED_ITEMS.md#fixed-1585--raiker-did-not-remember-what-its-own-work-taught), [FIXED-1589](FIXED_ITEMS.md#fixed-1589--lessons-were-never-filed-or-recalled-in-a-real-project)); live three-task journey on Windows passes ([record](../architecture/WEB_APP_LIVE_TEST.md#result--2026-11-28-ru-12-lessons-in-a-real-project)) | — |
 | RU-13 Always-on host | Open | — | User service on each platform; delivery with the window closed |
 | RU-14 Pause and Resume a running step | Open | — | Park a turn at the next safe boundary, freeze a command, resume |
 | RU-15 Raiker as an MCP server | Done | `raiker mcp-serve`: seven read-only tools over stdio, each read governed and audited ([FIXED-1590](FIXED_ITEMS.md#fixed-1590--other-agents-could-not-reach-raikers-memory-notes-or-tasks)) | Writes over MCP need an approval channel the caller can wait on; not planned |
@@ -375,6 +375,10 @@ chat. Release qualification still requires a live run on the published build.
 - **2026-11-27 (Almost no approvals)** — Raiker keeps trusted memories itself
   with Undo; lessons are model-recorded on verified evidence, fix declared
   checks, come back when their command fails and retire when stale (FIXED-1586).
+- **2026-11-28 (Lessons live)** — RU-12 done: on Windows with WSL2 and a
+  local model, a failed-then-fixed command filed a lesson, the next task used
+  it, and it was archived when the original command passed (FIXED-1591 found
+  on the way).
 - **2026-11-28 (MCP server)** — RU-15 done: `raiker mcp-serve` serves
   memory, notes, conversations, Library and tasks to other agents, read-only,
   through the broker and audit (FIXED-1590).

@@ -30,6 +30,7 @@
   import ListDetail from "../../components/ListDetail.svelte";
   import ProviderUsagePanel from "./ProviderUsagePanel.svelte";
   import { providerName } from "../../format";
+  import { inferenceLabel, inferenceLocation } from "../../inferenceLocation";
   import { modelName } from "../../modelPresentation";
   import { isChoosableModel, openModelSetup, readinessForProfile } from "../../modelReadiness.svelte";
   import { readinessLabel, UNPINNED_MODEL } from "../../modelReadinessLabels";
@@ -224,7 +225,9 @@
             <h3>{rowName(profile)}</h3>
             <p class="where">
               {providerName(profile.provider)} ·
-              {profile.off_machine ? `Sent to ${providerName(profile.provider)}` : "Stays on this computer"}
+              {profile.off_machine
+                ? `Sent to ${providerName(profile.provider)}`
+                : inferenceLabel(inferenceLocation(profile, profile.model))}
             </p>
           </div>
         </header>

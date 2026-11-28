@@ -1,5 +1,36 @@
 # Fixed items
 
+## FIXED-1592 — Every turn rewrote the prompt prefix, so nothing was cached
+
+**Severity: High. Area: Runtime / Models / Memory. Status: Fixed 2026-11-28.**
+The clock and the workspace context sat near the top of every prompt, ahead of
+the conversation history. Every turn rewrote the prefix, so a hosted model
+reused nothing it had cached (cost and latency) and neither did llama.cpp's
+prompt cache. Automatic memory made the brief change most turns as well. The
+prompt is now laid out for reuse:
+
+- **Head, stable for the conversation:** rules, identity, the citation rule,
+  skills, persona, instruction files, and a **frozen memory snapshot** (as in
+  Hermes Agent). The snapshot is reused verbatim while every memory in it is
+  still recalled with the same words. It is rebuilt as soon as one is
+  forgotten, edited, archived or merged, and dropped the turn memory is
+  withheld.
+- **History:** the earlier turns, appended to and never rewritten.
+- **Tail, this turn only:** the clock, workspace context, retrieval, the plan
+  and background notices.
+
+`ModelMessage.turn_context` marks the tail. Anthropic carries it in the next
+user turn and caches the system prompt and the history. The OpenAI-compatible
+and Ollama adapters fold it into the next user message, because local chat
+templates refuse a system message mid-conversation.
+
+Also added: `memory_reflect` gathers the evidence for one question (facts
+newest first with near-copies collapsed, graph connections and possible
+conflicts, each citable by `memory_id`), so the turn's own model answers from
+it without a second model loop. **Merge near-copies** in Memory › Controls
+(`POST /api/memory/consolidate`) keeps the newest copy of a fact and supersedes
+the others, keeping their history. Evidence: `tests/test_prompt_cache_layout.py`,
+`tests/test_memory_reflect.py`.
 ## FIXED-1591 — A cloud Ollama model's card said nothing left the computer
 
 **Severity: Medium. Area: Models / privacy copy. Status: Fixed 2026-11-28.**
@@ -2513,6 +2544,7 @@ file you can open. The two capture sets that remain — `screenshots/pages/` and
 | [FIXED-1582](#fixed-1582--memory-opened-on-counts-instead-of-the-facts-raiker-knows) | Medium | Memory / Quiet UI | Fixed 2026-11-27 |
 | [FIXED-1583](#fixed-1583--import-discarded-a-memorys-reviewed-topic) | Medium | Memory / import | Fixed 2026-11-27 |
 | [FIXED-1587](#fixed-1587--memory-could-not-be-read-or-traversed-outside-raiker) | Medium | Memory | Fixed 2026-11-27 |
+| [FIXED-1592](#fixed-1592--every-turn-rewrote-the-prompt-prefix-so-nothing-was-cached) | High | Runtime / Models / Memory | Fixed 2026-11-28 |
 | [FIXED-1591](#fixed-1591--a-cloud-ollama-models-card-said-nothing-left-the-computer) | Medium | Models / privacy copy | Fixed 2026-11-28 |
 | [FIXED-1590](#fixed-1590--other-agents-could-not-reach-raikers-memory-notes-or-tasks) | Medium | Interoperability | Fixed 2026-11-28 |
 | [FIXED-1589](#fixed-1589--lessons-were-never-filed-or-recalled-in-a-real-project) | High | Memory / Build | Fixed 2026-11-28 |

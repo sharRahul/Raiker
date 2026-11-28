@@ -4255,6 +4255,12 @@ export type McpToolsApproved = {
   pending: string[];
 };
 
+export type MemoriesConsolidated = {
+  ok: boolean;
+  merged: number;
+  groups: number;
+};
+
 export type MemoryArchived = {
   ok: boolean;
   memory_id: string;
@@ -8283,6 +8289,8 @@ export const contract = {
     request<MemoryControlView[]>(withQuery("/api/memory", query)),
   setAskBeforeRemembering: (body: Record<string, unknown>) =>
     call<AskBeforeRememberingSet>("PUT", "/api/memory/ask-before-remembering", { body }),
+  consolidateMemories: () =>
+    call<MemoriesConsolidated>("POST", "/api/memory/consolidate"),
   rebuildConversationIndex: () =>
     call<ConversationIndexRebuilt>("POST", "/api/memory/conversation-index/rebuild"),
   cleanupExpiredObservations: (body: Record<string, unknown>) =>

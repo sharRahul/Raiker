@@ -76,6 +76,7 @@ ALWAYS_PROJECTED: frozenset[str] = frozenset({
     "skill_load",
     # Remembering and finding.
     "memory_search",
+    "memory_reflect",
     "note_search",
     "note_read",
     "memory_write",

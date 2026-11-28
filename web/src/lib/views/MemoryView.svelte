@@ -187,6 +187,20 @@
       actionError = failure("The vault was not synced", "Memory is unchanged.", "Check the folder is reachable, then sync again.", e);
     } finally { busy = false; }
   }
+  let mergeNotice = $state<string | null>(null);
+  async function mergeCopies() {
+    if (busy) return;
+    busy = true; actionError = null; mergeNotice = null;
+    try {
+      const result = await api.consolidateMemories();
+      mergeNotice = result.merged
+        ? `Merged ${result.merged} near-cop${result.merged === 1 ? "y" : "ies"} into ${result.groups} memor${result.groups === 1 ? "y" : "ies"}. The older wording stays in each memory's history.`
+        : "No near-copies found.";
+      await load();
+    } catch (e) {
+      actionError = failure("Memories were not merged", "Nothing was changed.", "Try again.", e);
+    } finally { busy = false; }
+  }
   async function toggleAskFirst() {
     if (!settings || busy) return;
     busy = true; actionError = null;
@@ -873,6 +887,15 @@
   <section class="control-card">
     <div><h3>Ask before remembering</h3><p>Off: Raiker keeps what you tell it and lessons from its own work, shows each under the answer, and Undo forgets it. What Raiker wrote itself and personal details like an email or phone number always wait for you.</p></div>
     <button class="switch" class:on={settings.ask_before_remembering} role="switch" aria-checked={settings.ask_before_remembering} aria-label="Ask before remembering" disabled={busy} onclick={() => void toggleAskFirst()}><span></span><b>{settings.ask_before_remembering ? "On" : "Off"}</b></button>
+  </section>
+
+  <section class="control-card">
+    <div>
+      <h3>Merge near-copies</h3>
+      <p>When the same fact was remembered more than once in slightly different words, keep the newest and retire the others. Nothing is deleted: the older wording stays in the memory's history.</p>
+      <button type="button" class="btn btn-soft btn-sm" disabled={busy} onclick={() => void mergeCopies()}>Merge near-copies</button>
+      {#if mergeNotice}<p class="saved" role="status">{mergeNotice}</p>{/if}
+    </div>
   </section>
 
   <section class="control-card vault-card">

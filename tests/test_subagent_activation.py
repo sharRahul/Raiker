@@ -201,7 +201,11 @@ def test_subagent_has_its_own_principal_and_parks_mutation_for_parent(tmp_path: 
          "git_diff", "git_log", "git_status", "glob", "grep", "help_read", "knowledge_graph",
          # Notes reads stay in the owner's chosen folder and return untrusted
          # reference data, without network access or note-writing authority.
-         "list_directory", "memory_get", "memory_list", "memory_search", "note_read", "note_search", "read_file",
+         # `memory_reflect` (FIXED-1592) gathers what `memory_search` and
+         # `knowledge_graph` already return into one evidence set: no model
+         # call, no write, no network.
+         "list_directory", "memory_get", "memory_list", "memory_reflect", "memory_search", "note_read",
+         "note_search", "read_file",
          "skill_load", "stat_path", "vector_get"]
     )
     assert store.list_approvals(status="pending")

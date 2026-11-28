@@ -158,6 +158,7 @@ class TestSourceDerivation:
                 {"repository": "repo", "checked": ["a.py"], "count": 0, "diagnostics": []},
             ),
             "memory_search": ({"query": "keys"}, {"count": 1, "results": [{"text": "x"}]}),
+            "memory_reflect": ({"question": "keys"}, {"facts": [{"memory_id": "mem_1", "text": "x"}]}),
             "note_read": ({"note": "Alpha"}, {"path": "Alpha.md", "content": "Recorded note text"}),
             "note_search": ({"query": "Alpha"}, {"results": [{"path": "Alpha.md", "snippet": "Recorded note text"}]}),
             "memory_list": ({}, {"count": 1, "results": [{"text": "x"}]}),

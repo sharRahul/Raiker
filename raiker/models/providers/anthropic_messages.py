@@ -183,12 +183,31 @@ def _map_status(status: int, *, model: str, body: str = "") -> Exception:
 def _to_anthropic_messages(
     messages: list[ModelMessage], *, include_images: bool = False
 ) -> tuple[str, list[dict[str, Any]]]:
-    """Split Raiker messages into top-level system text and Anthropic messages."""
+    """Split Raiker messages into top-level system text and Anthropic messages.
+
+    Only the system messages *before* the conversation are the system prompt.
+    One that comes after it is this turn's context (the clock, the workspace
+    block, retrieval): it travels as a text block at the start of the next
+    user turn, so the cached system prompt and history stay byte-identical
+    from turn to turn. The last history message before it is marked
+    ``_cache_breakpoint`` so the caller can cache the history too.
+    """
     system_parts: list[str] = []
     converted: list[dict[str, Any]] = []
+    marked = False
     for message in messages:
         if message.role == "system":
-            system_parts.append(message.content)
+            if not message.turn_context and not converted:
+                system_parts.append(message.content)
+                continue
+            if not marked and converted and converted[-1]["content"]:
+                converted[-1]["content"][-1]["_cache_breakpoint"] = True
+                marked = True
+            block = {"type": "text", "text": f"<turn_context>\n{message.content}\n</turn_context>"}
+            if converted and converted[-1]["role"] == "user":
+                converted[-1]["content"].append(block)
+            else:
+                converted.append({"role": "user", "content": [block]})
             continue
         if message.role == "tool":
             blocks: list[dict[str, Any]] = [
@@ -333,6 +352,10 @@ class AsyncAnthropicMessagesProvider:
             list(request.messages), include_images=self.capabilities.supports_vision
         )
         cache_control = _cache_control(request.cache_ttl)
+        for message in messages:
+            for block in message["content"]:
+                if block.pop("_cache_breakpoint", False) and cache_control is not None:
+                    block["cache_control"] = cache_control
         payload: dict[str, Any] = {
             "model": request.model or self.model,
             "max_tokens": request.max_tokens or self.max_tokens,

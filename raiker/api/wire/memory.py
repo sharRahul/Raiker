@@ -80,6 +80,12 @@ class MemoryVaultSynced(TypedDict):
     added: int
 
 
+class MemoriesConsolidated(TypedDict):
+    ok: bool
+    merged: int
+    groups: int
+
+
 class AskBeforeRememberingSet(TypedDict):
     ok: bool
     ask_before_remembering: bool

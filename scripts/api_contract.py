@@ -492,6 +492,7 @@ VERIFIED: frozenset[tuple[str, str]] = frozenset(
         ("POST", "/api/memory/embedding-index"),
         ("POST", "/api/memory/local-meaning"),
         ("POST", "/api/memory/vault/sync"),
+        ("POST", "/api/memory/consolidate"),
         ("POST", "/api/memory/entity-proposals/scan"),
         ("POST", "/api/memory/entity-proposals/{candidate_id}/decision"),
         ("POST", "/api/memory/entity-relationships/{relationship_id}/reject"),

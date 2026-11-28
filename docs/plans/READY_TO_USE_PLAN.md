@@ -273,8 +273,8 @@ Taken from Hermes Agent: scan memory writes for injection and invisible
 characters, and keep memory bounded. Not taken yet:
 - **Hindsight's rank fusion (RRF).** Raiker's weighted fusion is calibrated by
   the recall evaluation corpus, so switching means re-calibrating first.
-- **Hindsight's `reflect` and observation consolidation.**
-- **Hermes's frozen per-session memory snapshot**, which keeps the prompt
+- ~~**Hindsight's `reflect` and observation consolidation.**~~ (done without a model call, FIXED-1592)
+- ~~**Hermes's frozen per-session memory snapshot**~~ (done, FIXED-1592), which keeps the prompt
   cache warm. A forget must still take effect immediately, so the snapshot
   would need invalidating whenever a memory changes.
 

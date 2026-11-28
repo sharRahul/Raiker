@@ -30,6 +30,7 @@ from raiker.api.wire.memory import (
     GistDiscarded,
     IncognitoSet,
     LocalMeaningEnabled,
+    MemoriesConsolidated,
     MemoryArchived,
     MemoryCorrected,
     MemoryExport,
@@ -561,6 +562,20 @@ async def sync_memory_vault(
     answer = cast(MemoryVaultSynced, {
         "ok": True, "vault_path": service.store.memory_vault_path(owner), **result.data,
     })
+    return serialize_dto(answer)
+
+
+@router.post("/api/memory/consolidate")
+async def consolidate_memories(
+    request: Request,
+    auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+) -> dict[str, Any]:
+    """Merge near-copies of the same fact; older copies are superseded, never deleted."""
+    owner = auth_data[0].principal_id
+    result = await asyncio.to_thread(lambda: _service(request).consolidate_memories(owner))
+    if not result.ok:
+        raise refusal(status.HTTP_403_FORBIDDEN, result.reason_code)
+    answer = cast(MemoriesConsolidated, {"ok": True, **result.data})
     return serialize_dto(answer)
 
 

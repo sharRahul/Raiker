@@ -37,7 +37,8 @@ def test_an_interactive_run_has_a_terminal_and_answers_what_is_typed(tmp_path: P
         project, profile_probe=lambda profile: ProfileProbe(profile, True, None, utc_now())
     )
     owner = "owner_terminal"
-    interpreter = "python" if sys.platform == "win32" else "python3"
+    windows_program = sys.platform == "win32" and proof.boundary != "wsl_bubblewrap"
+    interpreter = "python" if windows_program else "python3"
     try:
         started = service.start(
             owner_principal_id=owner, acting_principal_id="agent_terminal",

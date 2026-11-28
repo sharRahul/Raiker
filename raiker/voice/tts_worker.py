@@ -25,6 +25,7 @@ import io
 import json
 import sys
 import threading
+import time
 import wave
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -109,11 +110,39 @@ def make_handler(synth: Synthesiser, token: str) -> type[BaseHTTPRequestHandler]
                 return
             self._json(200, {"ok": True, "engine": synth.engine, "voices": synth.voices()})
 
+        def _discard_small_body(self) -> None:
+            # Closing with unread POST data can reset the Windows connection
+            # before the client receives its 403. Consume only a bounded body,
+            # with a short deadline; never parse or synthesise rejected text.
+            try:
+                length = int(self.headers.get("Content-Length") or 0)
+            except ValueError:
+                return
+            if not 0 < length <= MAX_BODY_BYTES:
+                return
+            previous_timeout = self.connection.gettimeout()
+            deadline = time.monotonic() + 1.0
+            try:
+                with contextlib.suppress(OSError):
+                    while length:
+                        remaining = deadline - time.monotonic()
+                        if remaining <= 0:
+                            break
+                        self.connection.settimeout(remaining)
+                        chunk = self.rfile.read1(length)
+                        if not chunk:
+                            break
+                        length -= len(chunk)
+            finally:
+                self.connection.settimeout(previous_timeout)
+
         def do_POST(self) -> None:  # noqa: N802 - stdlib name
             if not self._authorised():
+                self._discard_small_body()
                 self._json(403, {"reason_code": "voice_worker_token"})
                 return
             if self.path != "/synthesize":
+                self._discard_small_body()
                 self._json(404, {"reason_code": "not_found"})
                 return
             length = int(self.headers.get("Content-Length") or 0)

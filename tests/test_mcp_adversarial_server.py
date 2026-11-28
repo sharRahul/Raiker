@@ -21,6 +21,7 @@ from __future__ import annotations
 import json
 import socket
 import sys
+import tempfile
 import threading
 from collections.abc import Iterator
 from pathlib import Path
@@ -104,7 +105,7 @@ def listener() -> Iterator[tuple[int, list[bool]]]:
 
 
 def test_a_hostile_local_mcp_server_cannot_reach_past_its_folder(
-    tmp_path: Path, listener: tuple[int, list[bool]]
+    tmp_path: Path, listener: tuple[int, list[bool]], request: pytest.FixtureRequest,
 ) -> None:
     port, reached = listener
     project = tmp_path / "project"
@@ -119,6 +120,23 @@ def test_a_hostile_local_mcp_server_cannot_reach_past_its_folder(
     home_canary.write_text("home canary", encoding="utf-8")
     planted = project / "planted-by-mcp.txt"
     child_planted = home / "planted-by-child.txt"
+    driver = NativeSandboxDriver(project)
+    proof = driver.probe()
+    if proof.boundary == "wsl_bubblewrap":
+        # Real files outside the program's folder, in the same distribution.
+        # Windows drive paths would be relative filenames to a Linux server.
+        base = driver.wsl_base()
+        assert base is not None and base.drive.startswith("\\\\")
+        control = tempfile.TemporaryDirectory(prefix="mcp-canary-", dir=base)
+        control_root = Path(control.name)
+        assert control_root.resolve().parent == base.resolve()
+        request.addfinalizer(control.cleanup)
+        project_canary = control_root / "project-secret.txt"
+        home_canary = control_root / "home-secret.txt"
+        planted = control_root / "planted-by-mcp.txt"
+        child_planted = control_root / "planted-by-child.txt"
+        project_canary.write_text("project canary", encoding="utf-8")
+        home_canary.write_text("home canary", encoding="utf-8")
     targets = {
         "port": port,
         "project_canary": str(project_canary),
@@ -126,8 +144,11 @@ def test_a_hostile_local_mcp_server_cannot_reach_past_its_folder(
         "planted": str(planted),
         "child_planted": str(child_planted),
     }
+    if proof.boundary == "wsl_bubblewrap":
+        for name in ("project_canary", "home_canary", "planted", "child_planted"):
+            targets[name] = "/" + "/".join(Path(str(targets[name])).parts[1:])
 
-    available = NativeSandboxDriver(project).probe().available
+    available = proof.available
     try:
         run = run_bounded_stdio(
             [Path(sys.executable).name, ".raiker/mcp/servers/hostile/server.py", json.dumps(targets)],

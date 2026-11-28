@@ -293,6 +293,51 @@ def test_the_worker_speaks_only_for_the_host_that_started_it(worker: Any) -> Non
     assert httpx.post(f"{base}/synthesize", json={"text": "  "}, headers=headers).status_code == 400
 
 
+def test_rejected_post_consumes_its_small_body_before_closing() -> None:
+    import json
+    import socket
+
+    synth = _Tone()
+    headers_seen = threading.Event()
+    handler = make_handler(synth, "secret-token")
+
+    class ObservedHandler(handler):  # type: ignore[valid-type, misc]
+        def _authorised(self) -> bool:
+            allowed = super()._authorised()
+            headers_seen.set()
+            return bool(allowed)
+
+    server = ThreadingHTTPServer(("127.0.0.1", 0), ObservedHandler)
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    body = b'{"text":"hi"}'
+    try:
+        with socket.create_connection(("127.0.0.1", server.server_address[1]), timeout=2) as connection:
+            connection.sendall(
+                ("POST /synthesize HTTP/1.1\r\nHost: localhost\r\n"
+                 f"Content-Length: {len(body)}\r\nX-Raiker-Voice-Token: wrong\r\n\r\n").encode()
+            )
+            assert headers_seen.wait(2)
+            connection.settimeout(0.1)
+            response = bytearray()
+            while True:
+                try:
+                    chunk = connection.recv(4096)
+                except TimeoutError:
+                    break
+                assert chunk, "worker closed before consuming the declared body"
+                response.extend(chunk)
+            connection.sendall(body)
+            connection.settimeout(2)
+            while chunk := connection.recv(4096):
+                response.extend(chunk)
+            assert response.split(b"\r\n", 1)[0].split()[1] == b"403"
+            assert json.loads(response.split(b"\r\n\r\n", 1)[1])["reason_code"] == "voice_worker_token"
+            assert synth.spoken == []
+    finally:
+        server.shutdown()
+        server.server_close()
+
+
 def test_pcm16_wav_round_trips() -> None:
     with wave.open(io.BytesIO(pcm16_wav(b"\x01\x00" * 10, 16000))) as clip:
         assert (clip.getnchannels(), clip.getsampwidth(), clip.getframerate(), clip.getnframes()) == (1, 2, 16000, 10)

@@ -243,3 +243,8 @@ heartbeat and Stop/revoke evidence. It does not enable hosted multi-user service
 ADD-23/PAA-06 owns isolated browser sessions and bounded actions; the existing
 web fetcher is not an interactive browser or persistent VM. See
 [the target architecture](../plans/PERSONAL_AUTONOMOUS_AGENT_SPEC.md).
+
+
+## WSL program transport
+
+Programs running in the WSL native boundary use Linux interpreter names and copy-relative hook paths. Their environment is constructed before launch; only those portable, explicitly selected variables are shared through WSLENV with the Windows-to-Linux /u flag. The host WSLENV, Windows PATH, loader settings and identity paths do not widen that selection. See [Microsoft’s WSLENV contract](https://learn.microsoft.com/en-us/windows/wsl/filesystems#share-environment-variables-between-windows-and-wsl-with-wslenv).

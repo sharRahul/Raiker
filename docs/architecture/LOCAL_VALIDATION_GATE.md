@@ -7,6 +7,11 @@
 
 Run these checks before committing a change:
 
+On Windows with the WSL backend selected, native integration tests execute
+Linux programs in RaikerSandbox. Its toolchain needs Git and python3-venv;
+the Windows installations do not supply those distro programs. Tests must
+choose commands and paths from the measured execution boundary.
+
 ```powershell
 python -m pytest
 python -m ruff check .

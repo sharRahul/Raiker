@@ -109,7 +109,8 @@ def test_a_real_copy_gets_its_own_virtualenv_and_promotes_none_of_it(tmp_path: P
     project = tmp_path / "project"
     (project / ".raiker").mkdir(parents=True)
     (project / "app.py").write_text("print('app')\n", encoding="utf-8")
-    if not NativeSandboxDriver(project).probe().available:
+    proof = NativeSandboxDriver(project).probe()
+    if not proof.available:
         pytest.skip("no enforced native boundary on this host")
     service = CommandService(
         project, profile_probe=lambda profile: ProfileProbe(profile, True, None, utc_now())
@@ -129,15 +130,18 @@ def test_a_real_copy_gets_its_own_virtualenv_and_promotes_none_of_it(tmp_path: P
             time.sleep(0.1)
         return service.poll(owner, started.run_id)
 
-    interpreter = "python" if sys.platform == "win32" else "python3"
-    venv_python = ".venv/Scripts/python.exe" if sys.platform == "win32" else ".venv/bin/python"
+    windows_program = sys.platform == "win32" and proof.boundary != "wsl_bubblewrap"
+    interpreter = "python" if windows_program else "python3"
+    venv_python = ".venv/Scripts/python.exe" if windows_program else ".venv/bin/python"
     try:
         made = run([interpreter, "-m", "venv", ".venv"])
         assert made["state"] == "succeeded", made
         pip = run([venv_python, "-m", "pip", "--version"])
         assert pip["state"] == "succeeded", pip
         [(_, copy)] = task_workspace_registry(project).session_copies(owner, session)
-        assert (copy.root / venv_python).exists()
+        # Windows cannot resolve a Linux venv's absolute interpreter symlink
+        # through the WSL UNC share; the successful pip run proves it executes.
+        assert (copy.root / ".venv" / "pyvenv.cfg").is_file()
         assert not (project / ".venv").exists()
         diff = diff_workspace(copy)
         assert not diff.created and not diff.modified and not diff.deleted

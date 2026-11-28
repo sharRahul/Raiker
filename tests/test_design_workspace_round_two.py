@@ -212,7 +212,14 @@ def test_a_vector_pdf_keeps_text_as_text_and_counts_what_it_could_not_encode(api
     if settings["text_encoding"] == "unicode":
         # A host TrueType font: every character it has a glyph for is written,
         # and the words read back through the ToUnicode map (BUG-348 DW-11).
-        assert "✓" in page.extract_text() and settings["characters_replaced"] == 0
+        from raiker.design.render import missing_glyphs
+
+        # Unicode encoding does not guarantee the installed font covers ✓.
+        # Pillow provides an independent check of the font the PDF embeds.
+        if missing_glyphs("✓"):
+            assert "✓" not in page.extract_text() and settings["characters_replaced"] == 1
+        else:
+            assert "✓" in page.extract_text() and settings["characters_replaced"] == 0
     else:
         assert settings["characters_replaced"] == 1 and settings["text_encoding"] == "windows-1252"
 

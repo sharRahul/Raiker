@@ -30,12 +30,6 @@ def test_command_hook_does_not_start_host_process(
     assert not any(str(script) in argv for argv in launches)
 
 
-def _real_boundary(workspace: Path) -> bool:
-    from raiker.execution.commands.backends.native import NativeSandboxDriver
-
-    return NativeSandboxDriver(workspace).probe().available
-
-
 DENY = '{"decision":"deny","decision_reason":"sandboxed"}'
 LEAK = '{"decision":"allow","decision_reason":"leaked"}'
 
@@ -44,21 +38,24 @@ def test_a_hook_runs_in_the_sandbox_and_cannot_see_the_project(tmp_path: Path) -
     """Real boundary: the hook decides from its event; the project is out of reach."""
     workspace = tmp_path / "ws"
     (workspace / ".raiker").mkdir(parents=True)
-    if not _real_boundary(workspace):
+    from raiker.execution.commands.backends.native import NativeSandboxDriver
+
+    proof = NativeSandboxDriver(workspace).probe(for_programs=True)
+    if not proof.available:
         pytest.skip("no enforced native boundary on this host")
     secret = workspace / "secret.txt"
     secret.write_text("project secret", encoding="utf-8")
-    if sys.platform == "win32":
+    if sys.platform == "win32" and proof.boundary != "wsl_bubblewrap":
         script = workspace / "hook.cmd"
         script.write_text(
             f'@echo off\r\nif exist "{secret}" (echo {LEAK}) else (echo {DENY})\r\n',
-            encoding="utf-8",
+            encoding="utf-8", newline="",
         )
     else:
         script = workspace / "hook.sh"
         script.write_text(
             f"#!/bin/sh\nread -r event\nif [ -e '{secret}' ]; then echo '{LEAK}'; else echo '{DENY}'; fi\n",
-            encoding="utf-8",
+            encoding="utf-8", newline="",
         )
         script.chmod(0o755)
     output = run_command(

@@ -1021,6 +1021,26 @@ def toolchain_mounts(executable: str | Path, workspace_root: Path) -> list[str]:
 _HOOK_PROOFS: dict[str, tuple[float, NativeSandboxProof]] = {}
 
 
+def _wsl_environment(environment: dict[str, str]) -> dict[str, str]:
+    """Share only this run's portable variables from Windows into WSL."""
+    excluded = {
+        "PATH", "HOME", "PWD", "USERPROFILE", "APPDATA", "LOCALAPPDATA",
+        "TEMP", "TMP", "TMPDIR", "COMSPEC", "PATHEXT", "SYSTEMROOT", "WINDIR",
+        "SHELL", "WSLENV", "WSL_INTEROP", "WSL_DISTRO_NAME",
+    }
+    names = sorted(
+        name for name in environment
+        if name.upper() not in excluded
+        and name.isascii()
+        and name.replace("_", "a").isalnum()
+        and (name[0].isalpha() or name[0] == "_")
+    )
+    # WSL imports named Windows variables only through WSLENV. /u is the
+    # Windows-to-Linux direction. Never inherit a host WSLENV grant or replace
+    # the distribution's PATH and identity with their Windows counterparts.
+    return {**environment, "WSLENV": ":".join(f"{name}/u" for name in names)}
+
+
 def _recent_proof(driver: NativeSandboxDriver, workspace_root: Path) -> NativeSandboxProof:
     key = str(workspace_root)
     cached = _HOOK_PROOFS.get(key)
@@ -1096,7 +1116,8 @@ class ScratchRun:
 
     def environment(self, extra: Mapping[str, str] | None = None) -> dict[str, str]:
         """The constructed environment, with HOME and the work folder in here."""
-        return sandbox_environment(workspace_root=self.folder, extra=dict(extra or {}))
+        environment = sandbox_environment(workspace_root=self.folder, extra=dict(extra or {}))
+        return _wsl_environment(environment) if self.wsl_pin is not None else environment
 
     def close(self) -> None:
         for policy in self._policies:
@@ -1166,8 +1187,11 @@ def run_sandboxed_program(
         copied = run.folder / program.name
         shutil.copyfile(program, copied)
         copied.chmod(0o755)
+        # WSL receives Linux argv unchanged. The copy's Windows/UNC path is
+        # not executable there; the policy already sets cwd to this folder.
+        executable = f"./{copied.name}" if run.wsl_pin is not None else str(copied)
         return subprocess.run(
-            run.command([str(copied), *args]),
+            run.command([executable, *args]),
             input=stdin,
             capture_output=True,
             text=True,

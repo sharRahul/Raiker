@@ -382,3 +382,56 @@ def test_the_account_requires_its_loopback_filter(
     assert proof.reason_code == "native_sandbox_not_enforced"
     assert driver.probe().available
     native_backend._ACCOUNT_BASE_CACHE.clear()
+
+
+def test_wsl_hook_launch_uses_the_copy_relative_program_name(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from collections.abc import Iterator
+    from contextlib import contextmanager
+
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+    program = workspace / "hook.sh"
+    program.write_bytes(b"#!/bin/sh\nexit 0\n")
+    folder = tmp_path / "scratch"
+    folder.mkdir()
+    run = native_backend.ScratchRun(
+        workspace, tmp_path / "runner.exe", folder, "hook", 1 << 20, 10, wsl_pin="a" * 64,
+    )
+    sent: list[list[str]] = []
+
+    @contextmanager
+    def scratch(*_args: Any, **_kwargs: Any) -> Iterator[native_backend.ScratchRun]:
+        try:
+            yield run
+        finally:
+            run.close()
+
+    def launch(argv: list[str], **_kwargs: Any) -> subprocess.CompletedProcess[str]:
+        sent.append(argv)
+        return subprocess.CompletedProcess(argv, 0, "ok", "")
+
+    monkeypatch.setattr(native_backend, "scratch_run", scratch)
+    monkeypatch.setattr(subprocess, "run", launch)
+    result = native_backend.run_sandboxed_program(workspace, program, [], stdin="{}", timeout_seconds=10)
+    assert result.returncode == 0
+    assert sent[0][sent[0].index("--") + 1:] == ["./hook.sh"]
+
+
+def test_wsl_program_receives_only_its_constructed_environment(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "ungranted-provider-key")
+    monkeypatch.setenv("WSLENV", "ANTHROPIC_API_KEY/u")
+    run = native_backend.ScratchRun(
+        tmp_path, tmp_path / "runner.exe", tmp_path / "scratch", "mcp", 1 << 20, 10,
+        wsl_pin="a" * 64,
+    )
+    environment = run.environment({"MCP_GRANTED": "owner-granted", "PYTHONUNBUFFERED": "1"})
+    shared = set(environment.get("WSLENV", "").split(":"))
+    assert "MCP_GRANTED/u" in shared
+    assert "PYTHONUNBUFFERED/u" in shared
+    assert "ANTHROPIC_API_KEY" not in environment
+    assert not any(name.partition("/")[0].upper() in {"PATH", "HOME", "USERPROFILE", "WSLENV"}
+                   for name in shared)

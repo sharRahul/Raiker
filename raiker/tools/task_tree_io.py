@@ -109,7 +109,7 @@ def _parent(path: Path, root: Path, *, create: bool = False) -> Iterator[Any]:
 def reader(path: Path, authority: Any = None) -> Iterator[BinaryIO]:
     root = copy_root(path, authority)
     if root is None:
-        with path.open("rb") as handle:
+        with _transport(path).open("rb") as handle:
             yield handle
         return
     with _parent(path, root) as parent:
@@ -144,8 +144,9 @@ def write_bytes(path: Path, data: bytes, authority: Any = None, *, expected_text
     root = copy_root(path, authority)
     expected = expected_text
     if root is None:
-        path.parent.mkdir(parents=True, exist_ok=True)
-        return path.write_bytes(data)
+        target = _transport(path)
+        target.parent.mkdir(parents=True, exist_ok=True)
+        return target.write_bytes(data)
     with _parent(path, root, create=True) as parent:
         if sys.platform == "win32":
             from raiker.execution.windows_file_handles import fresh_writer, regular_reader
@@ -200,7 +201,7 @@ def write_bytes(path: Path, data: bytes, authority: Any = None, *, expected_text
 def unlink(path: Path, authority: Any = None, *, missing_ok: bool = False) -> None:
     root = copy_root(path, authority)
     if root is None:
-        path.unlink(missing_ok=missing_ok)
+        _transport(path).unlink(missing_ok=missing_ok)
         return
     with _parent(path, root) as parent:
         try:
@@ -225,7 +226,7 @@ def entries(path: Path, authority: Any = None, *, root: Path | None = None) -> l
     """A directory snapshot, never following any child link or reparse point."""
     root = root or copy_root(path, authority)
     if root is None:
-        return [(child.name, child.is_dir()) for child in path.iterdir()]
+        return [(child.name, child.is_dir()) for child in _transport(path).iterdir()]
     # A dummy child makes _parent pin/open the directory being enumerated.
     with _parent(path / ".raiker-enumeration", root) as parent:
         if sys.platform == "win32":
@@ -244,7 +245,7 @@ def entries(path: Path, authority: Any = None, *, root: Path | None = None) -> l
 def stat_info(path: Path, authority: Any = None) -> os.stat_result:
     root = copy_root(path, authority)
     if root is None:
-        return path.stat()
+        return _transport(path).stat()
     if stat.S_ISDIR(_transport(path).lstat().st_mode):
         with _parent(path / ".raiker-stat", root) as parent:
             return _transport(path).stat() if sys.platform == "win32" else os.fstat(parent)
@@ -254,7 +255,7 @@ def stat_info(path: Path, authority: Any = None) -> os.stat_result:
 
 def exists(path: Path, authority: Any = None) -> bool:
     if copy_root(path, authority) is None:
-        return path.exists()
+        return _transport(path).exists()
     try:
         stat_info(path, authority)
         return True
@@ -264,13 +265,13 @@ def exists(path: Path, authority: Any = None) -> bool:
 
 def is_file(path: Path, authority: Any = None) -> bool:
     if copy_root(path, authority) is None:
-        return path.is_file()
+        return _transport(path).is_file()
     return stat.S_ISREG(stat_info(path, authority).st_mode)
 
 
 def is_dir(path: Path, authority: Any = None) -> bool:
     if copy_root(path, authority) is None:
-        return path.is_dir()
+        return _transport(path).is_dir()
     return stat.S_ISDIR(stat_info(path, authority).st_mode)
 
 

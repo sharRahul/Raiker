@@ -232,9 +232,16 @@ def test_design_round_trips_through_the_api(client: TestClient, owner_token: str
 
 
 def test_a_surface_default_never_grants_readiness(
-    client: TestClient, owner_token: str
+    client: TestClient, owner_token: str, monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """A preference decides where the picker starts, never whether work may run."""
+    from raiker.models.exceptions import ProviderConnectionError
+    from raiker.models.router import ModelRouter
+
+    async def unavailable_catalogue(*_args: object, **_kwargs: object) -> list[object]:
+        raise ProviderConnectionError("provider_connection_failed")
+
+    monkeypatch.setattr(ModelRouter, "alist_models_for_profile", unavailable_catalogue)
     client.put(
         "/api/surface-models",
         headers=_auth(owner_token),

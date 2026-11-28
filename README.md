@@ -13,6 +13,9 @@ you set in Settings; further goal-level capabilities are planned and staged in t
 Everything Raiker makes is in **Work › Library**, searchable by words and, where
 your embedding model may run, by meaning; Design exports decks whose words stay
 editable and reads a brand guide PDF into a design system.
+**Notes** is a linked Markdown notebook with tags, properties, backlinks, daily
+notes and a local graph. It opens an existing notes folder and protects edits
+against changes made in another tool. See [Notes and linked memory](docs/guide/memory.md#notes).
 **Personas** (`@DataAnalyst`) let you pick a way of answering you wrote, with
 its own instructions and a narrower set of tools; a persona can only narrow
 what a turn may do. Decks export every shape, picture and word as an editable

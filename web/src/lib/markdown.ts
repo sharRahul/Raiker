@@ -84,7 +84,7 @@ const SAFE_URL = /^(?:https?:\/\/|mailto:)\S+$/i;
  * so `#//host` — which reads as protocol-relative even though a fragment never
  * navigates — is not a shape this emits.
  */
-const IN_APP_URL = /^#\/[A-Za-z0-9\-._~]+(?:\/[A-Za-z0-9\-._~]+)*(?:\?[A-Za-z0-9\-._~=&]*)?$/;
+const IN_APP_URL = /^#\/[A-Za-z0-9\-._~]+(?:\/[A-Za-z0-9\-._~]+)*(?:\?(?:[A-Za-z0-9\-._~=&]|%[A-Fa-f0-9]{2})*)?$/;
 
 /** Language hints we are willing to echo into a `class`, once normalised. */
 const LANGUAGE_TOKEN = /^[A-Za-z0-9][A-Za-z0-9+#._-]{0,23}$/;

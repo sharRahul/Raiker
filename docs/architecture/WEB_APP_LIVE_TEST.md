@@ -1,5 +1,38 @@
 # Web App Live Test — model backends
 
+## Result — 2026-11-28 Notes handoff
+
+**RT-NOTES-01** (`web/e2e/notes-live.spec.ts`) runs on a real isolated host and
+real Markdown files, with no API mocks. It verifies the default Notes folder,
+creates two notes through the UI, saves and renders Markdown properties and
+wikilinks, follows a link, checks backlinks and the local graph, and renames a
+note while verifying that the referring file's link was rewritten.
+
+An actual second API writer changes the file while the editor holds a draft.
+Saving refuses the stale version; clicking another note retains the unsaved
+draft and current address. **Use the newer version** adopts the actual file and
+refreshes graph data. The journey also checks tag search, daily-note creation,
+recoverable trash and the renamed **Notes folder** control. No new approval
+prompt is introduced for note edits or Inbox ingestion.
+
+Desktop/phone light/dark screenshots are in `output/playwright/notes/`:
+`notes-{light,dark}-{1440,390}.png`, `notes-linked.png`, `notes-folder.png`,
+with the capture manifest. They are visually inspected and checked for
+horizontal overflow. The final run passed in 8.4 seconds, including graph
+refresh and inline tag-link checks. Screenshot review also found that encoded
+tag searches and spaced note names rendered as literal Markdown; the local-link
+renderer now handles them, with unsafe-scheme rejection retained.
+
+The focused Python run passed 65 Notes/memory/lesson/vault/temporal cases.
+Component regressions cover rendering, versioned saves, conflict navigation
+and unreadable-folder errors. The full web suite passed 317 files (2,996 tests,
+one skipped); production build, Svelte check, ESLint and all 31 mocked Playwright
+cases passed (19.2 seconds). Ruff, Mypy (1,358 files), SAST, secret scan,
+19 documentation/generated-contract checks and all 12 Notes API response
+contracts also passed. GitHub delivery is monitored for the pushed commit. This Notes journey
+does not qualify RU-12's real two-task lesson recall or the later full graph,
+Canvas, Bases-style and agent-writing work.
+
 ## Result — 2026-11-27 Memory summary
 
 **RT-MEM-SUMMARY-01 passed on the Windows development PC against an isolated

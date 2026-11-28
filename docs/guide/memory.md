@@ -85,12 +85,38 @@ project whose memory is off keep nothing and offer nothing. Something Raiker
 already remembers is not kept twice. To approve everything yourself, turn on
 **Ask before remembering** in Memory › Controls.
 
-## The memory vault
+## Notes
+
+Open **Notes** from the navigation rail for your linked Markdown notebook.
+**New note** accepts a name or `Folder/Note name`; **Today** opens a daily note,
+using `Templates/Daily.md` when present. Write `[[Note name]]` to link notes,
+`[[Note#Heading|label]]` to link a heading, and `#tag` to tag an idea. Read mode
+opens those links. The side pane shows properties, an outline, linked and
+unlinked mentions, unresolved links, and the current note's local graph.
+
+**Edit** opens the Markdown source. Changes save after a short pause, on leaving
+the editor, or with Ctrl+S (Command+S on macOS). If another tool changed the note,
+Raiker keeps your draft and offers **Use the newer version** or **Keep mine**.
+Switching to another note waits for a successful save. Click the note title to
+rename it; links from other notes are updated. **Move to trash** keeps the file
+under `.trash/` for recovery.
+
+Search supports words, quoted phrases, `tag:`, `path:`, `file:`, `[property:value]`
+and exclusions. Notes are plain files, compatible with an existing Obsidian
+folder. Chat's `note_search` and `note_read` tools can read them as untrusted
+reference material; note text cannot grant permissions. Agent note-writing,
+a full graph screen, Canvas and Bases-style views are planned separately.
+
+### Notes folder and linked memory
 
 Raiker can keep its memory as linked Markdown notes in a folder you choose, such
 as an Obsidian vault. Every tool that reads files can then use it: Claude Code,
 Hermes Agent, a script, or you in Obsidian. No plugin or integration is needed.
-Turn it on in **Memory › Controls › Memory vault** with a full folder path.
+Choose **Memory › Controls › Notes folder** with a full folder path. This sets
+both the notebook folder and linked memory sync. Without a chosen folder, Notes
+uses `Notes/` beside the workspace data; linked memory export stays off until
+you choose a folder. **Use default Notes folder** returns to that default and
+stops linked memory sync without deleting any existing files.
 
 - `Raiker Memory.md` links every topic and entity.
 - `Topics/` has one note per kind of memory (Preferences, Facts, Lessons…).

@@ -359,6 +359,15 @@ chat. Release qualification still requires a live run on the published build.
 
 ## Changelog
 
+- **2026-11-28 (Notes handoff)** — the linked Markdown notebook is tested from
+  the real browser: create/edit, properties, links/backlinks, rename/relink,
+  conflict recovery, search, daily notes and trash. **Notes folder** names the
+  shared notebook/memory control. Draft retention, graph refresh and shared UI
+  tokens are corrected. See [FIXED-1588](FIXED_ITEMS.md#fixed-1588--the-notes-handoff-needed-safe-editing-tests-and-a-consistent-folder-control)
+  and the [Notes plan](NOTES_PLAN.md) for the existing-screen delivery and
+  separately planned graph/Canvas/Bases/agent-writing expansion. Low-approval
+  memory policy is preserved. RU-12's live two-task qualification remains separate.
+
 - **2026-11-27 (Memory vault)** — memory as linked Markdown any tool can read
   and edit (Obsidian layer), recall by time (Hindsight's fourth leg), and Hermes
   Agent's injection scan before anything is kept without asking (FIXED-1587).

@@ -1,5 +1,30 @@
 # Fixed items
 
+## FIXED-1588 — The Notes handoff needed safe editing tests and a consistent folder control
+
+**Severity: Medium. Area: Notes / Quiet UI. Status: Fixed 2026-11-28.**
+Completed Claude's linked-notebook screen with component and real-host browser
+coverage. A failed save now retains the draft and keeps its note open; the
+conflict branch reads the API's actual reason code, so external changes expose
+the newer-version/keep-mine choices. Saving or adopting the newer version
+refreshes backlinks and the local graph instead of leaving stale edges.
+Undefined style tokens were replaced by Raiker's shared tokens; Notes is in
+the sidebar regression and has contextual guide navigation.
+Tag searches and note names with spaces now render as working local links;
+the Markdown renderer accepts valid encoded query values while still rejecting
+unsafe link schemes. Screen and renderer regressions cover the defect found
+in the live screenshots.
+
+The shared **Memory vault** control is now **Notes folder**, describing both
+the notebook and linked memory. The default uses `Notes/` beside workspace
+data; returning to it stops linked memory sync and keeps existing files.
+Ordinary edits and Inbox ingestion retain the low-approval policy.
+Evidence: `NotesView.test.ts`, `tests/test_notes_vault.py`, RT-NOTES-01 and
+desktop/phone light/dark captures
+([live record](../architecture/WEB_APP_LIVE_TEST.md#result--2026-11-28-notes-handoff)).
+The full graph screen, Canvas, Bases-style views and agent writing remain in
+the [Notes plan](NOTES_PLAN.md).
+
 ## FIXED-1587 — Memory could not be read or traversed outside Raiker
 
 **Severity: Medium. Area: Memory (RU-11, RU-12). Status: Fixed 2026-11-27.**
@@ -2419,6 +2444,7 @@ file you can open. The two capture sets that remain — `screenshots/pages/` and
 | [FIXED-1582](#fixed-1582--memory-opened-on-counts-instead-of-the-facts-raiker-knows) | Medium | Memory / Quiet UI | Fixed 2026-11-27 |
 | [FIXED-1583](#fixed-1583--import-discarded-a-memorys-reviewed-topic) | Medium | Memory / import | Fixed 2026-11-27 |
 | [FIXED-1587](#fixed-1587--memory-could-not-be-read-or-traversed-outside-raiker) | Medium | Memory | Fixed 2026-11-27 |
+| [FIXED-1588](#fixed-1588--the-notes-handoff-needed-safe-editing-tests-and-a-consistent-folder-control) | Medium | Notes / Quiet UI | Fixed 2026-11-28 |
 | [FIXED-1586](#fixed-1586--every-memory-waited-for-an-approval) | Medium | Memory / Chat | Fixed 2026-11-27 |
 | [FIXED-1585](#fixed-1585--raiker-did-not-remember-what-its-own-work-taught) | Low | Memory / Build | Fixed 2026-11-27 |
 | [FIXED-1584](#fixed-1584--conversation-incognito-was-missing-and-goal-noticing-ignored-memory-opt-out) | Medium | Memory / Chat / Quiet UI | Fixed 2026-11-27 |

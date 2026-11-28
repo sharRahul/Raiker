@@ -1,8 +1,15 @@
 import { describe, expect, it } from "vitest";
 
 import { noteToMarkdown, openLinkQuery, parseLinkBody, radialLayout, suggestNotes } from "./notes";
+import { renderMarkdown } from "./markdown";
 
 describe("Raiker Notes syntax", () => {
+  it("renders encoded note names and tag searches as local links", () => {
+    const html = renderMarkdown(noteToMarkdown("See [[Linked idea]] #idea"), { inAppLinks: true });
+    expect(html).toContain('href="#/notes?note=Linked%20idea"');
+    expect(html).toContain('href="#/notes?search=tag%3Aidea"');
+    expect(renderMarkdown("[bad](javascript:alert%281%29)", { inAppLinks: true })).not.toContain("<a");
+  });
   it("parses a wikilink body", () => {
     expect(parseLinkBody("Design#Goals|the goals")).toEqual({ target: "Design", heading: "Goals", alias: "the goals", embed: false });
     expect(parseLinkBody("Note#^block-1").heading).toBe("block-1");

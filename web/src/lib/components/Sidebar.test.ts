@@ -38,11 +38,11 @@ describe("Sidebar navigation", () => {
     expect(active).toHaveAttribute("aria-current", "page");
   });
 
-  it("is one quiet list of the six places work happens", () => {
+  it("keeps work and the linked notebook in one quiet list", () => {
     render(Sidebar, { current: "memory" });
     const nav = screen.getByRole("navigation", { name: "All navigation" });
     expect(within(nav).getAllByRole("link").map((a) => a.getAttribute("aria-label")).filter(Boolean)).toEqual([
-      "Home", "Chat", "Build", "Design", "Work", "Memory",
+      "Home", "Chat", "Build", "Design", "Work", "Memory", "Notes",
     ]);
     expect(within(nav).getByRole("link", { name: "Memory" })).toHaveAttribute("aria-current", "page");
     // No disclosure groups, and no subtitle under the name.

@@ -170,10 +170,10 @@
     busy = true; actionError = null; vaultNotice = null;
     try {
       const result = await api.setMemoryVault(path);
-      vaultNotice = path ? `Memory is kept as notes in ${result.vault_path}.` : "No vault is kept. Its notes stay where they are.";
+      vaultNotice = path ? `Notes and linked memory use ${result.vault_path}.` : "Notes uses the default Notes folder. Linked memory sync is off; existing files stay where they are.";
       await load();
     } catch (e) {
-      actionError = failure("The vault was not set", "Memory is unchanged.", "Choose a full folder path outside Raiker's own data, then try again.", e);
+      actionError = failure("The Notes folder was not set", "The folder is unchanged.", "Choose a full folder path outside Raiker's own data, then try again.", e);
     } finally { busy = false; }
   }
   async function syncVault() {
@@ -877,17 +877,17 @@
 
   <section class="control-card vault-card">
     <div>
-      <h3>Memory vault</h3>
-      <p>Keep memory as linked Markdown notes in a folder you choose, such as an Obsidian vault. Other tools can read the notes. Edit a fact to correct it, delete its line to archive it, and add new memories to <code>Inbox.md</code>. The notes are not encrypted, though secrets are masked.</p>
+      <h3>Notes folder</h3>
+      <p>Choose the folder used by Notes and Raiker's linked Markdown memory, such as an Obsidian vault. With no folder chosen, Notes uses <code>Notes/</code> beside the workspace data. Edit a fact to correct it, delete its line to archive it, and add new memories to <code>Inbox.md</code>. Notes are plain files; secrets are masked when memory is exported.</p>
       {#if settings.vault_path}
         <p class="vault-path">Kept in <code>{settings.vault_path}</code></p>
         <div class="vault-actions">
           <button type="button" class="btn btn-soft btn-sm" disabled={busy} onclick={() => void syncVault()}>Sync now</button>
-          <button type="button" class="btn btn-ghost btn-sm" disabled={busy} onclick={() => void saveVault(null)}>Stop keeping a vault</button>
+          <button type="button" class="btn btn-ghost btn-sm" disabled={busy} onclick={() => void saveVault(null)}>Use default Notes folder</button>
         </div>
       {:else}
         <form class="vault-actions" onsubmit={(event) => { event.preventDefault(); void saveVault(vaultDraft.trim()); }}>
-          <input type="text" aria-label="Vault folder" placeholder="C:\Users\you\Documents\Raiker Memory" bind:value={vaultDraft} disabled={busy} />
+          <input type="text" aria-label="Notes folder" placeholder="C:\Users\you\Documents\Notes" bind:value={vaultDraft} disabled={busy} />
           <button type="submit" class="btn btn-soft btn-sm" disabled={busy || !vaultDraft.trim()}>Keep notes here</button>
         </form>
       {/if}

@@ -52,6 +52,7 @@ const SECTIONS: Record<string, GuideTarget> = {
   // guide — which only works if the page can reach it.
   home: { slug: "tasks-and-projects", label: "How the work board works", part: "the-work-board" },
   memory: { slug: "working-in-chat", label: "How memory and recall work", part: "conversation-memory" },
+  notes: { slug: "memory", label: "How linked notes work", part: "notes" },
 };
 
 /** The guide target for a route, or null when the guide does not cover it yet. */

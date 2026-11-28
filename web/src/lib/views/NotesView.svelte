@@ -12,7 +12,7 @@
    */
   import { onMount, tick } from "svelte";
 
-  import { api } from "../api";
+  import { api, ApiError } from "../api";
   import Markdown from "../components/Markdown.svelte";
   import { failure } from "../errorCopy";
   import { noteHref, noteToMarkdown, openLinkQuery, radialLayout, suggestNotes } from "../notes";
@@ -70,7 +70,10 @@
   }
 
   async function open(path: string): Promise<void> {
-    if (dirty) await save();
+    if (dirty && !(await save())) {
+      if (note) window.history.replaceState(window.history.state, "", noteHref(note.path));
+      return;
+    }
     problem = null; conflict = false; renaming = false;
     try {
       const resolved = path.toLowerCase().endsWith(".md") ? path : (await api.notes.resolve(path, note?.path ?? "")).path;
@@ -83,27 +86,29 @@
       draft = saved = note.content;
       [backlinks, graph] = await Promise.all([api.notes.backlinks(note.path), api.notes.graph(note.path, 1)]);
       const heading = params().get("heading");
-      if (heading) await tick(), document.getElementById(`h-${heading}`)?.scrollIntoView();
+      if (heading) { await tick(); document.getElementById(`h-${heading}`)?.scrollIntoView(); }
     } catch (error) {
       problem = failure("The note could not be opened", "Nothing was changed.", "Pick it again from the list.", error);
     }
   }
 
-  async function save(force = false): Promise<void> {
-    if (!note || (!dirty && !force)) return;
+  async function save(force = false): Promise<boolean> {
+    if (!note || (!dirty && !force)) return true;
     if (saveTimer) clearTimeout(saveTimer);
     try {
       const next = await api.notes.save(note.path, draft, note.mtime);
       note = next; saved = next.content; conflict = false; status = "Saved";
-      backlinks = await api.notes.backlinks(next.path);
+      [backlinks, graph] = await Promise.all([api.notes.backlinks(next.path), api.notes.graph(next.path, 1)]);
       void loadIndex();
+      return true;
     } catch (error) {
-      if (String((error as { reason_code?: string })?.reason_code ?? error).includes("note_changed_elsewhere")) {
+      if (error instanceof ApiError && error.reasonCode === "note_changed_elsewhere") {
         conflict = true;
         status = "";
       } else {
         problem = failure("The note was not saved", "Your text is still here.", "Try saving again.", error);
       }
+      return false;
     }
   }
 
@@ -118,6 +123,7 @@
     if (!note) return;
     note = await api.notes.read(note.path);
     draft = saved = note.content; conflict = false;
+    [backlinks, graph] = await Promise.all([api.notes.backlinks(note.path), api.notes.graph(note.path, 1)]);
   }
 
   function edited(): void {
@@ -157,6 +163,7 @@
   }
 
   async function create(name: string): Promise<void> {
+    if (dirty && !(await save())) return;
     const path = name.trim();
     if (!path) return;
     try {
@@ -171,6 +178,7 @@
   }
 
   async function today(): Promise<void> {
+    if (dirty && !(await save())) return;
     try {
       const daily = await api.notes.daily();
       await loadIndex();
@@ -182,6 +190,7 @@
 
   async function rename(): Promise<void> {
     if (!note || !renameTo.trim()) return;
+    if (dirty && !(await save())) return;
     const folder = note.path.includes("/") ? note.path.slice(0, note.path.lastIndexOf("/") + 1) : "";
     const target = renameTo.includes("/") ? renameTo.trim() : folder + renameTo.trim();
     try {
@@ -197,6 +206,7 @@
 
   async function trash(): Promise<void> {
     if (!note) return;
+    if (dirty && !(await save())) return;
     try {
       const where = await api.notes.trash(note.path);
       status = `Moved to ${where.trashed}`;
@@ -353,7 +363,7 @@
       <div class="welcome">
         <h1>Notes</h1>
         <p>Write in Markdown and link ideas with <code>[[Note name]]</code>. Tag with <code>#tag</code>. Links work both ways, so every note shows what links to it.</p>
-        <p>Raiker keeps its memory here too, in <a href={noteHref("Raiker Memory/Raiker Memory.md")}>Raiker Memory</a>. Edit a fact and Raiker remembers the change. Ask in Chat about anything you wrote, and Raiker can read your notes to answer.</p>
+        <p>Choose a <a href="#/memory?tab=controls">Notes folder in Memory Controls</a> to share this notebook with Raiker's linked memory. Ask in Chat about something you wrote, and Raiker can read your notes to answer.</p>
       </div>
     {/if}
   </main>
@@ -417,7 +427,7 @@
   .context { border-right:none; border-left:1px solid var(--border); padding:0 0 0 var(--space-3); }
   .files ul, .context ul { list-style:none; margin:0 0 var(--space-3); padding:0; }
   .files a, .context a { display:block; padding:var(--space-1) var(--space-2); border-radius:var(--r-sm); color:var(--text-1); text-decoration:none; overflow-wrap:anywhere; }
-  .files a:hover, .files a.active, .context a:hover { background:var(--surface-2, var(--surface)); }
+  .files a:hover, .files a.active, .context a:hover { background:var(--raised); }
   .files a.active { font-weight:600; }
   small { display:block; color:var(--text-2); font-size:var(--text-xs); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   .tags a small { display:inline; }
@@ -430,22 +440,22 @@
   .count, .empty, .path { color:var(--text-2); font-size:var(--text-sm); }
   .page { min-width:0; }
   .note-head { display:flex; align-items:center; justify-content:space-between; gap:var(--space-3); flex-wrap:wrap; }
-  .note-head h1 { margin:0; font-size:var(--text-2xl, 1.6rem); }
+  .note-head h1 { margin:0; font-size:var(--text-xl); }
   .title { all:unset; cursor:text; }
-  .title:focus-visible { outline:2px solid var(--focus, currentColor); outline-offset:2px; }
+  .title:focus-visible { outline:2px solid var(--focus-ring); outline-offset:2px; }
   .head-actions { display:flex; align-items:center; gap:var(--space-2); }
   .status { color:var(--text-2); font-size:var(--text-sm); min-width:5rem; text-align:right; }
   .segmented { display:inline-flex; border:1px solid var(--border); border-radius:var(--r-md); overflow:hidden; }
   .segmented button { all:unset; padding:var(--space-1) var(--space-3); cursor:pointer; font-size:var(--text-sm); }
-  .segmented button.on { background:var(--surface-2, var(--surface)); font-weight:600; }
+  .segmented button.on { background:var(--raised); font-weight:600; }
   .properties { display:grid; grid-template-columns:max-content 1fr; gap:var(--space-1) var(--space-3); margin:var(--space-3) 0; padding:var(--space-2) var(--space-3); border:1px solid var(--border); border-radius:var(--r-md); font-size:var(--text-sm); }
   .properties dt { color:var(--text-2); }
   .properties dd { margin:0; overflow-wrap:anywhere; }
   .editor { position:relative; }
   textarea { width:100%; min-height:60vh; box-sizing:border-box; font-family:var(--font-mono, ui-monospace, monospace); font-size:var(--text-sm); line-height:1.6; resize:vertical; }
-  .suggest { position:absolute; left:var(--space-3); top:var(--space-3); z-index:2; margin:0; padding:var(--space-1); list-style:none; background:var(--surface); border:1px solid var(--border); border-radius:var(--r-md); box-shadow:var(--shadow-md, 0 4px 16px rgb(0 0 0 / .15)); max-width:20rem; }
+  .suggest { position:absolute; left:var(--space-3); top:var(--space-3); z-index:2; margin:0; padding:var(--space-1); list-style:none; background:var(--surface); border:1px solid var(--border); border-radius:var(--r-md); box-shadow:var(--shadow-2); max-width:20rem; }
   .suggest button { all:unset; display:block; width:100%; box-sizing:border-box; padding:var(--space-1) var(--space-2); cursor:pointer; border-radius:var(--r-sm); }
-  .suggest button:hover, .suggest li:first-child button { background:var(--surface-2, var(--surface)); }
+  .suggest button:hover, .suggest li:first-child button { background:var(--raised); }
   .reading { max-width:46rem; line-height:1.7; }
   .context h2 { font-size:var(--text-sm); margin:var(--space-3) 0 var(--space-1); }
   .context h2 small { display:inline; }

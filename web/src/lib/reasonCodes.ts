@@ -92,6 +92,19 @@ const REASON_CODES: Record<string, ReasonCopy> = {
   },
   // UX-PROJ-05/06/07 — the project lifecycle's refusals, each naming the
   // destination or step that was wrong.
+  // RU-17 — opening a move file on first run.
+  move_cross_origin: {
+    plain: "A move file can only be opened from Raiker's own page.",
+    remediation: "Open Raiker on this computer and choose I have a backup there.",
+  },
+  move_file_required: {
+    plain: "No move file was sent.",
+    remediation: "Choose the .raikermove file you saved on the other machine.",
+  },
+  move_passphrase_required: {
+    plain: "The move file's passphrase is missing.",
+    remediation: "Enter the passphrase you chose when you made the file.",
+  },
   project_move_into_itself: {
     plain: "A project cannot be moved inside itself.",
     remediation: "Choose another folder, or Top level.",

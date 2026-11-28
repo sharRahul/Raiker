@@ -4890,6 +4890,13 @@ export type MoveProjectRequest = {
   expected_revision?: string | null;
 };
 
+/** RU-17 — whether first run can open a move file here, and its limits. */
+export type MoveStatusView = {
+  can_import: boolean;
+  min_passphrase: number;
+  max_bytes: number;
+};
+
 export type NativeUsageMetricView = {
   unit: string;
   used: string;
@@ -8485,6 +8492,8 @@ export const contract = {
     call<ServerCheck>("POST", `/api/models/${encodeURIComponent(profileId)}/server-check`, { body }),
   setWeeklyModelBudget: (profileId: string, body: ModelWeeklyBudgetRequest) =>
     call<WeeklyBudgetSet>("PUT", `/api/models/${encodeURIComponent(profileId)}/weekly-budget`, { body }),
+  moveStatus: () =>
+    request<MoveStatusView>("/api/move/status"),
   listNotes: () =>
     request<NotesIndex>("/api/notes"),
   noteBacklinks: (query: { path: string }) =>

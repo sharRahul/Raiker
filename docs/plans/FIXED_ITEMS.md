@@ -2623,6 +2623,8 @@ file you can open. The two capture sets that remain — `screenshots/pages/` and
 
 | ID | Severity | Area | Status |
 |---|---|---|---|
+| [FIXED-1598](#fixed-1598--ci-failed-on-a-restart-test-that-faked-an-unsupported-manager) | Low | CI / host lifecycle | Fixed 2026-11-28 |
+| [FIXED-1597](#fixed-1597--raiker-could-not-be-moved-to-another-machine) | High | Backups / first run | Fixed 2026-11-28 |
 | [FIXED-1596](#fixed-1596--the-composer-said-a-refused-message-had-been-sent) | Medium | Chat / Build / privacy copy | Fixed 2026-11-28 |
 | [FIXED-1595](#fixed-1595--the-memory-banner-contradicted-facts-and-project-lessons) | Medium | Memory / Quiet UI | Fixed 2026-11-28 |
 | [FIXED-1594](#fixed-1594--a-refused-first-turn-tried-to-file-a-conversation-that-did-not-exist) | Medium | Chat / Build / projects | Fixed 2026-11-28 |

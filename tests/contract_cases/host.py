@@ -57,7 +57,7 @@ def _registered(monkeypatch: Any) -> None:
     real = routes.registration
     monkeypatch.setattr(
         routes, "registration",
-        lambda workspace, **kwargs: replace(real(workspace, **kwargs), registered=True),
+        lambda workspace, **kwargs: replace(real(workspace, **kwargs), registered=True, mechanism="systemd --user"),
     )
 
 

@@ -30,6 +30,7 @@ from raiker.api.dependencies import refusal
 from raiker.api.routes_recovery import _require_this_machine
 from raiker.api.schemas import StrictRequest, serialize_dto
 from raiker.api.sessions import ApiSession
+from raiker.api.wire.control import MoveStatusView
 from raiker.runtime.authority.models import Principal
 from raiker.storage.move import (
     MAX_BYTES,
@@ -96,9 +97,8 @@ async def move_status(request: Request) -> dict[str, Any]:
     """Whether this Raiker can open a move file now: first run, from this machine."""
     _require_this_machine(request)
     in_use = await asyncio.to_thread(workspace_has_account, _workspace(request))
-    return serialize_dto(
-        {"can_import": not in_use, "min_passphrase": MIN_PASSPHRASE, "max_bytes": MAX_BYTES}
-    )
+    answer: MoveStatusView = {"can_import": not in_use, "min_passphrase": MIN_PASSPHRASE, "max_bytes": MAX_BYTES}
+    return serialize_dto(answer)
 
 
 @router.post("/api/move/import")

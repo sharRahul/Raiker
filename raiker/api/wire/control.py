@@ -276,6 +276,14 @@ class HealthView(TypedDict):
     text_search_reason: NotRequired[str]
 
 
+class MoveStatusView(TypedDict):
+    """RU-17 — whether first run can open a move file here, and its limits."""
+
+    can_import: bool
+    min_passphrase: int
+    max_bytes: int
+
+
 class RecoveryBackupsView(TypedDict):
     """BUG-323 — what the lock screen may restore from, read from manifests only."""
 

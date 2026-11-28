@@ -12,7 +12,7 @@ operation answers with, and whether OpenAPI describes it (OPT-01/OPT-02 —
 * **deferred** — the body has no declared type; a test fails while any is.
 * **special** — a stream, a file or another non-JSON transport; hand-written.
 
-**571 operations: 552 verified, 0 eligible, 1 deferred, 18 special.**
+**571 operations: 553 verified, 0 eligible, 0 deferred, 18 special.**
 
 | Method | Path | Request | Response | Status | Why |
 |---|---|---|---|---|---|
@@ -416,7 +416,7 @@ operation answers with, and whether OpenAPI describes it (OPT-01/OPT-02 —
 | PUT | `/api/models/{profile_id}/weekly-budget` | ModelWeeklyBudgetRequest | WeeklyBudgetSet | verified | declared WeeklyBudgetSet |
 | POST | `/api/move/export` | MoveExportRequest |  | special | special |
 | POST | `/api/move/import` |  |  | special | special |
-| GET | `/api/move/status` |  |  | deferred | body assembled in the route |
+| GET | `/api/move/status` |  | MoveStatusView | verified | declared MoveStatusView |
 | GET | `/api/notes` |  | NotesIndex | verified | declared by cast |
 | GET | `/api/notes/backlinks` |  | NoteBacklinks | verified | declared by cast |
 | POST | `/api/notes/daily` |  | NoteView | verified | declared by cast |

@@ -25484,6 +25484,30 @@
         "title": "MoveProjectRequest",
         "type": "object"
       },
+      "MoveStatusView": {
+        "description": "RU-17 — whether first run can open a move file here, and its limits.",
+        "properties": {
+          "can_import": {
+            "title": "Can Import",
+            "type": "boolean"
+          },
+          "max_bytes": {
+            "title": "Max Bytes",
+            "type": "integer"
+          },
+          "min_passphrase": {
+            "title": "Min Passphrase",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "can_import",
+          "min_passphrase",
+          "max_bytes"
+        ],
+        "title": "MoveStatusView",
+        "type": "object"
+      },
       "NativeUsageMetricView": {
         "properties": {
           "limit": {
@@ -55363,9 +55387,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Move Status Api Move Status Get",
-                  "type": "object"
+                  "$ref": "#/components/schemas/MoveStatusView"
                 }
               }
             },

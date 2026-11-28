@@ -373,6 +373,7 @@ CASES: Cases = {
         "/api/recovery/restore",
         {"backup_id": _locked_with_backup(ws, c, h)},
     ),
+    ("GET", "/api/move/status"): plain("/api/move/status"),
     ("POST", "/api/notifications/held/acknowledge"): _held_acknowledge,
     ("POST", "/api/notifications/test"): plain("/api/notifications/test"),
     ("GET", "/api/security/containment"): plain("/api/security/containment"),

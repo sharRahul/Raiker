@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 import math
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Any
 from uuid import uuid4
 
@@ -124,6 +124,10 @@ class ModelMessage:
     tool_call_id: str | None = None
     images: tuple[ModelImage, ...] = ()
     tool_calls: tuple[ToolCallProposal, ...] = ()
+    #: A system message that holds this turn's context (the clock, workspace
+    #: block, retrieval) rather than the standing system prompt. A provider
+    #: that caches a prefix keeps these out of it.
+    turn_context: bool = False
 
     def __post_init__(self) -> None:
         if self.role not in MODEL_ROLES:
@@ -158,6 +162,40 @@ class ModelMessage:
                 for call in self.tool_calls
             ]
         return message
+
+
+def fold_turn_context(messages: Sequence[ModelMessage]) -> list[ModelMessage]:
+    """This turn's context, moved into the next user message once the conversation starts.
+
+    The orchestrator puts per-turn context (the clock, the workspace block)
+    after the history so the cached prefix holds. Many chat templates (local
+    llama.cpp and Ollama models among them) refuse a system message after the
+    first non-system one, so such a message is folded into the user message
+    that follows it, marked off as context. Before the conversation starts a
+    turn-context system message stays a system message.
+    """
+    out: list[ModelMessage] = []
+    pending: list[str] = []
+    started = False
+    for message in messages:
+        if message.role == "system" and message.turn_context and started:
+            pending.append(message.content)
+            continue
+        if message.role != "system":
+            started = True
+        if pending and message.role == "user":
+            context = _wrap_turn_context(pending)
+            message = replace(message, content=f"{context}\n\n{message.content}")
+            pending = []
+        out.append(message)
+    if pending:
+        out.append(ModelMessage(role="user", content=_wrap_turn_context(pending)))
+    return out
+
+
+def _wrap_turn_context(parts: list[str]) -> str:
+    body = "\n\n".join(parts)
+    return f"<turn_context>\n{body}\n</turn_context>"
 
 
 @dataclass(frozen=True)

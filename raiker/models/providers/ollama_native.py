@@ -25,7 +25,7 @@ import json
 from collections.abc import Mapping
 from typing import Any
 
-from raiker.models.contracts import ModelMessage, ModelRequest, ToolCallProposal
+from raiker.models.contracts import ModelMessage, ModelRequest, ToolCallProposal, fold_turn_context
 from raiker.models.exceptions import ProviderResponseValidationError, ProviderStreamError
 
 #: The context sizes Raiker asks for, smallest first.
@@ -88,7 +88,7 @@ def payload(
     """The ``/api/chat`` body for *request*."""
     body: dict[str, Any] = {
         "model": model,
-        "messages": [_message(message, vision=vision) for message in request.messages],
+        "messages": [_message(message, vision=vision) for message in fold_turn_context(request.messages)],
         "stream": stream,
         "options": {
             "num_ctx": num_ctx,

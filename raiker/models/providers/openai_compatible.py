@@ -20,6 +20,7 @@ from raiker.models.contracts import (
     ModelStreamEvent,
     ProviderModelInfo,
     ToolCallProposal,
+    fold_turn_context,
 )
 from raiker.models.exceptions import (
     ModelProviderError,
@@ -429,7 +430,7 @@ class AsyncOpenAICompatibleProvider:
         return serialized
 
     def _payload(self, request: ModelRequest, *, stream: bool) -> dict[str, Any]:
-        messages = [self._message_dict(message) for message in request.messages]
+        messages = [self._message_dict(message) for message in fold_turn_context(request.messages)]
         model = request.model or self.model
         payload: dict[str, Any] = {
             "model": model,

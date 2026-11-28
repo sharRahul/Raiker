@@ -387,7 +387,7 @@ def test_restart_stops_the_server_gracefully_with_its_exit_status(tmp_path: Path
 
     monkeypatch.setattr(
         "raiker.api.routes_host.registration",
-        lambda *_a, **_k: ServiceRegistration(supported=True, registered=True, mechanism="systemd", label="raiker", path="/x", note=""),
+        lambda *_a, **_k: ServiceRegistration(supported=True, registered=True, mechanism="systemd --user", label="raiker", path="/x", note=""),
     )
     local = _free_socket()
     app = create_app(tmp_path)

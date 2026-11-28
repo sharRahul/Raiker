@@ -1,5 +1,14 @@
 # Fixed items
 
+## FIXED-1598 — CI failed on a restart test that faked an unsupported manager
+
+**Severity: Low. Area: CI / host lifecycle. Status: Fixed 2026-11-28.**
+After FIXED-1593, only `systemd --user` and the per-user LaunchAgent count as
+managers that restart an exit with status 75. `test_restart_stops_the_server_gracefully_with_its_exit_status`
+still faked a registration named `systemd`, so Restart was refused with
+`restart_not_supported` and CI's Python shard 2 and the Remote access jobs
+failed on Windows and macOS. The test now fakes the real mechanism name.
+
 ## FIXED-1597 — Raiker could not be moved to another machine
 
 **Severity: High. Area: Backups / first run (RU-17). Status: Fixed 2026-11-28.**

@@ -223,7 +223,7 @@ def _hex(key: bytes) -> str:
 
 def _rekey(source: Path, source_key: bytes, target: Path, target_key: bytes) -> dict[str, int]:
     """Copy ``source`` into a new database under ``target_key``; re-seal tokens; drop vault keys."""
-    from raiker.storage.backup import COUNTED_TABLES
+    from raiker.storage.backup import _inspect
     from raiker.storage.key_rotation import _reseal
 
     connection = sqlite3.connect(str(source))
@@ -251,10 +251,8 @@ def _rekey(source: Path, source_key: bytes, target: Path, target_key: bytes) -> 
             connection.execute(f"PRAGMA moved.user_version = {generation}")
         finally:
             connection.execute("DETACH DATABASE moved")
-        counts: dict[str, int] = {}
-        for table in COUNTED_TABLES:
-            if table in tables:
-                counts[table] = int(connection.execute(f'SELECT count(*) FROM "{table}"').fetchone()[0])
+        _integrity, _migrations, counted, _generation = _inspect(target, _hex(target_key))
+        counts = dict(counted)
         counts["keys_removed"] = removed
         return counts
     finally:

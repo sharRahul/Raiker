@@ -43,7 +43,6 @@ from raiker.storage.move import (
 
 router = APIRouter()
 
-PASSPHRASE_HEADER = "x-raiker-move-passphrase"
 
 
 class MoveExportRequest(StrictRequest):
@@ -107,7 +106,7 @@ async def move_import(request: Request) -> dict[str, Any]:
     _require_same_origin(request)
     if request.headers.get("content-type", "").split(";")[0].strip().lower() != "application/octet-stream":
         raise refusal(status.HTTP_415_UNSUPPORTED_MEDIA_TYPE, "move_file_required")
-    passphrase = request.headers.get(PASSPHRASE_HEADER, "")
+    passphrase = request.headers.get("x-raiker-move-passphrase", "")
     if not passphrase:
         raise refusal(422, "move_passphrase_required")
     declared = int(request.headers.get("content-length") or 0)

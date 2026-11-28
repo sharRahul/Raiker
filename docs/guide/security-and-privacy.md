@@ -281,6 +281,29 @@ Local ownership also means you are responsible for preserving the rest of the
 instance — audit records, configuration and vault material. Run
 `raiker-app --print-paths` before an off-machine backup or an uninstall.
 
+### Moving to another machine
+
+A backup opens only with this computer's workspace key. To take Raiker to a new
+computer, open **Settings → Backups → Move to another machine** and choose
+**Make a move file**. You choose a passphrase of at least twelve characters and
+confirm your password (and a code, with two-step sign-in). Raiker saves one
+`.raikermove` file sealed with AES-256-GCM under a key derived from that
+passphrase. Raiker cannot recover a forgotten passphrase.
+
+The file carries the account, conversations, memory, notes, tasks, personas,
+the settings kept in the store and as files (instructions, command policies,
+sandbox and egress choices, hooks), checkpoint files and uploads. It never
+carries provider or connector keys, local model files, the event log, attached
+folders or this machine's host and remote-access setup.
+
+On the new computer, choose **I have a backup** on the first screen, pick the
+file and enter the passphrase. It opens only while that Raiker has no account.
+The new computer keeps its own workspace key: the database is re-keyed and its
+sealed secrets re-sealed on arrival, and the empty database it replaces is kept
+under `.raiker/quarantine/`. Unlock with your old username and password, then
+add your provider keys again under **Models**. A wrong passphrase or a changed
+file changes nothing.
+
 ## Deliberately unavailable domains
 
 Finance, medical, CCTV, home-security, pregnancy/baby, and direct hardware

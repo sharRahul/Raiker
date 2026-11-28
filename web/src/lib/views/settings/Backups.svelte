@@ -6,6 +6,7 @@
    * Privacy and Security now, and the backup reminder links straight here.
    */
   import BackupsCard from "../../components/BackupsCard.svelte";
+  import MoveExportCard from "../../components/MoveExportCard.svelte";
 </script>
 
 <header class="section-heading">
@@ -13,6 +14,7 @@
 </header>
 
 <BackupsCard />
+<MoveExportCard />
 
 <style>
   .section-heading { margin-bottom: var(--space-3); }

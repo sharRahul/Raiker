@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { importMoveFile, moveProblem } from "../move";
   import { onMount, tick } from "svelte";
   import { auth, createInstance, health, ApiError } from "../api";
   import { isRemoteHost } from "../remoteAccess";
@@ -21,7 +22,11 @@
     runtimeState?: RuntimeState;
   } = $props();
 
-  let mode = $state<"login" | "register" | "recovery" | "recovery-complete">("login");
+  let mode = $state<"login" | "register" | "recovery" | "recovery-complete" | "move">("login");
+  // RU-17 — first run's *I have a backup*: a move file from another machine.
+  let moveFile = $state<File | null>(null);
+  let movePassphrase = $state("");
+  let moved = $state<string | null>(null);
   let step = $state<"credentials" | "mfa">("credentials");
   let username = $state("");
   let password = $state("");
@@ -237,6 +242,26 @@
     }
   }
 
+  async function openMoveFile(event: SubmitEvent) {
+    event.preventDefault();
+    if (!moveFile || movePassphrase.length === 0) return;
+    busy = true;
+    error = null;
+    try {
+      const result = await importMoveFile(moveFile, movePassphrase);
+      const sessions = result.counts.sessions ?? 0;
+      const what = sessions > 0 ? `your account, ${sessions} conversation${sessions === 1 ? "" : "s"} and your settings` : "your account and settings";
+      moved = `Moved in ${what}. Unlock with the account from the other machine, then add your provider keys again in Settings › Models.`;
+      bootstrapAllowed = false;
+      mode = "login";
+    } catch (e) {
+      error = moveProblem(e);
+    } finally {
+      busy = false;
+      movePassphrase = "";
+    }
+  }
+
   async function submitCredentials(event: Event) {
     event.preventDefault();
     error = null;
@@ -403,6 +428,19 @@
           {#if error}<p class="error" role="alert">{error}</p>{/if}
           <button type="submit" class="btn btn-primary submit" disabled={formDisabled} aria-busy={busy}>{busy ? "Updating…" : "Reset password"}</button>
         </form>
+      {:else if mode === "move"}
+        <h1 id="unlock-title">Open a move file</h1>
+        <p class="intro">Choose the <code>.raikermove</code> file you made on the other machine and enter its passphrase. Your account comes with it; provider keys do not.</p>
+        <form onsubmit={openMoveFile} data-testid="move-import-form">
+          <label for="move-file">Move file</label>
+          <input id="move-file" type="file" accept=".raikermove" required disabled={formDisabled}
+            onchange={(e) => (moveFile = (e.currentTarget as HTMLInputElement).files?.[0] ?? null)} />
+          <label for="move-passphrase">Passphrase</label>
+          <div class="field"><span class="field-icon" aria-hidden="true"><Icon name="lock" size="md" /></span><input id="move-passphrase" type="password" bind:value={movePassphrase} autocomplete="off" required disabled={formDisabled} /></div>
+          {#if error}<p class="error" role="alert">{error}</p>{/if}
+          <button type="submit" class="btn btn-primary submit" disabled={formDisabled || !moveFile || movePassphrase.length === 0} aria-busy={busy}>{busy ? "Opening…" : "Open and move in"}</button>
+        </form>
+        <button type="button" class="secondary" onclick={() => { mode = "login"; error = null; }} disabled={formDisabled}>Back</button>
       {:else if step === "credentials"}
         <h1 id="unlock-title">{isFirstRun ? "Welcome to Raiker" : isRegister ? "Create a User Account" : "Unlock Raiker"}</h1>
         <p class="intro">
@@ -474,6 +512,7 @@
 
           {#if error}<p class="error" role="alert">{error}</p>{/if}
           {#if recovered && !error}<p class="recovered" role="status">Your password was changed. Unlock with the new one.</p>{/if}
+          {#if moved && !error}<p class="recovered" role="status" data-testid="move-imported">{moved}</p>{/if}
           <button type="submit" class="btn btn-primary submit" disabled={formDisabled} aria-busy={busy}>
             {busy ? (registerIntent ? "Creating…" : "Unlocking…") : registerIntent ? "Create a User Account" : "Unlock Raiker"}
           </button>
@@ -483,6 +522,13 @@
         <!-- On first run there is no account yet, so account-switching, recovery,
              and secondary instance-creation controls have nothing to act on and
              are hidden — the primary CTA above already creates the account. -->
+        {#if isFirstRun}
+          <div class="divider" aria-hidden="true"><span>or</span></div>
+          <button type="button" class="secondary" onclick={() => { mode = "move"; error = null; }} disabled={formDisabled} data-testid="move-import-open">
+            <Icon name="projects" size="md" />
+            I have a backup
+          </button>
+        {/if}
         {#if !isFirstRun}
           <div class="divider" aria-hidden="true"><span>or</span></div>
 

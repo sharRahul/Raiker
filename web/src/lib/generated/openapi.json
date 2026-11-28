@@ -25441,6 +25441,20 @@
         "title": "ModelsView",
         "type": "object"
       },
+      "MoveExportRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "passphrase": {
+            "title": "Passphrase",
+            "type": "string"
+          }
+        },
+        "required": [
+          "passphrase"
+        ],
+        "title": "MoveExportRequest",
+        "type": "object"
+      },
       "MoveProjectRequest": {
         "additionalProperties": false,
         "properties": {
@@ -55282,6 +55296,83 @@
           }
         },
         "summary": "Set Weekly Model Budget"
+      }
+    },
+    "/api/move/export": {
+      "post": {
+        "operationId": "move_export_api_move_export_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MoveExportRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Move Export"
+      }
+    },
+    "/api/move/import": {
+      "post": {
+        "operationId": "move_import_api_move_import_post",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Move Import Api Move Import Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Move Import"
+      }
+    },
+    "/api/move/status": {
+      "get": {
+        "description": "Whether this Raiker can open a move file now: first run, from this machine.",
+        "operationId": "move_status_api_move_status_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Move Status Api Move Status Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Move Status"
       }
     },
     "/api/notes": {

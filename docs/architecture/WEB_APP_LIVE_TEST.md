@@ -3461,3 +3461,21 @@ reported plainly. Project: an attached folder whose `run.py` fails without
 Screenshots of each step were inspected at desktop size. Issues found and not
 fixed are in [TO_BE_FIXED](../plans/TO_BE_FIXED.md#ru-12-live-run--remaining-findings-2026-11-28).
 
+## Result — 2026-11-28 (RU-17 move to another machine)
+
+Windows 11 test PC, source checkout, two real hosts on fresh workspaces
+(`raiker-web --port 8781` as the old machine, `--port 8782` as the new one),
+built UI driven by Playwright and the browser pane. An Anthropic key was
+connected on the old machine through **Models → An account I have**.
+
+| # | Case | Expected | Result |
+|---|---|---|---|
+| RU17-1 | Old machine: Settings → Backups → **Make a move file** with passphrase and password | Step-up accepted; `raiker-move-<time>.raikermove` downloaded; *Saved …* notice | Pass |
+| RU17-2 | New machine first screen | **I have a backup** under *Create a User Account* | Pass |
+| RU17-3 | Open the file with a wrong passphrase | *That passphrase does not open this file…*; nothing changed | Pass |
+| RU17-4 | Open with the right passphrase | First build failed `WinError 32` (file held open); fixed, then *Moved in your account and settings…* | Failed, then fixed (FIXED-1597) |
+| RU17-5 | Unlock with the old username and password | Signed in on the new machine | Pass |
+| RU17-6 | Models on the new machine; `/api/move/status` | No provider connected (key left behind); `can_import: false` | Pass |
+
+Screenshots of each step were inspected at desktop size.
+

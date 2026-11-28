@@ -55,6 +55,7 @@ from raiker.api.routes_limit_rules import router as limit_rules_router
 from raiker.api.routes_local_runtime import router as local_runtime_router
 from raiker.api.routes_memory import router as memory_router
 from raiker.api.routes_models import router as models_router
+from raiker.api.routes_move import router as move_router
 from raiker.api.routes_notes import router as notes_router
 from raiker.api.routes_personas import router as personas_router
 from raiker.api.routes_project_limits import router as project_limits_router
@@ -84,6 +85,7 @@ from raiker.runtime.attachments import MAX_ATTACHMENT_BYTES
 from raiker.runtime.executors.registry import ExecutorRegistry
 from raiker.skills.package import MAX_BUNDLE_BYTES as MAX_SKILL_BUNDLE_BYTES
 from raiker.storage.internal_paths import display_path, internal_io_path
+from raiker.storage.move import MAX_BYTES as MAX_MOVE_BYTES
 from raiker.storage.sqlite import StoreUnavailableError
 from raiker.tasks.wakeup import SchedulerWakeup
 
@@ -692,6 +694,8 @@ def create_app(
             # base64, capped by the speech runtime's own limit. The default body
             # size would have cut a dictation off after about thirty seconds.
             "/api/speech/transcribe": MAX_SPEECH_AUDIO_BYTES + 8192,
+            # RU-17 — a move file arrives raw on first run, capped by its own limit.
+            "/api/move/import": MAX_MOVE_BYTES + 8192,
         },
     )
     app.add_middleware(
@@ -717,6 +721,7 @@ def create_app(
     app.include_router(auth_router)
     app.include_router(instances_router)
     app.include_router(recovery_router)
+    app.include_router(move_router)
     app.include_router(vault_router)
     app.include_router(settings_router)
     app.include_router(speech_router)

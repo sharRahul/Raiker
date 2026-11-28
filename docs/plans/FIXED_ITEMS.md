@@ -1,5 +1,26 @@
 # Fixed items
 
+## FIXED-1597 — Raiker could not be moved to another machine
+
+**Severity: High. Area: Backups / first run (RU-17). Status: Fixed 2026-11-28.**
+A backup opens only with the workspace key of the computer that made it, so
+there was no way to carry an account, its conversations, memory and settings to
+a new computer. **Settings → Backups → Move to another machine** now saves a
+passphrase-sealed `.raikermove` file (AES-256-GCM, scrypt-derived key, header
+authenticated), behind the same step-up as key rotation. First run's **I have
+a backup** opens it only while the workspace has no account, from this machine
+and Raiker's own page. On arrival the database is re-keyed to the new
+computer's key, sealed secrets are re-sealed, provider and connector keys are
+removed to be entered again, and the empty database is kept in quarantine.
+
+The live run found that on Windows a worker's open connection holds the
+database file, so the first build's file swap failed with `WinError 32`. The
+import now copies pages into the open database with SQLite's backup API, and
+rolls back the same way. Evidence: `raiker/storage/move.py`,
+`raiker/api/routes_move.py`, `tests/test_workspace_move.py` (the held-connection
+regression failed before the fix), `web/src/lib/move.test.ts`, and RU17-1 to
+RU17-6 in the [live record](../architecture/WEB_APP_LIVE_TEST.md#result--2026-11-28-ru-17-move-to-another-machine).
+
 ## FIXED-1596 — The composer said a refused message had been sent
 
 **Severity: Medium. Area: Chat / Build / privacy copy. Status: Fixed 2026-11-28.**

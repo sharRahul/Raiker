@@ -4881,6 +4881,10 @@ export type ModelsView = {
   catalogues: Record<string, string[]>;
 };
 
+export type MoveExportRequest = {
+  passphrase: string;
+};
+
 export type MoveProjectRequest = {
   parent_id?: string | null;
   expected_revision?: string | null;

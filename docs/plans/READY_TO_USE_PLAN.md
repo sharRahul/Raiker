@@ -64,7 +64,7 @@ build is still owed for every item (the regular-use journeys in
 | RU-14 Pause and Resume a running step | Open | — | Park a turn at the next safe boundary, freeze a command, resume |
 | RU-15 Raiker as an MCP server | Done | `raiker mcp-serve`: seven read-only tools over stdio, each read governed and audited ([FIXED-1590](FIXED_ITEMS.md#fixed-1590--other-agents-could-not-reach-raikers-memory-notes-or-tasks)) | Writes over MCP need an approval channel the caller can wait on; not planned |
 | RU-16 Import another agent's setup | Done | `AGENTS.md`/`CLAUDE.md`/`.cursorrules` ([FIXED-1536](FIXED_ITEMS.md#fixed-1536--a-projects-agentsmd-or-claudemd-was-ignored), [FIXED-1542](FIXED_ITEMS.md#fixed-1542--a-projects-cursorrules-was-ignored)), Hermes and Markdown memory ([FIXED-1541](FIXED_ITEMS.md#fixed-1541--another-agents-markdown-memory-could-not-be-imported)), Claude Desktop / Cursor `mcpServers` paste ([FIXED-1561](FIXED_ITEMS.md#fixed-1561--an-owner-could-not-add-a-local-mcp-server-and-none-could-drive-an-application)) ; the `.cursor/rules` folder ([FIXED-1569](FIXED_ITEMS.md#fixed-1569--a-projects-cursorrules-folder-was-ignored)); ChatGPT and Claude `conversations.json` ([FIXED-1572](FIXED_ITEMS.md#fixed-1572--chatgpt-and-claude-conversation-exports-could-not-be-imported)) | — |
-| RU-17 Move to another machine | Open | — | Encrypted export and first-run import |
+| RU-17 Move to another machine | Done | Passphrase-sealed move file from Settings → Backups, opened by first run's *I have a backup*; re-keyed on arrival, provider keys asked for again ([FIXED-1597](FIXED_ITEMS.md#fixed-1597--raiker-could-not-be-moved-to-another-machine)); live two-host journey passes | — |
 | RU-21 A project for Build has a folder | Done | Bare commands run in the project ([FIXED-1549](FIXED_ITEMS.md#fixed-1549--a-projects-command-with-no-folder-ran-at-the-workspace-root)); **Create project** makes `~/Raiker Projects/<name>` ([FIXED-1559](FIXED_ITEMS.md#fixed-1559--a-new-project-had-no-folder-outside-raikers-data)); RT-1125-11 | RU-J4 on a published build |
 | RU-22 Build runs declared checks | Done | The runtime proposes each declared check the model did not run ([FIXED-1558](FIXED_ITEMS.md#fixed-1558--build-left-declared-checks-to-the-model)); the card says what verifies ([FIXED-1554](FIXED_ITEMS.md#fixed-1554--not-verified-did-not-say-how-to-verify)) | RU-J4 ending *Verified* live |
 
@@ -347,6 +347,7 @@ ChatGPT and Claude exports are open.
 **RU-17 · Move Raiker to another machine. P1, M.** An encrypted export of
 workspace, settings and personas, imported by first run's *I have a backup*;
 provider keys are asked for again.
+*Done 2026-11-28* ([FIXED-1597](FIXED_ITEMS.md#fixed-1597--raiker-could-not-be-moved-to-another-machine)).
 
 ### G. Later
 

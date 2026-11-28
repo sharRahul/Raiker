@@ -11,6 +11,7 @@ import httpx
 class TrayMenuState:
     status_label: str
     pause_label: str
+    restart_enabled: bool
 
 
 def menu_state(host: dict[str, Any]) -> TrayMenuState:
@@ -21,7 +22,10 @@ def menu_state(host: dict[str, Any]) -> TrayMenuState:
         "needs attention": "Needs attention",
         "stopped": "Stopped",
     }
-    return TrayMenuState(labels.get(state, "Needs attention"), "Resume" if state == "paused" else "Pause")
+    return TrayMenuState(
+        labels.get(state, "Needs attention"), "Resume" if state == "paused" else "Pause",
+        host.get("restartable") is True,
+    )
 
 
 TRAY_ICON_SIZE = (64, 64)
@@ -106,7 +110,10 @@ def _run_native_tray(base_url: str, bootstrap_secret: str) -> None:
                 state.pause_label,
                 lambda: post("/api/host/resume" if state.pause_label == "Resume" else "/api/host/pause"),
             ),
-            pystray.MenuItem("Restart", lambda: post("/api/host/restart", {"confirm": True})),
+            pystray.MenuItem(
+                "Restart", lambda: post("/api/host/restart", {"confirm": True}),
+                enabled=state.restart_enabled,
+            ),
             pystray.MenuItem("Quit", lambda: post("/api/host/quit", {"confirm": True})),
         )
 

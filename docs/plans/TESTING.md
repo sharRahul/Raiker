@@ -1,5 +1,21 @@
 # Raiker testing and real-user qualification
 
+## Open RU regression coverage — 2026-11-28
+
+[RT-RU-OPEN-01](../architecture/WEB_APP_LIVE_TEST.md#result--2026-11-28-open-ru-regressions)
+connects a real provider through the UI, verifies an answer, activates a
+forbidding execution profile and checks that refusal creates no phantom
+session requests. It checks the Memory and Host controls at desktop/phone
+widths in both themes, with screenshots. Host unit/API tests cover matching
+workspace/port registration, frozen executables, legacy Windows line endings
+and refusal of an unsupervised restart; tray and Remote access share that
+restart fact. This is regression evidence, not RU-13's logout/reboot gate.
+
+The six source workflows were reviewed again and retained: each owns a
+distinct current gate. The two obsolete remote records remain disabled;
+there is no stale source workflow to delete. Active plans retain unfinished
+requirements, so none is removed as complete in this review.
+
 ## Permissions and work-page regression coverage — 2026-11-27
 
 The [live record](../architecture/WEB_APP_LIVE_TEST.md#result--2026-11-27-permissions-and-work-page-refinement)

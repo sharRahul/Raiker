@@ -241,7 +241,7 @@ describe("MemoryView", () => {
     });
     render(MemoryView, { props: { tab: "memories" } });
 
-    expect(await screen.findByText(/memory store is off/i)).toBeInTheDocument();
+    expect(await screen.findByText(/memory tools are off/i)).toBeInTheDocument();
     expect(screen.queryByText(/could not read your memory permissions/i)).not.toBeInTheDocument();
   });
 

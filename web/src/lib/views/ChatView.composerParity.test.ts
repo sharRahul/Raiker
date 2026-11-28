@@ -406,7 +406,7 @@ describe("ChatView composer parity", () => {
       "GET /api/models": { profiles: [REASONING_PROFILE], chat_profiles: [REASONING_PROFILE] },
     });
     render(ChatView, { projects });
-    expect(await screen.findByText("Sent to Anthropic")).toBeInTheDocument();
+    expect(await screen.findByText("Goes to Anthropic")).toBeInTheDocument();
   });
 
   it("says a local model's messages stay on this computer", async () => {

@@ -75,7 +75,7 @@ test("RT-QUI-02 — Anthropic connects through Models and the composer says wher
   await page.goto(`${BASE}/#/new-chat`);
   await chooseModelForTurn(page, /Haiku|claude/i);
   // QUI-C04 — said in the composer before anything is sent.
-  await expect(page.getByText("Sent to Anthropic")).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByText("Goes to Anthropic")).toBeVisible({ timeout: 30_000 });
   // QUI-C10 — an empty conversation's four starters; a question fills the box.
   const starters = page.getByRole("list", { name: "Ways to start" });
   await expect(starters.getByRole("listitem")).toHaveCount(4);

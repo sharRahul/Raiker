@@ -263,6 +263,50 @@ def test_install_writes_the_definition_and_uninstall_removes_it(tmp_path: Path) 
     assert registration(tmp_path, port=8765, os_name="windows", home=home).registered is False
 
 
+def test_another_workspaces_startup_entry_does_not_register_this_host(tmp_path: Path) -> None:
+    home = tmp_path / "home"
+    install(service_plan(tmp_path / "first", port=8765, os_name="windows", home=home), activate=False)
+    assert not registration(tmp_path / "second", port=8765, os_name="windows", home=home).registered
+    assert not registration(tmp_path / "first", port=9000, os_name="windows", home=home).registered
+
+
+def test_legacy_windows_startup_line_endings_still_identify_the_registered_host(tmp_path: Path) -> None:
+    home = tmp_path / "home"
+    plan = service_plan(tmp_path, port=8765, os_name="windows", home=home)
+    assert plan.path is not None
+    plan.path.parent.mkdir(parents=True)
+    # Earlier write_text calls translated an already-CRLF batch file again.
+    plan.path.write_bytes(plan.contents.replace("\r\n", "\r\r\n").encode())
+    assert registration(tmp_path, port=8765, os_name="windows", home=home).registered
+
+
+@pytest.mark.parametrize("mechanism,registered,expected", [
+    ("systemd --user", True, True),
+    ("launchd LaunchAgent (per-user)", True, True),
+    ("Windows per-user startup", True, False),
+    ("systemd --user", False, False),
+])
+def test_registration_distinguishes_startup_from_restart(
+    mechanism: str, registered: bool, expected: bool,
+) -> None:
+    from raiker.app.service import ServiceRegistration
+
+    state = ServiceRegistration(True, registered, mechanism, "Raiker", None, "")
+    assert state.can_restart is expected
+
+
+def test_a_frozen_host_registers_its_executable_without_python_module_arguments(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from raiker.app import service
+
+    monkeypatch.setattr(service.sys, "frozen", True, raising=False)
+    monkeypatch.setattr(service.sys, "executable", str(tmp_path / "Raiker.exe"))
+    monkeypatch.setattr(service.shutil, "which", lambda _name: None)
+    command = service.launch_command(tmp_path, 8765)
+    assert command[:2] == [str(tmp_path / "Raiker.exe"), "--no-browser"]
+
+
 def test_uninstalling_a_registration_that_is_not_there_is_not_an_error(tmp_path: Path) -> None:
     plan = service_plan(tmp_path, port=8765, os_name="windows", home=tmp_path / "home")
     result = uninstall(plan)

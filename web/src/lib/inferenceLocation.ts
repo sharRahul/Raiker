@@ -53,7 +53,7 @@ export function inferenceSentence(location: InferenceLocation): string {
  */
 export function inferenceLabel(location: InferenceLocation): string {
   if (location.kind === "device") return "Stays on this computer";
-  if (location.kind === "remote") return `Sent to ${location.destination}`;
+  if (location.kind === "remote") return `Goes to ${location.destination}`;
   return "Where it runs is not confirmed";
 }
 
@@ -78,6 +78,6 @@ export function composerDataLabel(location: InferenceLocation, attachments: numb
   if (attachments <= 0) return inferenceLabel(location);
   const files = `${attachments} ${attachments === 1 ? "file" : "files"}`;
   if (location.kind === "device") return `Stays on this computer, with ${files}`;
-  if (location.kind === "remote") return `Sent to ${location.destination}, with ${files}`;
+  if (location.kind === "remote") return `Goes to ${location.destination}, with ${files}`;
   return `Where it runs is not confirmed, with ${files}`;
 }

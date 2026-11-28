@@ -254,6 +254,7 @@
     attachments: ComposerAttachment[];
     events: StreamEvent[];
     response: AgentResponse | null;
+    preflightRefused?: boolean;
     streaming: boolean;
     error: string | null;
     // BUG-24 — the same parked-turn presentation Chat uses, so a decision made
@@ -786,7 +787,7 @@
     const now = streaming;
     if (wasStreaming && !now) {
       const last = turns[turns.length - 1];
-      if (last?.response && last.response.status !== "needs_approval") {
+      if (last?.response && !last.preflightRefused && last.response.status !== "needs_approval") {
         announceResponseReady((selectedProject ? `Build · ${selectedProject.name}` : "Build"), `#/build?session=${encodeURIComponent(last.response.session_id)}`, `response-${last.response.turn_id}`, delivery.current?.quiet_hours.active ?? false);
       }
     }
@@ -1692,16 +1693,22 @@
           if (event.kind === "final" && event.response !== null) {
             turn.response = event.response;
             turn.refusal = refusalFromFinal(event);
-            sessionId = event.response.session_id;
-            // C6 — the citation markers this answer just wrote need the ledger
-            // they resolve against, so it is refreshed with the turn.
-            void sources.refresh(event.response.session_id);
-            void refreshContextUsage();
-            if (plan === null) void loadPlan();
-            window.dispatchEvent(new Event("raiker:chats-changed"));
-            void applyPendingProject();
-            void review.load();
-            void loadInstructionFiles(boundary?.project_id);
+            // Preflight refusals carry a response id for correlation, but no
+            // streamed session id: the gateway never created a conversation.
+            // Keep the refusal on screen without filing or reading that id.
+            turn.preflightRefused = event.session_id === null;
+            if (!turn.preflightRefused) {
+              sessionId = event.response.session_id;
+              // C6 — the citation markers this answer just wrote need the ledger
+              // they resolve against, so it is refreshed with the turn.
+              void sources.refresh(event.response.session_id);
+              void refreshContextUsage();
+              if (plan === null) void loadPlan();
+              window.dispatchEvent(new Event("raiker:chats-changed"));
+              void applyPendingProject();
+              void review.load();
+              void loadInstructionFiles(boundary?.project_id);
+            }
           } else {
             turn.events = [...turn.events, event];
             const streamed = planFromEvent(event);

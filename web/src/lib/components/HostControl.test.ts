@@ -70,6 +70,18 @@ async function open(routes: Record<string, unknown>) {
 }
 
 describe("HostControl install and updates", () => {
+  it("explains why a Windows startup entry cannot restart the running host", async () => {
+    await open({
+      "GET /api/host/update": update(),
+      "GET /api/host": {
+        ...HOST,
+        service: { ...HOST.service, registered: true, mechanism: "Windows per-user startup" },
+      },
+    });
+    expect(await screen.findByText(/starts at sign-in; to restart, quit Raiker and open it again/i)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Restart" })).toBeDisabled();
+  });
+
   it("says source checkout when there is no installation record", async () => {
     await open({ "GET /api/host/update": update() });
     expect(await screen.findByText("source checkout")).toBeInTheDocument();

@@ -85,6 +85,13 @@ class ServiceRegistration(View):
     path: str | None
     note: str
 
+    @property
+    def can_restart(self) -> bool:
+        """Whether this registration's manager restarts an exit with status 75."""
+        return self.registered and self.mechanism in {
+            "systemd --user", "launchd LaunchAgent (per-user)",
+        }
+
 
 def detect_os(system: str | None = None) -> str:
     """``windows``, ``macos``, ``linux``, or ``posix`` for anything else."""
@@ -107,8 +114,11 @@ def launch_command(workspace: Path, port: int) -> list[str]:
     background service that opens a browser window at sign-in is a background
     service nobody keeps enabled.
     """
-    executable = shutil.which("raiker-app")
-    base = [executable] if executable else [sys.executable, "-m", "raiker.app.launcher"]
+    if getattr(sys, "frozen", False):
+        base = [sys.executable]
+    else:
+        executable = shutil.which("raiker-app")
+        base = [executable] if executable else [sys.executable, "-m", "raiker.app.launcher"]
     return [*base, "--no-browser", "--workspace", str(workspace), "--port", str(port)]
 
 
@@ -283,7 +293,17 @@ def registration(
 ) -> ServiceRegistration:
     """Whether the background host is currently registered on this platform."""
     plan = service_plan(workspace, port=port, os_name=os_name, home=home)
-    registered = bool(plan.path is not None and plan.path.is_file())
+    # One per-user definition is shared by all workspaces. Its existence alone
+    # cannot say which workspace or port it starts. Fail closed on unreadable
+    # or edited definitions rather than promising this host will come back.
+    try:
+        registered = bool(
+            plan.path is not None
+            and plan.path.read_bytes().decode("utf-8").replace("\r\r\n", "\n").replace("\r\n", "\n")
+            == plan.contents.replace("\r\n", "\n")
+        )
+    except (OSError, UnicodeError):
+        registered = False
     return ServiceRegistration(
         supported=plan.supported,
         registered=registered,
@@ -317,7 +337,7 @@ def install(plan: ServicePlan, *, activate: bool = True) -> ServiceActionResult:
     if not plan.supported or plan.path is None:
         return ServiceActionResult(False, None, [], [], plan.note)
     plan.path.parent.mkdir(parents=True, exist_ok=True)
-    plan.path.write_text(plan.contents, encoding="utf-8")
+    plan.path.write_text(plan.contents, encoding="utf-8", newline="")
     ran, failed = ([], []) if not activate else run_all(plan.activate)
     message = (
         f"Registered with {plan.mechanism}."

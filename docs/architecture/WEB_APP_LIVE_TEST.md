@@ -1,5 +1,50 @@
 # Web App Live Test — model backends
 
+## Result — 2026-11-28 Open RU regressions
+
+**RT-RU-OPEN-01 passed in 1.2 minutes** on the Windows development PC, using
+an isolated real host at loopback port 8878 and its encrypted store. The test
+`web/e2e/ru-open-items-live.spec.ts` creates/unlocks the owner through the UI,
+connects Anthropic through Models (including the workspace id), chooses Haiku
+4.5 and receives the requested real answer. Credentials come from the run's
+environment and are entered through the UI, never included in source or
+captures. No API response or provider is mocked.
+
+The owner then activates **Private local** in Settings, starts a new Chat on
+the same hosted model and receives **Not sent** with its Settings recovery
+link. Network observation confirms **zero** requests under `/api/sessions/`
+for that refused first turn, and the address has no phantom session id. Unit
+regressions independently cover Build's missing-repository preflight and
+successful first-turn project filing.
+Screenshot review also corrected the prospective destination label from
+*Sent to Anthropic* to **Goes to Anthropic** (FIXED-1596); it describes where
+the next message goes, without claiming the refused one was sent.
+
+Memory's disabled-tools banner names **Ask before remembering** for facts and
+project lessons. Host shows this development instance's unregistered startup
+state and disables Restart. Desktop and phone captures in both themes were
+visually inspected under `output/playwright/ru-open-items/`:
+`real-answer.png`, `preflight-no-session.png`, `memory-{light,dark}-{1440,390}.png`,
+`host-{light,dark}-{1440,390}.png` and their provenance manifest. There are no
+page errors or horizontal document overflow after navigation transitions settle.
+The first phone assertion ran during the drawer transition; the final run
+waits for the responsive navigation state and animations, as other live specs do.
+
+The full web suite passes **318 files / 3,001 tests**, one existing skip;
+production build, Svelte check and ESLint pass. Ruff, Mypy and focused host,
+tray, remote-access and preflight regressions pass. The runner needed the
+installed Chrome and an elevated host/browser: sandbox temporary-path
+rewriting prevented browser startup, and its loopback host was unreachable
+from the elevated browser. Those failed launches are environment evidence,
+not successful live runs. Windows supervised restart, logout/reboot delivery,
+clean-machine first-run timing, full Apply/push, native-account containment,
+command freeze/resume and portable migration are **not qualified by this run**.
+See the [remaining RU work](../plans/TO_BE_FIXED.md#open-ru-qualification--review-2026-11-28).
+
+The final production build also passes all **31 mocked Playwright scenarios**
+in 23.0 seconds. Secret scanning reports no credentials; SAST reports only
+reviewed, unexpired findings, and the API contract check passes.
+
 ## Result — 2026-11-28 Notes handoff
 
 **RT-NOTES-01** (`web/e2e/notes-live.spec.ts`) runs on a real isolated host and
@@ -3414,5 +3459,5 @@ reported plainly. Project: an attached folder whose `run.py` fails without
 | RU12-5 | Models card for `gpt-oss:120b-cloud` | Never says nothing leaves this computer | Failed, then fixed (FIXED-1591) |
 
 Screenshots of each step were inspected at desktop size. Issues found and not
-fixed are in [TO_BE_FIXED](../plans/TO_BE_FIXED.md#ru-12-live-run--found-not-fixed-2026-11-28).
+fixed are in [TO_BE_FIXED](../plans/TO_BE_FIXED.md#ru-12-live-run--remaining-findings-2026-11-28).
 

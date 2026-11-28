@@ -1,5 +1,62 @@
 # Fixed items
 
+## FIXED-1596 — The composer said a refused message had been sent
+
+**Severity: Medium. Area: Chat / Build / privacy copy. Status: Fixed 2026-11-28.**
+Screenshot review of RT-RU-OPEN-01 showed **Not sent** above a composer still
+labelled *Sent to Anthropic*. That label describes the next message's
+destination, not a delivery receipt. The shared composer label now reads
+**Goes to Anthropic**, including the attached-file count when present.
+Local and unknown-location disclosures retain their existing meaning.
+The inference-location and Chat composer-parity regressions failed with the
+old text and pass after the correction; the live refusal asserts the new label.
+
+## FIXED-1595 — The Memory banner contradicted facts and project lessons
+
+**Severity: Medium. Area: Memory / Quiet UI (RU-11, RU-12). Status: Fixed 2026-11-28.**
+With the memory-write capability off, Memory said conversations could not
+propose memories, even while facts and project lessons were being kept by the
+separate **Ask before remembering** control. The banner now describes the
+memory tools permission and names the control facts and lessons follow. It
+does not report the encrypted store itself as off. Evidence:
+`web/src/lib/memoryPosture.test.ts`, `MemoryView.test.ts` and
+RT-RU-OPEN-01 in the [live record](../architecture/WEB_APP_LIVE_TEST.md#result--2026-11-28-open-ru-regressions).
+
+## FIXED-1594 — A refused first turn tried to file a conversation that did not exist
+
+**Severity: Medium. Area: Chat / Build / projects (RU-12). Status: Fixed 2026-11-28.**
+A preflight refusal carries a response id for correlation but no streamed
+session id: the gateway has not created that conversation. Chat and Build
+adopted the response id anyway and fetched its sources, history and context;
+Build also tried to file it under the project, producing `unknown_session`.
+Both views now retain the refusal without adopting or reading its placeholder
+id. Existing conversation identity and pending project selection are preserved.
+An independent review also caught completion notifications linking that
+placeholder: refused preflight turns now suppress those announcements while
+speech and scrolling still receive the displayed refusal.
+Regression cases in `ChatView.test.ts` and `BuildView.test.ts` failed before the
+fix and pass afterwards; successful first-turn project filing remains covered.
+RT-RU-OPEN-01 exercises a real execution-profile refusal without session reads.
+
+## FIXED-1593 — Startup registration promised a restart it could not perform
+
+**Severity: High. Area: Host lifecycle (RU-13). Status: Fixed 2026-11-28.**
+Any per-user registration file counted as this host's registration, including
+one for a different workspace or port. A Windows Startup entry also counted as
+a supervisor: **Restart** exited the host with status 75, but nothing restarted
+it. Registration now matches the generated definition, tolerating the legacy
+Windows line endings; frozen builds register their own executable without
+Python's `-m` arguments. New definitions preserve their planned line endings.
+The host API, Remote access and native tray share the distinction between
+startup and supervised restart. Windows refuses restart without stopping,
+and the Host panel explains **Quit Raiker and open it again**.
+
+Evidence: `tests/test_app_lifecycle.py`, `tests/test_api_host.py`,
+`tests/test_tray.py`, `HostControl.test.ts`; the new regressions failed before
+their fixes. This repairs existing lifecycle behavior. It does **not** close
+RU-13's supervised Windows host, setup control, lingering, delivery,
+logout/reboot or process-ownership qualification.
+
 ## FIXED-1592 — Every turn rewrote the prompt prefix, so nothing was cached
 
 **Severity: High. Area: Runtime / Models / Memory. Status: Fixed 2026-11-28.**
@@ -2536,6 +2593,10 @@ file you can open. The two capture sets that remain — `screenshots/pages/` and
 
 | ID | Severity | Area | Status |
 |---|---|---|---|
+| [FIXED-1596](#fixed-1596--the-composer-said-a-refused-message-had-been-sent) | Medium | Chat / Build / privacy copy | Fixed 2026-11-28 |
+| [FIXED-1595](#fixed-1595--the-memory-banner-contradicted-facts-and-project-lessons) | Medium | Memory / Quiet UI | Fixed 2026-11-28 |
+| [FIXED-1594](#fixed-1594--a-refused-first-turn-tried-to-file-a-conversation-that-did-not-exist) | Medium | Chat / Build / projects | Fixed 2026-11-28 |
+| [FIXED-1593](#fixed-1593--startup-registration-promised-a-restart-it-could-not-perform) | High | Host lifecycle | Fixed 2026-11-28 |
 | [FIXED-1574](#fixed-1574--health-did-not-say-whether-a-model-answers-or-the-disk-is-filling) | Medium | Health / UI (RU-08) | Fixed 2026-11-26 |
 | [FIXED-1575](#fixed-1575--the-sandbox-posture-trusted-installation-instead-of-enforcement) | High | Permissions / first run (RU-07) | Fixed 2026-11-26 |
 | [FIXED-1576](#fixed-1576--github-retained-two-active-workflows-after-their-files-were-removed) | Low | CI / maintenance | Fixed 2026-11-26 |

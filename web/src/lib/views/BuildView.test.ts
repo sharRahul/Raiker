@@ -11,6 +11,7 @@ import type { AgentResponse, CodeReposView, ProjectsList, StreamEvent } from "..
 import { makeGate, stubFetch, openComposerAttach, openComposerProject, startComposerDictation, installLocalRecordingFake } from "../test-helpers";
 import { resetModels } from "../models.svelte";
 import { routeStateFromHash } from "../routeState";
+import * as desktopNotices from "../desktopNotice";
 
 const streamPromptMock = vi.hoisted(() => vi.fn());
 vi.mock("../voice", async (importOriginal) => ({
@@ -25,6 +26,7 @@ vi.mock("../api", async (importOriginal) => {
 import BuildView from "./BuildView.svelte";
 
 afterEach(() => {
+  vi.restoreAllMocks();
   vi.unstubAllGlobals();
   streamPromptMock.mockReset();
   resetModels();
@@ -786,6 +788,26 @@ describe("Build repository context", () => {
 });
 
 describe("Build project filing", () => {
+  it("does not file a session named only by a refused preflight response", async () => {
+    const announce = vi.spyOn(desktopNotices, "announceResponseReady");
+    const fetchMock = stubFetch(baseRoutes());
+    streamPromptMock.mockImplementation(async (_body: unknown, onEvent: (ev: StreamEvent) => void) => {
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      onEvent({
+        kind: "final", text: "", event_type: "", payload: {}, session_id: null,
+        response: { ...finalResponse("Invalid prompt: the repository folder is missing."), session_id: "sess_invalid", status: "failed" },
+      } as StreamEvent);
+    });
+    await renderBuildWithProject();
+    await fireEvent.input(screen.getByLabelText("Describe the change"), { target: { value: "Start" } });
+    await fireEvent.click(sendButton());
+    await screen.findByText(/Invalid prompt: the repository folder is missing/);
+    expect(fetchMock.mock.calls.filter(([url]) => String(url).includes("/api/sessions/sess_invalid"))).toHaveLength(0);
+    expect(announce).not.toHaveBeenCalled();
+    await fireEvent.click(screen.getByRole("button", { name: "New chat" }));
+    expect(screen.queryByText(/This chat was not moved/)).not.toBeInTheDocument();
+  });
+
   it("files the chat as soon as the first turn creates a session", async () => {
     // Choosing a project before the chat exists must not silently do nothing.
     const fetchMock = stubFetch({

@@ -12,6 +12,7 @@ import { handOffToChat } from "../chatHandoff";
 import { resetWorkProject, setWorkProject } from "../workProject.svelte";
 import type { ProjectsList } from "../apiTypes";
 import { ApiError } from "../api";
+import * as desktopNotices from "../desktopNotice";
 
 const streamPromptMock = vi.hoisted(() => vi.fn());
 vi.mock("../api", async (importOriginal) => {
@@ -22,6 +23,7 @@ vi.mock("../api", async (importOriginal) => {
 import ChatView from "./ChatView.svelte";
 
 afterEach(() => {
+  vi.restoreAllMocks();
   vi.unstubAllGlobals();
   streamPromptMock.mockReset();
   resetModels();
@@ -67,6 +69,24 @@ function finalResponse(message: string): AgentResponse {
 }
 
 describe("ChatView streaming transcript", () => {
+  it("does not adopt or read a session named only by a refused preflight response", async () => {
+    const announce = vi.spyOn(desktopNotices, "announceResponseReady");
+    const fetchMock = stubFetch(MODELS_ROUTE);
+    streamPromptMock.mockImplementation(async (_body: unknown, onEvent: (ev: StreamEvent) => void) => {
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      onEvent({
+        kind: "final", text: "", event_type: "", payload: {}, session_id: null,
+        response: { ...finalResponse("Invalid prompt: the attachment is missing."), session_id: "sess_invalid", status: "failed" },
+      } as StreamEvent);
+    });
+    render(ChatView);
+    await fireEvent.input(screen.getByRole("textbox", { name: /prompt/i }), { target: { value: "Read it" } });
+    await fireEvent.click(screen.getByRole("button", { name: /^send$/i }));
+    await screen.findByText(/Invalid prompt: the attachment is missing/);
+    expect(fetchMock.mock.calls.filter(([url]) => String(url).includes("/api/sessions/sess_invalid"))).toHaveLength(0);
+    expect(announce).not.toHaveBeenCalled();
+  });
+
   it("preserves the prompt and opens model setup from Send when the selected model is unready", async () => {
     stubFetch({
       "GET /api/models": { ...(MODELS_ROUTE["GET /api/models"] as Record<string, unknown>), profiles: [{ profile_id: "ollama", provider: "ollama", model: "qwen", selected: true, configured: true, ready: false, readiness_state: "runtime_stopped", readiness_summary: "Ollama is not reachable.", readiness_reason_code: "local_runtime_unreachable", readiness_remediation: "Start Ollama, then check again." }], chat_profiles: [{ profile_id: "ollama", provider: "ollama", model: "qwen", selected: true, configured: true, ready: false, readiness_state: "runtime_stopped", readiness_summary: "Ollama is not reachable.", readiness_reason_code: "local_runtime_unreachable", readiness_remediation: "Start Ollama, then check again." }] },

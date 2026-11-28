@@ -112,7 +112,7 @@ def _restartable(request: Request) -> bool:
     from raiker.app.service import registration
 
     try:
-        return registration(_ws(request), port=_local_port(request)).registered
+        return registration(_ws(request), port=_local_port(request)).can_restart
     except Exception:  # noqa: BLE001 - unknown means "restart it yourself"
         return False
 

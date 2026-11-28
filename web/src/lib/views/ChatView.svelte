@@ -160,6 +160,7 @@
     attachments: ComposerAttachment[];
     events: StreamEvent[];
     response: AgentResponse | null;
+    preflightRefused?: boolean;
     streaming: boolean;
     error: string | null;
     // BUG-24 — how a parked turn is presented while its approval is outstanding
@@ -583,7 +584,7 @@
     const now = streaming;
     if (wasStreaming && !now) {
       const last = turns[turns.length - 1];
-      if (last?.response && last.response.status !== "needs_approval") {
+      if (last?.response && !last.preflightRefused && last.response.status !== "needs_approval") {
         announceResponseReady(conversationTitle, `#/new-chat?session=${encodeURIComponent(last.response.session_id)}`, `response-${last.response.turn_id}`, delivery.current?.quiet_hours.active ?? false);
       }
     }
@@ -1375,23 +1376,28 @@
           if (event.kind === "final" && event.response !== null) {
             turn.response = event.response;
             turn.refusal = refusalFromFinal(event);
-            sessionId = event.response.session_id;
-            void applyPendingProject();
-            // A file written by this turn is stored as a session-authorized
-            // attachment before the final SSE event reaches us. Refreshing the
-            // chips here makes the generated file immediately openable in the
-            // existing right-hand inspector, without exposing the workspace.
-            void restoreAttachmentChips(event.response.session_id);
-            // C6 — the citation markers this answer just wrote need the ledger
-            // they resolve against, so it is refreshed with the turn.
-            void inspector.refreshTurnSources(event.response.session_id);
-            void recall.refresh(event.response.session_id);
-            void refreshContextUsage();
-            if (plan === null) void loadPlan();
-            window.dispatchEvent(new Event("raiker:chats-changed"));
-            // QUI-C01 — a new conversation learns the title the runtime gave it.
-            if (handoffTitle !== null) void nameHandedOffChat(event.response.session_id, handoffTitle);
-            else if (conversationTitle === "") void refreshTitle(event.response.session_id);
+            // A preflight final has no streamed session id. Its response id
+            // is only correlation, not a conversation the gateway stored.
+            turn.preflightRefused = event.session_id === null;
+            if (!turn.preflightRefused) {
+              sessionId = event.response.session_id;
+              void applyPendingProject();
+              // A file written by this turn is stored as a session-authorized
+              // attachment before the final SSE event reaches us. Refreshing the
+              // chips here makes the generated file immediately openable in the
+              // existing right-hand inspector, without exposing the workspace.
+              void restoreAttachmentChips(event.response.session_id);
+              // C6 — the citation markers this answer just wrote need the ledger
+              // they resolve against, so it is refreshed with the turn.
+              void inspector.refreshTurnSources(event.response.session_id);
+              void recall.refresh(event.response.session_id);
+              void refreshContextUsage();
+              if (plan === null) void loadPlan();
+              window.dispatchEvent(new Event("raiker:chats-changed"));
+              // QUI-C01 — a new conversation learns the title the runtime gave it.
+              if (handoffTitle !== null) void nameHandedOffChat(event.response.session_id, handoffTitle);
+              else if (conversationTitle === "") void refreshTitle(event.response.session_id);
+            }
           } else if (event.kind === "error") {
             turn.error = event.text || "An error occurred.";
             turn.events = [...turn.events, event];

@@ -1,10 +1,25 @@
-## RU-12 live run — found, not fixed (2026-11-28)
+## Open RU qualification — review 2026-11-28
 
-- **A chat could not be moved into a project.** After a Build repository folder
-  was removed, *New chat* showed *This chat was not moved (HTTP 403,
-  unknown_session)*. `PUT /api/sessions/{id}/project` was sent for a session
-  that had never been created. The UI should not try to move a session that
-  doesn't exist.
+The repository is synced with `origin/main`. RU-11, RU-12 and RU-15 already
+have completed implementation and dated live evidence in the
+[ready-to-use plan](READY_TO_USE_PLAN.md#status--2026-11-25). This review fixes
+the phantom-session and Memory-banner regressions from RU-12
+([FIXED-1594](FIXED_ITEMS.md#fixed-1594--a-refused-first-turn-tried-to-file-a-conversation-that-did-not-exist),
+[FIXED-1595](FIXED_ITEMS.md#fixed-1595--the-memory-banner-contradicted-facts-and-project-lessons)).
+The remaining requested work is still open:
+
+| Item | Remaining work |
+|---|---|
+| RU-03 | Restricted-account isolation gaps and the native setup journey; retain refusal until containment is qualified. |
+| RU-05 | Production MXC adapter, resource limits and lifecycle qualification; the probe alone is not the adapter. |
+| RU-07 | Full repository, Apply and push journey with only the intended push approval. |
+| RU-09 | Timed clean-machine first useful answer on Windows and Linux. This development checkout is not a clean machine. |
+| RU-13 | Startup correctness is repaired in FIXED-1593; a supervised Windows host, in-app setup, Linux lingering, delivery with the window closed and logout/reboot evidence remain. A definition matching the current host is not proof that its service manager owns the answering process; qualify that handoff too. |
+| RU-14 | Safe-boundary turn parking, command-tree freezing, timeout cleanup and resumption with fresh authority/budget checks. Existing Pause stops new scheduled work only. |
+| RU-17 | Portable encrypted export/import, exclusion of provider credentials and first-run restoration. Existing local recovery is not portable migration. |
+
+## RU-12 live run — remaining findings (2026-11-28)
+
 - **Two folder rules disagree.** Build's *Local folder* must be inside the
   workspace, while *Projects → Attach existing folder* refuses one inside it
   (`attach_path_inside_workspace`). An owner trying the same folder in both
@@ -14,9 +29,6 @@
   differ between the failing and the passing run.
 - **A non-zero exit reads as a runtime fault.** A command that exited 2 shows
   *failed — runtime_execution_failed*, which reads as if Raiker broke.
-- **The Memory banner contradicts the lessons.** *Memory store is off, so
-  conversations cannot propose memories* sits above a lesson Raiker just
-  proposed and kept.
 
 ## Windows-only test failures seen during RU-15 — 2026-11-28
 

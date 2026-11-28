@@ -90,13 +90,13 @@ test("RT-QUI-45 — Home and Chat say where the message goes, with attachments (
   await start(page);
   await open(page, "#/home");
   const label = page.locator(".home-composer .data-label");
-  await expect(label).toHaveText(/Sent to Anthropic/, { timeout: 30_000 });
+  await expect(label).toHaveText(/Goes to Anthropic/, { timeout: 30_000 });
   await page.locator("#home-prompt").fill("Summarise this");
   await page.locator(".home-composer").getByRole("button", { name: "Add attachment" }).click();
   await page.locator(".home-composer").getByLabel("Upload document").setInputFiles({
     name: "notes.txt", mimeType: "text/plain", buffer: Buffer.from("Anna prefers short replies."),
   });
-  await expect(label).toHaveText(/Sent to Anthropic, with 1 file/, { timeout: 30_000 });
+  await expect(label).toHaveText(/Goes to Anthropic, with 1 file/, { timeout: 30_000 });
   await capture(page, `${SHOTS}/45-home-data-label.png`, page.locator(".home-composer"));
 });
 

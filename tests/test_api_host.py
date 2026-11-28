@@ -156,6 +156,23 @@ def test_restart_records_the_exit_status_the_service_manager_restarts_on(
     assert app.state.exit_code == routes_host.RESTART_EXIT_CODE
 
 
+def test_windows_startup_registration_cannot_restart_the_running_host(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from raiker.api import routes_host
+    from raiker.app.service import ServiceRegistration
+
+    monkeypatch.setattr(routes_host, "registration", lambda *_args, **_kwargs: ServiceRegistration(
+        supported=True, registered=True, mechanism="Windows per-user startup",
+        label="Raiker.cmd", path="Raiker.cmd", note="Starts when you sign in.",
+    ))
+    headers = _headers(client)
+    assert client.get("/api/host", headers=headers).json()["restartable"] is False
+    response = client.post("/api/host/restart", headers=headers, json={"confirm": True})
+    assert response.status_code == 409
+    assert response.json()["detail"]["reason_code"] == "restart_not_supported"
+
+
 def test_quit_and_pause_both_need_an_owner_session(client: TestClient) -> None:
     assert client.post("/api/host/pause", json={}).status_code == 401
     assert client.post("/api/host/quit", json={"confirm": True}).status_code == 401

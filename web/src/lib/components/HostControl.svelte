@@ -158,6 +158,8 @@
       notice =
         error instanceof ApiError && error.reasonCode === "not_registered"
           ? "Raiker is not registered to start in the background, so nothing would start it again. Register it first, or quit and start it yourself."
+          : error instanceof ApiError && error.reasonCode === "restart_not_supported"
+            ? "This registration starts Raiker at sign-in. To restart, quit Raiker and open it again."
           : "That action could not be carried out. Raiker is still running as it was; try again.";
     } finally {
       busy = false;
@@ -215,6 +217,10 @@
                 ? `No — run “raiker-app service install” to register it with ${host.service.mechanism}`
                 : host.service.note}
           </dd>
+          {#if host.service.registered && !host.restartable}
+            <dt>Restart</dt>
+            <dd>Starts at sign-in; to restart, quit Raiker and open it again.</dd>
+          {/if}
         </dl>
       {/if}
 
@@ -300,7 +306,7 @@
           type="button"
           class="btn btn-sm"
           disabled={busy || !host?.restartable}
-          title={host?.restartable ? undefined : "Raiker is not registered to start in the background, so nothing would start it again."}
+          title={host?.restartable ? undefined : host?.service.registered ? "Quit Raiker and open it again to restart." : "Raiker is not registered to start in the background, so nothing would start it again."}
           onclick={() => act("restart", confirming === "restart")}
         >
           <Icon name="refresh" size="sm" /> Restart

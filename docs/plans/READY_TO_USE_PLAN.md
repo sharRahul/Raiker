@@ -60,7 +60,7 @@ build is still owed for every item (the regular-use journeys in
 | RU-10 Keep or skip under the answer | Done | [FIXED-1539](FIXED_ITEMS.md#fixed-1539--a-memory-raiker-proposed-could-only-be-kept-from-memory), owner's words only ([FIXED-1548](FIXED_ITEMS.md#fixed-1548--a-sentence-the-model-invented-was-offered-to-keep-as-a-memory)); RT-1125-08 | — |
 | RU-11 Memory as a summary | Done | Summary, inline Edit/Forget, Use memory, saved conversation Incognito and local meaning setup; real embedding and four chat-turn conditions pass ([FIXED-1584](FIXED_ITEMS.md#fixed-1584--conversation-incognito-was-missing-and-goal-noticing-ignored-memory-opt-out)) | None for RU-11; clean-machine timing remains RU-09 |
 | RU-12 Remembers its own work | Done | Lessons from a project task's own command records, kept with Undo and recalled in that project unless its memory is disabled; the failing command's result carries the lesson ([FIXED-1585](FIXED_ITEMS.md#fixed-1585--raiker-did-not-remember-what-its-own-work-taught), [FIXED-1589](FIXED_ITEMS.md#fixed-1589--lessons-were-never-filed-or-recalled-in-a-real-project)); live three-task journey on Windows passes ([record](../architecture/WEB_APP_LIVE_TEST.md#result--2026-11-28-ru-12-lessons-in-a-real-project)) | — |
-| RU-13 Always-on host | Open | — | User service on each platform; delivery with the window closed |
+| RU-13 Always-on host | Partly done | Detached desktop host and existing per-user startup; matching workspace/port registration, frozen launch command and honest Windows restart controls ([FIXED-1593](FIXED_ITEMS.md#fixed-1593--startup-registration-promised-a-restart-it-could-not-perform)) | Supervised Windows host, in-app setup, Linux lingering, service ownership and delivery/logout/reboot qualification |
 | RU-14 Pause and Resume a running step | Open | — | Park a turn at the next safe boundary, freeze a command, resume |
 | RU-15 Raiker as an MCP server | Done | `raiker mcp-serve`: seven read-only tools over stdio, each read governed and audited ([FIXED-1590](FIXED_ITEMS.md#fixed-1590--other-agents-could-not-reach-raikers-memory-notes-or-tasks)) | Writes over MCP need an approval channel the caller can wait on; not planned |
 | RU-16 Import another agent's setup | Done | `AGENTS.md`/`CLAUDE.md`/`.cursorrules` ([FIXED-1536](FIXED_ITEMS.md#fixed-1536--a-projects-agentsmd-or-claudemd-was-ignored), [FIXED-1542](FIXED_ITEMS.md#fixed-1542--a-projects-cursorrules-was-ignored)), Hermes and Markdown memory ([FIXED-1541](FIXED_ITEMS.md#fixed-1541--another-agents-markdown-memory-could-not-be-imported)), Claude Desktop / Cursor `mcpServers` paste ([FIXED-1561](FIXED_ITEMS.md#fixed-1561--an-owner-could-not-add-a-local-mcp-server-and-none-could-drive-an-application)) ; the `.cursor/rules` folder ([FIXED-1569](FIXED_ITEMS.md#fixed-1569--a-projects-cursorrules-folder-was-ignored)); ChatGPT and Claude `conversations.json` ([FIXED-1572](FIXED_ITEMS.md#fixed-1572--chatgpt-and-claude-conversation-exports-could-not-be-imported)) | — |
@@ -80,6 +80,19 @@ mid-turn (it is allowed per server or held); Ollama Cloud models need the owner'
 own quota; the published-build live journeys RU-J1 to RU-J5.
 
 ## What the reference agents do
+
+**Lifecycle review, 2026-11-28:** checked the requested references again before
+repairing the startup/restart boundary. [Claude's desktop documentation](https://code.claude.com/docs/en/desktop)
+and [Cursor's Cloud Agents](https://cursor.com/docs/cloud-agent) distinguish
+the client from where work runs. [ChatGPT scheduled tasks](https://help.openai.com/en/articles/10291617-scheduled-tasks-in-chatgpt)
+and [Perplexity Computer](https://www.perplexity.ai/en-GB/hub/workshops/introducing-perplexity-computer)
+document scheduled work; [Meta's own Muse page](https://ai.meta.com/muse/)
+now provides a first-party background-work reference. [Hermes gateway internals](https://hermes-agent.nousresearch.com/docs/developer-guide/gateway-internals)
+and its [setup source](https://github.com/NousResearch/hermes-agent/blob/main/hermes_cli/gateway_setup_service.py)
+explicitly distinguish a running gateway from an installed service. Raiker's
+decision follows that distinction: a Startup file is not a supervisor, and
+matching registration is not logout/reboot evidence. These references do not
+substitute for Raiker's own containment and lifecycle tests.
 
 Reviewed 2026-11-16 from each product's own documentation where it is public,
 and from its source where it is open. Claude, ChatGPT, Cursor, Perplexity and
@@ -359,6 +372,13 @@ turns, and RU-J5 checks the approved facts in Memory before recall in a new
 chat. Release qualification still requires a live run on the published build.
 
 ## Changelog
+
+- **2026-11-28 (Open RU review)** — repaired startup identity, frozen launch
+  commands and Windows restart reporting (FIXED-1593); early refusals no
+  longer file phantom sessions (FIXED-1594); Memory names its tools permission
+  without contradicting project lessons (FIXED-1595). The remaining native,
+  first-run, always-on, Pause/Resume and migration work is retained explicitly
+  in [Open defects](TO_BE_FIXED.md#open-ru-qualification--review-2026-11-28).
 
 - **2026-11-28 (Notes handoff)** — the linked Markdown notebook is tested from
   the real browser: create/edit, properties, links/backlinks, rename/relink,

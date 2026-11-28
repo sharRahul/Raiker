@@ -126,9 +126,18 @@ on macOS, `systemd --user` on Linux, and the Startup folder on Windows. It does
 not install a system-wide privileged service. Include `--workspace PATH` when
 the service should operate a non-default instance.
 
+On Windows this starts Raiker at sign-in; it does not supervise a stopped
+process or keep it running after sign-out. **Restart** is unavailable for this
+registration: quit Raiker and open it again. Linux's user service stops at
+sign-out unless lingering is enabled; macOS's LaunchAgent runs while signed in.
+Full always-on setup and logout/reboot qualification remain in
+[RU-13](../plans/READY_TO_USE_PLAN.md#e-always-on-and-a-pause-that-really-pauses).
+
 The registration points to the current Raiker executable and workspace. If you
 move or delete the source checkout, virtual environment, or workspace later,
 remove the registration first and install it again from the new location.
+Status matches the executable, workspace and port in the registration; a
+registration for another instance is not reported as this instance's.
 
 ## Open Raiker from the applications menu
 

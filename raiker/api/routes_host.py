@@ -92,7 +92,9 @@ def _payload(request: Request) -> HostView:
         view["pid"] = os.getpid()
     service = registration(control.workspace_root, port=_port(request))
     view["service"] = service.to_dict()
-    view["restartable"] = service.registered
+    # A Startup entry runs once at sign-in; it does not supervise this process.
+    # Exiting 75 on Windows would leave the owner with a stopped host.
+    view["restartable"] = service.can_restart
     from raiker.api.routes_remote_access import access_summary
 
     view["access"] = access_summary(request)
@@ -162,6 +164,18 @@ async def restart_host(
     _require_loopback(request)
     view = _payload(request)
     if not view["restartable"]:
+        if cast(dict[str, Any], view["service"])["registered"]:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail={
+                    "ok": False,
+                    "reason_code": "restart_not_supported",
+                    "message": (
+                        "This startup registration runs Raiker at sign-in and cannot restart "
+                        "the running host. Quit Raiker, then open it again."
+                    ),
+                },
+            )
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail={

@@ -138,8 +138,14 @@ _BACKGROUND_TIMEOUT_SECONDS = 7200.0
 #: a turn. A goal step whose execution profile withholds memory from a hosted
 #: model answers each of them ``withheld`` (PA-D02).
 _PERSONAL_MEMORY_TOOLS = frozenset(
-    {"memory_search", "memory_list", "memory_get", "conversation_search", "knowledge_graph", "note_read", "note_search"}
+    {"memory_search", "memory_reflect", "memory_list", "memory_get", "conversation_search", "knowledge_graph", "note_read", "note_search"}
 )
+
+def _memory_reflect(workspace_root: Any, question: str, **kwargs: Any) -> dict[str, Any]:
+    from raiker.memory.reflect import reflect
+
+    return reflect(workspace_root, question, **kwargs)
+
 
 _CONTENT_RESULT_TOOLS = CONTENT_WITHHELD_TOOL_NAMES
 _CONTENT_RESULT_FIELDS = ("answer", "content")
@@ -322,6 +328,12 @@ class ToolBroker:
                 entity_id=str(args["entity_id"]) if args.get("entity_id") else None,
                 max_results=args.get("max_results", 20),
                 owner_principal_id=self.owner_scope,
+            ),
+            "memory_reflect": lambda args: _memory_reflect(
+                self.workspace_root,
+                str(args.get("question", "") or args.get("query", "")),
+                owner_principal_id=self.owner_scope,
+                scope=args.get("scope"),
             ),
             "memory_list": lambda args: memory_list(
                 self.workspace_root,

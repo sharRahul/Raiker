@@ -217,6 +217,7 @@ TOOL_LABELS: dict[str, str] = {
     "web_extract": "Read part of a page",
     "weather_lookup": "Weather",
     "memory_search": "Search memory",
+    "memory_reflect": "Reflect on memory",
     "memory_write": "Remember",
     "knowledge_graph": "Explore graph",
     "conversation_search": "Search chats",

@@ -312,6 +312,7 @@ CASES: Cases = {
     ("GET", "/api/memory/remembered"): _remembered,
     ("PUT", "/api/memory/vault"): _vault,
     ("POST", "/api/memory/vault/sync"): _vault_sync,
+    ("POST", "/api/memory/consolidate"): plain("/api/memory/consolidate"),
     ("POST", "/api/memory/proposals"): _correction,
     ("POST", "/api/memory/proposals/{candidate_id}/decision"): _proposal_decision,
     ("GET", "/api/memory/relationship-proposals"): _relationships("relationship-proposals"),

@@ -74,6 +74,7 @@ SOURCE_TYPES: Mapping[str, str] = {
     "knowledge_graph": "graph",
     "vector_get": "memory_index",
     "memory_search": "memory_index",
+    "memory_reflect": "memory_index",
     "note_search": "workspace_index",
     "note_read": "workspace_file",
     "consult_advisor": "advisor",

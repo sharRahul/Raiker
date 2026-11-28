@@ -21842,6 +21842,29 @@
         "title": "McpToolsApproved",
         "type": "object"
       },
+      "MemoriesConsolidated": {
+        "properties": {
+          "groups": {
+            "title": "Groups",
+            "type": "integer"
+          },
+          "merged": {
+            "title": "Merged",
+            "type": "integer"
+          },
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "ok",
+          "merged",
+          "groups"
+        ],
+        "title": "MemoriesConsolidated",
+        "type": "object"
+      },
       "MemoryArchived": {
         "properties": {
           "archived": {
@@ -51854,6 +51877,25 @@
           }
         },
         "summary": "Set Ask Before Remembering"
+      }
+    },
+    "/api/memory/consolidate": {
+      "post": {
+        "description": "Merge near-copies of the same fact; older copies are superseded, never deleted.",
+        "operationId": "consolidate_memories_api_memory_consolidate_post",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MemoriesConsolidated"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Consolidate Memories"
       }
     },
     "/api/memory/conversation-index/rebuild": {

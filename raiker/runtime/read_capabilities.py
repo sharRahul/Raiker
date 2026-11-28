@@ -85,6 +85,7 @@ EXTERNAL_READ_CAPABILITIES: tuple[str, ...] = (
 #: parity contract is actually about.
 LOCAL_READ_CAPABILITIES: tuple[str, ...] = (
     "memory_search",
+    "memory_reflect",
     "conversation_search",
     "read_file",
     "glob",

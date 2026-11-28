@@ -51,6 +51,7 @@ UNGATED: dict[str, str] = {
     "memory_list": PROJECT_READ,
     "memory_search": PROJECT_READ,
     "note_read": PROJECT_READ,
+    "memory_reflect": PROJECT_READ,
     "note_search": PROJECT_READ,
     "record_lesson": LESSON_EVIDENCE,
     "vector_get": PROJECT_READ,

@@ -1017,6 +1017,8 @@ export const api = {
   // Memory as linked Markdown in a folder (an Obsidian vault); null stops it.
   setMemoryVault: (path: string | null) => contract.setMemoryVault({ path }),
   syncMemoryVault: () => contract.syncMemoryVault(),
+  // Merge near-copies of the same fact (the newest is kept).
+  consolidateMemories: () => contract.consolidateMemories(),
   // Raiker Notes — the owner's linked-Markdown notebook.
   notes: {
     list: () => contract.listNotes(),

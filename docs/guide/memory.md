@@ -179,6 +179,29 @@ longer needed and Raiker archives the lesson (restore it from Memory). A lesson
 is recalled in its project unless that project's memory is turned off. A lesson about one of the
 project's declared checks asks first, because keeping it fixes the check.
 
+### One question, all the evidence
+
+Ask *what do you know about…* and Raiker gathers everything memory holds on it
+in one step. That includes the facts newest first, with repeats of the same
+fact shown once, how they connect, and where they disagree. It then answers
+from those facts alone, citing each one. No extra model call is spent on this.
+
+### Merging repeats
+
+Because Raiker remembers on its own, the same fact can be kept twice in
+slightly different words. **Memory › Controls › Merge near-copies** keeps the
+newest wording and retires the others. Nothing is deleted: the older wording
+stays in the memory's history.
+
+### Memory in a long conversation
+
+Raiker reads its memory brief once, at the start of a conversation, and reuses
+it on every later turn. The start of the prompt then stays the same, so the
+model can reuse its cached input, which keeps long chats cheaper and faster. A
+memory kept during the conversation is already in the conversation, and the
+next one starts with it. Forgetting, editing or archiving a memory takes effect
+on the very next turn, as does turning Use memory off or Incognito on.
+
 ### Recall by time
 
 Recall searches four ways at once: by words, by meaning, through the entity

@@ -461,6 +461,16 @@ def source_from_tool_result(
             ),
             passage=passage,
         )
+    if tool_name == "memory_reflect":
+        facts = output.get("facts") or []
+        question = _text(args.get("question"))
+        return SourceDraft(
+            kind=kind, title=f"Memory: {question}" if question else "Memory", tool_name=tool_name,
+            detail=_count_detail(len(facts), "memories"),
+            passage=redact_text("\n".join(
+                f"{row.get('memory_id', '')}: {row.get('text', '')}" for row in facts if isinstance(row, dict)
+            ))[0][:MAX_PASSAGE_CHARS],
+        )
     if tool_name in ("memory_search", "memory_list"):
         results = output.get("results", []) or []
         query = _text(args.get("query"))

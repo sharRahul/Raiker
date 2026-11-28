@@ -451,6 +451,15 @@ class MemoryService:
             "archived": result.archived, "added": result.added,
         })
 
+    def consolidate_memories(self: DashboardService, acting_principal_id: str | None) -> ControlResult:
+        """Merge near-copies of the same fact: the newest is kept, older copies superseded."""
+        if not self._is_human(acting_principal_id):
+            return ControlResult(ok=False, reason_code="not_authorized_human")
+        from raiker.memory.reflect import consolidate
+
+        result = consolidate(self.store, owner_principal_id=acting_principal_id or "")
+        return ControlResult(ok=True, data={"merged": result.merged, "groups": len(result.groups)})
+
     def set_ask_before_remembering(
         self: DashboardService, ask: bool, acting_principal_id: str | None
     ) -> ControlResult:

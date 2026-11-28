@@ -12,6 +12,13 @@ probe and classify the full suite failures on an isolated Windows test process
 before changing ctypes or hardware detection. Local log:
 `output/ru11-python-tests.log`.
 
+**Reproduced 2026-11-28 during Notes verification:** a broader local response-
+contract run again emitted `0xc0000008` in the same Windows hardware probe and
+showed a failure before completion. It was stopped and is not counted as a
+passing run. The Notes-focused response contracts and scoped regressions pass;
+the broad log is `output/notes-final-regressions.log`. Keep this separate from
+the repaired Python 3.11/tool-integration failures found by GitHub CI.
+
 The existing `test_run_command_returns_feedback_only_for_exact_active_session_grant`
 also fails on this PC: its governed `git --version` returns exit code 91 in an
 elevated test process (and fails earlier in the restricted runner). The new

@@ -199,7 +199,9 @@ def test_subagent_has_its_own_principal_and_parks_mutation_for_parent(tmp_path: 
          # TOOL-46 — `help_read` reads the guide this install ships: local,
          # read-only, no store and no network, the same rule as the rest.
          "git_diff", "git_log", "git_status", "glob", "grep", "help_read", "knowledge_graph",
-         "list_directory", "memory_get", "memory_list", "memory_search", "read_file",
+         # Notes reads stay in the owner's chosen folder and return untrusted
+         # reference data, without network access or note-writing authority.
+         "list_directory", "memory_get", "memory_list", "memory_search", "note_read", "note_search", "read_file",
          "skill_load", "stat_path", "vector_get"]
     )
     assert store.list_approvals(status="pending")

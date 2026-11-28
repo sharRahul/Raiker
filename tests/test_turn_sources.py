@@ -158,6 +158,8 @@ class TestSourceDerivation:
                 {"repository": "repo", "checked": ["a.py"], "count": 0, "diagnostics": []},
             ),
             "memory_search": ({"query": "keys"}, {"count": 1, "results": [{"text": "x"}]}),
+            "note_read": ({"note": "Alpha"}, {"path": "Alpha.md", "content": "Recorded note text"}),
+            "note_search": ({"query": "Alpha"}, {"results": [{"path": "Alpha.md", "snippet": "Recorded note text"}]}),
             "memory_list": ({}, {"count": 1, "results": [{"text": "x"}]}),
             "memory_get": ({}, {"memory_id": "mem_1", "text": "x"}),
             "knowledge_graph": (
@@ -207,6 +209,17 @@ class TestSourceDerivation:
             assert draft is not None, f"{tool} declares source_kind={kind} and produces no source"
             assert draft.kind == kind
             assert draft.title != ""
+
+    def test_note_sources_keep_the_passage_the_answer_read(self) -> None:
+        read = source_from_tool_result("note_read", {"note": "Alpha"}, {
+            "status": "success", "path": "Alpha.md", "content": "A useful detail.",
+        })
+        assert read is not None and read.passage == "A useful detail."
+        assert read.locator == "Alpha.md"
+        search = source_from_tool_result("note_search", {"query": "detail"}, {
+            "status": "success", "results": [{"path": "Alpha.md", "snippet": "A useful detail."}],
+        })
+        assert search is not None and "Alpha.md: A useful detail." in search.passage
 
     def test_a_recalled_exchange_names_its_conversation_and_its_date(self) -> None:
         # Without the heading, a recalled passage is a paragraph the owner

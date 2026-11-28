@@ -158,6 +158,16 @@ class PolicyEngine:
                 risk_level=action.risk_level,
                 timestamp=utc_now(),
             )
+        if action.tool_name == "record_lesson":
+            # An evidence-bound proposal, not a read or an execution grant.
+            # The executor verifies this turn's failed/passed receipts and
+            # leaves durable admission to the owner's memory policy.
+            return PolicyDecision(
+                decision_id=new_id("pol_"), action_id=action.action_id,
+                decision="allow", reasons=["evidence_bound_lesson_proposal"],
+                requires_user_approval=False, policy_version=self.config.policy_version,
+                risk_level=action.risk_level, timestamp=utc_now(),
+            )
         if action.tool_name in self.config.allowed_read_actions:
             inside, reasons = self._path_arguments_inside_workspace(action)
             if not inside:

@@ -33,6 +33,9 @@ COMMAND_GRANT = "command grant"
 OWN_GATE = "own gate"
 #: Changes only the turn itself: asks the owner, records a plan, suggests.
 TURN_ONLY = "turn only"
+# A local proposal checked against this turn's command evidence; only the
+# existing owner memory policy may admit it, with Undo or explicit review.
+LESSON_EVIDENCE = "lesson evidence"
 
 UNGATED: dict[str, str] = {
     "read_file": PROJECT_READ,
@@ -47,6 +50,9 @@ UNGATED: dict[str, str] = {
     "memory_get": PROJECT_READ,
     "memory_list": PROJECT_READ,
     "memory_search": PROJECT_READ,
+    "note_read": PROJECT_READ,
+    "note_search": PROJECT_READ,
+    "record_lesson": LESSON_EVIDENCE,
     "vector_get": PROJECT_READ,
     "conversation_search": PROJECT_READ,
     "help_read": PROJECT_READ,

@@ -14,6 +14,11 @@ Tag searches and note names with spaces now render as working local links;
 the Markdown renderer accepts valid encoded query values while still rejecting
 unsafe link schemes. Screen and renderer regressions cover the defect found
 in the live screenshots.
+CI review corrected Python 3.11 Notes wire types, registered the bounded lesson
+proposal's policy verdict and reviewed tool authority, and supplied Notes source
+passages for citations. Notes read/search now share account and conversation
+Incognito withholding, closing a linked-memory bypass without adding edit
+approvals. Broker regressions cover both tools and both opt-out scopes.
 
 The shared **Memory vault** control is now **Notes folder**, describing both
 the notebook and linked memory. The default uses `Notes/` beside workspace

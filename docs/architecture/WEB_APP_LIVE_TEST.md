@@ -29,7 +29,14 @@ and unreadable-folder errors. The full web suite passed 317 files (2,996 tests,
 one skipped); production build, Svelte check, ESLint and all 31 mocked Playwright
 cases passed (19.2 seconds). Ruff, Mypy (1,358 files), SAST, secret scan,
 19 documentation/generated-contract checks and all 12 Notes API response
-contracts also passed. GitHub delivery is monitored for the pushed commit. This Notes journey
+contracts also passed. GitHub delivery is monitored for the pushed commit.
+
+The first CI run exposed Python 3.11 TypedDict compatibility and missing tool
+policy/inventory/source integration. Those paths were corrected, with 93 focused
+policy, broker, source, delegation and contract-generation cases passing locally.
+Notes tools now withhold under account and conversation Incognito; the new
+regressions failed before that fix. No new edit/Inbox approval was introduced.
+This Notes journey
 does not qualify RU-12's real two-task lesson recall or the later full graph,
 Canvas, Bases-style and agent-writing work.
 

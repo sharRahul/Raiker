@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import fields
+from pathlib import Path
 
 from raiker.contracts.ids import new_id
 from raiker.contracts.models import ToolAction
@@ -75,6 +76,17 @@ def test_planning_and_delegation_are_read_shaped(tmp_path) -> None:  # type: ign
         )
         assert decision.decision == "allow", name
         assert decision.requires_user_approval is False, name
+
+
+def test_record_lesson_is_a_bounded_proposal_without_an_extra_approval(tmp_path: Path) -> None:
+    from raiker.models.tool_registry import definition
+
+    decision = _engine(tmp_path).review(ToolAction(new_id("act_"), "record_lesson", {}, "medium", False))
+    assert decision.decision == "allow"
+    assert not decision.requires_user_approval
+    assert decision.reasons == ["evidence_bound_lesson_proposal"]
+    tool = definition("record_lesson")
+    assert tool is not None and not tool.read_shaped
 
 
 def test_local_organisation_tools_take_the_approval_path(tmp_path) -> None:  # type: ignore[no-untyped-def]

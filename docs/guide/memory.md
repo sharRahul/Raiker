@@ -104,7 +104,9 @@ under `.trash/` for recovery.
 Search supports words, quoted phrases, `tag:`, `path:`, `file:`, `[property:value]`
 and exclusions. Notes are plain files, compatible with an existing Obsidian
 folder. Chat's `note_search` and `note_read` tools can read them as untrusted
-reference material; note text cannot grant permissions. Agent note-writing,
+reference material; note text cannot grant permissions.
+Incognito and account-wide Use memory off also withhold these Notes reads, so
+the linked memory folder cannot bypass the recall opt-out. Agent note-writing,
 a full graph screen, Canvas and Bases-style views are planned separately.
 
 ### Notes folder and linked memory

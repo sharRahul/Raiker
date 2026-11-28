@@ -44,6 +44,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
+from raiker.context.redaction import redact_text
 from raiker.models.tool_registry import TOOL_SOURCE_KIND_BY_TOOL
 from raiker.runtime.source_provenance import (
     MAX_EXCERPT_CHARS,
@@ -302,6 +303,25 @@ def source_from_tool_result(
     # Connector, web and subagent results carry their material under `content`;
     # the local read tools carry it under `text` or as a structured listing.
     passage = _passage_for(tool_name, output)
+
+    if tool_name == "note_read":
+        path = _text(output.get("path") or args.get("note"))
+        return SourceDraft(
+            kind=kind, title=f"Note: {path}", locator=path, tool_name=tool_name,
+            detail="read (truncated)" if output.get("truncated") else "read in full",
+            passage=redact_text(str(output.get("content") or ""))[0][:MAX_PASSAGE_CHARS],
+        )
+    if tool_name == "note_search":
+        results = output.get("results") or []
+        query = _text(args.get("query"))
+        return SourceDraft(
+            kind=kind, title=f"Notes: {query}", tool_name=tool_name,
+            detail=_count_detail(len(results), "matches"),
+            passage=redact_text("\n".join(
+                f"{row.get('path', '')}: {row.get('snippet', '')}"
+                for row in results if isinstance(row, dict)
+            ))[0][:MAX_PASSAGE_CHARS],
+        )
 
     if tool_name == "read_file":
         path = _text(output.get("path") or args.get("path"))

@@ -138,7 +138,7 @@ _BACKGROUND_TIMEOUT_SECONDS = 7200.0
 #: a turn. A goal step whose execution profile withholds memory from a hosted
 #: model answers each of them ``withheld`` (PA-D02).
 _PERSONAL_MEMORY_TOOLS = frozenset(
-    {"memory_search", "memory_list", "memory_get", "conversation_search", "knowledge_graph"}
+    {"memory_search", "memory_list", "memory_get", "conversation_search", "knowledge_graph", "note_read", "note_search"}
 )
 
 _CONTENT_RESULT_TOOLS = CONTENT_WITHHELD_TOOL_NAMES
@@ -2711,7 +2711,10 @@ class ToolBroker:
         memory_withheld = (
             action.tool_name in _PERSONAL_MEMORY_TOOLS
             and self.store is not None
-            and session_memory_withheld(self.store, session_id)
+            and (
+                session_memory_withheld(self.store, session_id)
+                or ("incognito" if self.store.is_memory_incognito(verified.claims.owner_principal_id) else "")
+            )
         )
         if memory_withheld:
             # The conversation's Incognito setting or execution profile also

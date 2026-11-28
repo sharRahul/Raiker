@@ -63,6 +63,24 @@ def test_conversation_incognito_withholds_an_explicit_memory_tool(tmp_path: Path
     assert result.output == {"status": "withheld", "reason": "incognito", "count": 0, "results": []}
 
 
+@pytest.mark.parametrize("tool,args", [("note_read", {"note": "Alpha"}), ("note_search", {"query": "Alpha"})])
+@pytest.mark.parametrize("scope", ["account", "conversation"])
+def test_notes_cannot_bypass_memory_incognito(tmp_path: Path, tool: str, args: dict[str, str], scope: str) -> None:
+    broker = _broker(tmp_path)
+    session_id = new_id("sess_")
+    broker.store.create_session(session_id, str(tmp_path))
+    if scope == "account":
+        broker.store.set_memory_incognito(True, "principal_owner")
+    else:
+        with broker.store.connect() as connection:
+            connection.execute("UPDATE sessions SET incognito = 1 WHERE session_id = ?", (session_id,))
+    broker.executors[tool] = lambda _args: pytest.fail("Incognito read the Notes folder")
+    result, _ = broker.execute(
+        ToolAction(new_id("act_"), tool, args, "low", False), session_id=session_id, turn_id=new_id("turn_"),
+    )
+    assert result.output == {"status": "withheld", "reason": "incognito", "count": 0, "results": []}
+
+
 def test_a_tool_assigned_to_a_retired_container_never_runs_on_the_host(
     tmp_path: Path,
 ) -> None:

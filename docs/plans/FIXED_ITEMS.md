@@ -1,5 +1,19 @@
 # Fixed items
 
+## FIXED-1591 — A cloud Ollama model's card said nothing left the computer
+
+**Severity: Medium. Area: Models / privacy copy. Status: Fixed 2026-11-28.**
+Found in the RU-12 live run. With `gpt-oss:120b-cloud` in use, the Models
+card said *Sent to ollama.com* and, one line below, *Nothing you send leaves
+this computer, and there is no API cost*. The model's detail header also said
+*Stays on this computer*. Both lines checked only `off_machine`, which is false
+for the local Ollama endpoint, and ignored the cloud-inference rule
+(BUG-340) that the line above already used. The card now says *What you send
+leaves this computer, and provider pricing may apply*, and the header names
+the destination host. Evidence: `ModelsView.test.ts` (*does not say a
+cloud-tagged Ollama model keeps data on this computer*); the real host checked
+in the browser.
+
 ## FIXED-1590 — Other agents could not reach Raiker's memory, notes or tasks
 
 **Severity: Medium. Area: Interoperability (RU-15). Status: Fixed 2026-11-28.**
@@ -2499,6 +2513,7 @@ file you can open. The two capture sets that remain — `screenshots/pages/` and
 | [FIXED-1582](#fixed-1582--memory-opened-on-counts-instead-of-the-facts-raiker-knows) | Medium | Memory / Quiet UI | Fixed 2026-11-27 |
 | [FIXED-1583](#fixed-1583--import-discarded-a-memorys-reviewed-topic) | Medium | Memory / import | Fixed 2026-11-27 |
 | [FIXED-1587](#fixed-1587--memory-could-not-be-read-or-traversed-outside-raiker) | Medium | Memory | Fixed 2026-11-27 |
+| [FIXED-1591](#fixed-1591--a-cloud-ollama-models-card-said-nothing-left-the-computer) | Medium | Models / privacy copy | Fixed 2026-11-28 |
 | [FIXED-1590](#fixed-1590--other-agents-could-not-reach-raikers-memory-notes-or-tasks) | Medium | Interoperability | Fixed 2026-11-28 |
 | [FIXED-1589](#fixed-1589--lessons-were-never-filed-or-recalled-in-a-real-project) | High | Memory / Build | Fixed 2026-11-28 |
 | [FIXED-1588](#fixed-1588--the-notes-handoff-needed-safe-editing-tests-and-a-consistent-folder-control) | Medium | Notes / Quiet UI | Fixed 2026-11-28 |

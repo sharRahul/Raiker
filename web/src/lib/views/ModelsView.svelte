@@ -1226,7 +1226,9 @@
           <p class="profile-tradeoff">
             {inForce.off_machine
               ? `What you send leaves this computer and ${providerName(inForce.provider)} bills each request to your account.`
-              : "Nothing you send leaves this computer, and there is no API cost."}
+              : usesCloudInference(inForce)
+                ? "What you send leaves this computer, and provider pricing may apply."
+                : "Nothing you send leaves this computer, and there is no API cost."}
             {#if totalSpend > 0}
               {formatCost(String(totalSpend), spendCurrency)} spent so far.
             {/if}

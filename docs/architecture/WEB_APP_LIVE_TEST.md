@@ -3396,3 +3396,23 @@ had its owner bootstrapped first.
 
 There is no UI for this feature, so no screenshot. The transcript is in FIXED-1590's evidence.
 
+## Result — 2026-11-28 (RU-12 lessons in a real project)
+
+Windows 11 test PC, source checkout, real host on a fresh workspace, built UI
+in the browser pane. Command sandbox: WSL2 (Raiker's distribution). Posture:
+*Work in the sandbox* plus *Set up for Build*. Model: Ollama `qwen3.5:9b` on
+this GPU. The cloud model first returned HTTP 402 (quota), which Raiker
+reported plainly. Project: an attached folder whose `run.py` fails without
+`--mode=ci`.
+
+| # | Case | Expected | Result |
+|---|---|---|---|
+| RU12-1 | Task 1: run `python3 run.py`, fix it from the error | Exit 2, then `python3 run.py --mode=ci` exit 0; `memory_lesson_proposed`; lesson auto-kept with Undo | Pass |
+| RU12-2 | Memory → Overview | *Lessons: In this project, run `python3 run.py --mode=ci` instead of `python3 run.py`* · *In one project only* | Pass |
+| RU12-3 | Task 2 (new chat, same project): "run this project's check" | Model says *Based on the memory record, the correct command is python3 run.py --mode=ci*; one call, exit 0 | Pass |
+| RU12-4 | Task 3 after the script stops needing the flag: run bare `python3 run.py` | Exit 0; lesson archived `lesson_stale` in the lifecycle audit; Memory shows nothing | Pass |
+| RU12-5 | Models card for `gpt-oss:120b-cloud` | Never says nothing leaves this computer | Failed, then fixed (FIXED-1591) |
+
+Screenshots of each step were inspected at desktop size. Issues found and not
+fixed are in [TO_BE_FIXED](../plans/TO_BE_FIXED.md#ru-12-live-run--found-not-fixed-2026-11-28).
+

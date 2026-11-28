@@ -69,11 +69,26 @@ def doctor(argv: list[str]) -> int:
     return 1
 
 
+def mcp_serve(argv: list[str]) -> int:
+    """RU-15 — ``raiker mcp-serve``: let another agent read Raiker over MCP (stdio)."""
+    parser = argparse.ArgumentParser(
+        prog="raiker mcp-serve",
+        description="Serve Raiker's memory, notes, conversations, Library and tasks to another agent over MCP (stdio). Read-only.",
+    )
+    parser.add_argument("--workspace", default=".", help="Raiker's data folder.")
+    args = parser.parse_args(argv)
+    from raiker.interop.mcp_server import serve
+
+    return serve(Path(args.workspace).resolve())
+
+
 def main(argv: list[str] | None = None) -> int:
     _use_utf8_output()
     arguments = list(sys.argv[1:] if argv is None else argv)
     if arguments[:1] == ["doctor"]:
         return doctor(arguments[1:])
+    if arguments[:1] == ["mcp-serve"]:
+        return mcp_serve(arguments[1:])
     parser = argparse.ArgumentParser(prog="raiker", description="Open the Raiker terminal client.")
     parser.add_argument(
         "--workspace", default=".", help="Workspace root for local Phase 1 runtime state."

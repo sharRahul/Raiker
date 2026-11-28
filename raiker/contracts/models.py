@@ -88,6 +88,8 @@ EVENT_TYPES = {
     "sandbox_preparation_executed",
     "global_command_invoked",
     "terminal_client_started",
+    # RU-15 — another agent read Library or tasks through `raiker mcp-serve`.
+    "mcp_read",
     "tui_started",
     "tui_ready",
     "tui_exited",

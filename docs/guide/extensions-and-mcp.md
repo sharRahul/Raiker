@@ -405,6 +405,30 @@ separate account, it is copied once into Raiker's toolchain cache in the
 sandbox's own folder and run from there, so nothing in your profile is
 re-permissioned. An interpreter anywhere else in your home is still passed over.
 
+### Using Raiker from another agent
+
+Raiker can also *be* an MCP server, so Claude, ChatGPT, Cursor or Hermes Agent
+can look things up in it. Add this to that agent's MCP settings (the
+`mcpServers` format Claude Desktop and Cursor use):
+
+```json
+{
+  "mcpServers": {
+    "raiker": {
+      "command": "raiker",
+      "args": ["mcp-serve", "--workspace", "<Raiker's data folder>"]
+    }
+  }
+}
+```
+
+It offers seven tools, all read-only: `memory_search`, `memory_get`,
+`note_search`, `note_read`, `conversation_search`, `library_list` and
+`tasks_list`. Each call goes through the same permissions and audit as
+Raiker's own reads, under the client name `raiker-mcp-server`. Nothing can be
+written this way. To store or change something, use Raiker itself. The server
+refuses every call until the owner account exists.
+
 ## Skills
 
 A skill is a `SKILL.md` document — instructions Raiker follows when the task

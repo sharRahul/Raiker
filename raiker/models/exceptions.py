@@ -409,6 +409,8 @@ def stream_failure(exc: Exception) -> Exception:
 # the whole answer is the defect FIXED-01 removed from the Models page; a turn
 # that fails must not put one back in the transcript (BUG-72).
 _PROVIDER_ERROR_SENTENCES: tuple[tuple[str, str], ...] = (
+    ("provider_circuit_open", "this model connection is paused briefly after repeated connection failures. Try again in 30 seconds."),
+    ("model_connection_changed", "the model connection changed during the request. Start a new request to use the current connection."),
     (
         "provider_auth_failed",
         "the provider rejected the saved credential. Update the key on Models, then try again.",

@@ -27,6 +27,7 @@ from raiker.contracts.ids import new_id, utc_now
 from raiker.hooks.contracts import HookInput
 from raiker.models.contracts import ModelMessage, ReasoningOptions, summarize_model_usage
 from raiker.models.exceptions import ModelProviderError, provider_error_code
+from raiker.models.gateway_context import model_request_context
 from raiker.runtime.conversation_history import (
     ConversationHistoryUnavailable,
     fit_exchange,
@@ -396,13 +397,14 @@ class ConversationCompactor:
             last_error: Exception | None = None
             for candidate_provider, candidate_model in chain:
                 try:
-                    response = await self.model_router.achat(
-                        candidate_provider,
-                        candidate_model,
-                        summary_messages,
-                        None,
-                        reasoning=ReasoningOptions(enabled=False),
-                    )
+                    with model_request_context(kind="compaction", session_id=session_id):
+                        response = await self.model_router.achat(
+                            candidate_provider,
+                            candidate_model,
+                            summary_messages,
+                            None,
+                            reasoning=ReasoningOptions(enabled=False),
+                        )
                 except ModelProviderError as exc:
                     last_error = exc
                     continue

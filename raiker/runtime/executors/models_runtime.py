@@ -767,6 +767,7 @@ class ModelProviderExecutor:
             policy = provider_runtime_policy_from_gates(self._store, principal_id)
             router = ModelRouter(
                 registry,
+                gateway_scope=f"{self._store.paths.workspace_root}:{principal_id}",
                 runtime_policy=policy,
                 runtime_policy_resolver=lambda: provider_runtime_policy_from_gates(
                     self._store, principal_id

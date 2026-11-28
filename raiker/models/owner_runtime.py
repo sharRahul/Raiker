@@ -44,6 +44,7 @@ def owner_model_runtime(
     router = ModelRouter(
         registry,
         writer,
+        gateway_scope=f"{store.paths.workspace_root}:{owner_principal_id}",
         runtime_policy=provider_runtime_policy_from_gates(store, owner_principal_id),
         runtime_policy_resolver=lambda: provider_runtime_policy_from_gates(
             store, owner_principal_id

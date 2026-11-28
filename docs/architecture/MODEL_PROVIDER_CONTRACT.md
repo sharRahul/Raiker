@@ -215,3 +215,8 @@ Tests must prove:
 6. provider output cannot execute tools directly;
 7. invalid structured tool proposals are rejected before policy;
 8. model request/response events are emitted where model routing is exercised.
+
+
+## Shared AI gateway
+
+ModelRouter inference calls use the [in-process AI gateway](AI_GATEWAY.md) for bounded transient failure circuits, retry authorization and metadata-only request telemetry. Runtime retry/fallback policy is shared by streaming and regular calls; existing workflow and billing authorities remain in place.

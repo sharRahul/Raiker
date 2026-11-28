@@ -3541,6 +3541,7 @@ async def check_model_server(
         raise HTTPException(status_code=400, detail={"reason_code": "server_check_model_required"})
     router = ModelRouter(
         registry,
+        gateway_scope=f"{store.paths.workspace_root}:{session.principal_id}",
         runtime_policy=provider_runtime_policy_from_gates(store, session.principal_id),
         connection_resolver=lambda pid: get_model_connection(store, session.principal_id, pid),
     )

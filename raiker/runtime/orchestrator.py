@@ -8,7 +8,7 @@ import logging
 import math
 import time
 from collections import OrderedDict
-from collections.abc import AsyncIterator, Callable, Mapping, Sequence
+from collections.abc import AsyncGenerator, AsyncIterator, Callable, Mapping, Sequence
 from dataclasses import replace
 from pathlib import Path
 from typing import Any
@@ -37,6 +37,7 @@ from raiker.events.summaries import response_created_summary
 from raiker.events.types import make_event
 from raiker.events.writer import EventLogWriter
 from raiker.hooks.contracts import HookInput
+from raiker.models.attempts import ModelAttempts, is_transport_failure
 from raiker.models.contracts import (
     FINISH_REASONS,
     ModelImage,
@@ -55,6 +56,7 @@ from raiker.models.exceptions import (
     provider_failure_message,
 )
 from raiker.models.factory import capabilities_from_profile
+from raiker.models.gateway_context import correlated_model_stream, model_request_context
 from raiker.models.router import ModelRouter
 from raiker.models.tool_call_validation import (
     ToolCallRejected,
@@ -171,46 +173,6 @@ def _log_provider_failure(
         type(exc).__name__,
         code,
     )
-
-
-# Reason codes that mean "the request never reached a decision" — a closed or
-# refused connection, a timeout, a provider 5xx, or a stream that ended in an
-# exception nobody classified. One immediate re-attempt on the *same* model is
-# the right answer to all of them and to none of the others: an expired key, an
-# empty balance, a missing model and a rejected request are all decisions, and
-# asking again just spends the owner's quota to be told the same thing (BUG-72).
-_TRANSPORT_FAILURE_CODES = (
-    "provider_connection_failed",
-    "provider_timeout",
-    "provider_unavailable",
-)
-
-
-def _is_transport_failure(code: str) -> bool:
-    base = code.split(":", 1)[0]
-    if base in _TRANSPORT_FAILURE_CODES:
-        return True
-    # `provider_stream_failed` bare is a provider-declared stream error, which is
-    # a decision. `provider_stream_failed:<Type>` is an unclassified exception
-    # mid-stream — the shape a dropped connection takes.
-    return base == "provider_stream_failed" and ":" in code
-
-
-def _attempt_plan(
-    chain: list[tuple[str, str]],
-) -> list[tuple[int, str, str, bool]]:
-    """Each candidate, followed by one retry slot the caller may decline.
-
-    Returns ``(fallback_rank, provider, model, is_retry)``. The retry slot is
-    consumed only when the preceding attempt failed in transport; otherwise the
-    caller skips it, so a healthy chain and a chain that fails on a *decision*
-    both make exactly as many provider calls as they did before.
-    """
-    plan: list[tuple[int, str, str, bool]] = []
-    for rank, (provider, model) in enumerate(chain):
-        plan.append((rank, provider, model, False))
-        plan.append((rank, provider, model, True))
-    return plan
 
 
 _SYSTEM_PROMPT = (
@@ -2518,16 +2480,9 @@ class RuntimeOrchestrator:
         # for the fallback event that follows it.
         last_failed_provider: str | None = None
         last_failed_reason: str | None = None
-        # BUG-72 — a transport failure earns one immediate re-attempt on the same
-        # model before the chain falls through to the next one. `retry_armed` is
-        # set only by the failure handler below, so the extra slot costs nothing
-        # on a healthy turn or on a turn the provider actually decided.
-        retry_armed = False
+        attempts = ModelAttempts(self._provider_chain(envelope))
         breaker = self._capability_breaker()
-        for rank, provider, model, is_retry in _attempt_plan(self._provider_chain(envelope)):
-            if is_retry and not retry_armed:
-                continue
-            retry_armed = False
+        for rank, provider, model, is_retry in attempts:
             contained = self._contained_provider(breaker, envelope, provider)
             if contained is not None:
                 # A provider that already failed this turn keeps its own reason:
@@ -2563,15 +2518,16 @@ class RuntimeOrchestrator:
                 {"provider": provider, "model": model, "message_count": len(messages)},
             )
             try:
-                reasoning = self._turn_reasoning(envelope, provider, model)
-                if reasoning is None:
-                    response = await self.model_router.achat(
-                        provider, model, messages, self._turn_tool_specs(provider, model)
-                    )
-                else:
-                    response = await self.model_router.achat(
-                        provider, model, messages, self._turn_tool_specs(provider, model), reasoning=reasoning
-                    )
+                with model_request_context(session_id=envelope.session_id, turn_id=envelope.turn_id):
+                    reasoning = self._turn_reasoning(envelope, provider, model)
+                    if reasoning is None:
+                        response = await self.model_router.achat(
+                            provider, model, messages, self._turn_tool_specs(provider, model)
+                        )
+                    else:
+                        response = await self.model_router.achat(
+                            provider, model, messages, self._turn_tool_specs(provider, model), reasoning=reasoning
+                        )
             except ModelProviderError as exc:
                 last_error_code = provider_error_code(exc)
                 last_failed_provider, last_failed_reason = provider, last_error_code
@@ -2589,7 +2545,7 @@ class RuntimeOrchestrator:
                 self._record_provider_outcome(
                     breaker, envelope, provider, ok=False, reason_code=last_error_code
                 )
-                retry_armed = not is_retry and _is_transport_failure(last_error_code)
+                attempts.failed(last_error_code)
                 continue
             usage = summarize_model_usage(response.usage)
             self._event(
@@ -2654,6 +2610,11 @@ class RuntimeOrchestrator:
     ) -> None:
         if breaker is None:
             return
+        # Connection outages belong to the gateway's owner/connection-scoped
+        # circuit. Feeding them into the provider-wide capability breaker would
+        # also pause unrelated credentials and reset the gateway's cooldown.
+        if not ok and (reason_code == "provider_circuit_open" or is_transport_failure(reason_code)):
+            return
         with contextlib.suppress(Exception):
             breaker.record(
                 self._source_owner(envelope),
@@ -2705,7 +2666,7 @@ class RuntimeOrchestrator:
 
     async def _astream_model_call(
         self, envelope: PromptEnvelope, messages: list[ModelMessage]
-    ) -> AsyncIterator[StreamEvent | ModelResponse]:
+    ) -> AsyncGenerator[StreamEvent | ModelResponse, None]:
         """Yield provider output live and finish with one ``ModelResponse``.
 
         A fallback may be attempted only before any text/tool output from the
@@ -2719,16 +2680,9 @@ class RuntimeOrchestrator:
         # for the fallback event that follows it.
         last_failed_provider: str | None = None
         last_failed_reason: str | None = None
-        # BUG-72 — a transport failure earns one immediate re-attempt on the same
-        # model before the chain falls through to the next one. `retry_armed` is
-        # set only by the failure handler below, so the extra slot costs nothing
-        # on a healthy turn or on a turn the provider actually decided.
-        retry_armed = False
+        attempts = ModelAttempts(self._provider_chain(envelope))
         breaker = self._capability_breaker()
-        for rank, provider, model, is_retry in _attempt_plan(self._provider_chain(envelope)):
-            if is_retry and not retry_armed:
-                continue
-            retry_armed = False
+        for rank, provider, model, is_retry in attempts:
             contained = self._contained_provider(breaker, envelope, provider)
             if contained is not None:
                 # A provider that already failed this turn keeps its own reason:
@@ -2781,40 +2735,43 @@ class RuntimeOrchestrator:
                     if reasoning is not None
                     else self.model_router.astream(provider, model, messages, self._turn_tool_specs(provider, model))
                 )
+                stream = correlated_model_stream(
+                    stream, session_id=envelope.session_id, turn_id=envelope.turn_id
+                )
                 stopped_mid_stream = False
                 next_stop_check = time.monotonic() + _STOP_POLL_SECONDS
-                async for provider_event in stream:
-                    if provider_event.text_delta:
-                        output_committed = True
-                        text_parts.append(provider_event.text_delta)
-                        yield StreamEvent(kind=TEXT_DELTA, text=provider_event.text_delta)
-                    # BUG-207 slices B and C — the model's own reasoning, on its
-                    # own kind. Deliberately *not* `output_committed`: reasoning
-                    # is not an answer, so a provider that fails after producing
-                    # only reasoning may still be retried on the next candidate.
-                    if provider_event.reasoning_delta:
-                        reasoning_parts.append(provider_event.reasoning_delta)
-                        yield StreamEvent(
-                            kind=REASONING_DELTA, text=provider_event.reasoning_delta
-                        )
-                    if provider_event.tool_call_delta:
-                        output_committed = True
-                        tool_deltas.append(provider_event.tool_call_delta)
-                    stream_usage = provider_event.metadata.get("usage")
-                    if isinstance(stream_usage, dict):
-                        usage = stream_usage
-                    if provider_event.event_type == "finish":
-                        finish = provider_event.finish_reason
-                    # B17/C13 — an owner who presses Stop during a long answer
-                    # should not have to wait out the rest of it. The control row
-                    # is only *peeked* at here (polled, not per-delta, so this
-                    # costs one cheap read a second); the loop above consumes it
-                    # and ends the turn honestly with the text already shown.
-                    if time.monotonic() >= next_stop_check:
-                        next_stop_check = time.monotonic() + _STOP_POLL_SECONDS
-                        if self._stop_requested(envelope) is not None:
-                            stopped_mid_stream = True
-                            break
+                async with contextlib.aclosing(stream):
+                    async for provider_event in stream:
+                        if provider_event.text_delta:
+                            output_committed = True
+                            text_parts.append(provider_event.text_delta)
+                            yield StreamEvent(kind=TEXT_DELTA, text=provider_event.text_delta)
+                        # Reasoning is visible output too: once shown, switching
+                        # providers would combine two executions in one answer.
+                        if provider_event.reasoning_delta:
+                            output_committed = True
+                            reasoning_parts.append(provider_event.reasoning_delta)
+                            yield StreamEvent(
+                                kind=REASONING_DELTA, text=provider_event.reasoning_delta
+                            )
+                        if provider_event.tool_call_delta:
+                            output_committed = True
+                            tool_deltas.append(provider_event.tool_call_delta)
+                        stream_usage = provider_event.metadata.get("usage")
+                        if isinstance(stream_usage, dict):
+                            usage = stream_usage
+                        if provider_event.event_type == "finish":
+                            finish = provider_event.finish_reason
+                        # B17/C13 — an owner who presses Stop during a long answer
+                        # should not have to wait out the rest of it. The control row
+                        # is only *peeked* at here (polled, not per-delta, so this
+                        # costs one cheap read a second); the loop above consumes it
+                        # and ends the turn honestly with the text already shown.
+                        if time.monotonic() >= next_stop_check:
+                            next_stop_check = time.monotonic() + _STOP_POLL_SECONDS
+                            if self._stop_requested(envelope) is not None:
+                                stopped_mid_stream = True
+                                break
                 if stopped_mid_stream:
                     with contextlib.suppress(Exception):
                         await stream.aclose()  # type: ignore[attr-defined]
@@ -2886,7 +2843,7 @@ class RuntimeOrchestrator:
                 # Only a turn that has shown nothing may be re-attempted: the
                 # deltas already on screen cannot be un-said, so a retry would
                 # answer the same question twice in the same message.
-                retry_armed = not is_retry and _is_transport_failure(last_error_code)
+                attempts.failed(last_error_code, output_committed=output_committed)
                 continue
 
             response = ModelResponse(

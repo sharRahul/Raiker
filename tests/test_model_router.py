@@ -115,6 +115,9 @@ def test_an_endpoint_that_refuses_tools_is_asked_again_without_them(
         async def aclose(self) -> None: ...
 
     class _Factory:
+        def validate(self, _profile: object) -> None:
+            pass
+
         def create(self, _profile):  # type: ignore[no-untyped-def]
             return _Provider()
 

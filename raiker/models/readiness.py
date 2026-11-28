@@ -644,12 +644,15 @@ class ProviderCatalogueProbe:
         registry = ModelProfileRegistry.load()
         profile = registry.resolve_profile_id(key.profile_id)
         label = registry.provider_display_name(profile.provider)
-        connection = get_model_connection(self.store, key.owner_principal_id, key.profile_id)
         router = ModelRouter(
             registry,
+            gateway_scope=f"{self.store.paths.workspace_root}:{key.owner_principal_id}",
             runtime_policy=provider_runtime_policy_from_gates(self.store, key.owner_principal_id),
-            connection_resolver=lambda profile_id: (
-                connection if profile_id == key.profile_id else None
+            runtime_policy_resolver=lambda: provider_runtime_policy_from_gates(
+                self.store, key.owner_principal_id
+            ),
+            connection_resolver=lambda profile_id: get_model_connection(
+                self.store, key.owner_principal_id, profile_id
             ),
         )
         effective = profile_with_model(profile, key.model)

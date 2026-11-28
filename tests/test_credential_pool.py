@@ -23,7 +23,7 @@ from raiker.auth.vault_key_file import VAULT_KEY_ENV
 from raiker.cli.principal_resolver import bootstrap_owner
 from raiker.models import credential_pool
 from raiker.models.connections import get_model_connection, put_model_connection
-from raiker.models.contracts import ModelMessage, ModelResponse
+from raiker.models.contracts import ModelMessage, ModelResponse, ModelStreamEvent
 from raiker.models.exceptions import ProviderQuotaExhaustedError, ProviderRateLimitError
 from raiker.models.registry import ModelProfileRegistry
 from raiker.models.router import ModelRouter
@@ -84,7 +84,7 @@ class _Provider:
         self._sent.append(self._key)
         if self._key in self._refuse:
             raise self._refuse[self._key]
-        yield {"type": "text", "text": "hi"}
+        yield ModelStreamEvent("text_delta", text_delta="hi")
 
     async def aclose(self) -> None: ...
 
@@ -94,6 +94,9 @@ def _router(monkeypatch: pytest.MonkeyPatch, connection: dict[str, str], refuse:
     router = ModelRouter(ModelProfileRegistry.load(), connection_resolver=lambda _pid: connection)
 
     class _Factory:
+        def validate(self, _profile: object) -> None:
+            pass
+
         def __init__(self, key: str) -> None:
             self.key = key
 
@@ -133,7 +136,7 @@ def test_a_stream_rotates_only_before_anything_streamed(monkeypatch: pytest.Monk
     async def collect() -> list[Any]:
         return [event async for event in router.astream("openai", "gpt-test", [ModelMessage("user", "hi")])]
 
-    assert asyncio.run(collect()) == [{"type": "text", "text": "hi"}]
+    assert asyncio.run(collect()) == [ModelStreamEvent("text_delta", text_delta="hi")]
     assert sent == ["k1", "k2"]
 
 

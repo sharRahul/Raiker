@@ -1,8 +1,11 @@
 from __future__ import annotations
 
 import asyncio
+import json
 from collections.abc import AsyncIterator, Callable, Sequence
+from contextlib import aclosing
 from dataclasses import dataclass, replace
+from uuid import uuid4
 
 from raiker.contracts.models import ClientMetadata, ModelProfile
 from raiker.events.types import make_event
@@ -32,6 +35,9 @@ from raiker.models.factory import (
     ProviderRuntimePolicy,
     capabilities_from_profile,
 )
+from raiker.models.gateway import AIGateway, GatewayTarget, model_gateway
+from raiker.models.gateway_context import model_call_context
+from raiker.models.gateway_provider import GatewayOperation, GatewayProvider
 from raiker.models.health import ProviderHealth
 from raiker.models.registry import ModelProfileRegistry, RegistryError
 from raiker.models.subscription_limits import LimitWindowSink
@@ -83,7 +89,13 @@ class ModelRouter:
         connection_resolver: Callable[[str], dict[str, str] | None] | None = None,
         limit_window_sink: LimitWindowSink | None = None,
         client_pool: ProviderClientPool | None = None,
+        gateway: AIGateway | None = None,
+        gateway_scope: str | None = None,
     ) -> None:
+        self.gateway = gateway if gateway is not None else model_gateway
+        # Unbound routers never share failure state with another owner. Product
+        # owner factories supply a stable workspace/principal scope explicitly.
+        self.gateway_scope = gateway_scope or uuid4().hex
         self.registry = registry
         self.writer = writer
         # GCR-14 — the connections this router's providers reuse. Every method
@@ -140,6 +152,32 @@ class ModelRouter:
             limit_window_sink=self.limit_window_sink,
             client_pool=self.client_pool,
         )
+
+    def _provider(
+        self, profile: ModelProfile, connection: dict[str, str] | None = None,
+        operation: GatewayOperation | None = None, *, kind: str = "chat",
+    ) -> GatewayProvider:
+        factory = self._factory(profile, connection)
+        # Authorization precedes circuit admission, including a recovering
+        # circuit. Resolved headers bind credential/environment changes too.
+        provider = factory.create(profile)
+        target = GatewayTarget(
+            self.gateway_scope, profile.profile_id, provider.model,
+            json.dumps([getattr(provider, "endpoint", ""),
+                        dict(getattr(provider, "extra_headers", {}))], sort_keys=True),
+        )
+        return GatewayProvider(provider, self.gateway, target, operation, kind=kind)
+
+    def _validate_retry(
+        self, profile: ModelProfile, position: int, connection: dict[str, str] | None,
+    ) -> None:
+        # A suspended request cannot reuse a credential or endpoint the owner
+        # changed while it was awaiting the provider. A new call resolves the
+        # new connection normally; this call fails closed rather than mixing it.
+        current = dict(self._key_attempts(profile)).get(position)
+        if current != connection:
+            raise ProviderPolicyError("model_connection_changed")
+        self._factory(profile, connection).validate(profile)
 
     def _profile(self, provider: str, model: str) -> ModelProfile:
         return self.registry.resolve(provider, model)
@@ -200,6 +238,8 @@ class ModelRouter:
                 max_tokens if max_tokens is not None else int(profile.raw.get("max_tokens", 1024))
             ),
             stream=stream,
+            session_id=model_call_context.get().session_id,
+            turn_id=model_call_context.get().turn_id,
             tool_call_mode=str(profile.raw.get("tool_call_mode", "text_json")),
             reasoning=reasoning if reasoning is not None else self.reasoning,
             cache_ttl=_cache_ttl(profile),
@@ -221,8 +261,11 @@ class ModelRouter:
     ) -> ModelResponse:
         profile = self._profile(provider, model)
         attempts = self._key_attempts(profile)
+        operation = GatewayOperation()
         for attempt, (position, connection) in enumerate(attempts):
-            model_provider = self._factory(profile, connection).create(profile)
+            if attempt:
+                self._validate_retry(profile, position, connection)
+            model_provider = self._provider(profile, connection, operation)
             request = self._request(
                 profile,
                 model_provider.provider,
@@ -245,6 +288,11 @@ class ModelRouter:
                     if not request.tools or not _refused_tools(exc):
                         raise
                     _TOOLLESS_MODELS.add((profile.profile_id, request.model))
+                    self._validate_retry(profile, position, connection)
+                    # Rebuild after reauthorization so environment-backed headers
+                    # and endpoints are the current ones, not the first attempt's.
+                    await model_provider.aclose()
+                    model_provider = self._provider(profile, connection, operation)
                     response = await model_provider.chat(replace(request, tools=None))
                 credential_pool.record_use(profile.profile_id, position)
                 return response
@@ -268,7 +316,7 @@ class ModelRouter:
         schema. Not one: OpenAI's reasoning models refuse a one-token budget with
         a 400, which read as "cannot execute this model with the current account".
         """
-        model_provider = self._factory(profile).create(profile)
+        model_provider = self._provider(profile, kind="probe")
         request = ModelRequest(
             profile.profile_id,
             model_provider.provider,
@@ -295,8 +343,11 @@ class ModelRouter:
     ) -> AsyncIterator[ModelStreamEvent]:
         profile = self._profile(provider, model)
         attempts = self._key_attempts(profile)
+        operation = GatewayOperation()
         for attempt, (position, connection) in enumerate(attempts):
-            model_provider = self._factory(profile, connection).create(profile)
+            if attempt:
+                self._validate_retry(profile, position, connection)
+            model_provider = self._provider(profile, connection, operation)
             request = self._request(
                 profile,
                 model_provider.provider,
@@ -311,17 +362,22 @@ class ModelRouter:
             started = False
             try:
                 try:
-                    async for event in model_provider.stream_chat(request):
-                        started = True
-                        yield event
+                    async with aclosing(model_provider.stream_chat(request)) as stream:
+                        async for event in stream:
+                            started = True
+                            yield event
                 except ProviderUnsupportedCapabilityError as exc:
                     # Refused before anything streamed: the same retry as `achat`.
                     if started or not request.tools or not _refused_tools(exc):
                         raise
                     _TOOLLESS_MODELS.add((profile.profile_id, request.model))
-                    async for event in model_provider.stream_chat(replace(request, tools=None)):
-                        started = True
-                        yield event
+                    self._validate_retry(profile, position, connection)
+                    await model_provider.aclose()
+                    model_provider = self._provider(profile, connection, operation)
+                    async with aclosing(model_provider.stream_chat(replace(request, tools=None))) as stream:
+                        async for event in stream:
+                            started = True
+                            yield event
                 credential_pool.record_use(profile.profile_id, position)
                 return
             except (ProviderRateLimitError, ProviderQuotaExhaustedError) as exc:
@@ -336,7 +392,7 @@ class ModelRouter:
 
     async def aembed(self, provider: str, model: str, text: str) -> EmbeddingResponse:
         profile = self._profile(provider, model)
-        model_provider = self._factory(profile).create(profile)
+        model_provider = self._provider(profile)
         embedding_model = str(profile.raw.get("embedding_model") or model_provider.model)
         if "<" in embedding_model or ">" in embedding_model:
             embedding_model = model_provider.model

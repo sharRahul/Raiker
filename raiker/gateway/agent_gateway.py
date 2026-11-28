@@ -117,6 +117,7 @@ class AgentGateway:
         self.model_router = ModelRouter(
             self.model_registry,
             self.writer,
+            gateway_scope=f"{self.workspace_root}:{principal_id}",
             runtime_policy=provider_runtime_policy_from_gates(self.store, principal_id),
             runtime_policy_resolver=lambda: provider_runtime_policy_from_gates(
                 self.store, principal_id

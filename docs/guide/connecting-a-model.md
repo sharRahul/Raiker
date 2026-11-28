@@ -757,6 +757,17 @@ than silently choosing a backend you did not pick. A turn a fallback answered
 says so in its timeline — *Switched to … because … was unavailable* — with the
 reason the earlier one gave.
 
+Repeated connection failures temporarily pause that model connection for 30
+seconds. Raiker can use the fallback sequence you configured during that pause;
+when the pause ends, one request checks whether the connection has recovered.
+The pause does not disable other accounts or connections. Authentication and
+quota errors keep their own repair instructions.
+
+Once text, reasoning or tool output has started arriving, Raiker does not retry
+or switch models within that response. If the stream fails, the partial output
+is kept and the failure is reported. Disconnecting a provider or revoking its
+permissions also stops further retry attempts.
+
 ---
 
 ## Side-task models

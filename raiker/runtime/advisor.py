@@ -240,6 +240,7 @@ class AdvisorService:
             principal_id = self._principal_id
             router = ModelRouter(
                 ModelProfileRegistry.load(),
+                gateway_scope=f"{self._store.paths.workspace_root}:{principal_id}" if principal_id else None,
                 runtime_policy=provider_runtime_policy_from_gates(self._store, principal_id),
                 # An off-machine advisor is reached through the owner's saved
                 # connection for its profile, like every other model call; no

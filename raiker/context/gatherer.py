@@ -216,6 +216,11 @@ class ContextGatherer:
             str(disclosure.get("effective_mode") or "off") if disclosure else "search_when_relevant"
         )
         brief_project_id = scope.project_id or self._brief_project_id(project)
+        lesson_project_id = (
+            str(project.get("project_id") or "") or None
+            if project is not None and str(project.get("memory_mode") or "inherit") != "disabled"
+            else None
+        )
 
         builders: dict[str, Callable[[], ContextItem | None]] = {
             "current_prompt": lambda: self._current_prompt(root, prompt_text),
@@ -233,7 +238,8 @@ class ContextGatherer:
             ),
             "memory_brief": lambda: (
                 self._memory_brief(
-                    store, owner_principal_id, brief_project_id, disclosure, compact=compact_brief
+                    store, owner_principal_id, brief_project_id, disclosure, compact=compact_brief,
+                    lesson_project_id=lesson_project_id,
                 )
                 if effective_mode in {"brief", "search_when_relevant"}
                 else None
@@ -350,6 +356,7 @@ class ContextGatherer:
         disclosure: dict[str, object],
         *,
         compact: bool = False,
+        lesson_project_id: str | None = None,
     ) -> ContextItem | None:
         """MEM-BRIEF-01 — the bounded Memory Brief as one context item.
 
@@ -364,11 +371,15 @@ class ContextGatherer:
                 store,
                 owner_principal_id=owner_principal_id,
                 project_id=project_id,
+                lesson_project_id=lesson_project_id,
                 max_items=COMPACT_BRIEF_MAX_ITEMS,
                 token_budget=COMPACT_BRIEF_TOKEN_BUDGET,
             )
             if compact
-            else build_memory_brief(store, owner_principal_id=owner_principal_id, project_id=project_id)
+            else build_memory_brief(
+                store, owner_principal_id=owner_principal_id, project_id=project_id,
+                lesson_project_id=lesson_project_id,
+            )
         )
         disclosure["brief_omitted"] = len(brief.omitted)
         if not brief.items:

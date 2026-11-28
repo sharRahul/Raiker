@@ -200,6 +200,7 @@ def build_memory_brief(
     *,
     owner_principal_id: str,
     project_id: str | None = None,
+    lesson_project_id: str | None = None,
     max_items: int = DEFAULT_BRIEF_MAX_ITEMS,
     token_budget: int = DEFAULT_BRIEF_TOKEN_BUDGET,
     min_confidence: float = DEFAULT_BRIEF_MIN_CONFIDENCE,
@@ -210,7 +211,11 @@ def build_memory_brief(
     ``owner_principal_id`` is required: a brief without an owner would read
     every account's records, which is the cross-profile merge the decision
     forbids. ``project_id`` names the one project whose scoped memories may
-    join account-level ones.
+    join account-level ones. ``lesson_project_id`` admits only that project's
+    *lessons* (RU-12): what Raiker's own work taught about the project's
+    tooling is recalled there unless its memory is explicitly disabled, the
+    way Claude Code and Hermes keep project memory on, while the project's
+    other memories keep their opt-in.
     """
     if not owner_principal_id:
         raise ValueError("memory_brief_requires_owner")
@@ -240,7 +245,12 @@ def build_memory_brief(
         if str(row.get("approval_state") or "approved") not in _APPROVED_STATES:
             withhold("not_approved")
             continue
-        if not scope_in_brief(scope, project_id):
+        is_project_lesson = (
+            lesson_project_id is not None
+            and scope == f"project:{lesson_project_id}"
+            and str(row.get("memory_type") or "") in {"lesson", "check_fix"}
+        )
+        if not scope_in_brief(scope, project_id) and not is_project_lesson:
             withhold("out_of_scope")
             continue
         if (

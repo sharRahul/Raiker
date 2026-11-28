@@ -168,14 +168,14 @@ def test_a_kept_lesson_comes_back_when_its_command_fails_and_retires_when_stale(
             project_id="beta", command=command, exit_code=exit_code,
         )
 
-    assert note("make test", 0) is None
     assert "make test JOBS=1" in (note("make test", 2) or "")
-    assert note("make test", 2) is not None  # still kept
-    # The recommended command failed: the lesson is out of date and archived.
-    assert "archived" in (note("make test JOBS=1", 1) or "")
+    # The recommended command failing is not evidence: its tests may be failing.
+    assert note("make test JOBS=1", 1) is None
+    assert note("make test", 2) is not None
+    # The original command passing is: the workaround is no longer needed.
+    assert "archived" in (note("make test", 0) or "")
     assert note("make test", 2) is None
     assert build_memory_brief(service.store, owner_principal_id=OWNER, project_id="beta").items == ()
-
 
 def test_the_models_lesson_is_filed_only_on_this_tasks_evidence(
     service: DashboardService, monkeypatch: pytest.MonkeyPatch
@@ -198,3 +198,33 @@ def test_the_models_lesson_is_filed_only_on_this_tasks_evidence(
     [proposal] = service.list_memory_proposals(OWNER)
     assert proposal["text"] == "In this project, run `pnpm install` instead of `npm install`."
     assert len(_keep(service).kept) == 1  # type: ignore[attr-defined]
+
+
+def test_the_orchestrator_reads_the_command_record_not_the_payload(
+    service: DashboardService, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from types import SimpleNamespace
+
+    from raiker.execution.commands.store import CommandStore
+    from raiker.runtime.orchestrator import RuntimeOrchestrator
+
+    propose_turn_lessons(
+        service.store, owner_principal_id=OWNER, project_id="beta", session_id="sess_1",
+        turn_id="turn_1", source_event_id="evt_1",
+        runs=[_run("make test", 2, "1"), _run("make test JOBS=1", 0, "2")],
+    )
+    _keep(service)
+    run = SimpleNamespace(action_id="act_9", safe_display="make test", exit_code=2)
+    monkeypatch.setattr(CommandStore, "list_runs", lambda self, owner, **_: [run])
+    service.store.load_session = lambda _sid: {"project_id": "beta"}  # type: ignore[method-assign,assignment]
+    orchestrator = SimpleNamespace(
+        tool_broker=SimpleNamespace(store=service.store),
+        workspace_root=service.workspace_root,
+        _source_owner=lambda _envelope: OWNER,
+    )
+    envelope = SimpleNamespace(session_id="sess_9", prompt=SimpleNamespace(metadata={}))
+    action = SimpleNamespace(tool_name="shell", action_id="act_9", arguments={"command": "make test"})
+    # A foreground run reports `returncode`; the hook must not depend on it.
+    payload = {"status": "success", "returncode": 2, "stdout": ""}
+    result = RuntimeOrchestrator._with_kept_lesson(orchestrator, envelope, action, payload)  # type: ignore[arg-type]
+    assert "make test JOBS=1" in result["kept_lesson"]
